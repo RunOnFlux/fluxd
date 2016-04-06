@@ -3213,8 +3213,7 @@ void PruneAndFlush() {
 }
 
 /** Update chainActive and related internal data structures. */
-void static UpdateTip(CBlockIndex *pindexNew) {
-    const CChainParams& chainParams = Params();
+void static UpdateTip(CBlockIndex *pindexNew, const CChainParams& chainParams) {
     chainActive.SetTip(pindexNew);
 
     // New best block
@@ -3256,7 +3255,9 @@ void static UpdateTip(CBlockIndex *pindexNew) {
  * Disconnect chainActive's tip. You probably want to call mempool.removeForReorg and
  * mempool.removeWithoutBranchId after this, with cs_main held.
  */
-bool static DisconnectTip(CValidationState &state, const Consensus::Params& consensusParams, bool fBare = false) {
+bool static DisconnectTip(CValidationState &state, const Consensus::Params& consensusParams, bool fBare = false)
+{
+    const CChainParams& chainparams = Params(); // TODO replace consensusParams parameter
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
     // Read block from disk.
@@ -3303,7 +3304,7 @@ bool static DisconnectTip(CValidationState &state, const Consensus::Params& cons
     }
 
     // Update chainActive and related variables.
-    UpdateTip(pindexDelete->pprev);
+    UpdateTip(pindexDelete->pprev, chainparams);
     // Get the current commitment tree
     SproutMerkleTree newSproutTree;
     SaplingMerkleTree newSaplingTree;
@@ -3379,7 +3380,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     mempool.removeExpired(pindexNew->nHeight);
 
     // Update chainActive & related variables.
-    UpdateTip(pindexNew);
+    UpdateTip(pindexNew, chainparams);
     // Tell wallet about transactions that went from mempool
     // to conflicted:
     BOOST_FOREACH(const CTransaction &tx, txConflicted) {
