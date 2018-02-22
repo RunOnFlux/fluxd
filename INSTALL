@@ -1,0 +1,5 @@
+Building Zelcash
+
+See the Zelcash github wiki (https://github.com/zelcash/zelcash/wiki) for instructions on building zelcashd,
+the intended-for-services, no-graphical-interface, reference
+implementation of Zelcash.

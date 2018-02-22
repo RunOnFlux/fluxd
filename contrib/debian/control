@@ -1,0 +1,21 @@
+Source: zelcash
+Section: utils
+Priority: optional
+Maintainer: Zelcash Company <team@zel.cash>
+Homepage: https://zel.cash
+Build-Depends: autoconf, automake, bsdmainutils, build-essential,
+ git, g++-multilib, libc6-dev, libtool,
+ m4, ncurses-dev, pkg-config, python,
+ unzip, wget, zlib1g-dev
+Vcs-Git: https://github.com/zelcash/zelcash.git
+Vcs-Browser: https://github.com/zelcash/zelcash
+
+Package: zelcash
+Architecture: amd64
+Depends: ${shlibs:Depends}
+Description: HTTPS for money.
+ Based on Bitcoin's code, it intends to offer a far higher standard
+ of privacy and anonymity through a sophisticiated zero-knowledge
+ proving scheme which preserves confidentiality of transaction metadata.
+ This package provides the daemon, zelcashd, and the CLI tool,
+ zelcash-cli, to interact with the daemon.
