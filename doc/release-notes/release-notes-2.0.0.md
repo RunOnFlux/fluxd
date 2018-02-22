@@ -152,14 +152,14 @@ Richard Littauer (1):
       docs(LICENSE): update license year to 2018
 
 Sean Bowe (21):
-      Update librustzcash
+      Update librustzelcash
       Implementation of Sapling in-band secret distribution.
       Swap types in OutputDescription to use new NoteEncryption interfaces.
       Prevent nonce reuse in Sapling note encryption API.
       Add get_esk() function to Sapling note encryption.
       Minor edits
       Decryption and tests of note/outgoing encryption.
-      Update librustzcash and sapling-crypto.
+      Update librustzelcash and sapling-crypto.
       Fix bug in return value.
       Ensure sum of valueBalance and all vpub_new's does not exceed MAX_MONEY inside of CheckTransactionWithoutProofVerification.
       Move `extern params` to beginning of `test_checktransaction`.

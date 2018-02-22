@@ -23,8 +23,8 @@
 #include "serialize.h"
 #include "streams.h"
 
-#include "zcash/IncrementalMerkleTree.hpp"
-#include "zcash/util.h"
+#include "zelcash/IncrementalMerkleTree.hpp"
+#include "zelcash/util.h"
 
 #include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
 #include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
@@ -225,7 +225,7 @@ TEST(merkletree, SaplingVectors) {
 TEST(merkletree, emptyroots) {
     UniValue empty_roots = read_json(MAKE_STRING(json_tests::merkle_roots_empty));
 
-    libzcash::EmptyMerkleRoots<64, libzcash::SHA256Compress> emptyroots;
+    libzelcash::EmptyMerkleRoots<64, libzelcash::SHA256Compress> emptyroots;
 
     for (size_t depth = 0; depth <= 64; depth++) {
         expect_test_vector(empty_roots[depth], emptyroots.empty_root(depth));
@@ -238,7 +238,7 @@ TEST(merkletree, emptyroots) {
 TEST(merkletree, EmptyrootsSapling) {
     UniValue empty_roots = read_json(MAKE_STRING(json_tests::merkle_roots_empty_sapling));
 
-    libzcash::EmptyMerkleRoots<62, libzcash::PedersenHash> emptyroots;
+    libzelcash::EmptyMerkleRoots<62, libzelcash::PedersenHash> emptyroots;
 
     for (size_t depth = 0; depth <= 62; depth++) {
         expect_test_vector(empty_roots[depth], emptyroots.empty_root(depth));

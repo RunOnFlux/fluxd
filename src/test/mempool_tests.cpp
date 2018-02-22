@@ -163,19 +163,19 @@ BOOST_AUTO_TEST_CASE(RemoveWithoutBranchId) {
     entry.nFee = 10000LL;
     entry.hadNoDependencies = true;
 
-    // Add some Sprout transactions
+    // Add some Base transactions
     for (auto i = 1; i < 11; i++) {
         CMutableTransaction tx = CMutableTransaction();
         tx.vout.resize(1);
         tx.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         tx.vout[0].nValue = i * COIN;
-        pool.addUnchecked(tx.GetHash(), entry.BranchId(NetworkUpgradeInfo[Consensus::BASE_SPROUT].nBranchId).FromTx(tx));
+        pool.addUnchecked(tx.GetHash(), entry.BranchId(NetworkUpgradeInfo[Consensus::BASE].nBranchId).FromTx(tx));
     }
     BOOST_CHECK_EQUAL(pool.size(), 10);
 
-    // Check the pool only contains Sprout transactions
+    // Check the pool only contains Base transactions
     for (CTxMemPool::indexed_transaction_set::const_iterator it = pool.mapTx.begin(); it != pool.mapTx.end(); it++) {
-        BOOST_CHECK_EQUAL(it->GetValidatedBranchId(), NetworkUpgradeInfo[Consensus::BASE_SPROUT].nBranchId);
+        BOOST_CHECK_EQUAL(it->GetValidatedBranchId(), NetworkUpgradeInfo[Consensus::BASE].nBranchId);
     }
 
     // Add some dummy transactions
@@ -188,27 +188,27 @@ BOOST_AUTO_TEST_CASE(RemoveWithoutBranchId) {
     }
     BOOST_CHECK_EQUAL(pool.size(), 20);
 
-    // Add some Overwinter transactions
+    // Add some Acadia transactions
     for (auto i = 1; i < 11; i++) {
         CMutableTransaction tx = CMutableTransaction();
         tx.vout.resize(1);
         tx.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         tx.vout[0].nValue = i * COIN + 200;
-        pool.addUnchecked(tx.GetHash(), entry.BranchId(NetworkUpgradeInfo[Consensus::UPGRADE_OVERWINTER].nBranchId).FromTx(tx));
+        pool.addUnchecked(tx.GetHash(), entry.BranchId(NetworkUpgradeInfo[Consensus::UPGRADE_ACADIA].nBranchId).FromTx(tx));
     }
     BOOST_CHECK_EQUAL(pool.size(), 30);
 
-    // Remove transactions that are not for Overwinter
-    pool.removeWithoutBranchId(NetworkUpgradeInfo[Consensus::UPGRADE_OVERWINTER].nBranchId);
+    // Remove transactions that are not for Acadia
+    pool.removeWithoutBranchId(NetworkUpgradeInfo[Consensus::UPGRADE_ACADIA].nBranchId);
     BOOST_CHECK_EQUAL(pool.size(), 10);
 
-    // Check the pool only contains Overwinter transactions
+    // Check the pool only contains Acadia transactions
     for (CTxMemPool::indexed_transaction_set::const_iterator it = pool.mapTx.begin(); it != pool.mapTx.end(); it++) {
-        BOOST_CHECK_EQUAL(it->GetValidatedBranchId(), NetworkUpgradeInfo[Consensus::UPGRADE_OVERWINTER].nBranchId);
+        BOOST_CHECK_EQUAL(it->GetValidatedBranchId(), NetworkUpgradeInfo[Consensus::UPGRADE_ACADIA].nBranchId);
     }
 
     // Roll back to Sprout
-    pool.removeWithoutBranchId(NetworkUpgradeInfo[Consensus::BASE_SPROUT].nBranchId);
+    pool.removeWithoutBranchId(NetworkUpgradeInfo[Consensus::BASE].nBranchId);
     BOOST_CHECK_EQUAL(pool.size(), 0);
 }
 

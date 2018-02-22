@@ -1,7 +1,7 @@
-# Zcash CI workers
+# Zelcash CI workers
 
 This folder contains the Ansible playbooks for configuring a fresh OS
-installation for use as a Buildbot worker in Zcash's CI.
+installation for use as a Buildbot worker in Zelcash's CI.
 
 # Criteria for Adding Workers
 
@@ -19,13 +19,13 @@ c. When adding workers, start by adding workers for the "most common" variant of
 
 # Setting up a latent worker on Amazon EC2
 
-1. Add a regular (non-latent) worker to the master.cfg for dev-ci.z.cash, and
+1. Add a regular (non-latent) worker to the master.cfg for dev-ci.zel.cash, and
    deploy the changes.
   - This enables the Ansible playbook to run to completion, ending in the worker
     connecting to the master.
 
 2. Start a basic EC2 instance using the template AMI for the target OS.
-  - Choose the smallest instance size, it won't be used for building Zcash.
+  - Choose the smallest instance size, it won't be used for building Zelcash.
 
 3. Figure out which user to log into the instance with.
   - E.g. for the Ubuntu template, use "ubuntu" instead of "root"
@@ -37,22 +37,22 @@ c. When adding workers, start by adding workers for the "most common" variant of
 
 4. Create `inventory/hosts` containing the following:
 
-    [zcash-ci-worker-unix]
+    [zelcash-ci-worker-unix]
     some-name ansible_host=<INSTANCE_IP> ansible_ssh_user=<USERNAME>
 
 5. Run `ansible-playbook -e buildbot_worker_host_template=templates/host.ec2.j2 -i inventory/hosts unix.yml`,
    passing in the worker's Buildbot name and password.
-  - After a successful run, the worker should be connected to dev-ci.z.cash and
+  - After a successful run, the worker should be connected to dev-ci.zel.cash and
     visible in its worker list.
 
 6. Create an AMI from the instance. This is the worker AMI to put into the
-   master.cfg for dev-ci.z.cash.
+   master.cfg for dev-ci.zel.cash.
   - 16 GB of storage should be sufficient.
 
-7. SSH into the instance, and edit the worker config to connect to ci.z.cash.
+7. SSH into the instance, and edit the worker config to connect to ci.zel.cash.
 
 8. Create an AMI from the instance. This is the worker AMI to put into the
-   master.cfg for ci.z.cash.
+   master.cfg for ci.zel.cash.
   - 16 GB of storage should be sufficient.
 
 9. Delete the instance (it is no longer needed).

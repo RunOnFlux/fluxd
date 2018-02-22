@@ -26,11 +26,11 @@
 #include <boost/test/unit_test.hpp>
 #include <boost/thread.hpp>
 
-#include "librustzcash.h"
+#include "librustzelcash.h"
 
 CClientUIInterface uiInterface; // Declared but not defined in ui_interface.h
 CWallet* pwalletMain;
-ZCJoinSplit *pzcashParams;
+ZCJoinSplit *pzelcashParams;
 
 extern bool fPrintToConsole;
 extern void noui_connect();
@@ -39,7 +39,7 @@ JoinSplitTestingSetup::JoinSplitTestingSetup()
 {
     boost::filesystem::path pk_path = ZC_GetParamsDir() / "sprout-proving.key";
     boost::filesystem::path vk_path = ZC_GetParamsDir() / "sprout-verifying.key";
-    pzcashParams = ZCJoinSplit::Prepared(vk_path.string(), pk_path.string());
+    pzelcashParams = ZCJoinSplit::Prepared(vk_path.string(), pk_path.string());
 
     boost::filesystem::path sapling_spend = ZC_GetParamsDir() / "sapling-spend.params";
     boost::filesystem::path sapling_output = ZC_GetParamsDir() / "sapling-output.params";
@@ -47,12 +47,12 @@ JoinSplitTestingSetup::JoinSplitTestingSetup()
 
     static_assert(
         sizeof(boost::filesystem::path::value_type) == sizeof(codeunit),
-        "librustzcash not configured correctly");
+        "librustzelcash not configured correctly");
     auto sapling_spend_str = sapling_spend.native();
     auto sapling_output_str = sapling_output.native();
     auto sprout_groth16_str = sprout_groth16.native();
 
-    librustzcash_init_zksnark_params(
+    librustzelcash_init_zksnark_params(
         reinterpret_cast<const codeunit*>(sapling_spend_str.c_str()),
         sapling_spend_str.length(),
         "8270785a1a0d0bc77196f000ee6d221c9c9894f55307bd9357c3f0105d31ca63991ab91324160d8f53e2bbd3c2633a6eb8bdf5205d822e7f3f73edac51b2b70c",
@@ -67,7 +67,7 @@ JoinSplitTestingSetup::JoinSplitTestingSetup()
 
 JoinSplitTestingSetup::~JoinSplitTestingSetup()
 {
-    delete pzcashParams;
+    delete pzelcashParams;
 }
 
 BasicTestingSetup::BasicTestingSetup()

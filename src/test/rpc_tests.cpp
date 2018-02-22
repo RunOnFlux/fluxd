@@ -304,7 +304,7 @@ BOOST_AUTO_TEST_CASE(rpc_ban)
 BOOST_AUTO_TEST_CASE(rpc_raw_create_overwinter_v3)
 {
     SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
 
     // Sample regtest address:
     // public: tmHU5HLMu3yS8eoNvbrU1NWeJaGf6jxehru
@@ -336,7 +336,7 @@ BOOST_AUTO_TEST_CASE(rpc_raw_create_overwinter_v3)
     BOOST_CHECK_EQUAL(tx.GetHash().GetHex(), CTransaction(mtx).GetHash().GetHex());
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
 }
 
 BOOST_AUTO_TEST_CASE(rpc_getnetworksolps)

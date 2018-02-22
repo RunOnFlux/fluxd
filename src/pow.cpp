@@ -15,6 +15,7 @@
 #include "util.h"
 
 #include "sodium.h"
+#include "librustzelcash.h"
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {

@@ -79,13 +79,13 @@ Jack Grigg (83):
       [ci-workers] README cleanups
       [ci-workers] Add pkg-config to general dependencies
       depends: Correctly configure Rust when cross-compiling
-      depends: Configure librustzcash for cross-compiling
+      depends: Configure librustzelcash for cross-compiling
       depends: Fix BDB naming issue when cross-compiling
       zcutil/build.sh: Use $HOST to specify the depends prefix
       configure: Don't require RELRO and BIND_NOW when cross-compiling
       Measure Windows console size for metrics UI
       Use -O1 for darwin and mingw32 release builds
-      Clean up libzcash CPPFLAGS, CXXFLAGS, and LDFLAGS
+      Clean up libzelcash CPPFLAGS, CXXFLAGS, and LDFLAGS
       zcutil/build.sh: Use config.site to set default ./configure settings
       zcutil/build.sh: Remove --enable-werror from default configuration
       Pass correct compiler, linker, and flags into libsnark
@@ -119,7 +119,7 @@ Jack Grigg (83):
       Minor cleanups
       Fix RPC test that checks exact wording of cleaned-up error message
       Fix file permissions of wallet_sapling RPC test
-      Update librustzcash with ZIP 32 APIs
+      Update librustzelcash with ZIP 32 APIs
       ZIP 32 Sapling structs
       Store HDSeed in CBasicKeyStore
       Store HDSeed in CCryptoKeyStore

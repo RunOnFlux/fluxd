@@ -71,7 +71,7 @@ public:
     Fp6_3over2_model operator^(const bigint<m> &other) const;
 
     static bigint<n> base_field_char() { return modulus; }
-    static size_t extension_degree() { return 6; }
+    static uint64_t extension_degree() { return 6; }
 
     friend std::ostream& operator<< <n, modulus>(std::ostream &out, const Fp6_3over2_model<n, modulus> &el);
     friend std::istream& operator>> <n, modulus>(std::istream &in, Fp6_3over2_model<n, modulus> &el);

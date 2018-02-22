@@ -75,14 +75,14 @@ def initialize_datadir(dirname, n):
     datadir = os.path.join(dirname, "node"+str(n))
     if not os.path.isdir(datadir):
         os.makedirs(datadir)
-    with open(os.path.join(datadir, "zcash.conf"), 'w') as f:
-        f.write("regtest=1\n")
-        f.write("showmetrics=0\n")
-        f.write("rpcuser=rt\n")
-        f.write("rpcpassword=rt\n")
-        f.write("port="+str(p2p_port(n))+"\n")
-        f.write("rpcport="+str(rpc_port(n))+"\n")
-        f.write("listenonion=0\n")
+    with open(os.path.join(datadir, "zelcash.conf"), 'w') as f:
+        f.write("regtest=1\n");
+        f.write("showmetrics=0\n");
+        f.write("rpcuser=rt\n");
+        f.write("rpcpassword=rt\n");
+        f.write("port="+str(p2p_port(n))+"\n");
+        f.write("rpcport="+str(rpc_port(n))+"\n");
+        f.write("listenonion=0\n");
     return datadir
 
 def initialize_chain(test_dir):
@@ -144,7 +144,7 @@ def initialize_chain(test_dir):
         from_dir = os.path.join("cache", "node"+str(i))
         to_dir = os.path.join(test_dir,  "node"+str(i))
         shutil.copytree(from_dir, to_dir)
-        initialize_datadir(test_dir, i) # Overwrite port/rpcport in zcash.conf
+        initialize_datadir(test_dir, i) # Overwrite port/rpcport in zelcash.conf
 
 def initialize_chain_clean(test_dir, num_nodes):
     """

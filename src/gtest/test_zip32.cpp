@@ -12,7 +12,7 @@ TEST(ZIP32, TestVectors) {
         17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
     HDSeed seed(rawSeed);
 
-    auto m = libzcash::SaplingExtendedSpendingKey::Master(seed);
+    auto m = libzelcash::SaplingExtendedSpendingKey::Master(seed);
     EXPECT_EQ(m.depth, 0);
     EXPECT_EQ(m.parentFVKTag, 0);
     EXPECT_EQ(m.childIndex, 0);

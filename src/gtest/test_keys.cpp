@@ -11,7 +11,7 @@ TEST(Keys, EncodeAndDecodeSapling)
 
     std::vector<unsigned char, secure_allocator<unsigned char>> rawSeed(32);
     HDSeed seed(rawSeed);
-    auto m = libzcash::SaplingExtendedSpendingKey::Master(seed);
+    auto m = libzelcash::SaplingExtendedSpendingKey::Master(seed);
 
     for (uint32_t i = 0; i < 1000; i++) {
         auto sk = m.Derive(i);
@@ -24,8 +24,8 @@ TEST(Keys, EncodeAndDecodeSapling)
             auto spendingkey2 = DecodeSpendingKey(sk_string);
             EXPECT_TRUE(IsValidSpendingKey(spendingkey2));
 
-            ASSERT_TRUE(boost::get<libzcash::SaplingExtendedSpendingKey>(&spendingkey2) != nullptr);
-            auto sk2 = boost::get<libzcash::SaplingExtendedSpendingKey>(spendingkey2);
+            ASSERT_TRUE(boost::get<libzelcash::SaplingExtendedSpendingKey>(&spendingkey2) != nullptr);
+            auto sk2 = boost::get<libzelcash::SaplingExtendedSpendingKey>(spendingkey2);
             EXPECT_EQ(sk, sk2);
         }
         {
@@ -39,8 +39,8 @@ TEST(Keys, EncodeAndDecodeSapling)
             auto paymentaddr2 = DecodePaymentAddress(addr_string);
             EXPECT_TRUE(IsValidPaymentAddress(paymentaddr2));
 
-            ASSERT_TRUE(boost::get<libzcash::SaplingPaymentAddress>(&paymentaddr2) != nullptr);
-            auto addr2 = boost::get<libzcash::SaplingPaymentAddress>(paymentaddr2);
+            ASSERT_TRUE(boost::get<libzelcash::SaplingPaymentAddress>(&paymentaddr2) != nullptr);
+            auto addr2 = boost::get<libzelcash::SaplingPaymentAddress>(paymentaddr2);
             EXPECT_EQ(addr, addr2);
         }
     }

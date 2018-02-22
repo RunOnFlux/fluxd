@@ -9,8 +9,12 @@
 #include "serialize.h"
 #include "streams.h"
 #include "support/allocators/secure.h"
+<<<<<<< HEAD
 #include "zcash/Address.hpp"
 #include "zcash/zip32.h"
+=======
+#include "zelcash/Address.hpp"
+>>>>>>> adfdef7... initial ZEL changes to Overwinter
 
 class uint256;
 
@@ -208,12 +212,20 @@ public:
             mi++;
         }
     }
+<<<<<<< HEAD
     virtual bool AddCryptedSproutSpendingKey(
-        const libzcash::SproutPaymentAddress &address,
-        const libzcash::ReceivingKey &rk,
+        const libzelcash::SproutPaymentAddress &address,
+        const libzelcash::ReceivingKey &rk,
         const std::vector<unsigned char> &vchCryptedSecret);
-    bool AddSproutSpendingKey(const libzcash::SproutSpendingKey &sk);
-    bool HaveSproutSpendingKey(const libzcash::SproutPaymentAddress &address) const
+    bool AddSproutSpendingKey(const libzelcash::SproutSpendingKey &sk);
+    bool HaveSproutSpendingKey(const libzelcash::SproutPaymentAddress &address) const
+=======
+    virtual bool AddCryptedSpendingKey(const libzelcash::PaymentAddress &address,
+                                       const libzelcash::ReceivingKey &rk,
+                                       const std::vector<unsigned char> &vchCryptedSecret);
+    bool AddSpendingKey(const libzelcash::SpendingKey &sk);
+    bool HaveSpendingKey(const libzelcash::PaymentAddress &address) const
+>>>>>>> adfdef7... initial ZEL changes to Overwinter
     {
         {
             LOCK(cs_SpendingKeyStore);
@@ -223,8 +235,13 @@ public:
         }
         return false;
     }
-    bool GetSproutSpendingKey(const libzcash::SproutPaymentAddress &address, libzcash::SproutSpendingKey &skOut) const;
-    void GetSproutPaymentAddresses(std::set<libzcash::SproutPaymentAddress> &setAddress) const
+<<<<<<< HEAD
+    bool GetSproutSpendingKey(const libzelcash::SproutPaymentAddress &address, libzelcash::SproutSpendingKey &skOut) const;
+    void GetSproutPaymentAddresses(std::set<libzelcash::SproutPaymentAddress> &setAddress) const
+=======
+    bool GetSpendingKey(const libzelcash::PaymentAddress &address, libzelcash::SpendingKey &skOut) const;
+    void GetPaymentAddresses(std::set<libzelcash::PaymentAddress> &setAddress) const
+>>>>>>> adfdef7... initial ZEL changes to Overwinter
     {
         if (!IsCrypted())
         {
@@ -241,13 +258,13 @@ public:
     }
     //! Sapling 
     virtual bool AddCryptedSaplingSpendingKey(
-        const libzcash::SaplingExtendedFullViewingKey &extfvk,
+        const libzelcash::SaplingExtendedFullViewingKey &extfvk,
         const std::vector<unsigned char> &vchCryptedSecret,
-        const libzcash::SaplingPaymentAddress &defaultAddr);
+        const libzelcash::SaplingPaymentAddress &defaultAddr);
     bool AddSaplingSpendingKey(
-        const libzcash::SaplingExtendedSpendingKey &sk,
-        const libzcash::SaplingPaymentAddress &defaultAddr);
-    bool HaveSaplingSpendingKey(const libzcash::SaplingFullViewingKey &fvk) const
+        const libzelcash::SaplingExtendedSpendingKey &sk,
+        const libzelcash::SaplingPaymentAddress &defaultAddr);
+    bool HaveSaplingSpendingKey(const libzelcash::SaplingFullViewingKey &fvk) const
     {
         {
             LOCK(cs_SpendingKeyStore);
@@ -261,7 +278,7 @@ public:
         }
         return false;
     }
-    bool GetSaplingSpendingKey(const libzcash::SaplingFullViewingKey &fvk, libzcash::SaplingExtendedSpendingKey &skOut) const;
+    bool GetSaplingSpendingKey(const libzelcash::SaplingFullViewingKey &fvk, libzelcash::SaplingExtendedSpendingKey &skOut) const;
 
 
     /**

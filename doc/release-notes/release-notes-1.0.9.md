@@ -12,20 +12,20 @@ Jack Grigg (14):
       Fix prioritisetransaction RPC test
       torcontrol: Handle escapes in Tor QuotedStrings
       torcontrol: Add missing copyright header
-      Convert Zcash versions to Debian format
+      Convert Zelcash versions to Debian format
       [manpage] Handle build numbers in versions
       Address Daira's comments
       Address Daira's further comments
       Correctly handle three-digit octals with leading digit 4-7
       Check that >3-digit octals are truncated.
-      Implement automatic shutdown of deprecated Zcash versions
+      Implement automatic shutdown of deprecated Zelcash versions
       Wrap messages nicely on metrics screen
       Regenerate miner tests
       Add a benchmark for calling ConnectBlock on a block with many inputs
       Remove additional sources of determinism from benchmark archive
 
 Jay Graber (2):
-      Change help text examples to use Zcash addresses
+      Change help text examples to use Zelcash addresses
       Poll on getblocktemplate result rather than use bare sleep to avoid race condition.
 
 Nathan Wilcox (39):
@@ -34,7 +34,7 @@ Nathan Wilcox (39):
       Start on a make-release.py script; currently just arg parsing and unittests [unittests fail].
       Update version spec by altering test; also update regex to pass single 0 digits in major/minor/patch.
       Add another case from debian-style versions.
-      Add all of the zcash release tags in my current repo as positive test vector.
+      Add all of the zelcash release tags in my current repo as positive test vector.
       Add support for beta/rc release versions.
       Add version sorting, assert that RELEASE_PREV is the most recent release.
       Make SystemExit errors less redundant in output; verify clean git status on master.
@@ -57,8 +57,8 @@ Nathan Wilcox (39):
       First full-release-branch version of script; rewrite large swatch of release-process.md. [Manually tested.]
       Enable set -u mode.
       Fix a variable name typo.
-      Reuse zcash_rpc.
-      Do not use `-rpcwait` on all `zcash_rpc` invocations, only block when starting zcashd.
+      Reuse zelcash_rpc.
+      Do not use `-rpcwait` on all `zelcash_rpc` invocations, only block when starting zelcashd.
       Fix `release-process.md` doc usage for `make-release.py` to have correct arguments and order.
       Include release version in commit comments.
       Examine all future versions which are assumed to follow the same Version parser schema.
@@ -82,9 +82,9 @@ Simon Liu (5):
       Add AMQP 1.0 support via Apache Qpid Proton C++ API 0.17.0
       Add --disable-proton flag to build.sh.  Proton has build/linker issues with gcc 4.9.2 and requires gcc 5.x.
       Fix proton build issue with debian jessie, as used on CI servers.
-      Change regtest port to 18344.  Closes #2269.
+      Change regtest port to 26126.  Closes #2269.
       Patch to build Proton with minimal dependencies.
 
 emilrus (1):
-      Replace bitcoind with zcashd
+      Replace bitcoind with zelcashd
 

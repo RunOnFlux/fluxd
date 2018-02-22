@@ -110,10 +110,10 @@ Eirik Ogilvie-Wigley (7):
       Coinbase transactions can not have shielded spend or output
 
 Jack Grigg (55):
-      Disable building libzcashconsensus by default
+      Disable building libzelcashconsensus by default
       depends: Upgrade Rust to 1.26.0-beta.3
       depends: Add support for unpackaged Rust crates
-      depends: Update to latest librustzcash with sapling-crypto dependencies
+      depends: Update to latest librustzelcash with sapling-crypto dependencies
       Add Sapling to upgrade list
       Add static asserts to ensure CONTINUE_EXECUTION doesn't collide
       [Bitcoin-Tx] Adjust util-test test cases for Zcash
@@ -242,12 +242,12 @@ Puru (1):
       bitcoin-cli.cpp: Use symbolic constant for exit code
 
 Sean Bowe (49):
-      Switch to latest librustzcash
-      Invoke the merkle_hash API in librustzcash via test suite.
+      Switch to latest librustzelcash
+      Invoke the merkle_hash API in librustzelcash via test suite.
       Link with -ldl
-      Update librustzcash hash
+      Update librustzelcash hash
       Load Sapling testnet parameters into memory.
-      Update librustzcash hash
+      Update librustzelcash hash
       Check that duplicate Sapling nullifiers don't exist within a transaction.
       Abstract `uncommitted` and depth personalization for IncrementalMerkleTree.
       Add implementation of Sapling merkle tree
@@ -277,17 +277,17 @@ Sean Bowe (49):
       Fix outdated comment
       Fix broken error messages.
       Fix miner tests
-      Update sapling-crypto and librustzcash
+      Update sapling-crypto and librustzelcash
       Swap bit endianness of test vectors
       Remove unnecessary IsCoinbase() check. Coinbases are guaranteed to have empty vjoinsplit.
       Refactor so that dataToBeSigned can be used later in the function for other purposes.
-      Update to latest librustzcash
+      Update to latest librustzelcash
       Check Sapling Spend/Output proofs and signatures.
       Integrate Groth16 verification and proving.
-      Update librustzcash again
+      Update librustzelcash again
       Adjust tests and benchmarks
       Switch Rust to 1.26 Stable.
-      Update librustzcash
+      Update librustzelcash
       Update Sapling testnet parameters
       Update merkle tree and pedersen hash tests to account for new encoding
       Change txdb prefixes for sapling and avoid writing unnecessary information.
@@ -295,8 +295,8 @@ Sean Bowe (49):
 Simon Liu (18):
       Part of #2966, extending Sprout tests to other epochs.
       Closes #3134 - Least Authority Issue E
-      Refactoring: libzcash::Note is now a subclass of libzcash::BaseNote.
-      Refactoring: Rename class libzcash::Note to libzcash::SproutNote.
+      Refactoring: libzelcash::Note is now a subclass of libzelcash::BaseNote.
+      Refactoring: Rename class libzelcash::Note to libzelcash::SproutNote.
       Refactoring: SproutNote member variable value moved to BaseNote.
       Add virtual destructor to SproutNote and BaseNote
       Remove unused SproutNote variables.

@@ -179,8 +179,8 @@ TEST(checktransaction_tests, BadTxnsOversize) {
         mtx.nVersion = SAPLING_TX_VERSION;
 
         // Change the proof types (which requires re-signing the JoinSplit data)
-        mtx.vjoinsplit[0].proof = libzcash::GrothProof();
-        mtx.vjoinsplit[1].proof = libzcash::GrothProof();
+        mtx.vjoinsplit[0].proof = libzelcash::GrothProof();
+        mtx.vjoinsplit[1].proof = libzelcash::GrothProof();
         CreateJoinSplitSignature(mtx, NetworkUpgradeInfo[Consensus::UPGRADE_SAPLING].nBranchId);
 
         CTransaction tx(mtx);
@@ -207,8 +207,8 @@ TEST(checktransaction_tests, OversizeSaplingTxns) {
     mtx.nVersion = SAPLING_TX_VERSION;
 
     // Change the proof types (which requires re-signing the JoinSplit data)
-    mtx.vjoinsplit[0].proof = libzcash::GrothProof();
-    mtx.vjoinsplit[1].proof = libzcash::GrothProof();
+    mtx.vjoinsplit[0].proof = libzelcash::GrothProof();
+    mtx.vjoinsplit[1].proof = libzelcash::GrothProof();
     CreateJoinSplitSignature(mtx, NetworkUpgradeInfo[Consensus::UPGRADE_SAPLING].nBranchId);
 
     // Transaction just under the limit
@@ -730,13 +730,13 @@ TEST(checktransaction_tests, SaplingSproutInputSumsTooLarge) {
         // create JSDescription
         uint256 rt;
         uint256 joinSplitPubKey;
-        std::array<libzcash::JSInput, ZC_NUM_JS_INPUTS> inputs = {
-            libzcash::JSInput(),
-            libzcash::JSInput()
+        std::array<libzelcash::JSInput, ZC_NUM_JS_INPUTS> inputs = {
+            libzelcash::JSInput(),
+            libzelcash::JSInput()
         };
-        std::array<libzcash::JSOutput, ZC_NUM_JS_OUTPUTS> outputs = {
-            libzcash::JSOutput(),
-            libzcash::JSOutput()
+        std::array<libzelcash::JSOutput, ZC_NUM_JS_OUTPUTS> outputs = {
+            libzelcash::JSOutput(),
+            libzelcash::JSOutput()
         };
         std::array<size_t, ZC_NUM_JS_INPUTS> inputMap;
         std::array<size_t, ZC_NUM_JS_OUTPUTS> outputMap;
@@ -789,7 +789,7 @@ TEST(checktransaction_tests, OverwinterVersionNumberLow) {
 // Test bad Overwinter version number in ContextualCheckTransaction
 TEST(checktransaction_tests, OverwinterVersionNumberHigh) {
     SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
 
     CMutableTransaction mtx = GetValidTransaction();
     mtx.vjoinsplit.resize(0);
@@ -804,7 +804,7 @@ TEST(checktransaction_tests, OverwinterVersionNumberHigh) {
     ContextualCheckTransaction(tx, state, 1, 100);
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
 }
 
 
@@ -845,7 +845,7 @@ TEST(checktransaction_tests, OverwinterNotActive) {
 // This tests a transaction without the fOverwintered flag set, against the Overwinter consensus rule set.
 TEST(checktransaction_tests, OverwinterFlagNotSet) {
     SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
 
     CMutableTransaction mtx = GetValidTransaction();
     mtx.fOverwintered = false;
@@ -859,7 +859,7 @@ TEST(checktransaction_tests, OverwinterFlagNotSet) {
     ContextualCheckTransaction(tx, state, 1, 100);
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
 }
 
 
@@ -890,9 +890,8 @@ TEST(checktransaction_tests, OverwinteredContextualCreateTx) {
     SelectParams(CBaseChainParams::REGTEST);
     const Consensus::Params& consensusParams = Params().GetConsensus();
     int activationHeight = 5;
-    int saplingActivationHeight = 30;
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, activationHeight);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, saplingActivationHeight);
+
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, activationHeight);
 
     {
         CMutableTransaction mtx = CreateNewContextualCMutableTransaction(
@@ -969,8 +968,7 @@ TEST(checktransaction_tests, OverwinteredContextualCreateTx) {
     }
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
 }
 
 // Test a v1 transaction which has a malformed header, perhaps modified in-flight

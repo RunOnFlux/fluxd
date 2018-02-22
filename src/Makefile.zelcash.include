@@ -1,0 +1,28 @@
+noinst_PROGRAMS += \
+  zelcash/GenerateParams \
+  zelcash/CreateJoinSplit
+
+# tool for generating our public parameters
+zelcash_GenerateParams_SOURCES = zelcash/GenerateParams.cpp
+zelcash_GenerateParams_CPPFLAGS = $(AM_CPPFLAGS)
+zelcash_GenerateParams_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+zelcash_GenerateParams_LDADD = \
+  $(BOOST_LIBS) \
+  $(LIBZELCASH) \
+  $(LIBSNARK) \
+  $(LIBBITCOIN_UTIL) \
+  $(LIBBITCOIN_CRYPTO) \
+  $(LIBZELCASH_LIBS)
+
+# tool for profiling the creation of joinsplits
+zelcash_CreateJoinSplit_SOURCES = zelcash/CreateJoinSplit.cpp
+zelcash_CreateJoinSplit_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
+zelcash_CreateJoinSplit_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+zelcash_CreateJoinSplit_LDADD = \
+  $(LIBBITCOIN_COMMON) \
+  $(LIBZELCASH) \
+  $(LIBSNARK) \
+  $(LIBBITCOIN_UTIL) \
+  $(LIBBITCOIN_CRYPTO) \
+  $(BOOST_LIBS) \
+  $(LIBZELCASH_LIBS)

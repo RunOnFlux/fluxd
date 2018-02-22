@@ -1,23 +1,24 @@
 Format: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?rev=174
-Upstream-Name: Zcash
-Upstream-Contact: Zcash Company <team@z.cash>
-Source: https://github.com/zcash/zcash
+Upstream-Name: Zelcash
+Upstream-Contact: Zelcash Company <team@zel.cash>
+Source: https://github.com/zelcash/zelcash
 
 Files: *
-Copyright: 2016-2018, The Zcash developers
+Copyright: 2017-2018, The Zelcash developers
+ 2016-2018, The Zcash developers
  2009-2018, Bitcoin Core developers
  2009-2018, Bitcoin Developers
 License: Expat
 Comment: The Bitcoin Core developers encompasses the current developers listed on bitcoin.org,
  as well as the numerous contributors to the project.
- The Zcash developers are listed at https://z.cash/team.html.
+ The Zelcash developers are listed at https://zel.cash/team.html.
 
 Files: depends/sources/libsodium-*.tar.gz
 Copyright: 2013-2016 Frank Denis
 License: ISC
 
 Files: depends/sources/libsnark-*.tar.gz
-Copyright: 2012-2016 SCIPR Lab and contributors; 2016 The Zcash developers
+Copyright: 2012-2016 SCIPR Lab and contributors; 2016 The Zelcash developers
 License: Expat
 
 Files: depends/sources/gmp-*.tar.bz2

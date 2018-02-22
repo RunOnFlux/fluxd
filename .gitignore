@@ -65,47 +65,32 @@ src/univalue/gen
 *.json.h
 *.raw.h
 
-#libtool object files
+# Compiled Object files
+*.slo
 *.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
 *.la
+*.a
+*.lib
 
-# Compilation
-Makefile
-
-# Unit-tests
-Makefile.test
-src/test/buildenv.py
-
-# Resources cpp
-qrc_*.cpp
-
-# Mac specific
-.DS_Store
-build
-
-#lcov
-*.gcno
-*.gcda
-/*.info
-test_bitcoin.coverage/
-zcash-gtest.coverage/
-total.coverage/
-coverage_percent.txt
-
-#build tests
-linux-coverage-build
-linux-build
-win32-build
-qa/pull-tester/run-bitcoind-for-test.sh
-qa/pull-tester/tests-config.sh
-qa/pull-tester/cache/*
-qa/pull-tester/test.*/*
-
-!src/leveldb*/Makefile
-
-/doc/doxygen/
-
-libzcashconsensus.pc
-
-contrib/debian/files
-contrib/debian/substvars
+# Executables
+*.exe
+*.out
+*.app

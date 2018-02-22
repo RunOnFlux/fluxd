@@ -22,10 +22,9 @@ namespace Consensus {
  */
 enum UpgradeIndex {
     // Sprout must be first
-    BASE_SPROUT,
+    BASE,
     UPGRADE_TESTDUMMY,
-    UPGRADE_OVERWINTER,
-    UPGRADE_SAPLING,
+    UPGRADE_ACADIA,
     // NOTE: Also add new upgrades to NetworkUpgradeInfo in upgrades.cpp
     MAX_NETWORK_UPGRADES
 };

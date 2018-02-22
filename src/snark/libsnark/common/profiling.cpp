@@ -27,6 +27,13 @@
 #include <proc/readproc.h>
 #endif
 
+#ifdef __MACH__ // required to build on MacOS
+#include <time.h>
+#include <sys/time.h>
+#include <mach/clock.h>
+#include <mach/mach.h>
+#endif
+
 namespace libsnark {
 
 int64_t get_nsec_time()
@@ -39,10 +46,20 @@ int64_t get_nsec_time()
 int64_t get_nsec_cpu_time()
 {
     ::timespec ts;
+    #ifdef __MACH__
+    clock_serv_t cclock;
+    mach_timespec_t mts;
+    host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
+    clock_get_time(cclock, &mts);
+    mach_port_deallocate(mach_task_self(), cclock);
+    ts.tv_sec = mts.tv_sec;
+    ts.tv_nsec = mts.tv_nsec;
+    #else
     if ( ::clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts) )
         throw ::std::runtime_error("clock_gettime(CLOCK_PROCESS_CPUTIME_ID) failed");
         // If we expected this to work, don't silently ignore failures, because that would hide the problem and incur an unnecessarily system-call overhead. So if we ever observe this exception, we should probably add a suitable #ifdef .
         //TODO: clock_gettime(CLOCK_PROCESS_CPUTIME_ID) is not supported by native Windows. What about Cygwin? Should we #ifdef on CLOCK_PROCESS_CPUTIME_ID or on __linux__?
+    #endif
     return ts.tv_sec * 1000000000ll + ts.tv_nsec;
 }
 
@@ -68,12 +85,12 @@ static std::map<std::string, int64_t> enter_cpu_times;
 static std::map<std::string, int64_t> last_cpu_times;
 static std::map<std::pair<std::string, std::string>, int64_t> op_counts;
 static std::map<std::pair<std::string, std::string>, int64_t> cumulative_op_counts; // ((msg, data_point), value)
-    // TODO: Convert op_counts and cumulative_op_counts from pair to structs
+// TODO: Convert op_counts and cumulative_op_counts from pair to structs
 static size_t indentation = 0;
 
 static std::vector<std::string> block_names;
-
 static std::list<std::pair<std::string, int64_t*> > op_data_points = {
+
 #ifdef PROFILE_OP_COUNTS
     std::make_pair("Fradd", &Fr<default_ec_pp>::add_cnt),
     std::make_pair("Frsub", &Fr<default_ec_pp>::sub_cnt),

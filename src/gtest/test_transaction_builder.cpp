@@ -24,14 +24,14 @@ TEST(TransactionBuilder, Invoke)
     keystore.AddKey(tsk);
     auto scriptPubKey = GetScriptForDestination(tsk.GetPubKey().GetID());
 
-    auto sk_from = libzcash::SaplingSpendingKey::random();
+    auto sk_from = libzelcash::SaplingSpendingKey::random();
     auto fvk_from = sk_from.full_viewing_key();
 
-    auto sk = libzcash::SaplingSpendingKey::random();
+    auto sk = libzelcash::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
     auto fvk = sk.full_viewing_key();
     auto ivk = fvk.in_viewing_key();
-    libzcash::diversifier_t d = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    libzelcash::diversifier_t d = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     auto pk = *ivk.address(d);
 
     // Create a shielding transaction from transparent to Sapling
@@ -55,7 +55,7 @@ TEST(TransactionBuilder, Invoke)
     EXPECT_EQ(state.GetRejectReason(), "");
 
     // Prepare to spend the note that was just created
-    auto maybe_pt = libzcash::SaplingNotePlaintext::decrypt(
+    auto maybe_pt = libzelcash::SaplingNotePlaintext::decrypt(
         tx1.vShieldedOutput[0].encCiphertext, ivk, tx1.vShieldedOutput[0].ephemeralKey, tx1.vShieldedOutput[0].cm);
     ASSERT_EQ(static_cast<bool>(maybe_pt), true);
     auto maybe_note = maybe_pt.get().note(ivk);
@@ -129,7 +129,7 @@ TEST(TransactionBuilder, FailsWithNegativeChange)
     auto consensusParams = Params().GetConsensus();
 
     // Generate dummy Sapling address
-    auto sk = libzcash::SaplingSpendingKey::random();
+    auto sk = libzelcash::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
     auto fvk = sk.full_viewing_key();
     auto pk = sk.default_address();
@@ -143,7 +143,7 @@ TEST(TransactionBuilder, FailsWithNegativeChange)
     CTxDestination taddr = tkeyid;
 
     // Generate dummy Sapling note
-    libzcash::SaplingNote note(pk, 59999);
+    libzelcash::SaplingNote note(pk, 59999);
     auto cm = note.cm().value();
     SaplingMerkleTree tree;
     tree.append(cm);
@@ -184,12 +184,12 @@ TEST(TransactionBuilder, ChangeOutput)
     auto consensusParams = Params().GetConsensus();
 
     // Generate dummy Sapling address
-    auto sk = libzcash::SaplingSpendingKey::random();
+    auto sk = libzelcash::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
     auto pk = sk.default_address();
 
     // Generate dummy Sapling note
-    libzcash::SaplingNote note(pk, 25000);
+    libzelcash::SaplingNote note(pk, 25000);
     auto cm = note.cm().value();
     SaplingMerkleTree tree;
     tree.append(cm);
@@ -197,7 +197,7 @@ TEST(TransactionBuilder, ChangeOutput)
     auto witness = tree.witness();
 
     // Generate change Sapling address
-    auto sk2 = libzcash::SaplingSpendingKey::random();
+    auto sk2 = libzelcash::SaplingSpendingKey::random();
     auto fvkOut = sk2.full_viewing_key();
     auto zChangeAddr = sk2.default_address();
 
@@ -281,13 +281,13 @@ TEST(TransactionBuilder, SetFee)
     auto consensusParams = Params().GetConsensus();
 
     // Generate dummy Sapling address
-    auto sk = libzcash::SaplingSpendingKey::random();
+    auto sk = libzelcash::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
     auto fvk = sk.full_viewing_key();
     auto pk = sk.default_address();
 
     // Generate dummy Sapling note
-    libzcash::SaplingNote note(pk, 50000);
+    libzelcash::SaplingNote note(pk, 50000);
     auto cm = note.cm().value();
     SaplingMerkleTree tree;
     tree.append(cm);
@@ -340,7 +340,7 @@ TEST(TransactionBuilder, CheckSaplingTxVersion)
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     auto consensusParams = Params().GetConsensus();
 
-    auto sk = libzcash::SaplingSpendingKey::random();
+    auto sk = libzelcash::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
     auto pk = sk.default_address();
 
@@ -355,7 +355,7 @@ TEST(TransactionBuilder, CheckSaplingTxVersion)
     }
 
     // Cannot add Sapling spends to a non-Sapling transaction
-    libzcash::SaplingNote note(pk, 50000);
+    libzelcash::SaplingNote note(pk, 50000);
     SaplingMerkleTree tree;
     try {
         builder.AddSaplingSpend(expsk, note, uint256(), tree.witness());

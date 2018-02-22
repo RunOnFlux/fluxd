@@ -50,7 +50,7 @@ bool NetworkUpgradeActive(
 
 /**
  * Returns the index of the most recent upgrade as of the given block height
- * (corresponding to the current "epoch"). Consensus::BASE_SPROUT is the
+ * (corresponding to the current "epoch"). Consensus::BASE is the
  * default value if no upgrades are active. Caller must check that the height
  * is >= 0 (and handle unknown heights).
  */

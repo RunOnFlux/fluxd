@@ -1,9 +1,9 @@
-// Copyright (c) 2017 The Zcash developers
+// Copyright (c) 2017 The Zelcash developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef ZCASH_AMQP_AMQPSENDER_H
-#define ZCASH_AMQP_AMQPSENDER_H
+#ifndef ZELCASH_AMQP_AMQPSENDER_H
+#define ZELCASH_AMQP_AMQPSENDER_H
 
 #include "amqpconfig.h"
 
@@ -112,4 +112,4 @@ class AMQPSender : public proton::messaging_handler {
 };
 
 
-#endif //ZCASH_AMQP_AMQPSENDER_H
+#endif //ZELCASH_AMQP_AMQPSENDER_H

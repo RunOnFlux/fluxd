@@ -1,4 +1,4 @@
-Zcash Contributors
+Zelcash Contributors
 ==================
 
 Jack Grigg (850)

@@ -12,7 +12,7 @@
 #include "utilstrencodings.h"
 #include "test/test_bitcoin.h"
 
-#include "zcash/Address.hpp"
+#include "zelcash/Address.hpp"
 
 #include <string>
 #include <vector>
@@ -20,7 +20,7 @@
 #include <boost/test/unit_test.hpp>
 
 using namespace std;
-using namespace libzcash;
+using namespace libzelcash;
 
 static const std::string strSecret1 = "5HxWvvfubhXpYYpS3tJkw6fq9jE9j18THftkZjHHfmFiWtmAbrj";
 static const std::string strSecret2 = "5KC4ejrDjv152FGwP386VD1i2NYc5KkfSMyv1nGy1VGDxGHqVY3";
@@ -227,7 +227,7 @@ BOOST_AUTO_TEST_CASE(zs_address_test)
 
     std::vector<unsigned char, secure_allocator<unsigned char>> rawSeed(32);
     HDSeed seed(rawSeed);
-    auto m = libzcash::SaplingExtendedSpendingKey::Master(seed);
+    auto m = libzelcash::SaplingExtendedSpendingKey::Master(seed);
 
     for (uint32_t i = 0; i < 1000; i++) {
         auto sk = m.Derive(i);

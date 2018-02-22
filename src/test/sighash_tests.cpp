@@ -184,11 +184,11 @@ void static RandomTransaction(CMutableTransaction &tx, bool fSingle, uint32_t co
             randombytes_buf(jsdesc.ciphertexts[0].begin(), jsdesc.ciphertexts[0].size());
             randombytes_buf(jsdesc.ciphertexts[1].begin(), jsdesc.ciphertexts[1].size());
             if (tx.fOverwintered && tx.nVersion >= SAPLING_TX_VERSION) {
-                libzcash::GrothProof zkproof;
+                libzelcash::GrothProof zkproof;
                 randombytes_buf(zkproof.begin(), zkproof.size());
                 jsdesc.proof = zkproof;
             } else {
-                jsdesc.proof = libzcash::PHGRProof::random_invalid();
+                jsdesc.proof = libzelcash::PHGRProof::random_invalid();
             }
             jsdesc.macs[0] = GetRandHash();
             jsdesc.macs[1] = GetRandHash();
@@ -215,7 +215,7 @@ BOOST_FIXTURE_TEST_SUITE(sighash_tests, JoinSplitTestingSetup)
 
 BOOST_AUTO_TEST_CASE(sighash_test)
 {
-    uint32_t overwinterBranchId = NetworkUpgradeInfo[Consensus::UPGRADE_OVERWINTER].nBranchId;
+    uint32_t overwinterBranchId = NetworkUpgradeInfo[Consensus::UPGRADE_ACADIA].nBranchId;
     seed_insecure_rand(false);
 
     #if defined(PRINT_SIGHASH_JSON)

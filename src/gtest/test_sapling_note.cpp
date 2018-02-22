@@ -1,15 +1,15 @@
 #include <gtest/gtest.h>
 
-#include "zcash/Address.hpp"
-#include "zcash/Note.hpp"
+#include "zelcash/Address.hpp"
+#include "zelcash/Note.hpp"
 
 #include "amount.h"
 #include "random.h"
-#include "librustzcash.h"
+#include "librustzelcash.h"
 
 #include <array>
 
-using namespace libzcash;
+using namespace libzelcash;
 
 // Test data from https://github.com/zcash-hackworks/zcash-test-vectors/blob/master/sapling_key_components.py
 TEST(SaplingNote, TestVectors)

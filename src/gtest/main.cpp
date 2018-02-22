@@ -2,13 +2,13 @@
 #include "crypto/common.h"
 #include "key.h"
 #include "pubkey.h"
-#include "zcash/JoinSplit.hpp"
+#include "zelcash/JoinSplit.hpp"
 #include "util.h"
 
 #include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
 #include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
 
-#include "librustzcash.h"
+#include "librustzelcash.h"
 
 struct ECCryptoClosure
 {
@@ -36,12 +36,12 @@ int main(int argc, char **argv) {
 
     static_assert(
         sizeof(boost::filesystem::path::value_type) == sizeof(codeunit),
-        "librustzcash not configured correctly");
+        "librustzelcash not configured correctly");
     auto sapling_spend_str = sapling_spend.native();
     auto sapling_output_str = sapling_output.native();
     auto sprout_groth16_str = sprout_groth16.native();
 
-    librustzcash_init_zksnark_params(
+    librustzelcash_init_zksnark_params(
         reinterpret_cast<const codeunit*>(sapling_spend_str.c_str()),
         sapling_spend_str.length(),
         "8270785a1a0d0bc77196f000ee6d221c9c9894f55307bd9357c3f0105d31ca63991ab91324160d8f53e2bbd3c2633a6eb8bdf5205d822e7f3f73edac51b2b70c",

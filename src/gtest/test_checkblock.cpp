@@ -3,7 +3,7 @@
 
 #include "consensus/validation.h"
 #include "main.h"
-#include "zcash/Proof.hpp"
+#include "zelcash/Proof.hpp"
 
 class MockCValidationState : public CValidationState {
 public:
@@ -23,7 +23,7 @@ public:
 };
 
 TEST(CheckBlock, VersionTooLow) {
-    auto verifier = libzcash::ProofVerifier::Strict();
+    auto verifier = libzelcash::ProofVerifier::Strict();
 
     CBlock block;
     block.nVersion = 1;
@@ -60,7 +60,7 @@ TEST(CheckBlock, BlockSproutRejectsBadVersion) {
     MockCValidationState state;
     CBlockIndex indexPrev {Params().GenesisBlock()};
 
-    auto verifier = libzcash::ProofVerifier::Strict();
+    auto verifier = libzelcash::ProofVerifier::Strict();
 
     EXPECT_CALL(state, DoS(100, false, REJECT_INVALID, "bad-txns-version-too-low", false)).Times(1);
     EXPECT_FALSE(CheckBlock(block, state, verifier, false, false));
@@ -239,6 +239,7 @@ TEST_F(ContextualCheckBlockTest, BlockSaplingRulesAcceptSaplingTx) {
 // Sprout-Sapling, Overwinter-Sprout, Overwinter-Sapling, Sapling-Sprout, and
 // Sapling-Overwinter.
 
+<<<<<<< HEAD
 // Test that a block evaluated under Sprout rules cannot contain non-Sprout
 // transactions which require Overwinter to be active.  This test assumes that
 // mainnet Overwinter activation is at least height 2.
@@ -271,7 +272,7 @@ TEST_F(ContextualCheckBlockTest, BlockSproutRulesRejectOtherTx) {
 // transactions.
 TEST_F(ContextualCheckBlockTest, BlockOverwinterRulesRejectOtherTx) {
     SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, 1);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, 1);
 
     CMutableTransaction mtx = GetFirstBlockCoinbaseTx();
 
@@ -298,8 +299,8 @@ TEST_F(ContextualCheckBlockTest, BlockOverwinterRulesRejectOtherTx) {
 // Test block evaluated under Sapling rules cannot contain non-Sapling transactions.
 TEST_F(ContextualCheckBlockTest, BlockSaplingRulesRejectOtherTx) {
     SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, 1);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, 1);
+
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, 1);
 
     CMutableTransaction mtx = GetFirstBlockCoinbaseTx();
 

@@ -19,27 +19,27 @@
 #include <boost/optional.hpp>
 
 struct SpendDescriptionInfo {
-    libzcash::SaplingExpandedSpendingKey expsk;
-    libzcash::SaplingNote note;
+    libzelcash::SaplingExpandedSpendingKey expsk;
+    libzelcash::SaplingNote note;
     uint256 alpha;
     uint256 anchor;
     SaplingWitness witness;
 
     SpendDescriptionInfo(
-        libzcash::SaplingExpandedSpendingKey expsk,
-        libzcash::SaplingNote note,
+        libzelcash::SaplingExpandedSpendingKey expsk,
+        libzelcash::SaplingNote note,
         uint256 anchor,
         SaplingWitness witness);
 };
 
 struct OutputDescriptionInfo {
     uint256 ovk;
-    libzcash::SaplingNote note;
+    libzelcash::SaplingNote note;
     std::array<unsigned char, ZC_MEMO_SIZE> memo;
 
     OutputDescriptionInfo(
         uint256 ovk,
-        libzcash::SaplingNote note,
+        libzelcash::SaplingNote note,
         std::array<unsigned char, ZC_MEMO_SIZE> memo) : ovk(ovk), note(note), memo(memo) {}
 };
 
@@ -65,7 +65,7 @@ private:
     std::vector<OutputDescriptionInfo> outputs;
     std::vector<TransparentInputInfo> tIns;
 
-    boost::optional<std::pair<uint256, libzcash::SaplingPaymentAddress>> zChangeAddr;
+    boost::optional<std::pair<uint256, libzelcash::SaplingPaymentAddress>> zChangeAddr;
     boost::optional<CTxDestination> tChangeAddr;
 
 public:
@@ -77,14 +77,14 @@ public:
     // Returns false if the anchor does not match the anchor used by
     // previously-added Sapling spends.
     bool AddSaplingSpend(
-        libzcash::SaplingExpandedSpendingKey expsk,
-        libzcash::SaplingNote note,
+        libzelcash::SaplingExpandedSpendingKey expsk,
+        libzelcash::SaplingNote note,
         uint256 anchor,
         SaplingWitness witness);
 
     void AddSaplingOutput(
         uint256 ovk,
-        libzcash::SaplingPaymentAddress to,
+        libzelcash::SaplingPaymentAddress to,
         CAmount value,
         std::array<unsigned char, ZC_MEMO_SIZE> memo = {{0xF6}});
 
@@ -93,7 +93,7 @@ public:
 
     bool AddTransparentOutput(CTxDestination& to, CAmount value);
 
-    void SendChangeTo(libzcash::SaplingPaymentAddress changeAddr, uint256 ovk);
+    void SendChangeTo(libzelcash::SaplingPaymentAddress changeAddr, uint256 ovk);
 
     bool SendChangeTo(CTxDestination& changeAddr);
 

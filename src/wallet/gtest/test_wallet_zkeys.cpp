@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "zcash/Address.hpp"
+#include "zelcash/Address.hpp"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #include "util.h"
@@ -22,7 +22,7 @@ TEST(wallet_zkeys_tests, StoreAndLoadSaplingZkeys) {
     CWallet wallet;
 
     // wallet should be empty
-    std::set<libzcash::SaplingPaymentAddress> addrs;
+    std::set<libzelcash::SaplingPaymentAddress> addrs;
     wallet.GetSaplingPaymentAddresses(addrs);
     ASSERT_EQ(0, addrs.size());
 
@@ -45,7 +45,7 @@ TEST(wallet_zkeys_tests, StoreAndLoadSaplingZkeys) {
     ASSERT_TRUE(wallet.HaveSaplingIncomingViewingKey(address));
     
     // manually add new spending key to wallet
-    auto m = libzcash::SaplingExtendedSpendingKey::Master(seed);
+    auto m = libzelcash::SaplingExtendedSpendingKey::Master(seed);
     auto sk = m.Derive(0);
     ASSERT_TRUE(wallet.AddSaplingZKey(sk, sk.DefaultAddress()));
 
@@ -54,7 +54,7 @@ TEST(wallet_zkeys_tests, StoreAndLoadSaplingZkeys) {
     ASSERT_TRUE(wallet.HaveSaplingSpendingKey(fvk));
 
     // verify spending key stored correctly
-    libzcash::SaplingExtendedSpendingKey keyOut;
+    libzelcash::SaplingExtendedSpendingKey keyOut;
     wallet.GetSaplingSpendingKey(fvk, keyOut);
     ASSERT_EQ(sk, keyOut);
 
@@ -116,7 +116,7 @@ TEST(wallet_zkeys_tests, store_and_load_zkeys) {
     CWallet wallet;
 
     // wallet should be empty
-    std::set<libzcash::SproutPaymentAddress> addrs;
+    std::set<libzelcash::SproutPaymentAddress> addrs;
     wallet.GetSproutPaymentAddresses(addrs);
     ASSERT_EQ(0, addrs.size());
 
@@ -129,7 +129,7 @@ TEST(wallet_zkeys_tests, store_and_load_zkeys) {
     ASSERT_TRUE(wallet.HaveSproutSpendingKey(addr));
 
     // manually add new spending key to wallet
-    auto sk = libzcash::SproutSpendingKey::random();
+    auto sk = libzelcash::SproutSpendingKey::random();
     ASSERT_TRUE(wallet.AddSproutZKey(sk));
 
     // verify wallet did add it
@@ -137,7 +137,7 @@ TEST(wallet_zkeys_tests, store_and_load_zkeys) {
     ASSERT_TRUE(wallet.HaveSproutSpendingKey(addr));
 
     // verify spending key stored correctly
-    libzcash::SproutSpendingKey keyOut;
+    libzelcash::SproutSpendingKey keyOut;
     wallet.GetSproutSpendingKey(addr, keyOut);
     ASSERT_EQ(sk, keyOut);
 
@@ -147,7 +147,7 @@ TEST(wallet_zkeys_tests, store_and_load_zkeys) {
     ASSERT_EQ(1, addrs.count(addr));
 
     // Load a third key into the wallet
-    sk = libzcash::SproutSpendingKey::random();
+    sk = libzelcash::SproutSpendingKey::random();
     ASSERT_TRUE(wallet.LoadZKey(sk));
 
     // attach metadata to this third key
@@ -173,12 +173,12 @@ TEST(wallet_zkeys_tests, StoreAndLoadViewingKeys) {
     CWallet wallet;
 
     // wallet should be empty
-    std::set<libzcash::SproutPaymentAddress> addrs;
+    std::set<libzelcash::SproutPaymentAddress> addrs;
     wallet.GetSproutPaymentAddresses(addrs);
     ASSERT_EQ(0, addrs.size());
 
     // manually add new viewing key to wallet
-    auto sk = libzcash::SproutSpendingKey::random();
+    auto sk = libzelcash::SproutSpendingKey::random();
     auto vk = sk.viewing_key();
     ASSERT_TRUE(wallet.AddSproutViewingKey(vk));
 
@@ -189,12 +189,12 @@ TEST(wallet_zkeys_tests, StoreAndLoadViewingKeys) {
     ASSERT_FALSE(wallet.HaveSproutSpendingKey(addr));
 
     // verify viewing key stored correctly
-    libzcash::SproutViewingKey vkOut;
+    libzelcash::SproutViewingKey vkOut;
     wallet.GetSproutViewingKey(addr, vkOut);
     ASSERT_EQ(vk, vkOut);
 
     // Load a second viewing key into the wallet
-    auto sk2 = libzcash::SproutSpendingKey::random();
+    auto sk2 = libzelcash::SproutSpendingKey::random();
     ASSERT_TRUE(wallet.LoadSproutViewingKey(sk2.viewing_key()));
 
     // verify wallet did add it
@@ -229,7 +229,7 @@ TEST(wallet_zkeys_tests, write_zkey_direct_to_db) {
     ASSERT_TRUE(fFirstRun);
 
     // wallet should be empty
-    std::set<libzcash::SproutPaymentAddress> addrs;
+    std::set<libzelcash::SproutPaymentAddress> addrs;
     wallet.GetSproutPaymentAddresses(addrs);
     ASSERT_EQ(0, addrs.size());
 
@@ -241,7 +241,7 @@ TEST(wallet_zkeys_tests, write_zkey_direct_to_db) {
     ASSERT_EQ(1, addrs.size());
 
     // create random key and add it to database directly, bypassing wallet
-    auto sk = libzcash::SproutSpendingKey::random();
+    auto sk = libzelcash::SproutSpendingKey::random();
     auto addr = sk.address();
     int64_t now = GetTime();
     CKeyMetadata meta(now);
@@ -267,7 +267,7 @@ TEST(wallet_zkeys_tests, write_zkey_direct_to_db) {
     ASSERT_TRUE(wallet.HaveSproutSpendingKey(addr));
 
     // check key is the same
-    libzcash::SproutSpendingKey keyOut;
+    libzelcash::SproutSpendingKey keyOut;
     wallet.GetSproutSpendingKey(addr, keyOut);
     ASSERT_EQ(sk, keyOut);
 
@@ -301,7 +301,7 @@ TEST(wallet_zkeys_tests, WriteViewingKeyDirectToDB) {
     ASSERT_TRUE(fFirstRun);
 
     // create random viewing key and add it to database directly, bypassing wallet
-    auto sk = libzcash::SproutSpendingKey::random();
+    auto sk = libzelcash::SproutSpendingKey::random();
     auto vk = sk.viewing_key();
     auto addr = sk.address();
     int64_t now = GetTime();
@@ -319,7 +319,7 @@ TEST(wallet_zkeys_tests, WriteViewingKeyDirectToDB) {
     ASSERT_TRUE(wallet.HaveSproutViewingKey(addr));
 
     // check key is the same
-    libzcash::SproutViewingKey vkOut;
+    libzelcash::SproutViewingKey vkOut;
     wallet.GetSproutViewingKey(addr, vkOut);
     ASSERT_EQ(vk, vkOut);
 }
@@ -346,7 +346,7 @@ TEST(wallet_zkeys_tests, write_cryptedzkey_direct_to_db) {
     ASSERT_TRUE(fFirstRun);
 
     // wallet should be empty
-    std::set<libzcash::SproutPaymentAddress> addrs;
+    std::set<libzelcash::SproutPaymentAddress> addrs;
     wallet.GetSproutPaymentAddresses(addrs);
     ASSERT_EQ(0, addrs.size());
 
@@ -386,7 +386,7 @@ TEST(wallet_zkeys_tests, write_cryptedzkey_direct_to_db) {
     ASSERT_TRUE(addrs.count(paymentAddress2));
 
     // spending key is crypted, so we can't extract valid payment address
-    libzcash::SproutSpendingKey keyOut;
+    libzelcash::SproutSpendingKey keyOut;
     wallet2.GetSproutSpendingKey(paymentAddress, keyOut);
     ASSERT_FALSE(paymentAddress == keyOut.address());
     
@@ -423,7 +423,7 @@ TEST(wallet_zkeys_tests, WriteCryptedSaplingZkeyDirectToDb) {
     wallet.GenerateNewSeed();
 
     // wallet should be empty
-    std::set<libzcash::SaplingPaymentAddress> addrs;
+    std::set<libzelcash::SaplingPaymentAddress> addrs;
     wallet.GetSaplingPaymentAddresses(addrs);
     ASSERT_EQ(0, addrs.size());
 
@@ -436,7 +436,7 @@ TEST(wallet_zkeys_tests, WriteCryptedSaplingZkeyDirectToDb) {
 
     // Generate a diversified address different to the default
     // If we can't get an early diversified address, we are very unlucky
-    libzcash::SaplingExtendedSpendingKey extsk;
+    libzelcash::SaplingExtendedSpendingKey extsk;
     EXPECT_TRUE(wallet.GetSaplingExtendedSpendingKey(address, extsk));
     blob88 diversifier;
     diversifier.begin()[0] = 10;
@@ -477,12 +477,12 @@ TEST(wallet_zkeys_tests, WriteCryptedSaplingZkeyDirectToDb) {
     ASSERT_TRUE(addrs.count(dpa));
 
     // spending key is crypted, so we can't extract valid payment address
-    libzcash::SaplingExtendedSpendingKey keyOut;
+    libzelcash::SaplingExtendedSpendingKey keyOut;
     EXPECT_FALSE(wallet2.GetSaplingExtendedSpendingKey(address, keyOut));
     ASSERT_FALSE(address == keyOut.DefaultAddress());
 
     // address -> ivk mapping is not crypted
-    libzcash::SaplingIncomingViewingKey ivkOut;
+    libzelcash::SaplingIncomingViewingKey ivkOut;
     EXPECT_TRUE(wallet2.GetSaplingIncomingViewingKey(dpa, ivkOut));
     EXPECT_EQ(ivk, ivkOut);
 
