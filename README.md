@@ -18,7 +18,7 @@ sudo apt-get update
 sudo apt-get install g++-4.9
 ```
 ```
-git clone https://github.com/Scribbles-MCAMK/Zelcash.git
+git clone https://github.com/zelcash/zelcash.git
 git clone https://gitlab.com/zcashcommunity/params.git
 ```
 ```
