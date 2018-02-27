@@ -9,7 +9,7 @@
 #include "script/sign.h"
 
 #include <boost/variant.hpp>
-#include <librustzelcash.h>
+#include <librustzcash.h>
 
 SpendDescriptionInfo::SpendDescriptionInfo(
     libzelcash::SaplingExpandedSpendingKey expsk,
@@ -17,7 +17,7 @@ SpendDescriptionInfo::SpendDescriptionInfo(
     uint256 anchor,
     SaplingWitness witness) : expsk(expsk), note(note), anchor(anchor), witness(witness)
 {
-    librustzelcash_sapling_generate_r(alpha.begin());
+    librustzcash_sapling_generate_r(alpha.begin());
 }
 
 TransactionBuilder::TransactionBuilder(
@@ -156,7 +156,7 @@ boost::optional<CTransaction> TransactionBuilder::Build()
     // Sapling spends and outputs
     //
 
-    auto ctx = librustzelcash_sapling_proving_ctx_init();
+    auto ctx = librustzcash_sapling_proving_ctx_init();
 
     // Create Sapling SpendDescriptions
     for (auto spend : spends) {
@@ -164,7 +164,7 @@ boost::optional<CTransaction> TransactionBuilder::Build()
         auto nf = spend.note.nullifier(
             spend.expsk.full_viewing_key(), spend.witness.position());
         if (!(cm && nf)) {
-            librustzelcash_sapling_proving_ctx_free(ctx);
+            librustzcash_sapling_proving_ctx_free(ctx);
             return boost::none;
         }
 
@@ -173,7 +173,7 @@ boost::optional<CTransaction> TransactionBuilder::Build()
         std::vector<unsigned char> witness(ss.begin(), ss.end());
 
         SpendDescription sdesc;
-        if (!librustzelcash_sapling_spend_proof(
+        if (!librustzcash_sapling_spend_proof(
                 ctx,
                 spend.expsk.full_viewing_key().ak.begin(),
                 spend.expsk.nsk.begin(),
@@ -186,7 +186,7 @@ boost::optional<CTransaction> TransactionBuilder::Build()
                 sdesc.cv.begin(),
                 sdesc.rk.begin(),
                 sdesc.zkproof.data())) {
-            librustzelcash_sapling_proving_ctx_free(ctx);
+            librustzcash_sapling_proving_ctx_free(ctx);
             return boost::none;
         }
 
@@ -199,7 +199,7 @@ boost::optional<CTransaction> TransactionBuilder::Build()
     for (auto output : outputs) {
         auto cm = output.note.cm();
         if (!cm) {
-            librustzelcash_sapling_proving_ctx_free(ctx);
+            librustzcash_sapling_proving_ctx_free(ctx);
             return boost::none;
         }
 
@@ -207,14 +207,14 @@ boost::optional<CTransaction> TransactionBuilder::Build()
 
         auto res = notePlaintext.encrypt(output.note.pk_d);
         if (!res) {
-            librustzelcash_sapling_proving_ctx_free(ctx);
+            librustzcash_sapling_proving_ctx_free(ctx);
             return boost::none;
         }
         auto enc = res.get();
         auto encryptor = enc.second;
 
         OutputDescription odesc;
-        if (!librustzelcash_sapling_output_proof(
+        if (!librustzcash_sapling_output_proof(
                 ctx,
                 encryptor.get_esk().begin(),
                 output.note.d.data(),
@@ -223,7 +223,7 @@ boost::optional<CTransaction> TransactionBuilder::Build()
                 output.note.value(),
                 odesc.cv.begin(),
                 odesc.zkproof.begin())) {
-            librustzelcash_sapling_proving_ctx_free(ctx);
+            librustzcash_sapling_proving_ctx_free(ctx);
             return boost::none;
         }
 
@@ -252,25 +252,25 @@ boost::optional<CTransaction> TransactionBuilder::Build()
     try {
         dataToBeSigned = SignatureHash(scriptCode, mtx, NOT_AN_INPUT, SIGHASH_ALL, 0, consensusBranchId);
     } catch (std::logic_error ex) {
-        librustzelcash_sapling_proving_ctx_free(ctx);
+        librustzcash_sapling_proving_ctx_free(ctx);
         return boost::none;
     }
 
     // Create Sapling spendAuth and binding signatures
     for (size_t i = 0; i < spends.size(); i++) {
-        librustzelcash_sapling_spend_sig(
+        librustzcash_sapling_spend_sig(
             spends[i].expsk.ask.begin(),
             spends[i].alpha.begin(),
             dataToBeSigned.begin(),
             mtx.vShieldedSpend[i].spendAuthSig.data());
     }
-    librustzelcash_sapling_binding_sig(
+    librustzcash_sapling_binding_sig(
         ctx,
         mtx.valueBalance,
         dataToBeSigned.begin(),
         mtx.bindingSig.data());
 
-    librustzelcash_sapling_proving_ctx_free(ctx);
+    librustzcash_sapling_proving_ctx_free(ctx);
 
     // Transparent signatures
     CTransaction txNewConst(mtx);

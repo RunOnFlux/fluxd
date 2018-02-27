@@ -57,9 +57,9 @@ Gareth Davies (2):
 
 Jack Grigg (7):
       Update IncrementalMerkleTree test vectors to use valid commitments
-      Migrate to current librustzelcash
-      Pass parameter paths as native strings to librustzelcash
-      Build librustzelcash package without changing directory
+      Migrate to current librustzcash
+      Pass parameter paths as native strings to librustzcash
+      Build librustzcash package without changing directory
       Set nSaplingValue in-memory when loading block index from disk
       Comment in CDiskBlockIndex that LoadBlockIndexGuts also needs updating
       Test Sapling value pool accounting

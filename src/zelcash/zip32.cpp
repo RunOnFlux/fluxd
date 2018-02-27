@@ -10,7 +10,7 @@
 #include "version.h"
 #include "zcash/prf.h"
 
-#include <librustzelcash.h>
+#include <librustzcash.h>
 #include <sodium.h>
 
 const unsigned char ZCASH_HD_SEED_FP_PERSONAL[crypto_generichash_blake2b_PERSONALBYTES] =
@@ -66,7 +66,7 @@ boost::optional<SaplingExtendedFullViewingKey> SaplingExtendedFullViewingKey::De
     CSerializeData p_bytes(ss_p.begin(), ss_p.end());
 
     CSerializeData i_bytes(ZIP32_XFVK_SIZE);
-    if (librustzelcash_zip32_xfvk_derive(
+    if (librustzcash_zip32_xfvk_derive(
         reinterpret_cast<unsigned char*>(p_bytes.data()),
         i,
         reinterpret_cast<unsigned char*>(i_bytes.data())
@@ -89,7 +89,7 @@ boost::optional<std::pair<diversifier_index_t, libzelcash::SaplingPaymentAddress
 
     diversifier_index_t j_ret;
     CSerializeData addr_bytes(libzelcash::SerializedSaplingPaymentAddressSize);
-    if (librustzelcash_zip32_xfvk_address(
+    if (librustzcash_zip32_xfvk_address(
         reinterpret_cast<unsigned char*>(xfvk_bytes.data()),
         j.begin(), j_ret.begin(),
         reinterpret_cast<unsigned char*>(addr_bytes.data()))) {
@@ -117,7 +117,7 @@ SaplingExtendedSpendingKey SaplingExtendedSpendingKey::Master(const HDSeed& seed
 {
     auto rawSeed = seed.RawSeed();
     CSerializeData m_bytes(ZIP32_XSK_SIZE);
-    librustzelcash_zip32_xsk_master(
+    librustzcash_zip32_xsk_master(
         rawSeed.data(),
         rawSeed.size(),
         reinterpret_cast<unsigned char*>(m_bytes.data()));
@@ -135,7 +135,7 @@ SaplingExtendedSpendingKey SaplingExtendedSpendingKey::Derive(uint32_t i) const
     CSerializeData p_bytes(ss_p.begin(), ss_p.end());
 
     CSerializeData i_bytes(ZIP32_XSK_SIZE);
-    librustzelcash_zip32_xsk_derive(
+    librustzcash_zip32_xsk_derive(
         reinterpret_cast<unsigned char*>(p_bytes.data()),
         i,
         reinterpret_cast<unsigned char*>(i_bytes.data()));

@@ -8,7 +8,7 @@
 #include "hash.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"
-#include "librustzelcash.h"
+#include "librustzcash.h"
 
 JSDescription::JSDescription(
     bool makeGrothProof,
@@ -113,7 +113,7 @@ public:
     {
         uint256 h_sig = params.h_sig(jsdesc.randomSeed, jsdesc.nullifiers, joinSplitPubKey);
 
-        return librustzelcash_sprout_verify(
+        return librustzcash_sprout_verify(
             proof.begin(),
             jsdesc.anchor.begin(),
             h_sig.begin(),

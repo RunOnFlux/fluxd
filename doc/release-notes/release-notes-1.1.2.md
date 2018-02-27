@@ -57,9 +57,9 @@ Jack Grigg (16):
       Add hashFinalSaplingRoot to getblockheader and getblock output
 
 Jay Graber (8):
-      Add Sapling key classes to wallet, with new librustzelcash APIs
-      Change librustzelcash dependency hash to work for new Sapling classes
-      Update librustzelcash dependency, address comments
+      Add Sapling key classes to wallet, with new librustzcash APIs
+      Change librustzcash dependency hash to work for new Sapling classes
+      Update librustzcash dependency, address comments
       Minimal sapling key test
       Fix default_address()
       s/SaplingInViewingKey/SaplingIncomingViewingKey
@@ -85,7 +85,7 @@ Pieter Wuille (2):
 
 Simon Liu (12):
       Part of #3277. Add comment about deprecated txdb prefixes.
-      Remove now redundant Rust call to librustzelcash_xor.
+      Remove now redundant Rust call to librustzcash_xor.
       Add SaplingNote class and test_sapling_note unit test.
       Refactor and replace factory method random() with constructor.
       Return optional for Sapling commitments and nullifiers.

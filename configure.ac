@@ -611,7 +611,7 @@ fi
 if test x$use_boost = xyes; then
 
 dnl Check for boost libs
-dnl We need Boost >= 1.62 to fix a potential security bug (https://github.com/zelcash/zelcash/issues/1241)
+dnl We need Boost >= 1.62 to fix a potential security bug (https://github.com/zcash/zcash/issues/1241)
 AX_BOOST_BASE([1.62])
 AX_BOOST_SYSTEM
 AX_BOOST_FILESYSTEM
@@ -737,7 +737,6 @@ AC_CHECK_LIB([gmp],[[__gmpn_sub_n]],GMP_LIBS=-lgmp, [AC_MSG_ERROR(libgmp missing
 AC_CHECK_HEADER([gmpxx.h],,AC_MSG_ERROR(libgmpxx headers missing))
 AC_CHECK_LIB([gmpxx],[main],GMPXX_LIBS=-lgmpxx, [AC_MSG_ERROR(libgmpxx missing)])
 
-
 RUST_LIBS="-lrustzelcash"
 case $host in
   *mingw*)
@@ -746,7 +745,6 @@ case $host in
     RUST_LIBS="$RUST_LIBS -ldl"
     ;;
 esac
-
 
 dnl Check for OpenMP support
 AX_OPENMP(

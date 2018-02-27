@@ -18,7 +18,7 @@
 #include "sync.h"
 #include "amount.h"
 
-#include "librustzelcash.h"
+#include "librustzcash.h"
 #include "streams.h"
 #include "version.h"
 
@@ -286,7 +286,7 @@ public:
             ss2 << inputs[1].witness.path();
             std::vector<unsigned char> auth2(ss2.begin(), ss2.end());
 
-            librustzelcash_sprout_prove(
+            librustzcash_sprout_prove(
                 proof.begin(),
 
                 phi.begin(),

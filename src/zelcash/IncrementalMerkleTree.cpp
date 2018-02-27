@@ -5,7 +5,7 @@
 #include "zelcash/IncrementalMerkleTree.hpp"
 #include "crypto/sha256.h"
 #include "zelcash/util.h"
-#include "librustzelcash.h"
+#include "librustzcash.h"
 
 namespace libzelcash {
 
@@ -17,7 +17,7 @@ PedersenHash PedersenHash::combine(
 {
     PedersenHash res = PedersenHash();
 
-    librustzelcash_merkle_hash(
+    librustzcash_merkle_hash(
         depth,
         a.begin(),
         b.begin(),
@@ -30,7 +30,7 @@ PedersenHash PedersenHash::combine(
 PedersenHash PedersenHash::uncommitted() {
     PedersenHash res = PedersenHash();
 
-    librustzelcash_tree_uncommitted(res.begin());
+    librustzcash_tree_uncommitted(res.begin());
 
     return res;
 }

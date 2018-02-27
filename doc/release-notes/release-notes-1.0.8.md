@@ -114,7 +114,7 @@ Pieter Wuille (3):
       Fix interrupted HTTP RPC connection workaround for Python 3.5+
 
 Sean Bowe (2):
-      Introduce librustzelcash and Rust to depends system.
+      Introduce librustzcash and Rust to depends system.
       Allow Rust-language related assets to be disabled with `--disable-rust`.
 
 Simon Liu (4):

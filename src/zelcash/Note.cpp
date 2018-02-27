@@ -7,7 +7,7 @@
 #include "streams.h"
 
 #include "zelcash/util.h"
-#include "librustzelcash.h"
+#include "librustzcash.h"
 
 using namespace libzelcash;
 
@@ -44,13 +44,13 @@ uint256 SproutNote::nullifier(const SproutSpendingKey& a_sk) const {
 SaplingNote::SaplingNote(const SaplingPaymentAddress& address, const uint64_t value) : BaseNote(value) {
     d = address.d;
     pk_d = address.pk_d;
-    librustzelcash_sapling_generate_r(r.begin());
+    librustzcash_sapling_generate_r(r.begin());
 }
 
-// Call librustzelcash to compute the commitment
+// Call librustzcash to compute the commitment
 boost::optional<uint256> SaplingNote::cm() const {
     uint256 result;
-    if (!librustzelcash_sapling_compute_cm(
+    if (!librustzcash_sapling_compute_cm(
             d.data(),
             pk_d.begin(),
             value(),
@@ -64,14 +64,14 @@ boost::optional<uint256> SaplingNote::cm() const {
     return result;
 }
 
-// Call librustzelcash to compute the nullifier
+// Call librustzcash to compute the nullifier
 boost::optional<uint256> SaplingNote::nullifier(const SaplingFullViewingKey& vk, const uint64_t position) const
 {
     auto ak = vk.ak;
     auto nk = vk.nk;
 
     uint256 result;
-    if (!librustzelcash_sapling_compute_nf(
+    if (!librustzcash_sapling_compute_nf(
             d.data(),
             pk_d.begin(),
             value(),
@@ -206,12 +206,12 @@ boost::optional<SaplingNotePlaintext> SaplingNotePlaintext::decrypt(
     assert(ss.size() == 0);
 
     uint256 pk_d;
-    if (!librustzelcash_ivk_to_pkd(ivk.begin(), ret.d.data(), pk_d.begin())) {
+    if (!librustzcash_ivk_to_pkd(ivk.begin(), ret.d.data(), pk_d.begin())) {
         return boost::none;
     }
 
     uint256 cmu_expected;
-    if (!librustzelcash_sapling_compute_cm(
+    if (!librustzcash_sapling_compute_cm(
         ret.d.data(),
         pk_d.begin(),
         ret.value(),
@@ -250,7 +250,7 @@ boost::optional<SaplingNotePlaintext> SaplingNotePlaintext::decrypt(
     ss >> ret;
 
     uint256 cmu_expected;
-    if (!librustzelcash_sapling_compute_cm(
+    if (!librustzcash_sapling_compute_cm(
         ret.d.data(),
         pk_d.begin(),
         ret.value(),

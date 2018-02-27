@@ -3,7 +3,7 @@
 #include "hash.h"
 #include "prf.h"
 #include "streams.h"
-#include <librustzelcash.h>
+#include <librustzcash.h>
 
 const unsigned char ZELCASH_SAPLING_FVFP_PERSONALIZATION[crypto_generichash_blake2b_PERSONALBYTES] =
     {'Z', 'e', 'l','c', 'a', 's', 'h', 'A', 'c', 'a', 'd', 'i', 'a', 'F', 'V', 'F'};
@@ -51,8 +51,8 @@ uint256 SaplingPaymentAddress::GetHash() const {
 SaplingFullViewingKey SaplingExpandedSpendingKey::full_viewing_key() const {
     uint256 ak;
     uint256 nk;
-    librustzelcash_ask_to_ak(ask.begin(), ak.begin());
-    librustzelcash_nsk_to_nk(nsk.begin(), nk.begin());
+    librustzcash_ask_to_ak(ask.begin(), ak.begin());
+    librustzcash_nsk_to_nk(nsk.begin(), nk.begin());
     return SaplingFullViewingKey(ak, nk, ovk);
 }
 
@@ -66,13 +66,13 @@ SaplingFullViewingKey SaplingSpendingKey::full_viewing_key() const {
 
 SaplingIncomingViewingKey SaplingFullViewingKey::in_viewing_key() const {
     uint256 ivk;
-    librustzelcash_crh_ivk(ak.begin(), nk.begin(), ivk.begin());
+    librustzcash_crh_ivk(ak.begin(), nk.begin(), ivk.begin());
     return SaplingIncomingViewingKey(ivk);
 }
 
 bool SaplingFullViewingKey::is_valid() const {
     uint256 ivk;
-    librustzelcash_crh_ivk(ak.begin(), nk.begin(), ivk.begin());
+    librustzcash_crh_ivk(ak.begin(), nk.begin(), ivk.begin());
     return !ivk.IsNull();
 }
 
@@ -94,8 +94,8 @@ SaplingSpendingKey SaplingSpendingKey::random() {
 
 boost::optional<SaplingPaymentAddress> SaplingIncomingViewingKey::address(diversifier_t d) const {
     uint256 pk_d;
-    if (librustzelcash_check_diversifier(d.data())) {
-        librustzelcash_ivk_to_pkd(this->begin(), d.data(), pk_d.begin());
+    if (librustzcash_check_diversifier(d.data())) {
+        librustzcash_ivk_to_pkd(this->begin(), d.data(), pk_d.begin());
         return SaplingPaymentAddress(d, pk_d);
     } else {
         return boost::none;

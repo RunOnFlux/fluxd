@@ -9,7 +9,7 @@
 #include "zelcash/prf.h"
 #include "zelcash/Address.hpp"
 #include "crypto/sha256.h"
-#include "librustzelcash.h"
+#include "librustzcash.h"
 
 class TestNoteDecryption : public ZCNoteDecryption {
 public:
@@ -195,7 +195,7 @@ TEST(noteencryption, SaplingApi)
     {
         uint256 test_epk;
         uint256 test_esk = enc.get_esk();
-        ASSERT_TRUE(librustzelcash_sapling_ka_derivepublic(pk_1.d.begin(), test_esk.begin(), test_epk.begin()));
+        ASSERT_TRUE(librustzcash_sapling_ka_derivepublic(pk_1.d.begin(), test_esk.begin(), test_epk.begin()));
         ASSERT_TRUE(test_epk == epk_1);
     }
     auto cv_1 = random_uint256();

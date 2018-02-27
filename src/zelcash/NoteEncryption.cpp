@@ -3,7 +3,7 @@
 #include "sodium.h"
 #include <boost/static_assert.hpp>
 #include "prf.h"
-#include "librustzelcash.h"
+#include "librustzcash.h"
 
 #define NOTEENCRYPTION_CIPHER_KEYSIZE 32
 
@@ -106,10 +106,10 @@ boost::optional<SaplingNoteEncryption> SaplingNoteEncryption::FromDiversifier(di
     uint256 esk;
 
     // Pick random esk
-    librustzelcash_sapling_generate_r(esk.begin());
+    librustzcash_sapling_generate_r(esk.begin());
 
     // Compute epk given the diversifier
-    if (!librustzelcash_sapling_ka_derivepublic(d.begin(), esk.begin(), epk.begin())) {
+    if (!librustzcash_sapling_ka_derivepublic(d.begin(), esk.begin(), epk.begin())) {
         return boost::none;
     }
 
@@ -127,7 +127,7 @@ boost::optional<SaplingEncCiphertext> SaplingNoteEncryption::encrypt_to_recipien
 
     uint256 dhsecret;
 
-    if (!librustzelcash_sapling_ka_agree(pk_d.begin(), esk.begin(), dhsecret.begin())) {
+    if (!librustzcash_sapling_ka_agree(pk_d.begin(), esk.begin(), dhsecret.begin())) {
         return boost::none;
     }
 
@@ -160,7 +160,7 @@ boost::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption(
 {
     uint256 dhsecret;
 
-    if (!librustzelcash_sapling_ka_agree(epk.begin(), ivk.begin(), dhsecret.begin())) {
+    if (!librustzcash_sapling_ka_agree(epk.begin(), ivk.begin(), dhsecret.begin())) {
         return boost::none;
     }
 
@@ -196,7 +196,7 @@ boost::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption (
 {
     uint256 dhsecret;
 
-    if (!librustzelcash_sapling_ka_agree(pk_d.begin(), esk.begin(), dhsecret.begin())) {
+    if (!librustzcash_sapling_ka_agree(pk_d.begin(), esk.begin(), dhsecret.begin())) {
         return boost::none;
     }
 

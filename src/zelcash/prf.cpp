@@ -3,7 +3,7 @@
 #include "hash.h"
 
 #include <array>
-#include <librustzelcash.h>
+#include <librustzcash.h>
 
 const unsigned char ZCASH_EXPANDSEED_PERSONALIZATION[crypto_generichash_blake2b_PERSONALBYTES] = {'Z','c','a','s','h','_','E','x','p','a','n','d','S','e','e','d'};
 
@@ -28,7 +28,7 @@ uint256 PRF_ask(const uint256& sk)
 {
     uint256 ask;
     auto tmp = PRF_expand(sk, 0);
-    librustzelcash_to_scalar(tmp.data(), ask.begin());
+    librustzcash_to_scalar(tmp.data(), ask.begin());
     return ask;
 }
 
@@ -36,7 +36,7 @@ uint256 PRF_nsk(const uint256& sk)
 {
     uint256 nsk;
     auto tmp = PRF_expand(sk, 1);
-    librustzelcash_to_scalar(tmp.data(), nsk.begin());
+    librustzcash_to_scalar(tmp.data(), nsk.begin());
     return nsk;
 }
 
@@ -63,10 +63,10 @@ std::array<unsigned char, 11> default_diversifier(const uint256& sk)
         crypto_generichash_blake2b_update(&state, blob, 34);
         crypto_generichash_blake2b_final(&state, res.data(), 11);
         
-        if (librustzelcash_check_diversifier(res.data())) {
+        if (librustzcash_check_diversifier(res.data())) {
             break;
         } else if (blob[33] == 255) {
-            throw std::runtime_error("librustzelcash_check_diversifier did not return valid diversifier");
+            throw std::runtime_error("librustzcash_check_diversifier did not return valid diversifier");
         }
         blob[33] += 1;
     }

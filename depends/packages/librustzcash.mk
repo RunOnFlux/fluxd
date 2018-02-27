@@ -1,4 +1,4 @@
-package=librustzelcash
+package=librustzcash
 $(package)_version=0.1
 $(package)_download_path=https://github.com/zelcash/$(package)/archive/
 $(package)_file_name=$(package)-$($(package)_git_commit).tar.gz
@@ -11,7 +11,7 @@ $(package)_patches=cargo.config 0001-Start-using-cargo-clippy-for-CI.patch remov
 ifeq ($(host_os),mingw32)
 $(package)_library_file=target/x86_64-pc-windows-gnu/release/rustzcash.lib
 else
-$(package)_library_file=target/release/librustzelcash.a
+$(package)_library_file=target/release/librustzcash.a
 endif
 
 define $(package)_set_vars
@@ -27,12 +27,12 @@ define $(package)_preprocess_cmds
 endef
 
 define $(package)_build_cmds
-  cargo build --package librustzelcash $($(package)_build_opts)
+  cargo build --package librustzcash $($(package)_build_opts)
 endef
 
 define $(package)_stage_cmds
   mkdir $($(package)_staging_dir)$(host_prefix)/lib/ && \
   mkdir $($(package)_staging_dir)$(host_prefix)/include/ && \
   cp $($(package)_library_file) $($(package)_staging_dir)$(host_prefix)/lib/ && \
-  cp librustzelcash/include/librustzelcash.h $($(package)_staging_dir)$(host_prefix)/include/
+  cp librustzcash/include/librustzcash.h $($(package)_staging_dir)$(host_prefix)/include/
 endef

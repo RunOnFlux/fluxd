@@ -5,7 +5,7 @@
 
 #include "amount.h"
 #include "random.h"
-#include "librustzelcash.h"
+#include "librustzcash.h"
 
 #include <array>
 

@@ -492,16 +492,16 @@ static CCriticalSection csPathCached;
 
 static boost::filesystem::path ZC_GetBaseParamsDir()
 {
-    // Copied from GetDefaultDataDir and adapter for zelcash params.
+    // Copied from GetDefaultDataDir and adapter for zcash params.
 
     namespace fs = boost::filesystem;
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\ZelcashParams
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\ZelcashParams
-    // Mac: ~/Library/Application Support/ZelcashParams
-    // Unix: ~/.zelcash-params
+    // Windows < Vista: C:\Documents and Settings\Username\Application Data\ZcashParams
+    // Windows >= Vista: C:\Users\Username\AppData\Roaming\ZcashParams
+    // Mac: ~/Library/Application Support/ZcashParams
+    // Unix: ~/.zcash-params
 #ifdef WIN32
     // Windows
-    return GetSpecialFolderPath(CSIDL_APPDATA) / "ZelcashParams";
+    return GetSpecialFolderPath(CSIDL_APPDATA) / "ZcashParams";
 #else
     fs::path pathRet;
     char* pszHome = getenv("HOME");
@@ -513,10 +513,10 @@ static boost::filesystem::path ZC_GetBaseParamsDir()
     // Mac
     pathRet /= "Library/Application Support";
     TryCreateDirectory(pathRet);
-    return pathRet / "ZelcashParams";
+    return pathRet / "ZcashParams";
 #else
     // Unix
-    return pathRet / ".zelcash-params";
+    return pathRet / ".zcash-params";
 #endif
 #endif
 }

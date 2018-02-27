@@ -48,7 +48,7 @@ using namespace std;
 # error "Zelcash cannot be compiled without assertions."
 #endif
 
-#include "librustzelcash.h"
+#include "librustzcash.h"
 
 /**
  * Global state
@@ -1010,10 +1010,10 @@ bool ContextualCheckTransaction(
     if (!tx.vShieldedSpend.empty() ||
         !tx.vShieldedOutput.empty())
     {
-        auto ctx = librustzelcash_sapling_verification_ctx_init();
+        auto ctx = librustzcash_sapling_verification_ctx_init();
 
         for (const SpendDescription &spend : tx.vShieldedSpend) {
-            if (!librustzelcash_sapling_check_spend(
+            if (!librustzcash_sapling_check_spend(
                 ctx,
                 spend.cv.begin(),
                 spend.anchor.begin(),
@@ -1024,14 +1024,14 @@ bool ContextualCheckTransaction(
                 dataToBeSigned.begin()
             ))
             {
-                librustzelcash_sapling_verification_ctx_free(ctx);
+                librustzcash_sapling_verification_ctx_free(ctx);
                 return state.DoS(100, error("ContextualCheckTransaction(): Sapling spend description invalid"),
                                       REJECT_INVALID, "bad-txns-sapling-spend-description-invalid");
             }
         }
 
         for (const OutputDescription &output : tx.vShieldedOutput) {
-            if (!librustzelcash_sapling_check_output(
+            if (!librustzcash_sapling_check_output(
                 ctx,
                 output.cv.begin(),
                 output.cm.begin(),
@@ -1039,25 +1039,25 @@ bool ContextualCheckTransaction(
                 output.zkproof.begin()
             ))
             {
-                librustzelcash_sapling_verification_ctx_free(ctx);
+                librustzcash_sapling_verification_ctx_free(ctx);
                 return state.DoS(100, error("ContextualCheckTransaction(): Sapling output description invalid"),
                                       REJECT_INVALID, "bad-txns-sapling-output-description-invalid");
             }
         }
 
-        if (!librustzelcash_sapling_final_check(
+        if (!librustzcash_sapling_final_check(
             ctx,
             tx.valueBalance,
             tx.bindingSig.begin(),
             dataToBeSigned.begin()
         ))
         {
-            librustzelcash_sapling_verification_ctx_free(ctx);
+            librustzcash_sapling_verification_ctx_free(ctx);
             return state.DoS(100, error("ContextualCheckTransaction(): Sapling binding signature invalid"),
                                   REJECT_INVALID, "bad-txns-sapling-binding-signature-invalid");
         }
 
-        librustzelcash_sapling_verification_ctx_free(ctx);
+        librustzcash_sapling_verification_ctx_free(ctx);
     }
     return true;
 }
