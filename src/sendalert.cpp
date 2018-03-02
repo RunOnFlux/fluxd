@@ -1,8 +1,6 @@
-<<<<<<< HEAD
-// Copyright (c) 2016-2018 The Zcash developers
-=======
-// Copyright (c) 2016 The Zelcash developers
->>>>>>> adfdef7... initial ZEL changes to Overwinter
+// Copyright (c) 2018 The Zelcash developers
+// Copyright (c) 2016 The Zcash developers
+
 // Original code from: https://gist.github.com/laanwj/0e689cfa37b52bcbbb44
 
 /*
