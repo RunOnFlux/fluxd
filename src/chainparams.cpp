@@ -83,7 +83,7 @@ public:
         strCurrencyUnits = "ZEL";
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 5000;
-        consensus.nSubsidyHalvingInterval = 525600;
+        consensus.nSubsidyHalvingInterval = 657850; // 913.68 days
         consensus.nMajorityEnforceBlockUpgrade = 750;
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 4000;
@@ -123,6 +123,7 @@ public:
         vSeeds.push_back(CDNSSeedData("zelcash.tech", "dnsseed.zelcash.tech")); // Zelcash
         vSeeds.push_back(CDNSSeedData("node.zel.cash", "seed.zel.cash")); // Zelcash
         vSeeds.push_back(CDNSSeedData("node1.zel.cash", "dns.zel.cash")); // Zelcash
+		vSeeds.push_back(CDNSSeedData("vps.zelcash.online", "dnsseed.zelcash.online")); // TheTrunk
 
         // guarantees the first 2 characters, when base58 encoded, are "t1"
         base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0xB8};
@@ -169,10 +170,10 @@ class CTestNetParams : public CChainParams {
 public:
     CTestNetParams() {
         strNetworkID = "test";
-        strCurrencyUnits = "TAZ";
+        strCurrencyUnits = "TEL";
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 5000;
-        consensus.nSubsidyHalvingInterval = 840000;
+        consensus.nSubsidyHalvingInterval = 657850; // 913.68 days
         consensus.nMajorityEnforceBlockUpgrade = 51;
         consensus.nMajorityRejectBlockOutdated = 75;
         consensus.nMajorityWindow = 400;
