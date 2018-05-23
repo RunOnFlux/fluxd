@@ -37,8 +37,8 @@ Jack Grigg (31):
       Randomize JoinSplits in z_sendmany
       Refactor test code to better test JSDescription::Randomized()
       Remove stale comment
-      Rename libbitcoinconsensus to libzelcashconsensus
-      Rename bitcoin-tx to zelcash-tx
+      Rename libbitcoinconsensus to libzcashconsensus
+      Rename bitcoin-tx to zcash-tx
       Remove the RC 1 block index error message
       Disable wallet encryption
       Add more assertions, throw if find_output params are invalid
@@ -65,9 +65,9 @@ Jack Grigg (31):
       Fix RPC test
 
 Jay Graber (7):
-      Rm bitcoin dev keys from gitian-downloader, add zelcash dev keys
+      Rm bitcoin dev keys from gitian-downloader, add zcash dev keys
       Rm bips.md
-      Update files.md for zelcash
+      Update files.md for zcash
       Update dnsseed-policy.md
       Developer notes still relevant
       Document RPC interface security assumptions in security-warnings.md

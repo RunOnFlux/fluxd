@@ -5,7 +5,7 @@ Ariel Gabizon (1):
       boost::format -> tinyformat
 
 Bruno Arueira (1):
-      Removes out bitcoin mention in favor for zelcash
+      Removes out bitcoin mention in favor for zcash
 
 Cory Fields (1):
       httpserver: explicitly detach worker threads
@@ -21,12 +21,12 @@ Jack Grigg (37):
       Add benchmark for listunspent
       [Test] MiniNode: Implement JSDescription parsing
       [Test] MiniNode: Implement v2 CTransaction parsing
-      [Test] MiniNode: Implement Zelcash block parsing
+      [Test] MiniNode: Implement Zcash block parsing
       [Test] MiniNode: Update protocol version and network magics
-      [Test] MiniNode: Use Zelcash PoW
+      [Test] MiniNode: Use Zcash PoW
       [Test] MiniNode: Fix coinbase creation
       [Test] MiniNode: Coerce OP_PUSHDATA bytearrays to bytes
-      [Test] MiniNode: Implement Zelcash coinbase
+      [Test] MiniNode: Implement Zcash coinbase
       Fix BIP65 and BIP66 tests
       Un-indent RPC test output in test runner
       Replace full-test-suite.sh with a new test suite driver script
@@ -53,10 +53,10 @@ Jack Grigg (37):
       Change auto-senescence cycle to 16 weeks
 
 Jason Davies (1):
-      Replace "bitcoin" with "Zelcash".
+      Replace "bitcoin" with "Zcash".
 
 Jay Graber (1):
-      s/zelcash/Zelcash
+      s/zcash/Zcash
 
 Jonathan "Duke" Leto (1):
       Fix bug where performance-measurements.sh fails hards when given no args
@@ -72,7 +72,7 @@ Sean Bowe (5):
       Integrate low memory prover.
 
 Simon Liu (7):
-      Replace 'bitcoin address' with 'zelcash address'.
+      Replace 'bitcoin address' with 'zcash address'.
       Closes #2639. z_shieldcoinbase is now supported, no longer experimental.
       Closes #2263 fixing broken pipe error.
       Closes #2576. Update link to security info on zel.cash website.
