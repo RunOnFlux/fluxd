@@ -48,13 +48,13 @@ static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesi
  * database (and is in any case of zero value).
  *
  * >>> from pyblake2 import blake2s
- * >>> 'Zelcash' + blake2s(b'The Economist 2016-10-29 Known unknown: Another crypto-currency is born. BTC#436254 0000000000000000044f321997f336d2908cf8c8d6893e88dbf067e2d949487d ETH#2521903 483039a6b6bd8bd05f0584f9a078d075e454925eb71c1f13eaff59b405a721bb DJIA close on 27 Oct 2016: 18,169.68').hexdigest()
+ * >>> 'Zelcash' + blake2s(b'TODO').hexdigest()
  *
- * CBlock(hash=00040fe8, ver=4, hashPrevBlock=00000000000000, hashMerkleRoot=c4eaa5, nTime=1477641360, nBits=1f07ffff, nNonce=4695, vtx=1)
- *   CTransaction(hash=c4eaa5, ver=1, vin.size=1, vout.size=1, nLockTime=0)
+ * CBlock(hash=00052461, ver=4, hashPrevBlock=00000000000000, hashMerkleRoot=94c7ae, nTime=1516980000, nBits=1f07ffff, nNonce=6796, vtx=1)
+ *   CTransaction(hash=94c7ae, ver=1, vin.size=1, vout.size=1, nLockTime=0)
  *     CTxIn(COutPoint(000000, -1), coinbase 04ffff071f0104455a6361736830623963346565663862376363343137656535303031653335303039383462366665613335363833613763616331343161303433633432303634383335643334)
  *     CTxOut(nValue=0.00000000, scriptPubKey=0x5F1DF16B2B704C8A578D0B)
- *   vMerkleTree: c4eaa5
+ *   vMerkleTree: 94c7ae
  */
 static CBlock CreateGenesisBlock(uint32_t nTime, const uint256& nNonce, const std::vector<unsigned char>& nSolution, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
 {
@@ -83,7 +83,7 @@ public:
         strCurrencyUnits = "ZEL";
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 5000;
-        consensus.nSubsidyHalvingInterval = 525600;
+        consensus.nSubsidyHalvingInterval = 657850; // 2.5 years
         consensus.nMajorityEnforceBlockUpgrade = 750;
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 4000;
@@ -100,7 +100,7 @@ public:
         pchMessageStart[1] = 0xe9;
         pchMessageStart[2] = 0x27;
         pchMessageStart[3] = 0x64;
-        vAlertPubKey = ParseHex("04b7ecf0baa90495ceb4e4090f6b2fd37eec1e9c85fac68a487f3ce11589692e4a317479316ee814e066638e1db54e37a10689b70286e6315b1087b6615d179264");
+        vAlertPubKey = ParseHex("04b374b737ee4804b80306e35dd36fb86b8794477d752db086fb1ed0eede496745d3f4a6bcce521a568ea96bc2f8ce3d18e1fa7e08520d808bf46e1e8176df1d2f");
         nDefaultPort = 16125;
         nMaxTipAge = 24 * 60 * 60;
         nPruneAfterHeight = 100000;
@@ -123,6 +123,7 @@ public:
         vSeeds.push_back(CDNSSeedData("zelcash.tech", "dnsseed.zelcash.tech")); // Zelcash
         vSeeds.push_back(CDNSSeedData("node.zel.cash", "seed.zel.cash")); // Zelcash
         vSeeds.push_back(CDNSSeedData("node1.zel.cash", "dns.zel.cash")); // Zelcash
+        vSeeds.push_back(CDNSSeedData("vps.zelcash.online", "dnsseed.zelcash.online")); // TheTrunk
 
         // guarantees the first 2 characters, when base58 encoded, are "t1"
         base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0xB8};
@@ -150,11 +151,12 @@ public:
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
-            (0, consensus.hashGenesisBlock),
-            1516980000,     // * UNIX timestamp of last checkpoint block
-            0,         // * total number of transactions between genesis and last checkpoint
+            (0, consensus.hashGenesisBlock)
+            (5500, uint256S("0x0000000e7724f8bace09dd762657169c10622af4a6a8e959152cd00b9119848e")),
+            1517814694,     // * UNIX timestamp of last checkpoint block
+            11141,              // * total number of transactions between genesis and last checkpoint
                             //   (the tx=... number in the SetBestChain debug.log lines)
-            0            // * estimated number of transactions per day after checkpoint
+            1720            // * estimated number of transactions per day after checkpoint 720 newly mined +1000 for txs that users are doing
                             //   total number of tx / (checkpoint block height / (24 * 24))
         };
 
@@ -163,16 +165,16 @@ public:
 static CMainParams mainParams;
 
 /**
- * Testnet (v3)
+ * Testnet (v4)
  */
 class CTestNetParams : public CChainParams {
 public:
     CTestNetParams() {
         strNetworkID = "test";
-        strCurrencyUnits = "TAZ";
+        strCurrencyUnits = "TEL";
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 5000;
-        consensus.nSubsidyHalvingInterval = 840000;
+        consensus.nSubsidyHalvingInterval = 657850; // 2.5 years
         consensus.nMajorityEnforceBlockUpgrade = 51;
         consensus.nMajorityRejectBlockOutdated = 75;
         consensus.nMajorityWindow = 400;
@@ -186,7 +188,7 @@ public:
         pchMessageStart[1] = 0x1a;
         pchMessageStart[2] = 0xf9;
         pchMessageStart[3] = 0xbf;
-        vAlertPubKey = ParseHex("044e7a1553392325c871c5ace5d6ad73501c66f4c185d6b0453cf45dec5a1322e705c672ac1a27ef7cdaf588c10effdf50ed5f95f85f2f54a5f6159fca394ed0c6");
+        vAlertPubKey = ParseHex("046578ef01bb3a12ffcc2a14e63cdeb0fd037d7c08e6d1db8160d6e71e032e64505ddceae1ddffe97e1fa7108db66f11ee1d839978c9b8a6920d311f8a8a6aedb8");
         nDefaultPort = 26125;
         nMaxTipAge = 24 * 60 * 60;
         nPruneAfterHeight = 1000;
@@ -196,18 +198,18 @@ public:
         nEquihashK = K;
 
         genesis = CreateGenesisBlock(
-            1516970000,
+            1521043405,
             uint256S("0x0000000000000000000000000000000000000000000000000000000000000018"),
-            ParseHex("002b1a8c68c2a317fface1dc3c679197da92bfb7d63c3e0f4e715404d989ed495938cf5107f512bfead81531ffe1fedb78ddbc97f1c6b6da2c723a243a93cb2292f7e3c5531de39c3bd2537aca5069cd2a98146100cf55650632f61d9a7680ace9c530298e16389ba41294ccc1e469f56fbd1ee3efefa9b4b5168937107804ee6460944f693180b643429c5ec6ad45314b4d090d7f80a0e722276b6819316ae38d9ff498cd6fae23047194a84d42c9238a29e371ee3dbb560c9c50cad908075a72859f3e47b787eb16d06747aed0041f83b605b51f33338c5727bfa341e6602e0c8ca824261847134edeb6e70676868875715ac8f62b0109d82b13340b768580b9d273f3216443139e2c189e8ec9f6f82f47316c8e47d2c1e12490bba65075a39f9c0e5f26942df133a302cd088b4160f433dc4c57df5d93db23344d682b18cca7dc57948c67364cde37f5d8731d359200f57a953ac4b09e9a85b5d514df8296231e3febdc024ecb02525afdff48efa1bdbe50e78119c6a9d0ef0a1b8125e5248f0b503fc237ca1ba3c110dd4cc6b4741d8640bd677073cb6c1a365deeae8693e91af89902f90085d157e0f1d013d0c9e3b7018a3f5976acee5d99737ae6de3359cb04c6829fb637d3456a1fbc351ac72f6adf5d53d3b66c15b2dfdaa1f1764a71413c1bab51bcad488d02d24cd3a81e4c197258561fab33036ff699636c3b7b7681559d395cf04575cdbb92ec0a223b78087655d3ce9d1433f44095fe6617f96c9018fe32d68c0b83568ab1a93c19dcd7eb6e2e7eb7e027c3a427a4719ea1de41e4c9ad33bc071ec0fa0de806915d5504832b6ae1d073fca65223fe60e495b4b1440a97de58ef1769a991ba029ae847371b8fbd80cc09623ca78d84e587a70d1499885f5b6a0d6334605f6cefe3cb8adbe5bf1228396014689d368e1cda8aad02066221f1d772d2f772e10623118b79bad58f6b7f0c40128acc8ea801fd7b00d82e0e84eeb5e9df380d0543792cd30b38caa6bc007c58da9635ff1198104d29ffe3dfce4fdccb0c3172a0aa6f876ea9615d5a5e0badced3fcc40772ebaf23edd645781e477a99799437450ab45b8f035daf84b5726567185d6b1dd44633158f3f822824ca0d5e2761687099f27a78e7d8fb4c50a8c48a119bf8677113b518bf5446463cfe54bf3e05b92e256fd52c7d95164060d43d1fed60529e5e1b06b475738ce379ed57a6f0b0fb30ecd0e4fcca525a16d3cb94e513db3b4979037626fa3a511dad356f0d1df15e6f0399a7d0f92633b331f16ba6216eb19b2e070bff03e7ca9d936376091916d99eab3fa51d28f914ee1efe23e159735e587606e46bafaab7f05bf4721ca7b59599d0da2dc7631425675d984119525612e8300114928cf2bcc9f98e9487cf4cff3fcfe81ead9b02fd6db07d98ff0b09689150c75cfd49021e5561ec173119ccd5eb3bdffe3f045dec72413255bf3d4ecf047b670933fd37f3f58960711b0bd1a532cdcb95b417ad93e643e6b0497d8521a12b344b0cf5925aae4b133fbed77d8c64bdd6dfc26e0b41f7dd9a8ed5abca7ce61763aff46cd3b2ce9b7d56e54a5324bdbd17c117ccc5a1b0ca2c65edbdb76a9d56be728c09b7f21d317de6af669a533784ce73253b3b963d34f78b479204bad77b440a8a135ca7505662aff0f491d51d7c501542b2d407889599b95ea6b8bb60952a219d91b83125c40d4103e491b7b9b51266a4c060a4eabdaa690a4910e7bf17149ca90d37c7e33276956baa03bfff6906fc77ea6111ef7b9a77e0b92c6a2f01903fad7bfa22a6b72537999cc16e99a36278afd8f7a0f27d1fa71ed9a6044c12260d512e245318df03511c78173a522ed6ef6cb1ecbf1fb0d6ed6cfdfcd79fa82abf370c"),
+            ParseHex("004a3716c0cc99afe4d9b2eb5075e6fe20c8d45df45cf7a7a877f7a129c80f369f57bd4aab32fbfa4c7d157f9c9114dd977bb50cb7d123cba86e312e7f237e382de3dcd7b49167eea8664fdbe65b5f27d27a8d4902894b9c2f19ea65b842a0d28392be2cdc9e473f1109a143aac1043bb85063b1c036594470799e269e8b040d20de9a42843f3ed4d12b1820d32ccc365d81b428bb15f743f77767ce79f35d01eeaaf280af3dce15016bcc6cba18e00bef535040e7cc41a8b4ffd6568d4614e6d706316b05d39da7acf3dc325efd55fb72e60af5451d8bae6f93b2bef7997a65d6ab8097dfc22a11acad82505d1ef7029fd214ab9dc7a2795119bc0103674a86971cf30f9b473127b70d85627c0ed70b811af10da59d4cf55768eab6f417796652401a7860b10fe7db801058a60d72bd739bc45d453948bd3e54a5373ce1eb1e2f8fc3d7f3e8c5b9f3bfca7bb43c772a027a621d951e19b33f3963165850d1db85433e7d6e0dbe0924fc096b926514c3dd9de188f6e71f3c591307efa52a961eaf295b0dd26318ba0c8967443939d62441b75e9c6ea9eff49ae69a787041cdd9895215fe050b694b39cb4e84953a890d9174e99a5f37b3a066344b7c7b6a8ec72bd8ad24cf2ed3c91584c1f03cd21336dea2972987a55827c93dfa5a5d43416d3d21843a9fdbf1f6de6f31b2f495db1fbe07e5efae5f1435045484c679dad1e1916241f631ca8bd99fba6e338620356c6ed889f5e92b01436836b730a21fe75144f60aeda1876b4d80cf0792329a4a3fbe7ccc3e48aae72ff1d6569badf183b95155ed18eea00e410cf927a108c6e6e5b5d747f19e7e32a05ca0b763a5fdbe863010d5260d01db54acf284820aa5fa7b2cd03e6e68c6240de51d8fd52b3eab6c7360e0be7dde30ea3bbda0394a94f13a0ec76caead88abe7eeb3169c0ab689bd00fa76b347a08773928cc1a33c2365f52878ea436731477d8f602994e7cf03a362b25e0ca4dfa6abfeb50481f40e1312d40b6faca1696790d5450421fe659e1a549404a45083b29806d2a7d4197a32101bd78f3f0e39172065e41f558960f63faacd75a1d075f8c35435d22fa380b6739ff6c6a7fa7ef23ccf0f4ffc8c3a10829ef098a82f0b58c342beb35862c706d81d8a1a11a8ec33092272f9466cf5600f2c84ad8bc3503b9103705b9b004dead88dd6c2cb1fd7b96b04b03d4cd61c151566b9ec3359e5ce285577f70e1eed213b74710ecd7b4837d4bc2d1026d4e6c9fcfb55c9b2d18b3b12b88f31d98bc389652de67384cff141c5fe77719b171eb6579aec2855afd5a266a4fefe125f3fb813603b99f244f7f6e86de2b51696f2ce9fbf85861e659f229e4f715e1b9fd96588125e6fcef40211a1d6f0b826a4b1dfd8f0de9db6ab34986d470205d33cf34055027ee4f2a2e1a68fffda506291987ebe472b1b796b2698b97ab5e14db7169f926e853cba392ed6b927c90fbd82f783a9bc0166e3f431c6537621a26a18c9231cd7e9c02563369147adf3d24335ff4d204054f5590613363f339cb97b714b51b795729fb877a1d209561a54b2570eb57749b23a941569fe3519ca1d2f10dc2dcf9c0b89792bc9d622a44e28629985a3216f9b2b3cb2a38b1a95e0e181df06aa5a603fd3651c9e4282038455c5171a82d2f87225e064508279d704cecccf76d35f53b69f9c35159098205ada592a61053e599512c613cb7619c3e1097134fe2af4a7225bd3b36c4a2873fb0960e3f5dd45473486ecb88522c5083774f707dfabfab35bee979f11f174fe3c8b92136c78381812ba8a3cc2241d3321e2e3a1a33c68f6a1fd36343308c95ecb1882dd1b988ef4d6e27f91e681f29853a21b6badfd39ded1c532558336b7f74b42eb9b39ac93"),
             0x2007ffff, 4, 0);
         
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256S("0x050bbf622fdea636eb0e86886d964e80fde6f5030b6a04009d1b83ad45038254"));
+        assert(consensus.hashGenesisBlock == uint256S("0x0092081791f347d184d6d0d7d1544d99d0f51fb2948ffd2d6b3b620d8e18405a"));
         assert(genesis.hashMerkleRoot == uint256S("0x94c7aed6b2c67f1718006684bfc3b92081a2f19d59075691b189160d6f3aa13a"));
 
         vFixedSeeds.clear();
         vSeeds.clear();
-        vSeeds.push_back(CDNSSeedData("zelcash.tech", "dnsseed.testnet.zelcash.tech")); // Zelcash
+        vSeeds.push_back(CDNSSeedData("vps.testnet.zelcash.online", "dnsseedtestnet.zelcash.online")); // TheTrunk
 
         // guarantees the first 2 characters, when base58 encoded, are "tm"
         base58Prefixes[PUBKEY_ADDRESS]     = {0x1D,0x25};
@@ -236,17 +238,18 @@ public:
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
             (0, consensus.hashGenesisBlock),
-            1486897419,  // * UNIX timestamp of last checkpoint block
-            47163,       // * total number of transactions between genesis and last checkpoint
+            1521043405,  // * UNIX timestamp of last checkpoint block
+            0,           // * total number of transactions between genesis and last checkpoint
                          //   (the tx=... number in the SetBestChain debug.log lines)
-            715          //   total number of tx / (checkpoint block height / (24 * 24))
+            750          // * estimated number of transactions per day after checkpoint 720 newly mined +30 for txs that users are doing
+                         //   total number of tx / (checkpoint block height / (24 * 24))
         };
     }
 };
 static CTestNetParams testNetParams;
 
 /**
- * Regression test
+ * Regression test TODO
  */
 class CRegTestParams : public CChainParams {
 public:
