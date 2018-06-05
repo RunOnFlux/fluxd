@@ -20,6 +20,10 @@
 #include <mutex>
 #include "metrics.h"
 #include "crypto/equihash.h"
+
+extern double algoHashTotal[16];
+extern int algoHashHits[16];
+
 static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesisOutputScript, uint32_t nTime, const uint256& nNonce, const std::vector<unsigned char>& nSolution, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
 {
     CMutableTransaction txNew;
@@ -111,6 +115,8 @@ public:
         BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
         nEquihashN = N;
         nEquihashK = K;
+        //equihash_endblock = 100000 // change 
+        newalgo_startblock = 100000; //change
 
         genesis = CreateGenesisBlock(
             1516980000,
@@ -202,6 +208,8 @@ public:
         BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
         nEquihashN = N;
         nEquihashK = K;
+        //equihash_endblock = 10000 // change 
+        newalgo_startblock = 6400; //change
 
         genesis = CreateGenesisBlock(
             1521043405,
@@ -289,6 +297,8 @@ public:
         BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
         nEquihashN = N;
         nEquihashK = K;
+        //equihash_endblock = 10 // change 
+        newalgo_startblock = 1; //change
 
         genesis = CreateGenesisBlock(
             1296688602,

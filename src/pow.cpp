@@ -13,6 +13,7 @@
 #include "streams.h"
 #include "uint256.h"
 #include "util.h"
+#include "main.h"
 
 #include "sodium.h"
 
@@ -135,6 +136,12 @@ unsigned int LWMACalculateNextWorkRequired(const CBlockIndex* pindexLast, const 
 
 bool CheckEquihashSolution(const CBlockHeader *pblock, const CChainParams& params)
 {
+    //TODO some stuff for equihash_endblock, overlapping period
+    unsigned int b = params.Getnewalgo_startblock();
+    if (nHeight >= b) {
+        return true;
+    }
+
     unsigned int n = params.EquihashN();
     unsigned int k = params.EquihashK();
 
