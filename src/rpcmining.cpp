@@ -48,7 +48,7 @@ int64_t GetNetworkHashPS(int lookup, int height) {
 
     // If lookup is nonpositive, then use difficulty averaging window.
     if (lookup <= 0)
-        lookup = Params().GetConsensus().nPowAveragingWindow;
+        lookup = Params().GetConsensus().nDigishieldAveragingWindow;
 
     // If lookup is larger than chain, then set it to chain length.
     if (lookup > pb->nHeight)
