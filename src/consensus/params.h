@@ -52,7 +52,6 @@ struct Params {
     int64_t DigishieldMaxActualTimespan() const { return (DigishieldAveragingWindowTimespan() * (100 + nDigishieldMaxAdjustDown)) / 100; }
     /** Parameters for LWMA difficulty adjustment **/
     int64_t nZawyLWMAAveragingWindow;  // N
-    int64_t nZawyLWMAAdjustedWeight;  // k = (N+1)/2 * 0.9989^(500/N) * T
 };
 } // namespace Consensus
 

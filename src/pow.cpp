@@ -90,42 +90,34 @@ unsigned int DigishieldCalculateNextWorkRequired(arith_uint256 bnAvg,
 
 unsigned int LWMACalculateNextWorkRequired(const CBlockIndex* pindexLast, const Consensus::Params& params)
 {
-
-    const int T = params.nPowTargetSpacing;
-    const int N = params.nZawyLWMAAveragingWindow;
-    const int k = params.nZawyLWMAAdjustedWeight;
-    const int height = pindexLast->nHeight + 1;
+    // FTL = N * T / 20
+    const int64_t FTL = 360;
+    const int64_t T = params.nPowTargetSpacing;
+    const int64_t N = params.nZawyLWMAAveragingWindow;
+    const int64_t k = N*(N+1)*T/2;
+    const int height = pindexLast->nHeight;
     assert(height > N);
 
     arith_uint256 sum_target;
-    int t = 0, j = 0;
+    int64_t t = 0, j = 0, solvetime;
 
     // Loop through N most recent blocks.
-    for (int i = height - N; i < height; i++) {
+    for (int i = height - N+1; i <= height; i++) {
         const CBlockIndex* block = pindexLast->GetAncestor(i);
         const CBlockIndex* block_Prev = block->GetAncestor(i - 1);
-        int64_t solvetime = block->GetBlockTime() - block_Prev->GetBlockTime();
-
-        if (solvetime > 6 * T) { solvetime =  6 * T; }
-        if (solvetime < -5 * T) { solvetime = -5 * T; }
+        solvetime = block->GetBlockTime() - block_Prev->GetBlockTime();
+        solvetime = std::max(-FTL, std::min(solvetime, 6*T));
 
         j++;
-        t += solvetime * j;
+        t += solvetime * j;  // Weighted solvetime sum.
 
         arith_uint256 target;
         target.SetCompact(block->nBits);
-        sum_target += target / (k * N * N);
+        sum_target += target / (k * N);
     }
-    // Keep t reasonable in case strange solvetimes occurred.
-    if (t < N * k / 3) {
-        t = N * k / 3;
-    }
-
-    const arith_uint256 pow_limit = UintToArith256(params.powLimit);
+    // Keep t reasonable to >= 1/10 of expected t.
+    if (t < k/10 ) {   t = k/10;  }
     arith_uint256 next_target = t * sum_target;
-    if (next_target > pow_limit) {
-        next_target = pow_limit;
-    }
 
     /// debug print
     LogPrint("pow", "GetNextWorkRequired RETARGET LWMA\n");
