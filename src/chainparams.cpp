@@ -97,7 +97,7 @@ public:
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPowTargetSpacing = 2 * 60;
-        consensus.zawyLWMAHeight = 100000; //TODO
+        consensus.zawyLWMAHeight = 107900; //TODO
         consensus.nZawyLWMAAveragingWindow = 60;
         /**
          * The message start string should be awesome! ⓩ❤
@@ -114,8 +114,7 @@ public:
         BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
         nEquihashN = N;
         nEquihashK = K;
-        //equihash_endblock = 100000 // change 
-        newalgo_startblock = 100000; //change
+        newalgo_startblock = 108000; //change
 
         genesis = CreateGenesisBlock(
             1516980000,
@@ -192,7 +191,7 @@ public:
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPowTargetSpacing = 2 * 60;
-        consensus.zawyLWMAHeight = 6350; //TODO
+        consensus.zawyLWMAHeight = 80; //TODO
         consensus.nZawyLWMAAveragingWindow = 60;
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -206,8 +205,7 @@ public:
         BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
         nEquihashN = N;
         nEquihashK = K;
-        //equihash_endblock = 10000 // change 
-        newalgo_startblock = 6400; //change
+        newalgo_startblock = 100; //change
 
         genesis = CreateGenesisBlock(
             1521043405,
@@ -294,7 +292,6 @@ public:
         BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
         nEquihashN = N;
         nEquihashK = K;
-        //equihash_endblock = 10 // change 
         newalgo_startblock = 1; //change
 
         genesis = CreateGenesisBlock(
