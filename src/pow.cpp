@@ -98,10 +98,10 @@ unsigned int LWMACalculateNextWorkRequired(const CBlockIndex* pindexLast, const 
     int64_t N;
     const int height = pindexLast->nHeight;
     if (height >= params.zawyLWMAHeight && height <= newalgostart + 80) {
-        N = params.nZawyLWMAAveragingWindow / 6;
+        N = params.nZawyLWMAAveragingWindow / 3;
     }
     else if (height > newalgostart + 80 && height <= newalgostart + 160) {
-        N = (params.nZawyLWMAAveragingWindow * 3) / 4;
+        N = (params.nZawyLWMAAveragingWindow * 2) / 3;
     }
     else {
         N = params.nZawyLWMAAveragingWindow;
