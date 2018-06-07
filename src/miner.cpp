@@ -503,6 +503,9 @@ void static RavenMiner()
 
     LogPrint("pow", "Using X16 solver");
 
+    std::vector<unsigned char> solnPlaceholder = std::vector<unsigned char>();
+    solnPlaceholder.resize(Eh200_9.SolutionWidth);
+
     std::mutex m_cs;
     bool cancelSolver = false;
     boost::signals2::connection c = uiInterface.NotifyBlockTip.connect(
@@ -570,12 +573,12 @@ void static RavenMiner()
             //
             int64_t nStart = GetTime();
             arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+
+            pblock->nSolution = solnPlaceholder;
+
             while (true)
             {
-
                 uint256 hash;
-                while (true)
-                {
                     hash = pblock->GetHash();
                     solutionTargetChecks.increment();
                     if (UintToArith256(hash) <= hashTarget)
@@ -626,7 +629,6 @@ void static RavenMiner()
                 // Update nTime every few seconds
                 UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
             }
-        }
     }
     catch (const boost::thread_interrupted&)
     {
