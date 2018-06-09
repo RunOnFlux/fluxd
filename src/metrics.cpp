@@ -312,7 +312,7 @@ int printMetrics(size_t cols, bool mining)
     }
 
     if (mining && loaded) {
-        std::cout << "- " << strprintf(_("You have completed %d Equihash solver runs."), ehSolverRuns.get()) << std::endl;
+        std::cout << "- " << strprintf(_("You have completed %d solver runs."), ehSolverRuns.get()) << std::endl;
         lines++;
 
         int mined = 0;
