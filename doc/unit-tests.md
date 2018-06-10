@@ -1,3 +1,5 @@
+*** Warning: This document has not been updated for Zelcash and may be inaccurate. ***
+
 Compiling/running automated tests
 ---------------------------------
 

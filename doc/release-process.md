@@ -1,3 +1,5 @@
+*** Warning: This document has not been updated for Zelcash and may be inaccurate. ***
+
 Release Process
 ====================
 Meta: There should always be a single release engineer to disambiguate responsibility.
@@ -16,11 +18,11 @@ is a common reason.)
 
 Check that dependencies are properly hosted by looking at the `check-depends` builder:
 
-  https://ci.zel.cash/#/builders/1
+  https://ci.z.cash/#/builders/1
 
 Check that there are no surprising performance regressions:
 
-  https://speed.zel.cash
+  https://speed.z.cash
 
 Ensure that new performance metrics appear on that site.
 
@@ -104,14 +106,14 @@ signed. **CAUTION:** Remember the `v` at the beginning here:
 
 ## Make and deploy deterministic builds
 
-- Run the [Gitian deterministic build environment](https://github.com/zelcash/zelcash-gitian)
-- Compare the uploaded [build manifests on gitian.sigs](https://github.com/zelcash/gitian.sigs)
+- Run the [Gitian deterministic build environment](https://github.com/zcash/zcash-gitian)
+- Compare the uploaded [build manifests on gitian.sigs](https://github.com/zcash/gitian.sigs)
 - If all is well, the DevOps engineer will build the Debian packages and update the
-  [apt.zel.cash package repository](https://apt.zel.cash).
+  [apt.z.cash package repository](https://apt.z.cash).
 
 ## Add release notes to GitHub
 
-- Go to the [GitHub tags page](https://github.com/zelcash/zelcash/tags).
+- Go to the [GitHub tags page](https://github.com/zcash/zcash/tags).
 - Click "Add release notes" beside the tag for this release.
 - Copy the release blog post into the release description, and edit to suit
   publication on GitHub. See previous release notes for examples.
@@ -132,7 +134,7 @@ the marking to see what GitHub wants to be done.
 Notify the Zelcash DevOps engineer/sysadmin that the release has been tagged. They update some variables in the company's automation code and then run an Ansible playbook, which:
 
 * builds Zelcash based on the specified branch
-* deploys it as a public service (e.g. betatestnet.zel.cash, mainnet.zel.cash)
+* deploys it as a public service (e.g. betatestnet.z.cash, mainnet.z.cash)
 * often the same server can be re-used, and the role idempotently handles upgrades, but if not then they also need to update DNS records
 * possible manual steps: blowing away the `testnet3` dir, deleting old parameters, restarting DNS seeder
 
@@ -140,10 +142,10 @@ Then, verify that nodes can connect to the testnet server, and update the guide 
 
 ### Update the 1.0 User Guide
 
-This also means updating [the translations](https://github.com/zelcash/zelcash-docs).
+This also means updating [the translations](https://github.com/zcash/zcash-docs).
 Coordinate with the translation team for now. Suggestions for improving this
 part of the process should be added to #2596.
 
-### Publish the release announcement (blog, github, zelcash-dev, slack)
+### Publish the release announcement (blog, github, zcash-dev, slack)
 
 ## Celebrate

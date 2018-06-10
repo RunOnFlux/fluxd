@@ -1,7 +1,7 @@
 Source: zelcash
 Section: utils
 Priority: optional
-Maintainer: Zelcash Foundation <team@zel.cash>
+Maintainer: Zelcash Technologies <info@zel.cash>
 Homepage: https://zel.cash
 Build-Depends: autoconf, automake, bsdmainutils, build-essential,
  git, g++-multilib, libc6-dev, libtool,

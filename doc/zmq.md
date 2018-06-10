@@ -1,3 +1,5 @@
+*** Warning: This document has not been updated for Zelcash and may be inaccurate. ***
+
 # Block and Transaction Broadcasting With ZeroMQ
 
 [ZeroMQ](http://zeromq.org/) is a lightweight wrapper around TCP

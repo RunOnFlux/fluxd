@@ -159,11 +159,14 @@ public:
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
             (0, consensus.hashGenesisBlock)
-            (5500, uint256S("0x0000000e7724f8bace09dd762657169c10622af4a6a8e959152cd00b9119848e")),
-            1517814694,     // * UNIX timestamp of last checkpoint block
-            11141,              // * total number of transactions between genesis and last checkpoint
+            (5500, uint256S("0x0000000e7724f8bace09dd762657169c10622af4a6a8e959152cd00b9119848e"))
+            (35000, uint256S("0x000000004646dd797644b9c67aff320961e95c311b4f26985424b720d09fcaa5"))
+            (70000, uint256S("0x00000001edcf7768ed39fac55414e53a78d077b1b41fccdaf9307d7bc219626a"))
+            (94071, uint256S("0x00000005ec83876bc5288badf0971ae83ac7c6a286851f7b22a75a03e73b401a")), //Halep won French Open 2018
+            1528556469,     // * UNIX timestamp of last checkpoint block
+            248945,              // * total number of transactions between genesis and last checkpoint
                             //   (the tx=... number in the SetBestChain debug.log lines)
-            1720            // * estimated number of transactions per day after checkpoint 720 newly mined +1000 for txs that users are doing
+            1525            // * estimated number of transactions per day
                             //   total number of tx / (checkpoint block height / (24 * 24))
         };
 
