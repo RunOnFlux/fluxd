@@ -20,6 +20,10 @@
 #include <mutex>
 #include "metrics.h"
 #include "crypto/equihash.h"
+
+extern double algoHashTotal[16];
+extern int algoHashHits[16];
+
 static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesisOutputScript, uint32_t nTime, const uint256& nNonce, const std::vector<unsigned char>& nSolution, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
 {
     CMutableTransaction txNew;
@@ -88,11 +92,13 @@ public:
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 4000;
         consensus.powLimit = uint256S("0007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        consensus.nPowAveragingWindow = 17;
-        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nPowAveragingWindow);
-        consensus.nPowMaxAdjustDown = 32; // 32% adjustment down
-        consensus.nPowMaxAdjustUp = 16; // 16% adjustment up
+        consensus.nDigishieldAveragingWindow = 17;
+        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
+        consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
+        consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPowTargetSpacing = 2 * 60;
+        consensus.zawyLWMAHeight = 107900; //TODO
+        consensus.nZawyLWMAAveragingWindow = 60;
         /**
          * The message start string should be awesome! ⓩ❤
          */
@@ -108,6 +114,7 @@ public:
         BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
         nEquihashN = N;
         nEquihashK = K;
+        newalgo_startblock = 108000; //change
 
         genesis = CreateGenesisBlock(
             1516980000,
@@ -152,11 +159,14 @@ public:
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
             (0, consensus.hashGenesisBlock)
-            (5500, uint256S("0x0000000e7724f8bace09dd762657169c10622af4a6a8e959152cd00b9119848e")),
-            1517814694,     // * UNIX timestamp of last checkpoint block
-            11141,              // * total number of transactions between genesis and last checkpoint
+            (5500, uint256S("0x0000000e7724f8bace09dd762657169c10622af4a6a8e959152cd00b9119848e"))
+            (35000, uint256S("0x000000004646dd797644b9c67aff320961e95c311b4f26985424b720d09fcaa5"))
+            (70000, uint256S("0x00000001edcf7768ed39fac55414e53a78d077b1b41fccdaf9307d7bc219626a"))
+            (94071, uint256S("0x00000005ec83876bc5288badf0971ae83ac7c6a286851f7b22a75a03e73b401a")), //Halep won French Open 2018
+            1528556469,     // * UNIX timestamp of last checkpoint block
+            248945,              // * total number of transactions between genesis and last checkpoint
                             //   (the tx=... number in the SetBestChain debug.log lines)
-            1720            // * estimated number of transactions per day after checkpoint 720 newly mined +1000 for txs that users are doing
+            1525            // * estimated number of transactions per day
                             //   total number of tx / (checkpoint block height / (24 * 24))
         };
 
@@ -179,11 +189,13 @@ public:
         consensus.nMajorityRejectBlockOutdated = 75;
         consensus.nMajorityWindow = 400;
         consensus.powLimit = uint256S("07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        consensus.nPowAveragingWindow = 17;
-        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nPowAveragingWindow);
-        consensus.nPowMaxAdjustDown = 32; // 32% adjustment down
-        consensus.nPowMaxAdjustUp = 16; // 16% adjustment up
+        consensus.nDigishieldAveragingWindow = 17;
+        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
+        consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
+        consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPowTargetSpacing = 2 * 60;
+        consensus.zawyLWMAHeight = 80; //TODO
+        consensus.nZawyLWMAAveragingWindow = 60;
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
         pchMessageStart[2] = 0xf9;
@@ -196,6 +208,7 @@ public:
         BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
         nEquihashN = N;
         nEquihashK = K;
+        newalgo_startblock = 100; //change
 
         genesis = CreateGenesisBlock(
             1521043405,
@@ -263,11 +276,13 @@ public:
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 1000;
         consensus.powLimit = uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
-        consensus.nPowAveragingWindow = 17;
-        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nPowAveragingWindow);
-        consensus.nPowMaxAdjustDown = 0; // Turn off adjustment down
-        consensus.nPowMaxAdjustUp = 0; // Turn off adjustment up
+        consensus.nDigishieldAveragingWindow = 17;
+        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
+        consensus.nDigishieldMaxAdjustDown = 0; // Turn off adjustment down
+        consensus.nDigishieldMaxAdjustUp = 0; // Turn off adjustment up
         consensus.nPowTargetSpacing = 2 * 60;
+        consensus.zawyLWMAHeight = 10; //TODO
+        consensus.nZawyLWMAAveragingWindow = 60;
 
         pchMessageStart[0] = 0xaa;
         pchMessageStart[1] = 0xe8;
@@ -280,6 +295,7 @@ public:
         BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
         nEquihashN = N;
         nEquihashK = K;
+        newalgo_startblock = 1; //change
 
         genesis = CreateGenesisBlock(
             1296688602,

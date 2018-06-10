@@ -99,7 +99,7 @@ public:
 
 void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev)
 {
-    pblock->nTime = std::max(pindexPrev->GetMedianTimePast()+1, GetAdjustedTime());
+    pblock->nTime = std::max(pindexPrev->GetMedianTimePast() + 1, GetAdjustedTime());
 }
 
 CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
@@ -107,12 +107,12 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
     const CChainParams& chainparams = Params();
     // Create new block
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
-    if(!pblocktemplate.get())
+    if (!pblocktemplate.get())
         return NULL;
     CBlock *pblock = &pblocktemplate->block; // pointer for convenience
 
-    // -regtest only: allow overriding block.nVersion with
-    // -blockversion=N to test forking scenarios
+                                             // -regtest only: allow overriding block.nVersion with
+                                             // -blockversion=N to test forking scenarios
     if (Params().MineBlocksOnDemand())
         pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
 
@@ -121,10 +121,10 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
     pblocktemplate->vTxFees.push_back(-1); // updated at end
     pblocktemplate->vTxSigOps.push_back(-1); // updated at end
 
-    // Largest block you're willing to create:
+                                             // Largest block you're willing to create:
     unsigned int nBlockMaxSize = GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE);
     // Limit to betweeen 1K and MAX_BLOCK_SIZE-1K for sanity:
-    nBlockMaxSize = std::max((unsigned int)1000, std::min((unsigned int)(MAX_BLOCK_SIZE-1000), nBlockMaxSize));
+    nBlockMaxSize = std::max((unsigned int)1000, std::min((unsigned int)(MAX_BLOCK_SIZE - 1000), nBlockMaxSize));
 
     // How much of the block should be dedicated to high-priority transactions,
     // included regardless of the fees they pay
@@ -156,13 +156,13 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         vector<TxPriority> vecPriority;
         vecPriority.reserve(mempool.mapTx.size());
         for (map<uint256, CTxMemPoolEntry>::iterator mi = mempool.mapTx.begin();
-             mi != mempool.mapTx.end(); ++mi)
+            mi != mempool.mapTx.end(); ++mi)
         {
             const CTransaction& tx = mi->second.GetTx();
 
             int64_t nLockTimeCutoff = (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST)
-                                    ? nMedianTimePast
-                                    : pblock->GetBlockTime();
+                ? nMedianTimePast
+                : pblock->GetBlockTime();
 
             if (tx.IsCoinBase() || !IsFinalTx(tx, nHeight, nLockTimeCutoff))
                 continue;
@@ -222,7 +222,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             uint256 hash = tx.GetHash();
             mempool.ApplyDeltas(hash, dPriority, nTotalIn);
 
-            CFeeRate feeRate(nTotalIn-tx.GetValueOut(), nTxSize);
+            CFeeRate feeRate(nTotalIn - tx.GetValueOut(), nTxSize);
 
             if (porphan)
             {
@@ -283,7 +283,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             if (!view.HaveInputs(tx))
                 continue;
 
-            CAmount nTxFees = view.GetValueIn(tx)-tx.GetValueOut();
+            CAmount nTxFees = view.GetValueIn(tx) - tx.GetValueOut();
 
             nTxSigOps += GetP2SHSigOpCount(tx, view);
             if (nBlockSigOps + nTxSigOps >= MAX_BLOCK_SIGOPS)
@@ -342,7 +342,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         txNew.vout.resize(1);
         txNew.vout[0].scriptPubKey = scriptPubKeyIn;
         txNew.vout[0].nValue = GetBlockSubsidy(nHeight, chainparams.GetConsensus());
-        
+
         // Add fees
         txNew.vout[0].nValue += nFees;
         txNew.vin[0].scriptSig = CScript() << nHeight << OP_0;
@@ -358,10 +358,10 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         pblock->nNonce = ArithToUint256(nonce);
 
         // Fill in header
-        pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
-        pblock->hashReserved   = uint256();
+        pblock->hashPrevBlock = pindexPrev->GetBlockHash();
+        pblock->hashReserved = uint256();
         UpdateTime(pblock, Params().GetConsensus(), pindexPrev);
-        pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
+        pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
         pblock->nSolution.clear();
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
 
@@ -383,7 +383,8 @@ boost::optional<CScript> GetMinerScriptPubKey()
     CBitcoinAddress addr;
     if (addr.SetString(GetArg("-mineraddress", ""))) {
         addr.GetKeyID(keyID);
-    } else {
+    }
+    else {
 #ifdef ENABLE_WALLET
         CPubKey pubkey;
         if (!reservekey.GetReservedKey(pubkey)) {
@@ -432,7 +433,7 @@ void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& 
         hashPrevBlock = pblock->hashPrevBlock;
     }
     ++nExtraNonce;
-    unsigned int nHeight = pindexPrev->nHeight+1; // Height first in coinbase required for block.version=2
+    unsigned int nHeight = pindexPrev->nHeight + 1; // Height first in coinbase required for block.version=2
     CMutableTransaction txCoinbase(pblock->vtx[0]);
     txCoinbase.vin[0].scriptSig = (CScript() << nHeight << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;
     assert(txCoinbase.vin[0].scriptSig.size() <= 100);
@@ -479,6 +480,171 @@ static bool ProcessBlockFound(CBlock* pblock)
 
     return true;
 }
+#ifdef ENABLE_WALLET
+void static RavenMiner(CWallet *pwallet)
+#else
+void static RavenMiner()
+#endif
+{
+    LogPrintf("RavenMiner -- started\n");
+    SetThreadPriority(THREAD_PRIORITY_LOWEST);
+    RenameThread("raven-miner");
+    const CChainParams& chainparams = Params();
+
+#ifdef ENABLE_WALLET
+    // Each thread has its own key
+    CReserveKey reservekey(pwallet);
+#endif
+
+    unsigned int nExtraNonce = 0;
+
+    LogPrint("pow", "Using X16 solver\n");
+
+    std::vector<unsigned char> solnPlaceholder = std::vector<unsigned char>();
+    solnPlaceholder.resize(Eh200_9.SolutionWidth);
+
+    std::mutex m_cs;
+    bool cancelSolver = false;
+    boost::signals2::connection c = uiInterface.NotifyBlockTip.connect(
+        [&m_cs, &cancelSolver](const uint256& hashNewTip) mutable {
+        std::lock_guard<std::mutex> lock{ m_cs };
+        cancelSolver = true;
+    }
+    );
+    miningTimer.start();
+
+    try {
+        // Throw an error if no script was provided.  This can happen
+        // due to some internal error but also if the keypool is empty.
+        // In the latter case, already the pointer is NULL.
+
+        while (true) {
+
+            if (chainparams.MiningRequiresPeers()) {
+                // Busy-wait for the network to come online so we don't waste time mining
+                // on an obsolete chain. In regtest mode we expect to fly solo.
+                miningTimer.stop();
+                do {
+                    bool fvNodesEmpty;
+                    {
+                        LOCK(cs_vNodes);
+                        fvNodesEmpty = vNodes.empty();
+                    }
+                    if (!fvNodesEmpty && !IsInitialBlockDownload())
+                        break;
+                    MilliSleep(1000);
+                } while (true);
+                miningTimer.start();
+            }
+
+
+            //
+            // Create new block
+            //
+            unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
+            CBlockIndex* pindexPrev = chainActive.Tip();
+
+#ifdef ENABLE_WALLET
+            unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey));
+#else
+            unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey());
+#endif
+            if (!pblocktemplate.get())
+            {
+                if (GetArg("-mineraddress", "").empty()) {
+                    LogPrintf("Error in RavenZelcashMiner: Keypool ran out, please call keypoolrefill before restarting the mining thread\n");
+                }
+                else {
+                    // Should never reach here, because -mineraddress validity is checked in init.cpp
+                    LogPrintf("Error in RavenZelcashMiner: Invalid -mineraddress\n");
+                }
+                return;
+            }
+            CBlock *pblock = &pblocktemplate->block;
+            IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
+
+            LogPrintf("Running ZelcashMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
+                ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
+
+            //
+            // Search
+            //
+            int64_t nStart = GetTime();
+            arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+
+            pblock->nSolution = solnPlaceholder;
+
+            while (true)
+            {
+                uint256 hash;
+                while (true)
+                {
+                    hash = pblock->GetHash();
+                    solutionTargetChecks.increment();
+                    if (UintToArith256(hash) <= hashTarget)
+                    {
+                        // Found a solution
+                        SetThreadPriority(THREAD_PRIORITY_NORMAL);
+                        LogPrintf("RavenZelcashMiner:\n");
+                        LogPrintf("proof-of-work found  \n  hash: %s  \ntarget: %s\n", pblock->GetHash().GetHex(), hashTarget.GetHex());
+#ifdef ENABLE_WALLET
+                        if (ProcessBlockFound(pblock, *pwallet, reservekey)) {
+#else
+                        if (ProcessBlockFound(pblock)) {
+#endif
+                            // Ignore chain updates caused by us
+                            std::lock_guard<std::mutex> lock{ m_cs };
+                            cancelSolver = false;
+                        }
+                        SetThreadPriority(THREAD_PRIORITY_LOWEST);
+
+                        // In regression test mode, stop mining after a block is found. This
+                        // allows developers to controllably generate a block on demand.
+                        if (chainparams.MineBlocksOnDemand())
+                            throw boost::thread_interrupted();
+
+                        break;
+                        }
+                    pblock->nNonce = ArithToUint256(UintToArith256(pblock->nNonce) + 1);
+                    ehSolverRuns.increment();
+                    if ((UintToArith256(pblock->nNonce) & 0xFF) == 0)
+                        break;
+                    }
+
+                // Check for stop or if block needs to be rebuilt
+                boost::this_thread::interruption_point();
+                // Regtest mode doesn't require peers
+                //if (vNodes.empty() && chainparams.MiningRequiresPeers())
+                //    break;
+                if (UintToArith256(pblock->nNonce) >= 0xffff0000)
+                    break;
+                if (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 60)
+                    break;
+                if (pindexPrev != chainActive.Tip())
+                    break;
+
+                // Update nTime every few seconds
+                UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
+                }
+            }
+        }
+    catch (const boost::thread_interrupted&)
+    {
+        miningTimer.stop();
+        c.disconnect();
+        LogPrintf("RavenZelcashMiner terminated\n");
+        throw;
+    }
+    catch (const std::runtime_error &e)
+    {
+        miningTimer.stop();
+        c.disconnect();
+        LogPrintf("RavenZelcashMiner runtime error: %s\n", e.what());
+        return;
+    }
+    miningTimer.stop();
+    c.disconnect();
+    }
 
 #ifdef ENABLE_WALLET
 void static BitcoinMiner(CWallet *pwallet)
@@ -490,6 +656,8 @@ void static BitcoinMiner()
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
     RenameThread("zelcash-miner");
     const CChainParams& chainparams = Params();
+    unsigned int newAlgoHeight = chainparams.Getnewalgo_startblock();
+    LogPrint("pow", "Block height of algo swap: %s\n", newAlgoHeight);
 
 #ifdef ENABLE_WALLET
     // Each thread has its own key
@@ -504,15 +672,16 @@ void static BitcoinMiner()
 
     std::string solver = GetArg("-equihashsolver", "default");
     assert(solver == "tromp" || solver == "default");
+
     LogPrint("pow", "Using Equihash solver \"%s\" with n = %u, k = %u\n", solver, n, k);
 
     std::mutex m_cs;
     bool cancelSolver = false;
     boost::signals2::connection c = uiInterface.NotifyBlockTip.connect(
         [&m_cs, &cancelSolver](const uint256& hashNewTip) mutable {
-            std::lock_guard<std::mutex> lock{m_cs};
-            cancelSolver = true;
-        }
+        std::lock_guard<std::mutex> lock{ m_cs };
+        cancelSolver = true;
+    }
     );
     miningTimer.start();
 
@@ -550,7 +719,8 @@ void static BitcoinMiner()
             {
                 if (GetArg("-mineraddress", "").empty()) {
                     LogPrintf("Error in ZelcashMiner: Keypool ran out, please call keypoolrefill before restarting the mining thread\n");
-                } else {
+                }
+                else {
                     // Should never reach here, because -mineraddress validity is checked in init.cpp
                     LogPrintf("Error in ZelcashMiner: Invalid -mineraddress\n");
                 }
@@ -574,7 +744,7 @@ void static BitcoinMiner()
                 EhInitialiseState(n, k, state);
 
                 // I = the block header minus nonce and solution.
-                CEquihashInput I{*pblock};
+                CEquihashInput I{ *pblock };
                 CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                 ss << I;
 
@@ -585,20 +755,20 @@ void static BitcoinMiner()
                 crypto_generichash_blake2b_state curr_state;
                 curr_state = state;
                 crypto_generichash_blake2b_update(&curr_state,
-                                                  pblock->nNonce.begin(),
-                                                  pblock->nNonce.size());
+                    pblock->nNonce.begin(),
+                    pblock->nNonce.size());
 
                 // (x_1, x_2, ...) = A(I, V, n, k)
                 LogPrint("pow", "Running Equihash solver \"%s\" with nNonce = %s\n",
-                         solver, pblock->nNonce.ToString());
+                    solver, pblock->nNonce.ToString());
 
                 std::function<bool(std::vector<unsigned char>)> validBlock =
 #ifdef ENABLE_WALLET
-                        [&pblock, &hashTarget, &pwallet, &reservekey, &m_cs, &cancelSolver, &chainparams]
+                    [&pblock, &hashTarget, &pwallet, &reservekey, &m_cs, &cancelSolver, &chainparams]
 #else
-                        [&pblock, &hashTarget, &m_cs, &cancelSolver, &chainparams]
+                    [&pblock, &hashTarget, &m_cs, &cancelSolver, &chainparams]
 #endif
-                        (std::vector<unsigned char> soln) {
+                (std::vector<unsigned char> soln) {
                     // Write the solution to the hash and compute the result.
                     LogPrint("pow", "- Checking solution against target\n");
                     pblock->nSolution = soln;
@@ -618,7 +788,7 @@ void static BitcoinMiner()
                     if (ProcessBlockFound(pblock)) {
 #endif
                         // Ignore chain updates caused by us
-                        std::lock_guard<std::mutex> lock{m_cs};
+                        std::lock_guard<std::mutex> lock{ m_cs };
                         cancelSolver = false;
                     }
                     SetThreadPriority(THREAD_PRIORITY_LOWEST);
@@ -631,9 +801,9 @@ void static BitcoinMiner()
                     }
 
                     return true;
-                };
+                    };
                 std::function<bool(EhSolverCancelCheck)> cancelled = [&m_cs, &cancelSolver](EhSolverCancelCheck pos) {
-                    std::lock_guard<std::mutex> lock{m_cs};
+                    std::lock_guard<std::mutex> lock{ m_cs };
                     return cancelSolver;
                 };
 
@@ -648,7 +818,7 @@ void static BitcoinMiner()
                     eq.xfull = eq.bfull = eq.hfull = 0;
                     eq.showbsizes(0);
                     for (u32 r = 1; r < WK; r++) {
-                        (r&1) ? eq.digitodd(r, 0) : eq.digiteven(r, 0);
+                        (r & 1) ? eq.digitodd(r, 0) : eq.digiteven(r, 0);
                         eq.xfull = eq.bfull = eq.hfull = 0;
                         eq.showbsizes(r);
                     }
@@ -657,7 +827,7 @@ void static BitcoinMiner()
 
                     // Convert solution indices to byte array (decompress) and pass it to validBlock method.
                     for (size_t s = 0; s < eq.nsols; s++) {
-                        LogPrint("pow", "Checking solution %d\n", s+1);
+                        LogPrint("pow", "Checking solution %d\n", s + 1);
                         std::vector<eh_index> index_vector(PROOFSIZE);
                         for (size_t i = 0; i < PROOFSIZE; i++) {
                             index_vector[i] = eq.sols[s][i];
@@ -670,7 +840,8 @@ void static BitcoinMiner()
                             break;
                         }
                     }
-                } else {
+                }
+                else {
                     try {
                         // If we find a valid block, we rebuild
                         bool found = EhOptimisedSolve(n, k, curr_state, validBlock, cancelled);
@@ -678,14 +849,16 @@ void static BitcoinMiner()
                         if (found) {
                             break;
                         }
-                    } catch (EhSolverCancelledException&) {
+                    }
+                    catch (EhSolverCancelledException&) {
                         LogPrint("pow", "Equihash solver cancelled\n");
-                        std::lock_guard<std::mutex> lock{m_cs};
+                        std::lock_guard<std::mutex> lock{ m_cs };
                         cancelSolver = false;
                     }
                 }
 
                 // Check for stop or if block needs to be rebuilt
+                unsigned int nHeight = chainActive.Height();
                 boost::this_thread::interruption_point();
                 // Regtest mode doesn't require peers
                 if (vNodes.empty() && chainparams.MiningRequiresPeers())
@@ -696,13 +869,19 @@ void static BitcoinMiner()
                     break;
                 if (pindexPrev != chainActive.Tip())
                     break;
+                if (nHeight >= newAlgoHeight) {
+                    LogPrint("pow", "Changing mining algorithm\n");
+                    miningTimer.stop();
+                    c.disconnect();
+                    return;
+                }
 
                 // Update nNonce and nTime
                 pblock->nNonce = ArithToUint256(UintToArith256(pblock->nNonce) + 1);
                 UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
+                }
             }
         }
-    }
     catch (const boost::thread_interrupted&)
     {
         miningTimer.stop();
@@ -719,7 +898,7 @@ void static BitcoinMiner()
     }
     miningTimer.stop();
     c.disconnect();
-}
+    }
 
 #ifdef ENABLE_WALLET
 void GenerateBitcoins(bool fGenerate, CWallet* pwallet, int nThreads)
@@ -728,7 +907,10 @@ void GenerateBitcoins(bool fGenerate, int nThreads)
 #endif
 {
     static boost::thread_group* minerThreads = NULL;
-
+    const CChainParams& chainparams = Params();
+    unsigned int nHeight = chainActive.Height();
+    unsigned int newAlgoHeight = chainparams.Getnewalgo_startblock();
+    LogPrint("pow", "Block height of algo swap: %s\n", newAlgoHeight);
     if (nThreads < 0)
         nThreads = GetNumCores();
 
@@ -745,9 +927,19 @@ void GenerateBitcoins(bool fGenerate, int nThreads)
     minerThreads = new boost::thread_group();
     for (int i = 0; i < nThreads; i++) {
 #ifdef ENABLE_WALLET
-        minerThreads->create_thread(boost::bind(&BitcoinMiner, pwallet));
+        if (nHeight < newAlgoHeight) {
+            minerThreads->create_thread(boost::bind(&BitcoinMiner, pwallet));
+        }
+        else {
+            minerThreads->create_thread(boost::bind(&RavenMiner, pwallet));
+        }
 #else
-        minerThreads->create_thread(&BitcoinMiner);
+        if (nHeight < newAlgoHeight) {
+            minerThreads->create_thread(&BitcoinMiner);
+        }
+        else {
+            minerThreads->create_thread(&RavenMiner);
+        }
 #endif
     }
 }

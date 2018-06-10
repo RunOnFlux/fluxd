@@ -13,6 +13,7 @@
 #include "streams.h"
 #include "uint256.h"
 #include "util.h"
+#include "main.h"
 
 #include "sodium.h"
 
@@ -31,7 +32,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     // Find the first block in the averaging interval
     const CBlockIndex* pindexFirst = pindexLast;
     arith_uint256 bnTot {0};
-    for (int i = 0; pindexFirst && i < params.nPowAveragingWindow; i++) {
+    for (int i = 0; pindexFirst && i < params.nDigishieldAveragingWindow; i++) {
         arith_uint256 bnTmp;
         bnTmp.SetCompact(pindexFirst->nBits);
         bnTot += bnTmp;
@@ -42,12 +43,18 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     if (pindexFirst == NULL)
         return nProofOfWorkLimit;
 
-    arith_uint256 bnAvg {bnTot / params.nPowAveragingWindow};
-
-    return CalculateNextWorkRequired(bnAvg, pindexLast->GetMedianTimePast(), pindexFirst->GetMedianTimePast(), params);
+    arith_uint256 bnAvg {bnTot / params.nDigishieldAveragingWindow};
+    
+    //Difficulty algo
+    int nHeight = pindexLast->nHeight + 1;
+    if (nHeight < params.zawyLWMAHeight) {
+        return DigishieldCalculateNextWorkRequired(bnAvg, pindexLast->GetMedianTimePast(), pindexFirst->GetMedianTimePast(), params);
+    } else {
+        return LWMACalculateNextWorkRequired(pindexLast, params);
+    }
 }
 
-unsigned int CalculateNextWorkRequired(arith_uint256 bnAvg,
+unsigned int DigishieldCalculateNextWorkRequired(arith_uint256 bnAvg,
                                        int64_t nLastBlockTime, int64_t nFirstBlockTime,
                                        const Consensus::Params& params)
 {
@@ -55,34 +62,91 @@ unsigned int CalculateNextWorkRequired(arith_uint256 bnAvg,
     // Use medians to prevent time-warp attacks
     int64_t nActualTimespan = nLastBlockTime - nFirstBlockTime;
     LogPrint("pow", "  nActualTimespan = %d  before dampening\n", nActualTimespan);
-    nActualTimespan = params.AveragingWindowTimespan() + (nActualTimespan - params.AveragingWindowTimespan())/4;
+    nActualTimespan = params.DigishieldAveragingWindowTimespan() + (nActualTimespan - params.DigishieldAveragingWindowTimespan())/4;
     LogPrint("pow", "  nActualTimespan = %d  before bounds\n", nActualTimespan);
 
-    if (nActualTimespan < params.MinActualTimespan())
-        nActualTimespan = params.MinActualTimespan();
-    if (nActualTimespan > params.MaxActualTimespan())
-        nActualTimespan = params.MaxActualTimespan();
+    if (nActualTimespan < params.DigishieldMinActualTimespan())
+        nActualTimespan = params.DigishieldMinActualTimespan();
+    if (nActualTimespan > params.DigishieldMaxActualTimespan())
+        nActualTimespan = params.DigishieldMaxActualTimespan();
 
     // Retarget
     const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
     arith_uint256 bnNew {bnAvg};
-    bnNew /= params.AveragingWindowTimespan();
+    bnNew /= params.DigishieldAveragingWindowTimespan();
     bnNew *= nActualTimespan;
 
     if (bnNew > bnPowLimit)
         bnNew = bnPowLimit;
 
     /// debug print
-    LogPrint("pow", "GetNextWorkRequired RETARGET\n");
-    LogPrint("pow", "params.AveragingWindowTimespan() = %d    nActualTimespan = %d\n", params.AveragingWindowTimespan(), nActualTimespan);
+    LogPrint("pow", "GetNextWorkRequired RETARGET Digishield\n");
+    LogPrint("pow", "params.DigishieldAveragingWindowTimespan() = %d    nActualTimespan = %d\n", params.DigishieldAveragingWindowTimespan(), nActualTimespan);
     LogPrint("pow", "Current average: %08x  %s\n", bnAvg.GetCompact(), bnAvg.ToString());
     LogPrint("pow", "After:  %08x  %s\n", bnNew.GetCompact(), bnNew.ToString());
 
     return bnNew.GetCompact();
 }
 
+unsigned int LWMACalculateNextWorkRequired(const CBlockIndex* pindexLast, const Consensus::Params& params)
+{
+    // FTL = N * T / 20
+    const int64_t FTL = 360;
+    const int64_t T = params.nPowTargetSpacing;
+    const CChainParams& chainparams = Params();
+    const int64_t newalgostart = chainparams.Getnewalgo_startblock();
+    int64_t N;
+    const int height = pindexLast->nHeight;
+    if (height >= params.zawyLWMAHeight && height <= newalgostart + 80) {
+        N = params.nZawyLWMAAveragingWindow / 3;
+    }
+    else if (height > newalgostart + 80 && height <= newalgostart + 160) {
+        N = (params.nZawyLWMAAveragingWindow * 2) / 3;
+    }
+    else {
+        N = params.nZawyLWMAAveragingWindow;
+    }
+    const int64_t k = N * (N + 1) * T / 2;
+
+    assert(height > N);
+
+    arith_uint256 sum_target;
+    int64_t t = 0, j = 0, solvetime;
+
+    // Loop through N most recent blocks.
+    for (int i = height - N+1; i <= height; i++) {
+        const CBlockIndex* block = pindexLast->GetAncestor(i);
+        const CBlockIndex* block_Prev = block->GetAncestor(i - 1);
+        solvetime = block->GetBlockTime() - block_Prev->GetBlockTime();
+        solvetime = std::max(-FTL, std::min(solvetime, 6*T));
+
+        j++;
+        t += solvetime * j;  // Weighted solvetime sum.
+
+        arith_uint256 target;
+        target.SetCompact(block->nBits);
+        sum_target += target / (k * N);
+    }
+    // Keep t reasonable to >= 1/10 of expected t.
+    if (t < k/10 ) {   t = k/10;  }
+    arith_uint256 next_target = t * sum_target;
+
+    /// debug print
+    LogPrint("pow", "GetNextWorkRequired RETARGET LWMA\n");
+    LogPrint("pow", "After:  %08x  %s\n", next_target.GetCompact(), next_target.ToString());
+
+    return next_target.GetCompact();
+}
+
 bool CheckEquihashSolution(const CBlockHeader *pblock, const CChainParams& params)
 {
+    unsigned int nHeight = chainActive.Height();
+    //TODO some stuff for equihash_endblock, overlapping period
+    unsigned int b = params.Getnewalgo_startblock();
+    if (nHeight >= b) {
+        return true;
+    }
+
     unsigned int n = params.EquihashN();
     unsigned int k = params.EquihashK();
 

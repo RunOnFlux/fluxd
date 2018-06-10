@@ -49,7 +49,7 @@ def create_coinbase(heightAdjust = 0):
                 CScript([counter+heightAdjust, OP_0]), 0xffffffff))
     counter += 1
     coinbaseoutput = CTxOut()
-    coinbaseoutput.nValue = int(12.5*100000000)
+    coinbaseoutput.nValue = int(150*100000000)
     halvings = int((counter+heightAdjust)/150) # regtest
     coinbaseoutput.nValue >>= halvings
     coinbaseoutput.scriptPubKey = ""

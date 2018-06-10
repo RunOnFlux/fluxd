@@ -1,7 +1,7 @@
 Zelcash Contributors
 ==================
-Extra
 TheTrunk
+Extra
 Scribbles
 Lumi
 

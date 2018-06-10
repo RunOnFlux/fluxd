@@ -258,7 +258,7 @@ int printMiningStatus(bool mining)
             } else if (IsInitialBlockDownload()) {
                 std::cout << _("Mining is paused while downloading blocks.") << std::endl;
             } else {
-                std::cout << _("Mining is paused (a JoinSplit may be in progress).") << std::endl;
+                std::cout << _("Mining is paused (Algorithm change is taking place and so mining restart is required or a JoinSplit may be in progress ).") << std::endl;
             }
         }
         lines++;
@@ -312,7 +312,7 @@ int printMetrics(size_t cols, bool mining)
     }
 
     if (mining && loaded) {
-        std::cout << "- " << strprintf(_("You have completed %d Equihash solver runs."), ehSolverRuns.get()) << std::endl;
+        std::cout << "- " << strprintf(_("You have completed %d solver runs."), ehSolverRuns.get()) << std::endl;
         lines++;
 
         int mined = 0;

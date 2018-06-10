@@ -1,3 +1,5 @@
+*** Warning: This document has not been updated for Zelcash and may be inaccurate. ***
+
 * zelcash.conf: contains configuration settings for zelcashd
 * zelcashd.pid: stores the process id of zelcashd while running
 * blocks/blk000??.dat: block data (custom, 128 MiB per file)

@@ -1,4 +1,5 @@
 *** Warning: Do not assume Tor support does the correct thing in Zelcash; better Tor support is a future feature goal. ***
+*** Warning: This document has not been updated for Zelcash and may be inaccurate. ***
 
 TOR SUPPORT IN ZELCASH
 ====================
@@ -138,7 +139,7 @@ Now use zelcash-cli to verify there is only a single peer connection.
 	        "id" : 1,
 	        "addr" : "zctestseie6wxgio.onion:26125",
 	        ...
-	        "version" : 170002,
+	        "version" : 170003,
 	        "subver" : "/MagicBean:1.0.0/",
 	        ...
 	    }

@@ -1,6 +1,6 @@
 Format: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?rev=174
 Upstream-Name: Zelcash
-Upstream-Contact: Zelcash Foundation <team@zel.cash>
+Upstream-Contact: Zelcash Technologies <info@zel.cash>
 Source: https://github.com/zelcash/zelcash
 
 Files: *

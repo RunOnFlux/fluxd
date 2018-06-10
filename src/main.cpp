@@ -3008,9 +3008,19 @@ bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool f
                          REJECT_INVALID, "high-hash");
 
     // Check timestamp
-    if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
-        return state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),
+    unsigned int nHeight = chainActive.Height();
+    const CChainParams& chainparams = Params();
+    unsigned int newAlgoHeight = chainparams.GetzawyLWMAHeight();
+    //Digishield era and LWMA era, TLS = N * T / 20. Where N=60 is AveragingWindow, T is block time
+    if (nHeight < newAlgoHeight) {
+        if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
+            return state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),
                              REJECT_INVALID, "time-too-new");
+    } else {
+        if (block.GetBlockTime() > GetAdjustedTime() + 360)
+            return state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),
+                             REJECT_INVALID, "time-too-new");
+    }
 
     return true;
 }
