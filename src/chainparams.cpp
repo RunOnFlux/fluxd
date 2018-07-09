@@ -99,6 +99,8 @@ public:
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
 	consensus.nPowAllowMinDifficultyBlocksAfterHeight = boost::none;
+        consensus.nPowTargetSpacing = 2 * 60;
+
         consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE].nActivationHeight = 
             Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
@@ -120,7 +122,7 @@ public:
         pchMessageStart[1] = 0xe9;
         pchMessageStart[2] = 0x27;
         pchMessageStart[3] = 0x64;
-        vAlertPubKey = ParseHex("04b374b737ee4804b80306e35dd36fb86b8794477d752db086fb1ed0eede496745d3f4a6bcce521a568ea96bc2f8ce3d18e1fa7e08520d808bf46e1e8176df1d2f");
+        vAlertPubKey = ParseHex("04025b2cf3a116782a69bb68cb4ae5ba3b7f05069f7139b75573dd28e48f8992d95c118122b618d4943456ad64e7356b0b45b2ef179cbe3d9767a2426662d13d32"); //Zel Technologies
         nDefaultPort = 16125;
         nMaxTipAge = 24 * 60 * 60;
         nPruneAfterHeight = 100000;
@@ -233,8 +235,7 @@ public:
         pchMessageStart[1] = 0x1a;
         pchMessageStart[2] = 0xf9;
         pchMessageStart[3] = 0xbf;
-        vAlertPubKey = ParseHex("046578ef01bb3a12ffcc2a14e63cdeb0fd037d7c08e6d1db8160d6e71e032e64505ddceae1ddffe97e1fa7108db66f11ee1d839978c9b8a6920d311f8a8a6aedb8");
-
+        vAlertPubKey = ParseHex("044b5cb8fd1db34e2d89a93e7becf3fb35dd08a81bb3080484365e567136403fd4a6682a43d8819522ae35394704afa83de1ef069a3104763fd0ebdbdd505a1386"); //Zel Technologies
         nDefaultPort = 26125;
         nMaxTipAge = 24 * 60 * 60;
 
