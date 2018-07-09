@@ -87,7 +87,7 @@ public:
     EHparameters eh_epoch_2_params() const { return eh_epoch_2; }
     unsigned long eh_epoch_1_end() const { return eh_epoch_1_endblock; }
     unsigned long eh_epoch_2_start() const { return eh_epoch_2_startblock; }
-
+    unsigned int GetzawyLWMAHeight() const { return zawyLWMAHeight; }
     std::string CurrencyUnits() const { return strCurrencyUnits; }
     /** Make miner stop after a block is found. In RPC, don't return until nGenProcLimit blocks are generated */
     bool MineBlocksOnDemand() const { return fMineBlocksOnDemand; }
@@ -117,8 +117,9 @@ protected:
     uint64_t nPruneAfterHeight = 0;
     EHparameters eh_epoch_1 = eh200_9;
     EHparameters eh_epoch_2 = eh144_5;
-    unsigned long eh_epoch_1_endblock = 150000;
-    unsigned long eh_epoch_2_startblock = 140000;
+    unsigned int zawyLWMAHeight = 0;
+    unsigned long eh_epoch_1_endblock = 0;
+    unsigned long eh_epoch_2_startblock = 0;
     std::vector<CDNSSeedData> vSeeds;
     std::vector<unsigned char> base58Prefixes[MAX_BASE58_TYPES];
     std::string strNetworkID;
