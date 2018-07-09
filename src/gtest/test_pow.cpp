@@ -8,8 +8,8 @@
 TEST(PoW, DifficultyAveraging) {
     SelectParams(CBaseChainParams::MAIN);
     const Consensus::Params& params = Params().GetConsensus();
-    size_t lastBlk = 2*params.nPowAveragingWindow;
-    size_t firstBlk = lastBlk - params.nPowAveragingWindow;
+    size_t lastBlk = 2*params.nDigishieldAveragingWindow;
+    size_t firstBlk = lastBlk - params.nDigishieldAveragingWindow;
 
     // Start with blocks evenly-spaced and equal difficulty
     std::vector<CBlockIndex> blocks(lastBlk+1);
@@ -24,7 +24,7 @@ TEST(PoW, DifficultyAveraging) {
     // Result should be the same as if last difficulty was used
     arith_uint256 bnAvg;
     bnAvg.SetCompact(blocks[lastBlk].nBits);
-    EXPECT_EQ(CalculateNextWorkRequired(bnAvg,
+    EXPECT_EQ(DigishieldCalculateNextWorkRequired(bnAvg,
                                         blocks[lastBlk].GetMedianTimePast(),
                                         blocks[firstBlk].GetMedianTimePast(),
                                         params),
@@ -32,8 +32,8 @@ TEST(PoW, DifficultyAveraging) {
     // Result should be unchanged, modulo integer division precision loss
     arith_uint256 bnRes;
     bnRes.SetCompact(0x1e7fffff);
-    bnRes /= params.AveragingWindowTimespan();
-    bnRes *= params.AveragingWindowTimespan();
+    bnRes /= params.DigishieldAveragingWindowTimespan();
+    bnRes *= params.DigishieldAveragingWindowTimespan();
     EXPECT_EQ(bnRes.GetCompact(), GetNextWorkRequired(&blocks[lastBlk], nullptr, params));
 
     // Randomise the final block time (plus 1 to ensure it is always different)
@@ -41,7 +41,7 @@ TEST(PoW, DifficultyAveraging) {
 
     // Result should be the same as if last difficulty was used
     bnAvg.SetCompact(blocks[lastBlk].nBits);
-    EXPECT_EQ(CalculateNextWorkRequired(bnAvg,
+    EXPECT_EQ(DigishieldCalculateNextWorkRequired(bnAvg,
                                         blocks[lastBlk].GetMedianTimePast(),
                                         blocks[firstBlk].GetMedianTimePast(),
                                         params),
@@ -54,7 +54,7 @@ TEST(PoW, DifficultyAveraging) {
 
     // Result should not be the same as if last difficulty was used
     bnAvg.SetCompact(blocks[lastBlk].nBits);
-    EXPECT_NE(CalculateNextWorkRequired(bnAvg,
+    EXPECT_NE(DigishieldCalculateNextWorkRequired(bnAvg,
                                         blocks[lastBlk].GetMedianTimePast(),
                                         blocks[firstBlk].GetMedianTimePast(),
                                         params),
@@ -62,7 +62,7 @@ TEST(PoW, DifficultyAveraging) {
 
     // Result should be the same as if the average difficulty was used
     arith_uint256 average = UintToArith256(uint256S("0000796968696969696969696969696969696969696969696969696969696969"));
-    EXPECT_EQ(CalculateNextWorkRequired(average,
+    EXPECT_EQ(DigishieldCalculateNextWorkRequired(average,
                                         blocks[lastBlk].GetMedianTimePast(),
                                         blocks[firstBlk].GetMedianTimePast(),
                                         params),

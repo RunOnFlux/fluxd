@@ -94,10 +94,11 @@ public:
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 4000;
         consensus.powLimit = uint256S("0007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        consensus.nPowAveragingWindow = 17;
-        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nPowAveragingWindow);
-        consensus.nPowMaxAdjustDown = 32; // 32% adjustment down
-        consensus.nPowMaxAdjustUp = 16; // 16% adjustment up
+        consensus.nDigishieldAveragingWindow = 17;
+        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
+        consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
+        consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
+        consensus.nPowTargetSpacing = 2 * 60;
 
         consensus.nPowTargetSpacing = 2 * 60;
 	consensus.nPowAllowMinDifficultyBlocksAfterHeight = boost::none;
@@ -112,6 +113,8 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 263500;		// Approx January 31th 
 
+        consensus.zawyLWMAHeight = 100000; //TODO
+        consensus.nZawyLWMAAveragingWindow = 60;
 
         /**
          * The message start string should be awesome! ⓩ❤
@@ -209,13 +212,12 @@ public:
         consensus.nMajorityRejectBlockOutdated = 75;
         consensus.nMajorityWindow = 400;
         consensus.powLimit = uint256S("07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        consensus.nPowAveragingWindow = 17;
-        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nPowAveragingWindow);
-        consensus.nPowMaxAdjustDown = 32; // 32% adjustment down
-        consensus.nPowMaxAdjustUp = 16; // 16% adjustment up
-
+        consensus.nDigishieldAveragingWindow = 17;
+        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
+        consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
+        consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPowTargetSpacing = 2 * 60;
-	consensus.nPowAllowMinDifficultyBlocksAfterHeight = 299187;
+
         consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE].nActivationHeight =
 
@@ -227,6 +229,8 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 1000000;			// To be set when its time
 
+        consensus.zawyLWMAHeight = 6350; //TODO
+        consensus.nZawyLWMAAveragingWindow = 60;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -317,9 +321,12 @@ public:
         consensus.nMajorityWindow = 1000;
         consensus.powLimit = uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
         consensus.nPowAveragingWindow = 17;
-        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nPowAveragingWindow);
-        consensus.nPowMaxAdjustDown = 0; // Turn off adjustment down
-        consensus.nPowMaxAdjustUp = 0; // Turn off adjustment up
+        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
+        consensus.nDigishieldMaxAdjustDown = 0; // Turn off adjustment down
+        consensus.nDigishieldMaxAdjustUp = 0; // Turn off adjustment up
+
+	consensus.zawyLWMAHeight = 10; //TODO
+        consensus.nZawyLWMAAveragingWindow = 60;
 
         consensus.nPowTargetSpacing = 2 * 60;
 	consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
@@ -338,7 +345,6 @@ public:
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
-
 
         pchMessageStart[0] = 0xaa;
         pchMessageStart[1] = 0xe8;
