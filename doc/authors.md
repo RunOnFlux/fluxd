@@ -1,9 +1,8 @@
 Zelcash Contributors
 ==================
-Extra
-TheTrunk
-Scribbles
-Lumi
+
+Tadeas Kmenta (9)
+Miles Manley (1)
 
 Zcash Contributors
 ==================

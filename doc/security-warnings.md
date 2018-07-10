@@ -4,9 +4,9 @@ Security Warnings
 Security Audit
 --------------
 
-Zelcash has been subjected to a formal third-party security review. For security
+Zcash (Zelcash upstream) has been subjected to a formal third-party security review. For security
 announcements, audit results and other general security information, see
-https://zel.cash/support/security.html
+https://z.cash/support/security.html
 
 x86-64 Linux Only
 -----------------------

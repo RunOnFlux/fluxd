@@ -94,8 +94,8 @@ As a result, the maximum number of inputs that can be selected is:
 Here is an example of using `z_shieldcoinbase` on testnet to shield multi-sig coinbase UTXOs.
 
 - Block 141042 is almost ~2 MB in size (the maximum size for a block) and contains 1 coinbase reward transaction and 20 transactions, each indivually created by a call to z_shieldcoinbase.
-  - https://explorer.testnet.zel.cash/block/0050552a78e97c89f666713c8448d49ad1d7263274422272696187dedf6c0d03
+  - https://explorer.testnet.z.cash/block/0050552a78e97c89f666713c8448d49ad1d7263274422272696187dedf6c0d03
 - Drilling down into a transaction, you can see there is one joinsplit, with 244 inputs (vin) and 0 outputs (vout).
-  - https://explorer.testnet.zel.cash/tx/cf4f3da2e434f68b6e361303403344e22a9ff9a8fda9abc180d9520d0ca6527d
+  - https://explorer.testnet.z.cash/tx/cf4f3da2e434f68b6e361303403344e22a9ff9a8fda9abc180d9520d0ca6527d
 
 

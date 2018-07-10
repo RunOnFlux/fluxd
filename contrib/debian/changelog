@@ -76,35 +76,17 @@ zcash (1.1.0) stable; urgency=medium
 
  -- Zcash Company <team@z.cash>  Sat, 19 May 2018 10:16:14 +1200
 
-zelcash (1.1.0) stable; urgency=medium
+Zelcash (1.1.0) Initial stable; urgency=medium
 
   * 1.1.0 release.
 
- -- Zelcash Company <team@zel.cash>  Wed, 11 Apr 2018 20:15:29 -0600
-
-zelcash (1.1.0~rc1) stable; urgency=medium
-
-  * 1.1.0-rc1 release.
-
- -- Zelcash Company <team@zel.cash>  Thu, 05 Apr 2018 03:26:17 +0100
-
-zelcash (1.0.15) stable; urgency=medium
-
-  * 1.0.15 release.
-
- -- Zelcash Company <team@zel.cash>  Wed, 28 Feb 2018 16:58:19 +0000
-
-zelcash (1.0.15~rc1) stable; urgency=medium
-
-  * 1.0.15-rc1 release.
-
- -- Zelcash Company <team@zel.cash>  Sat, 24 Feb 2018 04:20:05 +0000
+  -- Zel Technologies LLC <info@zel.cash>  Fri, 13 Jul 2018 12:00:00 +0000
 
 Zelcash (1.0.14) Initial stable; urgency=medium
 
   * 1.0.14 release.
 
-  <team@zel.cash>
+  <info@zel.cash>
 
 zcash (1.0.14) stable; urgency=medium
 
