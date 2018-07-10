@@ -540,7 +540,7 @@ void static BitcoinMiner()
             // Get the height of current tip
             int nHeight = chainActive.Height();
             if (nHeight == -1) {
-                LogPrintf("Error in BitcoinZ Miner: chainActive.Height() returned -1\n");
+                LogPrintf("Error in ZelcashMiner: chainActive.Height() returned -1\n");
                 return;
             }
             CBlockIndex* pindexPrev = chainActive[nHeight];

@@ -138,7 +138,7 @@ Now use zelcash-cli to verify there is only a single peer connection.
 	        "id" : 1,
 	        "addr" : "zctestseie6wxgio.onion:26125",
 	        ...
-	        "version" : 170002,
+	        "version" : 170003,
 	        "subver" : "/MagicBean:1.0.0/",
 	        ...
 	    }

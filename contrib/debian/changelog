@@ -1,8 +1,14 @@
+Zelcash (1.1.0) Initial stable; urgency=medium
+
+  * 1.1.0 release.
+
+  -- Zel Technologies LLC <info@zel.cash>  Fri, 13 Jul 2018 12:00:00 +0000
+
 Zelcash (1.0.14) Initial stable; urgency=medium
 
   * 1.0.14 release.
 
-  <team@zel.cash>
+  <info@zel.cash>
 
 zcash (1.0.14) stable; urgency=medium
 

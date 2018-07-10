@@ -1,6 +1,9 @@
 # Zelcash
 INNOVATIVE  INTELLIGENT  INSPIRING
 
+Zelcash is a fork of 1.0.14 Zcash aiming to provide decentralised development platform via ZelNodes and ZelTreZ.
+POW asic resistant with Equihash (144,5) also known as Zhash with personalisation string ZelProof. 
+To speed up synchronisation you can also download our blockchain (state Fri 6. 7. 2018) at https://drive.google.com/file/d/1Vn8HWau24wjTtUc9QZU2stliKevaEFx1/view?usp=sharing (pw: zelcash).
 
 ## Build (Ubuntu 16.04 Tested)
 ```
