@@ -93,7 +93,7 @@ public:
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPowTargetSpacing = 2 * 60;
-        consensus.zawyLWMAHeight = 129900; //TODO
+        consensus.zawyLWMAHeight = 125000;
         consensus.nZawyLWMAAveragingWindow = 60;
         /**
          * The message start string should be awesome! ⓩ❤
@@ -108,8 +108,8 @@ public:
         nPruneAfterHeight = 100000;
         eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
-        eh_epoch_1_endblock = 130010;
-        eh_epoch_2_startblock = 130000;
+        eh_epoch_1_endblock = 125110;
+        eh_epoch_2_startblock = 125100;
 
 
         genesis = CreateGenesisBlock(
@@ -190,7 +190,7 @@ public:
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPowTargetSpacing = 2 * 60;
-        consensus.zawyLWMAHeight = 80; //TODO
+        consensus.zawyLWMAHeight = 500;
         consensus.nZawyLWMAAveragingWindow = 60;
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -202,8 +202,8 @@ public:
         nPruneAfterHeight = 1000;
         eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
-        eh_epoch_1_endblock = 100;
-        eh_epoch_2_startblock = 90;
+        eh_epoch_1_endblock = 610;
+        eh_epoch_2_startblock = 600;
 
         genesis = CreateGenesisBlock(
             1521043405,
@@ -276,7 +276,7 @@ public:
         consensus.nDigishieldMaxAdjustDown = 0; // Turn off adjustment down
         consensus.nDigishieldMaxAdjustUp = 0; // Turn off adjustment up
         consensus.nPowTargetSpacing = 2 * 60;
-        consensus.zawyLWMAHeight = 1; //TODO
+        consensus.zawyLWMAHeight = 1;
         consensus.nZawyLWMAAveragingWindow = 60;
 
         pchMessageStart[0] = 0xaa;
