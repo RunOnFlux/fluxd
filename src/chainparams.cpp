@@ -112,7 +112,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 263500;		// Approx January 31th 
 
-        consensus.zawyLWMAHeight = 129900; //TODO
+        consensus.zawyLWMAHeight = 125000; //TODO
         consensus.nZawyLWMAAveragingWindow = 60;
 
         /**
@@ -128,8 +128,8 @@ public:
         nPruneAfterHeight = 100000;
         eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
-        eh_epoch_1_endblock = 130010;
-        eh_epoch_2_startblock = 130000;
+        eh_epoch_1_endblock = 125110;
+        eh_epoch_2_startblock = 125100;
 
 
         genesis = CreateGenesisBlock(
@@ -228,7 +228,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 1000000;			// To be set when its time
 
-        consensus.zawyLWMAHeight = 80; //TODO
+        consensus.zawyLWMAHeight = 500; //TODO
         consensus.nZawyLWMAAveragingWindow = 60;
 
         pchMessageStart[0] = 0xfa;
@@ -236,14 +236,15 @@ public:
         pchMessageStart[2] = 0xf9;
         pchMessageStart[3] = 0xbf;
         vAlertPubKey = ParseHex("044b5cb8fd1db34e2d89a93e7becf3fb35dd08a81bb3080484365e567136403fd4a6682a43d8819522ae35394704afa83de1ef069a3104763fd0ebdbdd505a1386"); //Zel Technologies
+
         nDefaultPort = 26125;
         nMaxTipAge = 24 * 60 * 60;
 
         nPruneAfterHeight = 1000;
         eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
-        eh_epoch_1_endblock = 100;
-        eh_epoch_2_startblock = 90;
+        eh_epoch_1_endblock = 610;
+        eh_epoch_2_startblock = 600;
 
         genesis = CreateGenesisBlock(
             1521043405,
@@ -323,12 +324,13 @@ public:
         consensus.nDigishieldMaxAdjustDown = 0; // Turn off adjustment down
         consensus.nDigishieldMaxAdjustUp = 0; // Turn off adjustment up
 
-	consensus.zawyLWMAHeight = 1; //TODO
-
+        consensus.nPowTargetSpacing = 2 * 60;
+	consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
+        consensus.zawyLWMAHeight = 1;
         consensus.nZawyLWMAAveragingWindow = 60;
 
         consensus.nPowTargetSpacing = 2 * 60;
-	consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
+
         consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE].nActivationHeight =
             Consensus::NetworkUpgrade::ALWAYS_ACTIVE;

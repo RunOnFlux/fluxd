@@ -40,9 +40,9 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         }
     }
 
-    // Reset the difficulty after the algo fork and keep it for 30 blocks. LWMA averaging window is 60 blocks.
+    // Reset the difficulty after the algo fork and keep it for 61 blocks. LWMA averaging window is 60 blocks.
     if (pindexLast->nHeight > chainParams.eh_epoch_1_end() - 1
-        && pindexLast->nHeight < chainParams.eh_epoch_1_end() + 30) {
+        && pindexLast->nHeight < chainParams.eh_epoch_1_end() + 61) {
         return nProofOfWorkLimit;
     }
 
