@@ -124,6 +124,10 @@ unsigned int LWMACalculateNextWorkRequired(const CBlockIndex* pindexLast, const 
     if (t < k/10 ) {   t = k/10;  }
     arith_uint256 next_target = t * sum_target;
 
+    const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
+    if (next_target > bnPowLimit)
+        next_target = bnPowLimit;
+
     /// debug print
     LogPrint("pow", "GetNextWorkRequired RETARGET LWMA\n");
     LogPrint("pow", "After:  %08x  %s\n", next_target.GetCompact(), next_target.ToString());
