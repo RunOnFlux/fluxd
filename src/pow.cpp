@@ -22,16 +22,22 @@
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
+    const CChainParams& chainParams = Params();
     unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
 
     // Genesis block
     if (pindexLast == NULL)
         return nProofOfWorkLimit;
 
+    // Reset the difficulty after the algo fork and keep it for 61 blocks. LWMA averaging window is 60 blocks.
+    if (pindexLast->nHeight > chainParams.eh_epoch_1_end() - 1
+        && pindexLast->nHeight < chainParams.eh_epoch_1_end() + 61) {
+        return nProofOfWorkLimit;
+    }
     // Find the first block in the averaging interval
     const CBlockIndex* pindexFirst = pindexLast;
     arith_uint256 bnTot {0};
-    for (int i = 0; pindexFirst && i < params.nPowAveragingWindow; i++) {
+    for (int i = 0; pindexFirst && i < params.nDigishieldAveragingWindow; i++) {
         arith_uint256 bnTmp;
         bnTmp.SetCompact(pindexFirst->nBits);
         bnTot += bnTmp;
@@ -42,12 +48,18 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     if (pindexFirst == NULL)
         return nProofOfWorkLimit;
 
-    arith_uint256 bnAvg {bnTot / params.nPowAveragingWindow};
+    arith_uint256 bnAvg {bnTot / params.nDigishieldAveragingWindow};
 
-    return CalculateNextWorkRequired(bnAvg, pindexLast->GetMedianTimePast(), pindexFirst->GetMedianTimePast(), params);
+    //Difficulty algo
+    int nHeight = pindexLast->nHeight + 1;
+    if (nHeight < params.zawyLWMAHeight) {
+        return DigishieldCalculateNextWorkRequired(bnAvg, pindexLast->GetMedianTimePast(), pindexFirst->GetMedianTimePast(), params);
+    } else {
+        return LWMACalculateNextWorkRequired(pindexLast, params);
+    }
 }
 
-unsigned int CalculateNextWorkRequired(arith_uint256 bnAvg,
+unsigned int DigishieldCalculateNextWorkRequired(arith_uint256 bnAvg,
                                        int64_t nLastBlockTime, int64_t nFirstBlockTime,
                                        const Consensus::Params& params)
 {
@@ -55,36 +67,91 @@ unsigned int CalculateNextWorkRequired(arith_uint256 bnAvg,
     // Use medians to prevent time-warp attacks
     int64_t nActualTimespan = nLastBlockTime - nFirstBlockTime;
     LogPrint("pow", "  nActualTimespan = %d  before dampening\n", nActualTimespan);
-    nActualTimespan = params.AveragingWindowTimespan() + (nActualTimespan - params.AveragingWindowTimespan())/4;
+    nActualTimespan = params.DigishieldAveragingWindowTimespan() + (nActualTimespan - params.DigishieldAveragingWindowTimespan())/4;
     LogPrint("pow", "  nActualTimespan = %d  before bounds\n", nActualTimespan);
 
-    if (nActualTimespan < params.MinActualTimespan())
-        nActualTimespan = params.MinActualTimespan();
-    if (nActualTimespan > params.MaxActualTimespan())
-        nActualTimespan = params.MaxActualTimespan();
+    if (nActualTimespan < params.DigishieldMinActualTimespan())
+        nActualTimespan = params.DigishieldMinActualTimespan();
+    if (nActualTimespan > params.DigishieldMaxActualTimespan())
+        nActualTimespan = params.DigishieldMaxActualTimespan();
 
     // Retarget
     const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
     arith_uint256 bnNew {bnAvg};
-    bnNew /= params.AveragingWindowTimespan();
+    bnNew /= params.DigishieldAveragingWindowTimespan();
     bnNew *= nActualTimespan;
 
     if (bnNew > bnPowLimit)
         bnNew = bnPowLimit;
 
     /// debug print
-    LogPrint("pow", "GetNextWorkRequired RETARGET\n");
-    LogPrint("pow", "params.AveragingWindowTimespan() = %d    nActualTimespan = %d\n", params.AveragingWindowTimespan(), nActualTimespan);
+    LogPrint("pow", "GetNextWorkRequired RETARGET Digishield\n");
+    LogPrint("pow", "params.DigishieldAveragingWindowTimespan() = %d    nActualTimespan = %d\n", params.DigishieldAveragingWindowTimespan(), nActualTimespan);
     LogPrint("pow", "Current average: %08x  %s\n", bnAvg.GetCompact(), bnAvg.ToString());
     LogPrint("pow", "After:  %08x  %s\n", bnNew.GetCompact(), bnNew.ToString());
 
     return bnNew.GetCompact();
 }
 
+unsigned int LWMACalculateNextWorkRequired(const CBlockIndex* pindexLast, const Consensus::Params& params)
+{
+    // FTL = N * T / 20
+    const int64_t FTL = 360;
+    const int64_t T = params.nPowTargetSpacing;
+    const int64_t N = params.nZawyLWMAAveragingWindow;
+    const int64_t k = N*(N+1)*T/2;
+    const int height = pindexLast->nHeight;
+    assert(height > N);
+
+    arith_uint256 sum_target;
+    int64_t t = 0, j = 0, solvetime;
+
+    // Loop through N most recent blocks.
+    for (int i = height - N+1; i <= height; i++) {
+        const CBlockIndex* block = pindexLast->GetAncestor(i);
+        const CBlockIndex* block_Prev = block->GetAncestor(i - 1);
+        solvetime = block->GetBlockTime() - block_Prev->GetBlockTime();
+        solvetime = std::max(-FTL, std::min(solvetime, 6*T));
+
+        j++;
+        t += solvetime * j;  // Weighted solvetime sum.
+
+        arith_uint256 target;
+        target.SetCompact(block->nBits);
+        sum_target += target / (k * N);
+    }
+    // Keep t reasonable to >= 1/10 of expected t.
+    if (t < k/10 ) {   t = k/10;  }
+    arith_uint256 next_target = t * sum_target;
+
+    const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
+    if (next_target > bnPowLimit)
+        next_target = bnPowLimit;
+
+    /// debug print
+    LogPrint("pow", "GetNextWorkRequired RETARGET LWMA\n");
+    LogPrint("pow", "After:  %08x  %s\n", next_target.GetCompact(), next_target.ToString());
+
+    return next_target.GetCompact();
+}
+
 bool CheckEquihashSolution(const CBlockHeader *pblock, const CChainParams& params)
 {
-    unsigned int n = params.EquihashN();
-    unsigned int k = params.EquihashK();
+    //Set parameters N,K from solution size. Filtering of valid parameters
+    //for the givenblock height will be carried out in main.cpp/ContextualCheckBlockHeader
+    unsigned int n,k;
+    size_t nSolSize = pblock->nSolution.size();
+    switch (nSolSize){
+        case 1344: n=200; k=9; break;
+        case 100:  n=144; k=5; break;
+        case 68:   n=96;  k=5; break;
+        case 36:   n=48;  k=5; break;
+        default: return error("CheckEquihashSolution: Unsupported solution size of %d", nSolSize);
+    }
+    
+    LogPrint("pow", "selected n,k : %d, %d \n", n,k);
+
+    //need to put block height param switching code here
 
     // Hash state
     crypto_generichash_blake2b_state state;

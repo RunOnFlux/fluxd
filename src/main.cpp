@@ -3008,9 +3008,20 @@ bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool f
                          REJECT_INVALID, "high-hash");
 
     // Check timestamp
-    if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
-        return state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),
-                             REJECT_INVALID, "time-too-new");
+    unsigned int nHeight = chainActive.Height();
+    const CChainParams& chainParams = Params();
+    const Consensus::Params& consensusParams = chainParams.GetConsensus();
+    unsigned int newAlgoHeight = consensusParams.zawyLWMAHeight;
+    //Digishield era and LWMA era, TLS = N * T / 20. Where N=60 is AveragingWindow, T is block time
+    if (nHeight < newAlgoHeight) {
+        if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
+            return state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),
+                         REJECT_INVALID, "time-too-new");
+    } else {
+        if (block.GetBlockTime() > GetAdjustedTime() + 360)
+            return state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),
+                         REJECT_INVALID, "time-too-new");
+    }
 
     return true;
 }
@@ -3087,7 +3098,28 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
 
     assert(pindexPrev);
 
-    int nHeight = pindexPrev->nHeight+1;
+    long int nHeight = pindexPrev->nHeight+1;
+
+    //Check EH solution size matches an acceptable N,K
+    size_t nSolSize = block.nSolution.size();
+
+    EHparameters ehparams[MAX_EH_PARAM_LIST_LEN]; //allocate on-stack space for parameters list
+    int listlength=validEHparameterList(ehparams,nHeight,chainParams);
+    int solutionInvalid=1;
+        for(int i=0; i<listlength; i++){
+        LogPrint("pow", "ContextCheckBlockHeader index %d n:%d k:%d Solsize: %d \n",i, ehparams[i].n, ehparams[i].k , ehparams[i].nSolSize);
+        if(ehparams[i].nSolSize==nSolSize)
+            solutionInvalid=0;
+    }
+
+    //Block will be validated prior to mining, and will have a zero length equihash solution. These need to be let through. Checkequihashsolution will catch them.
+    if(!nSolSize)
+        solutionInvalid=0;
+
+    if(solutionInvalid){
+        return state.DoS(100,error("ContextualCheckBlockHeader: Equihash solution size %d for block %d does not match a valid length",nSolSize, nHeight),
+           REJECT_INVALID,"bad-equihash-solution-size");
+    }
 
     // Check proof of work
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))

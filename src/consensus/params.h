@@ -35,19 +35,23 @@ struct Params {
     int GetLastFoundersRewardBlockHeight() const {
         return nSubsidyHalvingInterval + SubsidySlowStartShift() - 1;
     }
+    /** LWMA algo starts at this block **/
+    int zawyLWMAHeight;
     /** Used to check majorities for block version upgrade */
     int nMajorityEnforceBlockUpgrade;
     int nMajorityRejectBlockOutdated;
     int nMajorityWindow;
     /** Proof of work parameters */
     uint256 powLimit;
-    int64_t nPowAveragingWindow;
-    int64_t nPowMaxAdjustDown;
-    int64_t nPowMaxAdjustUp;
+    int64_t nDigishieldAveragingWindow;
+    int64_t nDigishieldMaxAdjustDown;
+    int64_t nDigishieldMaxAdjustUp;
     int64_t nPowTargetSpacing;
-    int64_t AveragingWindowTimespan() const { return nPowAveragingWindow * nPowTargetSpacing; }
-    int64_t MinActualTimespan() const { return (AveragingWindowTimespan() * (100 - nPowMaxAdjustUp  )) / 100; }
-    int64_t MaxActualTimespan() const { return (AveragingWindowTimespan() * (100 + nPowMaxAdjustDown)) / 100; }
+    int64_t DigishieldAveragingWindowTimespan() const { return nDigishieldAveragingWindow * nPowTargetSpacing; }
+    int64_t DigishieldMinActualTimespan() const { return (DigishieldAveragingWindowTimespan() * (100 - nDigishieldMaxAdjustUp  )) / 100; }
+    int64_t DigishieldMaxActualTimespan() const { return (DigishieldAveragingWindowTimespan() * (100 + nDigishieldMaxAdjustDown)) / 100; }
+    /** Parameters for LWMA difficulty adjustment **/
+    int64_t nZawyLWMAAveragingWindow;  // N
 };
 } // namespace Consensus
 

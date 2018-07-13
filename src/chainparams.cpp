@@ -88,11 +88,13 @@ public:
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 4000;
         consensus.powLimit = uint256S("0007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        consensus.nPowAveragingWindow = 17;
-        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nPowAveragingWindow);
-        consensus.nPowMaxAdjustDown = 32; // 32% adjustment down
-        consensus.nPowMaxAdjustUp = 16; // 16% adjustment up
+        consensus.nDigishieldAveragingWindow = 17;
+        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
+        consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
+        consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPowTargetSpacing = 2 * 60;
+        consensus.zawyLWMAHeight = 125000;
+        consensus.nZawyLWMAAveragingWindow = 60;
         /**
          * The message start string should be awesome! ⓩ❤
          */
@@ -100,14 +102,15 @@ public:
         pchMessageStart[1] = 0xe9;
         pchMessageStart[2] = 0x27;
         pchMessageStart[3] = 0x64;
-        vAlertPubKey = ParseHex("04b374b737ee4804b80306e35dd36fb86b8794477d752db086fb1ed0eede496745d3f4a6bcce521a568ea96bc2f8ce3d18e1fa7e08520d808bf46e1e8176df1d2f");
+        vAlertPubKey = ParseHex("04025b2cf3a116782a69bb68cb4ae5ba3b7f05069f7139b75573dd28e48f8992d95c118122b618d4943456ad64e7356b0b45b2ef179cbe3d9767a2426662d13d32"); //Zel Technologies
         nDefaultPort = 16125;
         nMaxTipAge = 24 * 60 * 60;
         nPruneAfterHeight = 100000;
-        const size_t N = 200, K = 9;
-        BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
-        nEquihashN = N;
-        nEquihashK = K;
+        eh_epoch_1 = eh200_9;
+        eh_epoch_2 = eh144_5;
+        eh_epoch_1_endblock = 125110;
+        eh_epoch_2_startblock = 125100;
+
 
         genesis = CreateGenesisBlock(
             1516980000,
@@ -152,11 +155,14 @@ public:
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
             (0, consensus.hashGenesisBlock)
-            (5500, uint256S("0x0000000e7724f8bace09dd762657169c10622af4a6a8e959152cd00b9119848e")),
-            1517814694,     // * UNIX timestamp of last checkpoint block
-            11141,              // * total number of transactions between genesis and last checkpoint
+            (5500, uint256S("0x0000000e7724f8bace09dd762657169c10622af4a6a8e959152cd00b9119848e"))
+            (35000, uint256S("0x000000004646dd797644b9c67aff320961e95c311b4f26985424b720d09fcaa5"))
+            (70000, uint256S("0x00000001edcf7768ed39fac55414e53a78d077b1b41fccdaf9307d7bc219626a"))
+            (94071, uint256S("0x00000005ec83876bc5288badf0971ae83ac7c6a286851f7b22a75a03e73b401a")), //Halep won French Open 2018
+            1528556469,     // * UNIX timestamp of last checkpoint block
+            248945,              // * total number of transactions between genesis and last checkpoint
                             //   (the tx=... number in the SetBestChain debug.log lines)
-            1720            // * estimated number of transactions per day after checkpoint 720 newly mined +1000 for txs that users are doing
+            1525            // * estimated number of transactions per day
                             //   total number of tx / (checkpoint block height / (24 * 24))
         };
 
@@ -179,23 +185,25 @@ public:
         consensus.nMajorityRejectBlockOutdated = 75;
         consensus.nMajorityWindow = 400;
         consensus.powLimit = uint256S("07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        consensus.nPowAveragingWindow = 17;
-        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nPowAveragingWindow);
-        consensus.nPowMaxAdjustDown = 32; // 32% adjustment down
-        consensus.nPowMaxAdjustUp = 16; // 16% adjustment up
+        consensus.nDigishieldAveragingWindow = 17;
+        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
+        consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
+        consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPowTargetSpacing = 2 * 60;
+        consensus.zawyLWMAHeight = 500;
+        consensus.nZawyLWMAAveragingWindow = 60;
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
         pchMessageStart[2] = 0xf9;
         pchMessageStart[3] = 0xbf;
-        vAlertPubKey = ParseHex("046578ef01bb3a12ffcc2a14e63cdeb0fd037d7c08e6d1db8160d6e71e032e64505ddceae1ddffe97e1fa7108db66f11ee1d839978c9b8a6920d311f8a8a6aedb8");
+        vAlertPubKey = ParseHex("044b5cb8fd1db34e2d89a93e7becf3fb35dd08a81bb3080484365e567136403fd4a6682a43d8819522ae35394704afa83de1ef069a3104763fd0ebdbdd505a1386"); //Zel Technologies
         nDefaultPort = 26125;
         nMaxTipAge = 24 * 60 * 60;
         nPruneAfterHeight = 1000;
-        const size_t N = 200, K = 9;
-        BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
-        nEquihashN = N;
-        nEquihashK = K;
+        eh_epoch_1 = eh200_9;
+        eh_epoch_2 = eh144_5;
+        eh_epoch_1_endblock = 610;
+        eh_epoch_2_startblock = 600;
 
         genesis = CreateGenesisBlock(
             1521043405,
@@ -263,11 +271,13 @@ public:
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 1000;
         consensus.powLimit = uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
-        consensus.nPowAveragingWindow = 17;
-        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nPowAveragingWindow);
-        consensus.nPowMaxAdjustDown = 0; // Turn off adjustment down
-        consensus.nPowMaxAdjustUp = 0; // Turn off adjustment up
+        consensus.nDigishieldAveragingWindow = 17;
+        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
+        consensus.nDigishieldMaxAdjustDown = 0; // Turn off adjustment down
+        consensus.nDigishieldMaxAdjustUp = 0; // Turn off adjustment up
         consensus.nPowTargetSpacing = 2 * 60;
+        consensus.zawyLWMAHeight = 1;
+        consensus.nZawyLWMAAveragingWindow = 60;
 
         pchMessageStart[0] = 0xaa;
         pchMessageStart[1] = 0xe8;
@@ -276,10 +286,10 @@ public:
         nDefaultPort = 26126;
         nMaxTipAge = 24 * 60 * 60;
         nPruneAfterHeight = 1000;
-        const size_t N = 48, K = 5;
-        BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
-        nEquihashN = N;
-        nEquihashK = K;
+        eh_epoch_1 = eh48_5;
+        eh_epoch_2 = eh48_5;
+        eh_epoch_1_endblock = 1;
+        eh_epoch_2_startblock = 1;
 
         genesis = CreateGenesisBlock(
             1296688602,
@@ -390,4 +400,21 @@ CScript CChainParams::GetFoundersRewardScriptAtHeight(int nHeight) const {
 std::string CChainParams::GetFoundersRewardAddressAtIndex(int i) const {
     assert(i >= 0 && i < vFoundersRewardAddress.size());
     return vFoundersRewardAddress[i];
+}
+
+int validEHparameterList(EHparameters *ehparams, unsigned long blockheight, const CChainParams& params){
+    //if in overlap period, there will be two valid solutions, else 1.
+    //The upcoming version of EH is preferred so will always be first element
+    //returns number of elements in list
+    if(blockheight>=params.eh_epoch_2_start() && blockheight>params.eh_epoch_1_end()){
+        ehparams[0]=params.eh_epoch_2_params();
+        return 1;
+    }
+    if(blockheight<params.eh_epoch_2_start()){
+        ehparams[0]=params.eh_epoch_1_params();
+        return 1;
+    }
+    ehparams[0]=params.eh_epoch_2_params();
+    ehparams[1]=params.eh_epoch_1_params();
+    return 2;
 }
