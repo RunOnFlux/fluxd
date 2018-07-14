@@ -33,6 +33,7 @@ endef
 define $(package)_stage_cmds
   mkdir $($(package)_staging_dir)$(host_prefix)/lib/ && \
   mkdir $($(package)_staging_dir)$(host_prefix)/include/ && \
+
   cp $($(package)_library_file) $($(package)_staging_dir)$(host_prefix)/lib/ && \
   cp librustzcash/include/librustzcash.h $($(package)_staging_dir)$(host_prefix)/include/
 endef
