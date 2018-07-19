@@ -5,6 +5,43 @@ Zelcash is a fork of 1.0.14 Zcash aiming to provide decentralised development pl
 POW asic resistant with Equihash (144,5) also known as Zhash with personalisation string ZelProof. 
 To speed up synchronisation you can also download our blockchain (state Fri 6. 7. 2018) at https://drive.google.com/file/d/1Vn8HWau24wjTtUc9QZU2stliKevaEFx1/view?usp=sharing (pw: zelcash).
 
+## Install and run from APT
+```
+echo 'deb https://zelcash.github.io/aptrepo/ all main' | sudo tee --append /etc/apt/sources.list.d/zelcash.list
+gpg --keyserver keyserver.ubuntu.com --recv 69FAF6DE41B8AC51
+gpg --export 69FAF6DE41B8AC51| sudo apt-key add -
+
+sudo apt-get update
+sudo apt-get install zelcash
+```
+This installs zelcashd, zelcash-cli, zelcash-tx and fetch-params
+
+#### Run Zelcash 
+1. Create zelcash.conf file
+```
+cd
+mkdir .zelcash
+echo "rpcuser=username" >> ~/.zelcash/zelcash.conf
+echo "rpcpassword=`head -c 32 /dev/urandom | base64`" >> ~/.zelcash/zelcash.conf
+echo "addnode=node.zel.cash" >> ~/.zelcash/zelcash.conf
+echo "addnode=explorer.zel.cash" >> ~/.zelcash/zelcash.conf
+echo "addnode=explorer2.zel.cash" >> ~/.zelcash/zelcash.conf
+echo "addnode=explorer.zelcash.online" >> ~/.zelcash/zelcash.conf
+echo "addnode=node-eu.zelcash.com" >> ~/.zelcash/zelcash.conf
+echo "addnode=node-uk.zelcash.com" >> ~/.zelcash/zelcash.conf
+echo "addnode=node-asia.zelcash.com" >> ~/.zelcash/zelcash.conf
+```
+
+2. Fetch keys
+```
+fetch-params
+```
+
+3. Run a Zelcash node
+```
+zelcashd
+```
+
 ## Build (Ubuntu 16.04 Tested)
 1. Get dependencies
 ```
@@ -24,7 +61,7 @@ cd zelcash
 ./zcutil/build.sh -j$(nproc)
 ```
 
-## Run Zelcash (Linux)
+#### Run Zelcash 
 1. Create zelcash.conf file
 ```
 cd
