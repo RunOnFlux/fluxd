@@ -88,7 +88,7 @@ public:
 
     void SetFee(CAmount fee);
 
-    // Returns false if the anchor does not match the anchor used by
+    // Throws if the anchor does not match the anchor used by
     // previously-added Sapling spends.
     bool AddSaplingSpend(
         libzelcash::SaplingExpandedSpendingKey expsk,
@@ -105,11 +105,11 @@ public:
     // Assumes that the value correctly corresponds to the provided UTXO.
     void AddTransparentInput(COutPoint utxo, CScript scriptPubKey, CAmount value);
 
-    bool AddTransparentOutput(CTxDestination& to, CAmount value);
+    void AddTransparentOutput(CTxDestination& to, CAmount value);
 
     void SendChangeTo(libzelcash::SaplingPaymentAddress changeAddr, uint256 ovk);
 
-    bool SendChangeTo(CTxDestination& changeAddr);
+    void SendChangeTo(CTxDestination& changeAddr);
 
     TransactionBuilderResult Build();
 };

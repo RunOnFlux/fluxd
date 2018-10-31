@@ -1247,7 +1247,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         LogPrintf("Saving Sprout R1CS to %s\n", r1cs_path.string());
 
-        pzcashParams->saveR1CS(r1cs_path.string());
+        pzelcashParams->saveR1CS(r1cs_path.string());
     }
 
     /* Start the RPC server already.  It will be started in "warmup" mode
