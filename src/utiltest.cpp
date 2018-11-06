@@ -5,6 +5,8 @@
 #include "utiltest.h"
 
 #include "consensus/upgrades.h"
+#include "transaction_builder.h"
+
 
 #include <array>
 
@@ -150,6 +152,31 @@ CWalletTx GetValidSproutSpend(ZCJoinSplit& params,
                                 joinSplitPrivKey
                                ) == 0);
     CTransaction tx {mtx};
+    CWalletTx wtx {NULL, tx};
+    return wtx;
+}
+
+CWalletTx GetValidSaplingTx(const Consensus::Params& consensusParams,
+                            const libzelcash::SaplingExtendedSpendingKey &sk,
+                            CAmount value) {
+    auto expsk = sk.expsk;
+    auto fvk = expsk.full_viewing_key();
+    auto pk = sk.DefaultAddress();
+
+    // Generate dummy Sapling note
+    libzelcash::SaplingNote note(pk, value);
+    auto cm = note.cm().get();
+    SaplingMerkleTree tree;
+    tree.append(cm);
+    auto anchor = tree.root();
+    auto witness = tree.witness();
+
+    auto builder = TransactionBuilder(consensusParams, 1);
+    builder.SetFee(0);
+    assert(builder.AddSaplingSpend(expsk, note, anchor, witness));
+    builder.AddSaplingOutput(fvk.ovk, pk, value, {});
+
+    CTransaction tx = builder.Build().get();
     CWalletTx wtx {NULL, tx};
     return wtx;
 }
