@@ -7,7 +7,9 @@
 #include "zelcash/JoinSplit.hpp"
 #include "zelcash/Note.hpp"
 #include "zelcash/NoteEncryption.hpp"
+#include "zelcash/zip32.h"
 
+// Sprout
 CWalletTx GetValidSproutReceive(ZCJoinSplit& params,
                                 const libzelcash::SproutSpendingKey& sk,
                                 CAmount value,
@@ -20,3 +22,8 @@ CWalletTx GetValidSproutSpend(ZCJoinSplit& params,
                               const libzelcash::SproutSpendingKey& sk,
                               const libzelcash::SproutNote& note,
                               CAmount value);
+
+//  Sapling
+CWalletTx GetValidSaplingTx(const Consensus::Params& consensusParams,
+                            const libzelcash::SaplingExtendedSpendingKey &sk,
+                            CAmount value);
