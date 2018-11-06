@@ -8,13 +8,15 @@
 #include "zelcash/Note.hpp"
 #include "zelcash/NoteEncryption.hpp"
 
-CWalletTx GetValidReceive(ZCJoinSplit& params,
-                          const libzelcash::SproutSpendingKey& sk, CAmount value,
-                          bool randomInputs,
-                          int32_t version = 2);
-libzelcash::SproutNote GetNote(ZCJoinSplit& params,
-                       const libzelcash::SproutSpendingKey& sk,
-                       const CTransaction& tx, size_t js, size_t n);
-CWalletTx GetValidSpend(ZCJoinSplit& params,
-                        const libzelcash::SproutSpendingKey& sk,
-                        const libzelcash::SproutNote& note, CAmount value);
+CWalletTx GetValidSproutReceive(ZCJoinSplit& params,
+                                const libzelcash::SproutSpendingKey& sk,
+                                CAmount value,
+                                bool randomInputs,
+                                int32_t version = 2);
+libzelcash::SproutNote GetSproutNote(ZCJoinSplit& params,
+                                   const libzelcash::SproutSpendingKey& sk,
+                                   const CTransaction& tx, size_t js, size_t n);
+CWalletTx GetValidSproutSpend(ZCJoinSplit& params,
+                              const libzelcash::SproutSpendingKey& sk,
+                              const libzelcash::SproutNote& note,
+                              CAmount value);
