@@ -172,25 +172,28 @@ void DeactivateAcadia() {
     // SelectParams(CBaseChainParams::MAIN);
 }
 
+TestSaplingNote GetTestSaplingNote(const libzelcash::SaplingPaymentAddress& pa, CAmount value) {
+    // Generate dummy Sapling note
+    libzelcash::SaplingNote note(pa, value);
+    uint256 cm = note.cm().get();
+    SaplingMerkleTree tree;
+    tree.append(cm);
+    return { note, tree };
+}
+
 CWalletTx GetValidSaplingTx(const Consensus::Params& consensusParams,
                             const libzelcash::SaplingExtendedSpendingKey &sk,
                             CAmount value) {
     auto expsk = sk.expsk;
     auto fvk = expsk.full_viewing_key();
-    auto pk = sk.DefaultAddress();
+    auto pa = sk.DefaultAddress();
 
-    // Generate dummy Sapling note
-    libzelcash::SaplingNote note(pk, value);
-    auto cm = note.cm().get();
-    SaplingMerkleTree tree;
-    tree.append(cm);
-    auto anchor = tree.root();
-    auto witness = tree.witness();
+    auto testNote = GetTestSaplingNote(pa, value);
 
     auto builder = TransactionBuilder(consensusParams, 1);
     builder.SetFee(0);
-    assert(builder.AddSaplingSpend(expsk, note, anchor, witness));
-    builder.AddSaplingOutput(fvk.ovk, pk, value, {});
+    builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
+    builder.AddSaplingOutput(fvk.ovk, pa, value, {});
 
     CTransaction tx = builder.Build().GetTxOrThrow();
     CWalletTx wtx {NULL, tx};
