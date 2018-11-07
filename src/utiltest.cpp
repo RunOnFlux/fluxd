@@ -172,6 +172,12 @@ void DeactivateAcadia() {
     // SelectParams(CBaseChainParams::MAIN);
 }
 
+libzelcash::SaplingExtendedSpendingKey GetMasterSaplingSpendingKey() {
+    std::vector<unsigned char, secure_allocator<unsigned char>> rawSeed(32);
+    HDSeed seed(rawSeed);
+    return libzelcash::SaplingExtendedSpendingKey::Master(seed);
+}
+
 TestSaplingNote GetTestSaplingNote(const libzelcash::SaplingPaymentAddress& pa, CAmount value) {
     // Generate dummy Sapling note
     libzelcash::SaplingNote note(pa, value);
@@ -189,7 +195,7 @@ CWalletTx GetValidSaplingTx(const Consensus::Params& consensusParams,
     auto pa = sk.DefaultAddress();
 
     auto testNote = GetTestSaplingNote(pa, value);
-
+ 
     auto builder = TransactionBuilder(consensusParams, 1);
     builder.SetFee(0);
     builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());

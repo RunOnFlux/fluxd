@@ -33,6 +33,8 @@ const Consensus::Params& ActivateSapling();
 
 void DeactivateAcadia();
 
+libzelcash::SaplingExtendedSpendingKey GetMasterSaplingSpendingKey();
+
 /**
  * Generate a dummy SaplingNote and a SaplingMerkleTree with that note's commitment.
  */

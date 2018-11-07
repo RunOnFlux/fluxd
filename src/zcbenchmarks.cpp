@@ -302,9 +302,7 @@ double benchmark_try_decrypt_sapling_notes(size_t nAddrs)
     // Set params
     auto consensusParams = ActivateAcadia();
 
-    std::vector<unsigned char, secure_allocator<unsigned char>> rawSeed(32);
-    HDSeed seed(rawSeed);
-    auto masterKey = libzelcash::SaplingExtendedSpendingKey::Master(seed);
+    auto masterKey = GetMasterSaplingSpendingKey();
 
     CWallet wallet;
     wallet.AddSaplingSpendingKey(masterKey, masterKey.DefaultAddress());
