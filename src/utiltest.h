@@ -3,6 +3,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifndef ZELCASH_UTIL_TEST_H
+#define ZELCASH_UTIL_TEST_H
+
 #include "wallet/wallet.h"
 #include "zelcash/JoinSplit.hpp"
 #include "zelcash/Note.hpp"
@@ -43,3 +46,5 @@ TestSaplingNote GetTestSaplingNote(const libzelcash::SaplingPaymentAddress& pa, 
 CWalletTx GetValidSaplingTx(const Consensus::Params& consensusParams,
                             const libzelcash::SaplingExtendedSpendingKey &sk,
                             CAmount value);
+
+#endif // ZELCASH_UTIL_TEST_H
