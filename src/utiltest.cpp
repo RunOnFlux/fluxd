@@ -168,8 +168,6 @@ const Consensus::Params& ActivateAcadia() {
 void DeactivateAcadia() {
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-    // Consider: Should we be doing the following?
-    // SelectParams(CBaseChainParams::MAIN);
 }
 
 libzelcash::SaplingExtendedSpendingKey GetMasterSaplingSpendingKey() {
