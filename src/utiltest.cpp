@@ -168,12 +168,20 @@ const Consensus::Params& ActivateAcadia() {
 void DeactivateAcadia() {
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    // Consider: Should we be doing the following?
+    // SelectParams(CBaseChainParams::MAIN);
 }
 
 libzelcash::SaplingExtendedSpendingKey GetMasterSaplingSpendingKey() {
     std::vector<unsigned char, secure_allocator<unsigned char>> rawSeed(32);
     HDSeed seed(rawSeed);
     return libzelcash::SaplingExtendedSpendingKey::Master(seed);
+}
+
+CKey AddCKeyToKeyStore(CBasicKeyStore& keyStore) {
+    CKey tsk = DecodeSecret(T_SECRET_REGTEST);
+    keyStore.AddKey(tsk);
+    return tsk;
 }
 
 TestSaplingNote GetTestSaplingNote(const libzelcash::SaplingPaymentAddress& pa, CAmount value) {
