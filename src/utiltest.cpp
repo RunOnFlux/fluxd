@@ -51,6 +51,9 @@ CWalletTx GetValidSproutReceive(ZCJoinSplit& params,
                           inputs, outputs, 2*value, 0, false};
     mtx.vjoinsplit.push_back(jsdesc);
 
+    // Consider: The following is a bit misleading (given the name of this function)
+    // and should perhaps be changed, but currently a few tests in test_wallet.cpp
+    // depend on this happening.
     if (version >= 4) {
         // Shielded Output
         OutputDescription od;
@@ -193,18 +196,20 @@ TestSaplingNote GetTestSaplingNote(const libzelcash::SaplingPaymentAddress& pa, 
     return { note, tree };
 }
 
-CWalletTx GetValidSaplingTx(const Consensus::Params& consensusParams,
-                            const libzelcash::SaplingExtendedSpendingKey &sk,
-                            CAmount value) {
-    auto expsk = sk.expsk;
-    auto fvk = expsk.full_viewing_key();
+CWalletTx GetValidSaplingReceive(const Consensus::Params& consensusParams,
+                                 CBasicKeyStore& keyStore,
+                                 const libzelcash::SaplingExtendedSpendingKey &sk,
+                                 CAmount value) {
+    // From taddr
+    CKey tsk = AddCKeyToKeyStore(keyStore);
+    auto scriptPubKey = GetScriptForDestination(tsk.GetPubKey().GetID());
+    // To zaddr
+    auto fvk = sk.expsk.full_viewing_key();
     auto pa = sk.DefaultAddress();
 
-    auto testNote = GetTestSaplingNote(pa, value);
- 
-    auto builder = TransactionBuilder(consensusParams, 1);
+    auto builder = TransactionBuilder(consensusParams, 1, &keyStore);
     builder.SetFee(0);
-    builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
+    builder.AddTransparentInput(COutPoint(), scriptPubKey, value);
     builder.AddSaplingOutput(fvk.ovk, pa, value, {});
 
     CTransaction tx = builder.Build().GetTxOrThrow();
