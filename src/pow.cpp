@@ -64,7 +64,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
 
     //Difficulty algo
     int nHeight = pindexLast->nHeight + 1;
-    if (nHeight < params.zawyLWMAHeight) {
+    if (nHeight < params.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight) {
         return DigishieldCalculateNextWorkRequired(bnAvg, pindexLast->GetMedianTimePast(), pindexFirst->GetMedianTimePast(), params);
     } else {
         return LWMACalculateNextWorkRequired(pindexLast, params);

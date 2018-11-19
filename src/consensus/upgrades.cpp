@@ -19,10 +19,20 @@ const struct NUInfo NetworkUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
         /*.strName =*/ "Test dummy",
         /*.strInfo =*/ "Test dummy info",
     },
+     {
+        /*.nBranchId =*/ 0x76b809bb,
+        /*.strName =*/ "LWMA",
+        /*.strInfo =*/ "Zelcash upgraded to LWMA difficulty algorithm",
+    },
+     {
+        /*.nBranchId =*/ 0x76b809bb,
+        /*.strName =*/ "Equihash 144/5",
+        /*.strInfo =*/ "Zelcash PoW Change to Equihash 144/5",
+    }	
     {
         /*.nBranchId =*/ 0x76b809bb,
         /*.strName =*/ "Acadia",
-        /*.strInfo =*/ "The ZEL Acadia Update",
+        /*.strInfo =*/ "The Zelcash Acadia Update",
     }
 };
 

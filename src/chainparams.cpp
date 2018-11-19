@@ -108,12 +108,22 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        
+	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002; 
+	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 125000;
 
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
+	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002; 
+	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 125100;
+
+	consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 263500;		// Approx January 31th 
 
-        consensus.zawyLWMAHeight = 125000; //TODO
-        consensus.nZawyLWMAAveragingWindow = 60;
+	consensus.nZawyLWMAAveragingWindow = 60;
+	consensus.eh_epoch_fade_length = 10;
+
+	eh_epoch_1 = eh200_9;
+        eh_epoch_2 = eh144_5;
+
 
         /**
          * The message start string should be awesome! ⓩ❤
@@ -126,10 +136,6 @@ public:
         nDefaultPort = 16125;
         nMaxTipAge = 24 * 60 * 60;
         nPruneAfterHeight = 100000;
-        eh_epoch_1 = eh200_9;
-        eh_epoch_2 = eh144_5;
-        eh_epoch_1_endblock = 125110;
-        eh_epoch_2_startblock = 125100;
 
 
         genesis = CreateGenesisBlock(
@@ -225,11 +231,20 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 1000000;			// To be set when its time
+	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002; 
+	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 500;
 
-        consensus.zawyLWMAHeight = 500; //TODO
+	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002; 
+	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 600;
+
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 1500;			// To be set when its time
+
         consensus.nZawyLWMAAveragingWindow = 60;
+	consensus.eh_epoch_fade_length = 10;
+
+	eh_epoch_1 = eh200_9;
+        eh_epoch_2 = eh144_5;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -241,11 +256,7 @@ public:
         nMaxTipAge = 24 * 60 * 60;
 
         nPruneAfterHeight = 1000;
-        eh_epoch_1 = eh200_9;
-        eh_epoch_2 = eh144_5;
-        eh_epoch_1_endblock = 610;
-        eh_epoch_2_startblock = 600;
-
+  
         genesis = CreateGenesisBlock(
             1521043405,
             uint256S("0x0000000000000000000000000000000000000000000000000000000000000018"),
@@ -326,7 +337,8 @@ public:
 
         consensus.nPowTargetSpacing = 2 * 60;
 	consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
-        consensus.zawyLWMAHeight = 1;
+        consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 1;
+
         consensus.nZawyLWMAAveragingWindow = 60;
 
         consensus.nPowTargetSpacing = 2 * 60;
@@ -337,15 +349,26 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170003;
+
+	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002; 
+	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 10;
+
+	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002; 
+	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 10;
+
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170006;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-        consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nProtocolVersion = 170006;
-        consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight =
-            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+    
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
+	
+	consensus.nZawyLWMAAveragingWindow = 60;
+	consensus.eh_epoch_fade_length = 10;
+
+	eh_epoch_1 = eh48_5;
+        eh_epoch_2 = eh48_5;
 
         pchMessageStart[0] = 0xaa;
         pchMessageStart[1] = 0xe8;
@@ -354,10 +377,7 @@ public:
         nDefaultPort = 26126;
         nMaxTipAge = 24 * 60 * 60;
         nPruneAfterHeight = 1000;
-        eh_epoch_1 = eh48_5;
-        eh_epoch_2 = eh48_5;
-        eh_epoch_1_endblock = 1;
-        eh_epoch_2_startblock = 1;
+ 
 
         genesis = CreateGenesisBlock(
             1296688602,
@@ -490,11 +510,11 @@ int validEHparameterList(EHparameters *ehparams, unsigned long blockheight, cons
     //if in overlap period, there will be two valid solutions, else 1.
     //The upcoming version of EH is preferred so will always be first element
     //returns number of elements in list
-    if(blockheight>=params.eh_epoch_2_start() && blockheight>params.eh_epoch_1_end()){
+    if(blockheight>=(params.GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight + params..GetConsensus().eh_epoch_fade_length)){
         ehparams[0]=params.eh_epoch_2_params();
         return 1;
     }
-    if(blockheight<params.eh_epoch_2_start()){
+    if(blockheight<params.GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight){
         ehparams[0]=params.eh_epoch_1_params();
         return 1;
     }

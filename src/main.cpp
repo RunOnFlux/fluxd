@@ -3483,7 +3483,7 @@ bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool f
     unsigned int nHeight = chainActive.Height();
     const CChainParams& chainParams = Params();
     const Consensus::Params& consensusParams = chainParams.GetConsensus();
-    unsigned int newAlgoHeight = consensusParams.zawyLWMAHeight;
+    unsigned int newAlgoHeight = consensusParams.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight;
     //Digishield era and LWMA era, TLS = N * T / 20. Where N=60 is AveragingWindow, T is block time
     if (nHeight < newAlgoHeight) {
         if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)

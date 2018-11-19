@@ -21,9 +21,12 @@ namespace Consensus {
  * several functions depend on the enum being sorted.
  */
 enum UpgradeIndex {
-    // Sprout must be first
+    // BASE must be first
     BASE,
     UPGRADE_TESTDUMMY,
+    // LWMA algo starts at this block 
+    UPGRADE_LWMA,
+    UPGRADE_EQUI144_5,	
     UPGRADE_ACADIA,
     // NOTE: Also add new upgrades to NetworkUpgradeInfo in upgrades.cpp
     MAX_NETWORK_UPGRADES
@@ -85,8 +88,8 @@ struct Params {
     int GetLastFoundersRewardBlockHeight() const {
         return nSubsidyHalvingInterval + SubsidySlowStartShift() - 1;
     }
-    /** LWMA algo starts at this block **/
-    int zawyLWMAHeight;
+
+
     /** Used to check majorities for block version upgrade */
     int nMajorityEnforceBlockUpgrade;
     int nMajorityRejectBlockOutdated;
@@ -103,9 +106,14 @@ struct Params {
     int64_t DigishieldAveragingWindowTimespan() const { return nDigishieldAveragingWindow * nPowTargetSpacing; }
     int64_t DigishieldMinActualTimespan() const { return (DigishieldAveragingWindowTimespan() * (100 - nDigishieldMaxAdjustUp  )) / 100; }
     int64_t DigishieldMaxActualTimespan() const { return (DigishieldAveragingWindowTimespan() * (100 + nDigishieldMaxAdjustDown)) / 100; }
+
+    uint256 nMinimumChainWork;	
+	
     /** Parameters for LWMA difficulty adjustment **/
     int64_t nZawyLWMAAveragingWindow;  // N
-    uint256 nMinimumChainWork;	
+
+    /** Parameters for Equihash epoche fade **/
+    unsigned long eh_epoch_fade_length = 0;	
 
 };
 } // namespace Consensus
