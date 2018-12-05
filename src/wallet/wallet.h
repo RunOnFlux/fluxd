@@ -1142,11 +1142,7 @@ public:
 
     boost::optional<uint256> GetSproutNoteNullifier(
         const JSDescription& jsdesc,
-<<<<<<< HEAD
         const libzelcash::SproutPaymentAddress& address,
-=======
-        const libzelcash::PaymentAddress& address,
->>>>>>> adfdef7... initial ZEL changes to Overwinter
         const ZCNoteDecryption& dec,
         const uint256& hSig,
         uint8_t n) const;

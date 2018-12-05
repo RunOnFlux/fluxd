@@ -105,13 +105,8 @@ bool CWalletDB::WriteCryptedKey(const CPubKey& vchPubKey,
     return true;
 }
 
-<<<<<<< HEAD
 bool CWalletDB::WriteCryptedZKey(const libzelcash::SproutPaymentAddress & addr,
                                  const libzelcash::ReceivingKey &rk,
-=======
-bool CWalletDB::WriteCryptedZKey(const libzelcash::PaymentAddress & addr,
-                                 const libzelcash::ReceivingKey &rk,
->>>>>>> adfdef7... initial ZEL changes to Overwinter
                                  const std::vector<unsigned char>& vchCryptedSecret,
                                  const CKeyMetadata &keyMeta)
 {
@@ -158,11 +153,7 @@ bool CWalletDB::WriteMasterKey(unsigned int nID, const CMasterKey& kMasterKey)
     return Write(std::make_pair(std::string("mkey"), nID), kMasterKey, true);
 }
 
-<<<<<<< HEAD
 bool CWalletDB::WriteZKey(const libzelcash::SproutPaymentAddress& addr, const libzelcash::SproutSpendingKey& key, const CKeyMetadata &keyMeta)
-=======
-bool CWalletDB::WriteZKey(const libzelcash::PaymentAddress& addr, const libzelcash::SpendingKey& key, const CKeyMetadata &keyMeta)
->>>>>>> adfdef7... initial ZEL changes to Overwinter
 {
     nWalletDBUpdated++;
 
@@ -193,21 +184,14 @@ bool CWalletDB::WriteSaplingPaymentAddress(
     return Write(std::make_pair(std::string("sapzaddr"), addr), ivk, false);
 }
 
-<<<<<<< HEAD
+
 bool CWalletDB::WriteSproutViewingKey(const libzelcash::SproutViewingKey &vk)
-=======
-bool CWalletDB::WriteViewingKey(const libzelcash::ViewingKey &vk)
->>>>>>> adfdef7... initial ZEL changes to Overwinter
 {
     nWalletDBUpdated++;
     return Write(std::make_pair(std::string("vkey"), vk), '1');
 }
 
-<<<<<<< HEAD
 bool CWalletDB::EraseSproutViewingKey(const libzelcash::SproutViewingKey &vk)
-=======
-bool CWalletDB::EraseViewingKey(const libzelcash::ViewingKey &vk)
->>>>>>> adfdef7... initial ZEL changes to Overwinter
 {
     nWalletDBUpdated++;
     return Erase(std::make_pair(std::string("vkey"), vk));
@@ -545,11 +529,7 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
         }
         else if (strType == "vkey")
         {
-<<<<<<< HEAD
             libzelcash::SproutViewingKey vk;
-=======
-            libzelcash::ViewingKey vk;
->>>>>>> adfdef7... initial ZEL changes to Overwinter
             ssKey >> vk;
             char fYes;
             ssValue >> fYes;
@@ -562,15 +542,9 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
         }
         else if (strType == "zkey")
         {
-<<<<<<< HEAD
             libzelcash::SproutPaymentAddress addr;
             ssKey >> addr;
             libzelcash::SproutSpendingKey key;
-=======
-            libzelcash::PaymentAddress addr;
-            ssKey >> addr;
-            libzelcash::SpendingKey key;
->>>>>>> adfdef7... initial ZEL changes to Overwinter
             ssValue >> key;
 
             if (!pwallet->LoadZKey(key))
@@ -694,11 +668,7 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
         }
         else if (strType == "czkey")
         {
-<<<<<<< HEAD
             libzelcash::SproutPaymentAddress addr;
-=======
-            libzelcash::PaymentAddress addr;
->>>>>>> adfdef7... initial ZEL changes to Overwinter
             ssKey >> addr;
             // Deserialization of a pair is just one item after another
             uint256 rkValue;
@@ -749,11 +719,7 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
         }
         else if (strType == "zkeymeta")
         {
-<<<<<<< HEAD
             libzelcash::SproutPaymentAddress addr;
-=======
-            libzelcash::PaymentAddress addr;
->>>>>>> adfdef7... initial ZEL changes to Overwinter
             ssKey >> addr;
             CKeyMetadata keyMeta;
             ssValue >> keyMeta;

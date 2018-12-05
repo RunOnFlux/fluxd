@@ -171,8 +171,8 @@ TEST(checktransaction_tests, BadTxnsOversize) {
 
     {
         // But should be fine again once Sapling activates!
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
 
         mtx.fOverwintered = true;
         mtx.nVersionGroupId = SAPLING_VERSION_GROUP_ID;
@@ -181,7 +181,7 @@ TEST(checktransaction_tests, BadTxnsOversize) {
         // Change the proof types (which requires re-signing the JoinSplit data)
         mtx.vjoinsplit[0].proof = libzelcash::GrothProof();
         mtx.vjoinsplit[1].proof = libzelcash::GrothProof();
-        CreateJoinSplitSignature(mtx, NetworkUpgradeInfo[Consensus::UPGRADE_SAPLING].nBranchId);
+        CreateJoinSplitSignature(mtx, NetworkUpgradeInfo[Consensus::UPGRADE_ACADIA].nBranchId);
 
         CTransaction tx(mtx);
         EXPECT_EQ(::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION), 103713);
@@ -191,15 +191,15 @@ TEST(checktransaction_tests, BadTxnsOversize) {
         EXPECT_TRUE(ContextualCheckTransaction(tx, state, 1, 100));
 
         // Revert to default
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     }
 }
 
 TEST(checktransaction_tests, OversizeSaplingTxns) {
     SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
 
     CMutableTransaction mtx = GetValidTransaction();
     mtx.fOverwintered = true;
@@ -209,7 +209,7 @@ TEST(checktransaction_tests, OversizeSaplingTxns) {
     // Change the proof types (which requires re-signing the JoinSplit data)
     mtx.vjoinsplit[0].proof = libzelcash::GrothProof();
     mtx.vjoinsplit[1].proof = libzelcash::GrothProof();
-    CreateJoinSplitSignature(mtx, NetworkUpgradeInfo[Consensus::UPGRADE_SAPLING].nBranchId);
+    CreateJoinSplitSignature(mtx, NetworkUpgradeInfo[Consensus::UPGRADE_ACADIA].nBranchId);
 
     // Transaction just under the limit
     mtx.vin[0].scriptSig = CScript();
@@ -252,8 +252,8 @@ TEST(checktransaction_tests, OversizeSaplingTxns) {
     }
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
 }
 
 TEST(checktransaction_tests, bad_txns_vout_negative) {
@@ -903,7 +903,7 @@ TEST(checktransaction_tests, OverwinteredContextualCreateTx) {
         EXPECT_EQ(mtx.nExpiryHeight, 0);
     }
 
-    // Overwinter activates
+    /* // Overwinter activates
     {
         CMutableTransaction mtx = CreateNewContextualCMutableTransaction(
             consensusParams, activationHeight );
@@ -914,7 +914,7 @@ TEST(checktransaction_tests, OverwinteredContextualCreateTx) {
         EXPECT_EQ(mtx.nExpiryHeight, activationHeight + expiryDelta);
     }
 
-    // Close to Sapling activation
+   // Close to Sapling activation
     {
         CMutableTransaction mtx = CreateNewContextualCMutableTransaction(
             consensusParams, saplingActivationHeight - expiryDelta - 2);
@@ -954,17 +954,17 @@ TEST(checktransaction_tests, OverwinteredContextualCreateTx) {
         EXPECT_EQ(mtx.nVersionGroupId, OVERWINTER_VERSION_GROUP_ID);
         EXPECT_EQ(mtx.nVersion, OVERWINTER_TX_VERSION);
         EXPECT_EQ(mtx.nExpiryHeight, saplingActivationHeight - 1);
-    }
+    } */
 
     // Sapling activates
     {
         CMutableTransaction mtx = CreateNewContextualCMutableTransaction(
-            consensusParams, saplingActivationHeight);
+            consensusParams, activationHeight);
 
         EXPECT_EQ(mtx.fOverwintered, true);
         EXPECT_EQ(mtx.nVersionGroupId, SAPLING_VERSION_GROUP_ID);
         EXPECT_EQ(mtx.nVersion, SAPLING_TX_VERSION);
-        EXPECT_EQ(mtx.nExpiryHeight, saplingActivationHeight + expiryDelta);
+        EXPECT_EQ(mtx.nExpiryHeight, activationHeight + expiryDelta);
     }
 
     // Revert to default

@@ -11,8 +11,8 @@
 #include <key.h>
 #include <pubkey.h>
 #include <script/standard.h>
-#include <zcash/Address.hpp>
-#include <zcash/zip32.h>
+#include <zelcash/Address.hpp>
+#include <zelcash/zip32.h>
 
 #include <string>
 

@@ -72,8 +72,8 @@ TEST(PoW, DifficultyAveraging) {
 TEST(PoW, MinDifficultyRules) {
     SelectParams(CBaseChainParams::TESTNET);
     const Consensus::Params& params = Params().GetConsensus();
-    size_t lastBlk = 2*params.nPowAveragingWindow;
-    size_t firstBlk = lastBlk - params.nPowAveragingWindow;
+    size_t lastBlk = 2*params.nDigishieldAveragingWindow;
+    size_t firstBlk = lastBlk - params.nDigishieldAveragingWindow;
 
     // Start with blocks evenly-spaced and equal difficulty
     std::vector<CBlockIndex> blocks(lastBlk+1);
@@ -92,8 +92,8 @@ TEST(PoW, MinDifficultyRules) {
     // Result should be unchanged, modulo integer division precision loss
     arith_uint256 bnRes;
     bnRes.SetCompact(0x1e7fffff);
-    bnRes /= params.AveragingWindowTimespan();
-    bnRes *= params.AveragingWindowTimespan();
+    bnRes /= params.DigishieldAveragingWindowTimespan();
+    bnRes *= params.DigishieldAveragingWindowTimespan();
     EXPECT_EQ(GetNextWorkRequired(&blocks[lastBlk], &next, params), bnRes.GetCompact());
 
     // Delay last block up to the edge of the min-difficulty limit

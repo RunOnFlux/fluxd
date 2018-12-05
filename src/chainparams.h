@@ -93,8 +93,8 @@ public:
     int64_t PruneAfterHeight() const { return nPruneAfterHeight; }
     EHparameters eh_epoch_1_params() const { return eh_epoch_1; }
     EHparameters eh_epoch_2_params() const { return eh_epoch_2; }
-    unsigned long eh_epoch_1_end() const { return eh_epoch_1_endblock; }
-    unsigned long eh_epoch_2_start() const { return eh_epoch_2_startblock; }
+    unsigned long eh_epoch_1_end() const {   return GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight + GetConsensus().eh_epoch_fade_length - 1; }
+    unsigned long eh_epoch_2_start() const { return GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight; }
     std::string CurrencyUnits() const { return strCurrencyUnits; }
     uint32_t BIP44CoinType() const { return bip44CoinType; }
     /** Make miner stop after a block is found. In RPC, don't return until nGenProcLimit blocks are generated */

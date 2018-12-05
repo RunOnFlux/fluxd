@@ -119,7 +119,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 263500;		// Approx January 31th 
 
 	consensus.nZawyLWMAAveragingWindow = 60;
-	consensus.eh_epoch_fade_length = 10;
+	consensus.eh_epoch_fade_length = 11;
 
 	eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
@@ -134,7 +134,6 @@ public:
         pchMessageStart[3] = 0x64;
         vAlertPubKey = ParseHex("04025b2cf3a116782a69bb68cb4ae5ba3b7f05069f7139b75573dd28e48f8992d95c118122b618d4943456ad64e7356b0b45b2ef179cbe3d9767a2426662d13d32"); //Zel Technologies
         nDefaultPort = 16125;
-        nMaxTipAge = 24 * 60 * 60;
         nPruneAfterHeight = 100000;
 
 
@@ -241,7 +240,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 1500;			// To be set when its time
 
         consensus.nZawyLWMAAveragingWindow = 60;
-	consensus.eh_epoch_fade_length = 10;
+	consensus.eh_epoch_fade_length = 11;
 
 	eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
@@ -253,7 +252,6 @@ public:
         vAlertPubKey = ParseHex("044b5cb8fd1db34e2d89a93e7becf3fb35dd08a81bb3080484365e567136403fd4a6682a43d8819522ae35394704afa83de1ef069a3104763fd0ebdbdd505a1386"); //Zel Technologies
 
         nDefaultPort = 26125;
-        nMaxTipAge = 24 * 60 * 60;
 
         nPruneAfterHeight = 1000;
   
@@ -330,7 +328,7 @@ public:
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 1000;
         consensus.powLimit = uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
-        consensus.nPowAveragingWindow = 17;
+        consensus.nDigishieldAveragingWindow = 17;
         assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
         consensus.nDigishieldMaxAdjustDown = 0; // Turn off adjustment down
         consensus.nDigishieldMaxAdjustUp = 0; // Turn off adjustment up
@@ -365,7 +363,7 @@ public:
         consensus.nMinimumChainWork = uint256S("0x00");
 	
 	consensus.nZawyLWMAAveragingWindow = 60;
-	consensus.eh_epoch_fade_length = 10;
+	consensus.eh_epoch_fade_length = 11;
 
 	eh_epoch_1 = eh48_5;
         eh_epoch_2 = eh48_5;
@@ -375,7 +373,6 @@ public:
         pchMessageStart[2] = 0x3f;
         pchMessageStart[3] = 0x5f;
         nDefaultPort = 26126;
-        nMaxTipAge = 24 * 60 * 60;
         nPruneAfterHeight = 1000;
  
 
@@ -510,7 +507,7 @@ int validEHparameterList(EHparameters *ehparams, unsigned long blockheight, cons
     //if in overlap period, there will be two valid solutions, else 1.
     //The upcoming version of EH is preferred so will always be first element
     //returns number of elements in list
-    if(blockheight>=(params.GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight + params..GetConsensus().eh_epoch_fade_length)){
+    if(blockheight>=(params.GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight + params.GetConsensus().eh_epoch_fade_length)){
         ehparams[0]=params.eh_epoch_2_params();
         return 1;
     }

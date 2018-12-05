@@ -75,8 +75,8 @@ protected:
 
     virtual void TearDown() {
         // Revert to test default. No-op on mainnet params.
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     }
 
     // Returns a valid but empty mutable transaction at block height 1.
@@ -203,7 +203,7 @@ TEST_F(ContextualCheckBlockTest, BlockSproutRulesAcceptSproutTx) {
 // Test block evaluated under Overwinter rules will accept Overwinter transactions.
 TEST_F(ContextualCheckBlockTest, BlockOverwinterRulesAcceptOverwinterTx) {
     SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, 1);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, 1);
 
     CMutableTransaction mtx = GetFirstBlockCoinbaseTx();
 
@@ -220,8 +220,8 @@ TEST_F(ContextualCheckBlockTest, BlockOverwinterRulesAcceptOverwinterTx) {
 // Test that a block evaluated under Sapling rules can contain Sapling transactions.
 TEST_F(ContextualCheckBlockTest, BlockSaplingRulesAcceptSaplingTx) {
     SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, 1);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, 1);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, 1);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, 1);
 
     CMutableTransaction mtx = GetFirstBlockCoinbaseTx();
 
@@ -239,7 +239,6 @@ TEST_F(ContextualCheckBlockTest, BlockSaplingRulesAcceptSaplingTx) {
 // Sprout-Sapling, Overwinter-Sprout, Overwinter-Sapling, Sapling-Sprout, and
 // Sapling-Overwinter.
 
-<<<<<<< HEAD
 // Test that a block evaluated under Sprout rules cannot contain non-Sprout
 // transactions which require Overwinter to be active.  This test assumes that
 // mainnet Overwinter activation is at least height 2.

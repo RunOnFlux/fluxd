@@ -28,7 +28,7 @@
 
 #include "zcbenchmarks.h"
 
-#include "zelcash/zelcash.h"
+#include "zelcash/Zelcash.h"
 #include "zelcash/IncrementalMerkleTree.hpp"
 #include "zelcash/Note.hpp"
 #include "librustzcash.h"

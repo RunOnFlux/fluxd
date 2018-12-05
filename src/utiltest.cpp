@@ -70,21 +70,12 @@ CWalletTx GetValidReceive(ZCJoinSplit& params,
     return wtx;
 }
 
-<<<<<<< HEAD
 libzelcash::SproutNote GetNote(ZCJoinSplit& params,
                        const libzelcash::SproutSpendingKey& sk,
                        const CTransaction& tx, size_t js, size_t n) {
     ZCNoteDecryption decryptor {sk.receiving_key()};
     auto hSig = tx.vjoinsplit[js].h_sig(params, tx.joinSplitPubKey);
     auto note_pt = libzelcash::SproutNotePlaintext::decrypt(
-=======
-libzelcash::Note GetNote(ZCJoinSplit& params,
-                       const libzelcash::SpendingKey& sk,
-                       const CTransaction& tx, size_t js, size_t n) {
-    ZCNoteDecryption decryptor {sk.receiving_key()};
-    auto hSig = tx.vjoinsplit[js].h_sig(params, tx.joinSplitPubKey);
-    auto note_pt = libzelcash::NotePlaintext::decrypt(
->>>>>>> adfdef7... initial ZEL changes to Overwinter
         decryptor,
         tx.vjoinsplit[js].ciphertexts[n],
         tx.vjoinsplit[js].ephemeralKey,
@@ -94,13 +85,8 @@ libzelcash::Note GetNote(ZCJoinSplit& params,
 }
 
 CWalletTx GetValidSpend(ZCJoinSplit& params,
-<<<<<<< HEAD
                         const libzelcash::SproutSpendingKey& sk,
                         const libzelcash::SproutNote& note, CAmount value) {
-=======
-                        const libzelcash::SpendingKey& sk,
-                        const libzelcash::Note& note, CAmount value) {
->>>>>>> adfdef7... initial ZEL changes to Overwinter
     CMutableTransaction mtx;
     mtx.vout.resize(2);
     mtx.vout[0].nValue = value;
@@ -119,7 +105,6 @@ CWalletTx GetValidSpend(ZCJoinSplit& params,
     libzelcash::JSInput dummyin;
 
     {
-<<<<<<< HEAD
         if (note.value() > value) {
             libzelcash::SproutSpendingKey dummykey = libzelcash::SproutSpendingKey::random();
             libzelcash::SproutPaymentAddress dummyaddr = dummykey.address();
@@ -128,16 +113,6 @@ CWalletTx GetValidSpend(ZCJoinSplit& params,
             libzelcash::SproutSpendingKey dummykey = libzelcash::SproutSpendingKey::random();
             libzelcash::SproutPaymentAddress dummyaddr = dummykey.address();
             libzelcash::SproutNote dummynote(dummyaddr.a_pk, (value - note.value()), uint256(), uint256());
-=======
-        if (note.value > value) {
-            libzelcash::SpendingKey dummykey = libzelcash::SpendingKey::random();
-            libzelcash::PaymentAddress dummyaddr = dummykey.address();
-            dummyout = libzelcash::JSOutput(dummyaddr, note.value - value);
-        } else if (note.value < value) {
-            libzelcash::SpendingKey dummykey = libzelcash::SpendingKey::random();
-            libzelcash::PaymentAddress dummyaddr = dummykey.address();
-            libzelcash::Note dummynote(dummyaddr.a_pk, (value - note.value), uint256(), uint256());
->>>>>>> adfdef7... initial ZEL changes to Overwinter
             tree.append(dummynote.cm());
             dummyin = libzelcash::JSInput(tree.witness(), dummynote, dummykey);
         }
@@ -145,30 +120,16 @@ CWalletTx GetValidSpend(ZCJoinSplit& params,
 
     tree.append(note.cm());
 
-<<<<<<< HEAD
     std::array<libzelcash::JSInput, 2> inputs = {
         libzelcash::JSInput(tree.witness(), note, sk),
         dummyin
     };
 
     std::array<libzelcash::JSOutput, 2> outputs = {
-=======
-    boost::array<libzelcash::JSInput, 2> inputs = {
-        libzelcash::JSInput(tree.witness(), note, sk),
-        dummyin
-    };
-
-    boost::array<libzelcash::JSOutput, 2> outputs = {
->>>>>>> adfdef7... initial ZEL changes to Overwinter
         dummyout, // dummy output
         libzelcash::JSOutput() // dummy output
     };
 
-<<<<<<< HEAD
-=======
-    boost::array<libzelcash::Note, 2> output_notes;
-
->>>>>>> adfdef7... initial ZEL changes to Overwinter
     // Prepare JoinSplits
     uint256 rt = tree.root();
     JSDescription jsdesc {false, params, mtx.joinSplitPubKey, rt,

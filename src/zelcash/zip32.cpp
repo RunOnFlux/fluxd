@@ -8,7 +8,7 @@
 #include "random.h"
 #include "streams.h"
 #include "version.h"
-#include "zcash/prf.h"
+#include "zelcash/prf.h"
 
 #include <librustzcash.h>
 #include <sodium.h>

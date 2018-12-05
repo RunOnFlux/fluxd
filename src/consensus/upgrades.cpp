@@ -28,7 +28,7 @@ const struct NUInfo NetworkUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
         /*.nBranchId =*/ 0x76b809bb,
         /*.strName =*/ "Equihash 144/5",
         /*.strInfo =*/ "Zelcash PoW Change to Equihash 144/5",
-    }	
+    },	
     {
         /*.nBranchId =*/ 0x76b809bb,
         /*.strName =*/ "Acadia",
@@ -88,7 +88,7 @@ uint32_t CurrentEpochBranchId(int nHeight, const Consensus::Params& params) {
 }
 
 bool IsConsensusBranchId(int branchId) {
-    for (int idx = Consensus::BASE_SPROUT; idx < Consensus::MAX_NETWORK_UPGRADES; idx++) {
+    for (int idx = Consensus::BASE; idx < Consensus::MAX_NETWORK_UPGRADES; idx++) {
         if (branchId == NetworkUpgradeInfo[idx].nBranchId) {
             return true;
         }

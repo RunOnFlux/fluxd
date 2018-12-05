@@ -1,7 +1,7 @@
 #include <chainparams.h>
 #include <key_io.h>
-#include <zcash/Address.hpp>
-#include <zcash/zip32.h>
+#include <zelcash/Address.hpp>
+#include <zelcash/zip32.h>
 
 #include <gtest/gtest.h>
 

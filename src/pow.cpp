@@ -26,6 +26,12 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     if (pindexLast == NULL)
         return nProofOfWorkLimit;
 
+    // Reset the difficulty after the algo fork and keep it for 61 blocks. LWMA averaging window is 60 blocks.
+    if (pindexLast->nHeight > chainParams.eh_epoch_1_end() - 1
+        && pindexLast->nHeight < chainParams.eh_epoch_1_end() + 61) {
+        return nProofOfWorkLimit;
+    }	
+
     {
         // Comparing to pindexLast->nHeight with >= because this function
         // returns the work required for the block after pindexLast.
@@ -38,13 +44,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
             if (pblock && pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing * 6)
                 return nProofOfWorkLimit;
         }
-    }
-
-    // Reset the difficulty after the algo fork and keep it for 61 blocks. LWMA averaging window is 60 blocks.
-    if (pindexLast->nHeight > chainParams.eh_epoch_1_end() - 1
-        && pindexLast->nHeight < chainParams.eh_epoch_1_end() + 61) {
-        return nProofOfWorkLimit;
-    }
+    }  
 
     // Find the first block in the averaging interval
     const CBlockIndex* pindexFirst = pindexLast;
@@ -152,7 +152,7 @@ unsigned int LWMACalculateNextWorkRequired(const CBlockIndex* pindexLast, const 
 unsigned int Lwma3CalculateNextWorkRequired(const CBlockIndex* pindexLast, const Consensus::Params& params)
 {
     const int64_t T = params.nPowTargetSpacing;
-    const int64_t N = params.lwmaAveragingWindow;
+    const int64_t N = params.nZawyLWMAAveragingWindow;
     const int64_t k = N * (N + 1) * T / 2;
     const int64_t height = pindexLast->nHeight;
     const arith_uint256 powLimit = UintToArith256(params.powLimit);

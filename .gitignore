@@ -2,14 +2,14 @@
 *.deb
 *.exe
 src/bitcoin
-src/zcashd
-src/zcash-cli
-src/zcash-gtest
-src/zcash-tx
+src/zelcashd
+src/zelcash-cli
+src/zelcash-gtest
+src/zelcash-tx
 src/test/test_bitcoin
 
-*zcashTest.pk
-*zcashTest.vk
+*zelcashTest.pk
+*zelcashTest.vk
 
 # autoreconf
 Makefile.in
@@ -52,6 +52,7 @@ src/univalue/gen
 *.pyc
 *.o
 *.o-*
+.zelcash
 .zcash
 *.a
 *.pb.cc
@@ -276,9 +277,9 @@ PublishScripts/
 # NuGet Packages
 *.nupkg
 # The packages folder can be ignored because of Package Restore
-**/[Pp]ackages/*
+# **/[Pp]ackages/*
 # except build/, which is used as an MSBuild target.
-!**/[Pp]ackages/build/
+# !**/[Pp]ackages/build/
 # Uncomment if necessary however generally it will be regenerated when needed
 #!**/[Pp]ackages/repositories.config
 # NuGet v3's project.json files produces more ignorable files

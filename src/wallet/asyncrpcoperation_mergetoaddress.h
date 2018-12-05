@@ -11,8 +11,8 @@
 #include "primitives/transaction.h"
 #include "transaction_builder.h"
 #include "wallet.h"
-#include "zcash/Address.hpp"
-#include "zcash/JoinSplit.hpp"
+#include "zelcash/Address.hpp"
+#include "zelcash/JoinSplit.hpp"
 
 #include <array>
 #include <tuple>

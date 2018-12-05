@@ -8,7 +8,7 @@
 #include "serialize.h"
 #include "support/allocators/secure.h"
 #include "uint256.h"
-#include "zcash/Address.hpp"
+#include "zelcash/Address.hpp"
 
 #include <boost/optional.hpp>
 

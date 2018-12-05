@@ -4,7 +4,7 @@
 
 #include <utilstrencodings.h>
 #include <test/test_bitcoin.h>
-#include <zcash/NoteEncryption.hpp>
+#include <zelcash/NoteEncryption.hpp>
 
 #include <boost/test/unit_test.hpp>
 

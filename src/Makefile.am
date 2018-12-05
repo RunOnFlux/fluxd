@@ -74,7 +74,7 @@ $(LIBUNIVALUE): $(wildcard univalue/lib/*) $(wildcard univalue/include/*)
 
 # Make is not made aware of per-object dependencies to avoid limiting building parallelization
 # But to build the less dependent modules first, we manually select their order here:
-<<<<<<< HEAD
+
 EXTRA_LIBRARIES += \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBBITCOIN_UTIL) \
@@ -87,33 +87,6 @@ EXTRA_LIBRARIES += \
   $(LIBZELCASH)
 
 lib_LTLIBRARIES = $(LIBZELCASH_CONSENSUS)
-=======
-EXTRA_LIBRARIES = \
-  crypto/libbitcoin_crypto.a \
-  libbitcoin_util.a \
-  libbitcoin_common.a \
-  libbitcoin_server.a \
-  libbitcoin_cli.a \
-  libzelcash.a
-if ENABLE_WALLET
-BITCOIN_INCLUDES += $(BDB_CPPFLAGS)
-EXTRA_LIBRARIES += libbitcoin_wallet.a
-endif
-if ENABLE_ZMQ
-EXTRA_LIBRARIES += libbitcoin_zmq.a
-endif
-if ENABLE_PROTON
-EXTRA_LIBRARIES += libbitcoin_proton.a
-endif
-
-if BUILD_BITCOIN_LIBS
-lib_LTLIBRARIES = libzelcashconsensus.la
-LIBZELCASH_CONSENSUS=libzelcashconsensus.la
-else
-LIBZELCASH_CONSENSUS=
-endif
->>>>>>> adfdef7... initial ZEL changes to Overwinter
-
 bin_PROGRAMS =
 noinst_PROGRAMS =
 TESTS =

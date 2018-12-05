@@ -23,7 +23,7 @@
 #include "utiltime.h"
 #include "wallet.h"
 #include "walletdb.h"
-#include "zcash/IncrementalMerkleTree.hpp"
+#include "zelcash/IncrementalMerkleTree.hpp"
 
 #include <chrono>
 #include <iostream>

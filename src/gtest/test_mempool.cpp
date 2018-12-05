@@ -289,7 +289,7 @@ TEST(Mempool, SproutNegativeVersionTxWhenOverwinterActive) {
 
 TEST(Mempool, ExpiringSoonTxRejection) {
     SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
 
     CTxMemPool pool(::minRelayTxFee);
     bool missingInputs;
@@ -315,5 +315,5 @@ TEST(Mempool, ExpiringSoonTxRejection) {
     }
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
 }

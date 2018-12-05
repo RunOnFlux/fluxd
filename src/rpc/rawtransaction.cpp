@@ -504,9 +504,8 @@ UniValue createrawtransaction(const UniValue& params, bool fHelp)
         rawTx.nLockTime = nLockTime;
     }
     
-<<<<<<< HEAD:src/rpc/rawtransaction.cpp
     if (params.size() > 3 && !params[3].isNull()) {
-        if (NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER)) {
+        if (NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
             int64_t nExpiryHeight = params[3].get_int64();
             if (nExpiryHeight < 0 || nExpiryHeight >= TX_EXPIRY_HEIGHT_THRESHOLD) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid parameter, expiryheight must be nonnegative and less than %d.", TX_EXPIRY_HEIGHT_THRESHOLD));
@@ -520,12 +519,6 @@ UniValue createrawtransaction(const UniValue& params, bool fHelp)
             rawTx.nExpiryHeight = nExpiryHeight;
         } else {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, expiryheight can only be used if Overwinter is active when the transaction is mined");
-=======
-    if (NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
-        rawTx.nExpiryHeight = nextBlockHeight + expiryDelta;
-        if (rawTx.nExpiryHeight >= TX_EXPIRY_HEIGHT_THRESHOLD){
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "nExpiryHeight must be less than TX_EXPIRY_HEIGHT_THRESHOLD.");
->>>>>>> 27c6f6c... Introducing Acadia Features #1:src/rpcrawtransaction.cpp
         }
     }
 
@@ -1027,7 +1020,7 @@ UniValue sendrawtransaction(const UniValue& params, bool fHelp)
     // DoS mitigation: reject transactions expiring soon
     if (tx.nExpiryHeight > 0) {
         int nextBlockHeight = chainActive.Height() + 1;
-        if (NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER)) {
+        if (NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
             if (nextBlockHeight + TX_EXPIRING_SOON_THRESHOLD > tx.nExpiryHeight) {
                 throw JSONRPCError(RPC_TRANSACTION_REJECTED,
                     strprintf("tx-expiring-soon: expiryheight is %d but should be at least %d to avoid transaction expiring soon",

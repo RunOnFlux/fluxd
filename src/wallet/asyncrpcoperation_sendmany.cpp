@@ -741,7 +741,7 @@ bool AsyncRPCOperation_sendmany::main_impl() {
 
             ZCNoteDecryption decryptor(boost::get<libzelcash::SproutSpendingKey>(spendingkey_).receiving_key());
             auto hSig = prevJoinSplit.h_sig(*pzelcashParams, tx_.joinSplitPubKey);
-f
+
             try {
                 SproutNotePlaintext plaintext = SproutNotePlaintext::decrypt(
                         decryptor,
