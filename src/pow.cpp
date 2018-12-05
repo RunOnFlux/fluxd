@@ -66,8 +66,10 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     int nHeight = pindexLast->nHeight + 1;
     if (nHeight < params.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight) {
         return DigishieldCalculateNextWorkRequired(bnAvg, pindexLast->GetMedianTimePast(), pindexFirst->GetMedianTimePast(), params);
-    } else {
+    } else if (nHeight < params.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight)  {
         return LWMACalculateNextWorkRequired(pindexLast, params);
+    } else {
+        return Lwma3CalculateNextWorkRequired(pindexLast, params);
     }
 }
 
@@ -145,6 +147,51 @@ unsigned int LWMACalculateNextWorkRequired(const CBlockIndex* pindexLast, const 
     LogPrint("pow", "After:  %08x  %s\n", next_target.GetCompact(), next_target.ToString());
 
     return next_target.GetCompact();
+}
+
+unsigned int Lwma3CalculateNextWorkRequired(const CBlockIndex* pindexLast, const Consensus::Params& params)
+{
+    const int64_t T = params.nPowTargetSpacing;
+    const int64_t N = params.lwmaAveragingWindow;
+    const int64_t k = N * (N + 1) * T / 2;
+    const int64_t height = pindexLast->nHeight;
+    const arith_uint256 powLimit = UintToArith256(params.powLimit);
+    
+    if (height < N) { return powLimit.GetCompact(); }
+
+    arith_uint256 sumTarget, previousDiff, nextTarget;
+    int64_t thisTimestamp, previousTimestamp;
+    int64_t t = 0, j = 0, solvetimeSum = 0;
+
+    const CBlockIndex* blockPreviousTimestamp = pindexLast->GetAncestor(height - N);
+    previousTimestamp = blockPreviousTimestamp->GetBlockTime();
+
+    // Loop through N most recent blocks. 
+    for (int64_t i = height - N + 1; i <= height; i++) {
+        const CBlockIndex* block = pindexLast->GetAncestor(i);
+        thisTimestamp = (block->GetBlockTime() > previousTimestamp) ? block->GetBlockTime() : previousTimestamp + 1;
+
+        int64_t solvetime = std::min(6 * T, thisTimestamp - previousTimestamp);
+        previousTimestamp = thisTimestamp;
+
+        j++;
+        t += solvetime * j; // Weighted solvetime sum.
+        arith_uint256 target;
+        target.SetCompact(block->nBits);
+        sumTarget += target / (k * N);
+
+      //  if (i > height - 3) { solvetimeSum += solvetime; } // deprecated
+        if (i == height) { previousDiff = target.SetCompact(block->nBits); }
+    }
+
+    nextTarget = t * sumTarget;
+    
+    if (nextTarget > (previousDiff * 150) / 100) { nextTarget = (previousDiff * 150) / 100; }
+    if ((previousDiff * 67) / 100 > nextTarget) { nextTarget = (previousDiff * 67)/100; }
+   //  if (solvetimeSum < (8 * T) / 10) { nextTarget = previousDiff * 100 / 106; } // deprecated
+    if (nextTarget > powLimit) { nextTarget = powLimit; }
+
+    return nextTarget.GetCompact();
 }
 
 bool CheckEquihashSolution(const CBlockHeader *pblock, const CChainParams& params)

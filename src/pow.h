@@ -24,6 +24,9 @@ unsigned int DigishieldCalculateNextWorkRequired(arith_uint256 bnAvg,
 /** LWMA **/
 unsigned int LWMACalculateNextWorkRequired(const CBlockIndex* pindexLast, const Consensus::Params& params);
 
+/** LWMA-3 **/
+unsigned int Lwma3CalculateNextWorkRequired(const CBlockIndex* pindexLast, const Consensus::Params& params);
+
 /** Check whether the Equihash solution in a block header is valid */
 bool CheckEquihashSolution(const CBlockHeader *pblock, const CChainParams&);
 
