@@ -201,7 +201,7 @@ public:
 static CMainParams mainParams;
 
 /**
- * Testnet (v4)
+ * Testnet (v5)
  */
 class CTestNetParams : public CChainParams {
 public:
@@ -231,19 +231,19 @@ public:
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002; 
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 500;
+	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 65;
 
 	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002; 
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 600;
+	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 66;
 
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 1500;			// To be set when its time
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 100;			// To be set when its time
 
         consensus.nZawyLWMAAveragingWindow = 60;
-	consensus.eh_epoch_fade_length = 11;
+	consensus.eh_epoch_fade_length = 6;
 
-	eh_epoch_1 = eh200_9;
-        eh_epoch_2 = eh144_5;
+	eh_epoch_1 = eh48_5;
+        eh_epoch_2 = eh48_5;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -285,14 +285,14 @@ public:
         // guarantees the first 2 characters, when base58 encoded, are "ST"
         base58Prefixes[ZCSPENDING_KEY]     = {0xAC,0x08};
 
-        bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "ztestsapling";
-        bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviewtestsapling";
-        bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivktestsapling";
+        bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "ztestacadia";
+        bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviewtestacadia";
+        bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivktestacadia";
         bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-test";
 
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
 
-        fMiningRequiresPeers = true;
+        fMiningRequiresPeers = false;
         fDefaultConsistencyChecks = false;
         fRequireStandard = true;
         fMineBlocksOnDemand = false;

@@ -4,7 +4,7 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #
 ZELCASH_LOAD_TIMEOUT=500
-DATADIR="/home/wilke/ZEL/zelcash/.zelcash"
+DATADIR="/home/wilke/github/zelcash/.zelcash"
 rm -rf "$DATADIR"
 mkdir -p "$DATADIR"/regtest
 touch "$DATADIR/zelcash.conf"
@@ -12,7 +12,7 @@ touch "$DATADIR/regtest/debug.log"
 tail -q -n 1 -F "$DATADIR/regtest/debug.log" | grep -m 1 -q "Done loading" &
 WAITER=$!
 PORT=`expr 10000 + $$ % 55536`
-"/home/wilke/ZEL/zelcash/src/zelcashd" -connect=0.0.0.0 -datadir="$DATADIR" -rpcuser=user -rpcpassword=pass -listen -keypool=3 -debug -debug=net -logtimestamps -checkmempool=0 -relaypriority=0 -port=$PORT -whitelist=127.0.0.1 -regtest -rpcport=`expr $PORT + 1` &
+"/home/wilke/github/zelcash/src/zelcashd" -connect=0.0.0.0 -datadir="$DATADIR" -rpcuser=user -rpcpassword=pass -listen -keypool=3 -debug -debug=net -logtimestamps -checkmempool=0 -relaypriority=0 -port=$PORT -whitelist=127.0.0.1 -regtest -rpcport=`expr $PORT + 1` &
 BITCOIND=$!
 
 #Install a watchdog.
