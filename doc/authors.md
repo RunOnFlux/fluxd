@@ -2,6 +2,7 @@ Zelcash Contributors
 ==================
 
 Tadeas Kmenta (9)
+Wilke Trei (6)
 Miles Manley (1)
 
 Zcash Contributors

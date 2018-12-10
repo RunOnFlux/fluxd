@@ -46,9 +46,6 @@ TEST(CheckBlock, BlockSproutRejectsBadVersion) {
     mtx.vout.resize(1);
     mtx.vout[0].scriptPubKey = CScript() << OP_TRUE;
     mtx.vout[0].nValue = 0;
-    mtx.vout.push_back(CTxOut(
-        GetBlockSubsidy(1, Params().GetConsensus())/5,
-        Params().GetFoundersRewardScriptAtHeight(1)));
     mtx.fOverwintered = false;
     mtx.nVersion = -1;
     mtx.nVersionGroupId = 0;
@@ -94,11 +91,6 @@ protected:
         mtx.vout.resize(1);
         mtx.vout[0].scriptPubKey = CScript() << OP_TRUE;
         mtx.vout[0].nValue = 0;
-
-        // Give it a Founder's Reward vout for height 1.
-        mtx.vout.push_back(CTxOut(
-                    GetBlockSubsidy(1, Params().GetConsensus())/5,
-                    Params().GetFoundersRewardScriptAtHeight(1)));
 
         return mtx;
     }
@@ -154,10 +146,10 @@ TEST_F(ContextualCheckBlockTest, BadCoinbaseHeight) {
     MockCValidationState state;
     EXPECT_TRUE(ContextualCheckBlock(block, state, NULL));
 
-    // Give the transaction a Founder's Reward vout
-    mtx.vout.push_back(CTxOut(
-                GetBlockSubsidy(1, Params().GetConsensus())/5,
-                Params().GetFoundersRewardScriptAtHeight(1)));
+    // Give the block a dummy founders reward
+   // mtx.vout.push_back(CTxOut(
+   //             GetBlockSubsidy(1, Params().GetConsensus())/5,
+   //             Params().GetFoundersRewardScriptAtHeight(0)));
 
     // Treating block as non-genesis should fail
     CTransaction tx2 {mtx};
@@ -196,23 +188,6 @@ TEST_F(ContextualCheckBlockTest, BlockSproutRulesAcceptSproutTx) {
     mtx.nVersion = 1;
 
     SCOPED_TRACE("BlockSproutRulesAcceptSproutTx");
-    ExpectValidBlockFromTx(CTransaction(mtx));
-}
-
-
-// Test block evaluated under Overwinter rules will accept Overwinter transactions.
-TEST_F(ContextualCheckBlockTest, BlockOverwinterRulesAcceptOverwinterTx) {
-    SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, 1);
-
-    CMutableTransaction mtx = GetFirstBlockCoinbaseTx();
-
-    // Make it an Overwinter transaction
-    mtx.fOverwintered = true;
-    mtx.nVersion = OVERWINTER_TX_VERSION;
-    mtx.nVersionGroupId = OVERWINTER_VERSION_GROUP_ID;
-
-    SCOPED_TRACE("BlockOverwinterRulesAcceptOverwinterTx");
     ExpectValidBlockFromTx(CTransaction(mtx));
 }
 
@@ -267,34 +242,6 @@ TEST_F(ContextualCheckBlockTest, BlockSproutRulesRejectOtherTx) {
 };
 
 
-// Test block evaluated under Overwinter rules cannot contain non-Overwinter
-// transactions.
-TEST_F(ContextualCheckBlockTest, BlockOverwinterRulesRejectOtherTx) {
-    SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, 1);
-
-    CMutableTransaction mtx = GetFirstBlockCoinbaseTx();
-
-    // Set the version to Sprout+JoinSplit (but nJoinSplit will be 0).
-    mtx.nVersion = 2;
-
-    {
-        SCOPED_TRACE("BlockOverwinterRulesRejectSproutTx");
-        ExpectInvalidBlockFromTx(CTransaction(mtx), 100, "tx-overwinter-active");
-    }
-
-    // Make it a Sapling transaction
-    mtx.fOverwintered = true;
-    mtx.nVersion = SAPLING_TX_VERSION;
-    mtx.nVersionGroupId = SAPLING_VERSION_GROUP_ID;
-
-    {
-        SCOPED_TRACE("BlockOverwinterRulesRejectSaplingTx");
-        ExpectInvalidBlockFromTx(CTransaction(mtx), 0, "bad-overwinter-tx-version-group-id");
-    }
-}
-
-
 // Test block evaluated under Sapling rules cannot contain non-Sapling transactions.
 TEST_F(ContextualCheckBlockTest, BlockSaplingRulesRejectOtherTx) {
     SelectParams(CBaseChainParams::REGTEST);
@@ -309,15 +256,5 @@ TEST_F(ContextualCheckBlockTest, BlockSaplingRulesRejectOtherTx) {
     {
         SCOPED_TRACE("BlockSaplingRulesRejectSproutTx");
         ExpectInvalidBlockFromTx(CTransaction(mtx), 100, "tx-overwinter-active");
-    }
-
-    // Make it an Overwinter transaction
-    mtx.fOverwintered = true;
-    mtx.nVersion = OVERWINTER_TX_VERSION;
-    mtx.nVersionGroupId = OVERWINTER_VERSION_GROUP_ID;
-
-    {
-        SCOPED_TRACE("BlockSaplingRulesRejectOverwinterTx");
-        ExpectInvalidBlockFromTx(CTransaction(mtx), 0, "bad-sapling-tx-version-group-id");
     }
 }

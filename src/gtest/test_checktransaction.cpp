@@ -800,7 +800,7 @@ TEST(checktransaction_tests, OverwinterVersionNumberHigh) {
 
     UNSAFE_CTransaction tx(mtx);
     MockCValidationState state;
-    EXPECT_CALL(state, DoS(100, false, REJECT_INVALID, "bad-tx-overwinter-version-too-high", false)).Times(1);
+    EXPECT_CALL(state, DoS(0, false, REJECT_INVALID, "bad-sapling-tx-version-group-id", false)).Times(1);
     ContextualCheckTransaction(tx, state, 1, 100);
 
     // Revert to default
@@ -849,13 +849,13 @@ TEST(checktransaction_tests, OverwinterFlagNotSet) {
 
     CMutableTransaction mtx = GetValidTransaction();
     mtx.fOverwintered = false;
-    mtx.nVersion = OVERWINTER_TX_VERSION;
-    mtx.nVersionGroupId = OVERWINTER_VERSION_GROUP_ID;
+    mtx.nVersion = SAPLING_TX_VERSION;
+    mtx.nVersionGroupId = SAPLING_TX_VERSION;
     mtx.nExpiryHeight = 0;
 
     CTransaction tx(mtx);
     MockCValidationState state;
-    EXPECT_CALL(state, DoS(100, false, REJECT_INVALID, "tx-overwinter-flag-not-set", false)).Times(1);
+    EXPECT_CALL(state, DoS(100, false, REJECT_INVALID, "tx-overwintered-flag-not-set", false)).Times(1);
     ContextualCheckTransaction(tx, state, 1, 100);
 
     // Revert to default

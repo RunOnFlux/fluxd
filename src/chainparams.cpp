@@ -116,7 +116,7 @@ public:
 	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 125100;
 
 	consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 263500;		// Approx January 31th 
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January 12th 
 
 	consensus.nZawyLWMAAveragingWindow = 60;
 	consensus.eh_epoch_fade_length = 11;
@@ -169,7 +169,7 @@ public:
         // guarantees the first 2 characters, when base58 encoded, are "SK"
         base58Prefixes[ZCSPENDING_KEY]     = {0xAB,0x36};
 
-        bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "zs";
+        bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "zela";
         bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviews";
         bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivks";
         bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-main";
@@ -220,30 +220,31 @@ public:
         assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
+	consensus.nPowAllowMinDifficultyBlocksAfterHeight = 299187;
         consensus.nPowTargetSpacing = 2 * 60;
 
         consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE].nActivationHeight =
-
             Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
+
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002; 
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 65;
+	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 100;
 
 	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002; 
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 66;
+	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 500;
 
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 100;			// To be set when its time
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 1000;		
 
         consensus.nZawyLWMAAveragingWindow = 60;
-	consensus.eh_epoch_fade_length = 6;
+	consensus.eh_epoch_fade_length = 10;
 
-	eh_epoch_1 = eh48_5;
-        eh_epoch_2 = eh48_5;
+	eh_epoch_1 = eh96_5;
+        eh_epoch_2 = eh144_5;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -292,7 +293,7 @@ public:
 
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
 
-        fMiningRequiresPeers = false;
+        fMiningRequiresPeers = true;
         fDefaultConsistencyChecks = false;
         fRequireStandard = true;
         fMineBlocksOnDemand = false;
@@ -313,7 +314,7 @@ public:
 static CTestNetParams testNetParams;
 
 /**
- * Regression test TODO
+ * Regression test
  */
 class CRegTestParams : public CChainParams {
 public:
@@ -335,11 +336,6 @@ public:
 
         consensus.nPowTargetSpacing = 2 * 60;
 	consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
-        consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 1;
-
-        consensus.nZawyLWMAAveragingWindow = 60;
-
-        consensus.nPowTargetSpacing = 2 * 60;
 
         consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE].nActivationHeight =
@@ -349,13 +345,15 @@ public:
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002; 
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 10;
+	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 
+	    Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002; 
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 10;
+	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 
+            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170006;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight =
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
     
 
@@ -480,6 +478,7 @@ std::string CChainParams::GetFoundersRewardAddressAtHeight(int nHeight) const {
     return vFoundersRewardAddress[i];
 }
 
+
 // Block height must be >0 and <=last founders reward block height
 // The founders reward address is expected to be a multisig (P2SH) address
 CScript CChainParams::GetFoundersRewardScriptAtHeight(int nHeight) const {
@@ -492,7 +491,6 @@ CScript CChainParams::GetFoundersRewardScriptAtHeight(int nHeight) const {
     CScript script = CScript() << OP_HASH160 << ToByteVector(scriptID) << OP_EQUAL;
     return script;
 }
-
 std::string CChainParams::GetFoundersRewardAddressAtIndex(int i) const {
     assert(i >= 0 && i < vFoundersRewardAddress.size());
     return vFoundersRewardAddress[i];

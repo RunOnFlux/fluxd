@@ -222,13 +222,13 @@ TEST(Mempool, SproutV3TxWhenOverwinterActive) {
     bool missingInputs;
     CMutableTransaction mtx = GetValidTransaction();
     mtx.vjoinsplit.resize(0); // no joinsplits
-    mtx.fOverwintered = false;
-    mtx.nVersion = 3;
+    mtx.fOverwintered = false;	
+    mtx.nVersion = 4;
     CValidationState state1;
     CTransaction tx1(mtx);
 
     EXPECT_FALSE(AcceptToMemoryPool(pool, state1, tx1, false, &missingInputs));
-    EXPECT_EQ(state1.GetRejectReason(), "tx-overwinter-flag-not-set");
+    EXPECT_EQ(state1.GetRejectReason(), "tx-overwintered-flag-not-set");
 
     // Revert to default
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
@@ -296,8 +296,8 @@ TEST(Mempool, ExpiringSoonTxRejection) {
     CMutableTransaction mtx = GetValidTransaction();
     mtx.vjoinsplit.resize(0); // no joinsplits
     mtx.fOverwintered = true;
-    mtx.nVersion = OVERWINTER_TX_VERSION;
-    mtx.nVersionGroupId = OVERWINTER_VERSION_GROUP_ID;
+    mtx.nVersion = SAPLING_TX_VERSION;
+    mtx.nVersionGroupId = SAPLING_VERSION_GROUP_ID;
 
     // The next block height is 0 since there is no active chain and current height is -1.
     // Given an expiring soon threshold of 3 blocks, a tx is considered to be expiring soon
