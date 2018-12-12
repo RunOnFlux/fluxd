@@ -390,7 +390,7 @@ std::istream& operator>>(std::istream& in, std::vector<Fp12_2over3over2_model<n,
 {
     v.clear();
 
-    uint64_t s;
+    size_t s;
     in >> s;
 
     char b;

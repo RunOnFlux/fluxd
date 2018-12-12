@@ -22,16 +22,15 @@
 #include <cassert>
 #include "algebra/fields/field_utils.hpp"
 #include "algebra/evaluation_domain/domains/basic_radix2_domain.hpp"
-#include "common/assert_except.hpp"
 
 namespace libsnark {
 
 template<typename FieldT>
 std::shared_ptr<evaluation_domain<FieldT> > get_evaluation_domain(const size_t min_size)
 {
-    assert_except(min_size > 1);
+    assert(min_size > 1);
     const size_t log_min_size = log2(min_size);
-    assert_except(log_min_size <= (FieldT::s+1));
+    assert(log_min_size <= (FieldT::s+1));
 
     std::shared_ptr<evaluation_domain<FieldT> > result;
     if (min_size == (1u << log_min_size))
@@ -93,8 +92,8 @@ std::shared_ptr<evaluation_domain<FieldT> > get_evaluation_domain(const size_t m
 template<typename FieldT>
 FieldT lagrange_eval(const size_t m, const std::vector<FieldT> &domain, const FieldT &t, const size_t idx)
 {
-    assert_except(m == domain.size());
-    assert_except(idx < m);
+    assert(m == domain.size());
+    assert(idx < m);
 
     FieldT num = FieldT::one();
     FieldT denom = FieldT::one();
