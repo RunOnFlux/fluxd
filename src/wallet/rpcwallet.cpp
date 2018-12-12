@@ -3804,7 +3804,8 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
     // If Sapling is not active, do not allow sending from or sending to Sapling addresses.
     if (!NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
         if (fromSapling || containsSaplingOutput) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, Sapling has not activated");
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, Acadia(Sapling) has not activated. ") + 
+                    string("Will be activated on block ") + to_string(Params().GetConsensus().vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight) + string("."));
         }
     }
 
@@ -4004,7 +4005,8 @@ UniValue z_shieldcoinbase(const UniValue& params, bool fHelp)
         if (IsValidPaymentAddress(res)) {
             bool toSapling = boost::get<libzelcash::SaplingPaymentAddress>(&res) != nullptr;
             if (toSapling) {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, Sapling has not activated");
+                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, Acadia(Sapling) has not activated. ") + 
+                    string("Will be activated on block ") + to_string(Params().GetConsensus().vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight) + string("."));
             }
         } else {
             throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, unknown address format: ") + destaddress );
@@ -4268,7 +4270,8 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
                 isToSaplingZaddr = true;
                 // If Sapling is not active, do not allow sending to a sapling addresses.
                 if (!saplingActive) {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, Sapling has not activated");
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, Acadia(Sapling) has not activated. ") + 
+                    string("Will be activated on block ") + to_string(Params().GetConsensus().vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight) + string("."));
                 }
             } else {
                 isToSproutZaddr = true;
@@ -4397,7 +4400,8 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
 
         // If Sapling is not active, do not allow sending from a sapling addresses.
         if (!saplingActive && saplingEntries.size() > 0) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, Sapling has not activated");
+            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, Acadia(Sapling) has not activated. ") + 
+                    string("Will be activated on block ") + to_string(Params().GetConsensus().vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight) + string("."));
         }
         // Sending from both Sprout and Sapling is currently unsupported using z_mergetoaddress
         if (sproutEntries.size() > 0 && saplingEntries.size() > 0) {
