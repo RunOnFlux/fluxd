@@ -40,7 +40,7 @@ chmod 0755 -R $BUILD_DIR/*
 # Copy binaries
 cp $SRC_PATH/src/zelcashd $DEB_BIN
 cp $SRC_PATH/src/zelcash-cli $DEB_BIN
-cp $SRC_PATH/zcutil/fetch-params.sh $DEB_BIN/zelcash-fetch-params
+cp $SRC_PATH/zcutil/fetch-params.sh $DEB_BIN/zcash-fetch-params
 # Copy docs
 cp $SRC_PATH/doc/release-notes/release-notes-1.0.0.md $DEB_DOC/changelog
 cp $SRC_DEB/changelog $DEB_DOC/changelog.Debian
@@ -49,7 +49,7 @@ cp -r $SRC_DEB/examples $DEB_DOC
 # Copy manpages
 cp $SRC_DOC/man/zelcashd.1 $DEB_MAN
 cp $SRC_DOC/man/zelcash-cli.1 $DEB_MAN
-cp $SRC_DOC/man/zelcash-fetch-params.1 $DEB_MAN
+cp $SRC_DOC/man/zcash-fetch-params.1 $DEB_MAN
 # Copy bash completion files
 cp $SRC_PATH/contrib/zelcashd.bash-completion $DEB_CMP/zelcashd
 cp $SRC_PATH/contrib/zelcash-cli.bash-completion $DEB_CMP/zelcash-cli
@@ -58,7 +58,7 @@ gzip --best -n $DEB_DOC/changelog
 gzip --best -n $DEB_DOC/changelog.Debian
 gzip --best -n $DEB_MAN/zelcashd.1
 gzip --best -n $DEB_MAN/zelcash-cli.1
-gzip --best -n $DEB_MAN/zelcash-fetch-params.1
+gzip --best -n $DEB_MAN/zcash-fetch-params.1
 
 cd $SRC_PATH/contrib
 

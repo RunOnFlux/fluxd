@@ -374,7 +374,7 @@ target_alias =
 top_build_prefix = ../../
 top_builddir = ../..
 top_srcdir = ../..
-dist_man1_MANS = zelcashd.1 zelcash-cli.1 zelcash-fetch-params.1 zelcash-tx.1
+dist_man1_MANS = zelcashd.1 zelcash-cli.1 zcash-fetch-params.1 zelcash-tx.1
 all: all-am
 
 .SUFFIXES:

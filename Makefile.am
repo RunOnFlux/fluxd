@@ -154,7 +154,7 @@ dist_noinst_SCRIPTS = autogen.sh zcutil/build-debian-package.sh zcutil/build.sh
 EXTRA_DIST = $(top_srcdir)/share/genbuild.sh qa/pull-tester/rpc-tests.sh qa/pull-tester/run-bitcoin-cli qa/rpc-tests qa/zelcash $(DIST_DOCS) $(BIN_CHECKS)
 
 install-exec-hook:
-	mv $(DESTDIR)$(bindir)/fetch-params.sh $(DESTDIR)$(bindir)/zelcash-fetch-params
+	mv $(DESTDIR)$(bindir)/fetch-params.sh $(DESTDIR)$(bindir)/zcash-fetch-params
 
 .INTERMEDIATE: $(COVERAGE_INFO)
 

@@ -1159,7 +1159,7 @@ $(BITCOIN_CLI_BIN): FORCE
 #cov: test_bitcoin.coverage/.dirstamp cov-zelcash total.coverage/.dirstamp
 
 install-exec-hook:
-	mv $(DESTDIR)$(bindir)/fetch-params.sh $(DESTDIR)$(bindir)/zelcash-fetch-params
+	mv $(DESTDIR)$(bindir)/fetch-params.sh $(DESTDIR)$(bindir)/zcash-fetch-params
 
 .INTERMEDIATE: $(COVERAGE_INFO)
 
