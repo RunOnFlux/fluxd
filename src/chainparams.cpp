@@ -89,7 +89,7 @@ public:
 	bip44CoinType = 133;
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 5000;
-        consensus.nSubsidyHalvingInterval = 657850; // 2.5 years
+        consensus.nSubsidyHalvingInterval = 655350; // 2.5 years
         consensus.nMajorityEnforceBlockUpgrade = 750;
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 4000;
@@ -170,8 +170,8 @@ public:
         base58Prefixes[ZCSPENDING_KEY]     = {0xAB,0x36};
 
         bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "za";
-        bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviews";
-        bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivks";
+        bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviewa";
+        bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivka";
         bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-main";
 
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_main, pnSeed6_main + ARRAYLEN(pnSeed6_main));
@@ -211,7 +211,7 @@ public:
         bip44CoinType = 1;
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 5000;
-        consensus.nSubsidyHalvingInterval = 657850; // 2.5 years
+        consensus.nSubsidyHalvingInterval = 655350; // 2.5 years
         consensus.nMajorityEnforceBlockUpgrade = 51;
         consensus.nMajorityRejectBlockOutdated = 75;
         consensus.nMajorityWindow = 400;

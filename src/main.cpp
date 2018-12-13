@@ -1734,8 +1734,7 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
 {
     CAmount nSubsidy = 150 * COIN;
 
-    if(nHeight == 1)
-    {
+    if (nHeight == 1) {
         return 13020000 * COIN;
     }
     // Mining slow start
@@ -1757,7 +1756,7 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
     if (halvings >= 64)
         return 0;
 
-    // Subsidy is cut in half every 840,000 blocks which will occur approximately every 4 years.
+    // Subsidy is cut in half every 655,350 blocks which will occur approximately every 2.5 years.
     nSubsidy >>= halvings;
     return nSubsidy;
 }
@@ -3645,6 +3644,7 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
     // In Zelcash this has been enforced since launch, except that the genesis
     // block didn't include the height in the coinbase (see Zcash protocol spec
     // section '6.8 Bitcoin Improvement Proposals').
+    // Needs to be at least > 16 to satisfy second condition.
     if (nHeight > 20)
     {
         CScript expect = CScript() << nHeight;
