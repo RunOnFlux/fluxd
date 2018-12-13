@@ -431,7 +431,6 @@ ASALocalRun/
 .vscode/tasks.json
 .vscode/launch.json
 .vscode/extensions.json
-.DS_Store
 
 # Compilation
 Makefile
