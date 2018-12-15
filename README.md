@@ -1,10 +1,10 @@
 =======
-# Zelcash
+# ZelCash
 =======
-# Zelcash 2.0.0
+# ZelCash 2.0.0
 INNOVATIVE  INTELLIGENT  INSPIRING
 
-Zelcash is a fork of 2.0.2 Zcash aiming to provide decentralised development platform via ZelNodes and ZelTreZ.
+ZelCash is a fork of 2.0.2 Zcash aiming to provide decentralised development platform via ZelNodes and ZelCore.
 
 POW asic resistant with Equihash (144,5) also known as Zhash with personalisation string ZelProof. 
 
@@ -21,7 +21,7 @@ sudo apt-get install zelcash
 ```
 This installs zelcashd, zelcash-cli, zelcash-tx and fetch-params
 
-#### Run Zelcash 
+#### Run ZelCash 
 1. Create zelcash.conf file
 ```
 cd
@@ -42,7 +42,7 @@ echo "addnode=node-asia.zelcash.com" >> ~/.zelcash/zelcash.conf
 fetch-params
 ```
 
-3. Run a Zelcash node
+3. Run a ZelCash node
 ```
 zelcashd
 ```
@@ -59,14 +59,14 @@ sudo apt-get install \
 
 2. Build
 ```
-# pull
+# Pull
 git clone https://github.com/zelcash/zelcash.git
 cd zelcash
 # Build
 ./zcutil/build.sh -j$(nproc)
 ```
 
-#### Run Zelcash 
+#### Run ZelCash 
 1. Create zelcash.conf file
 ```
 cd
@@ -88,7 +88,7 @@ cd zelcash
 ./zcutil/fetch-params.sh
 ```
 
-3. Run a Zelcash node
+3. Run a ZelCash node
 ```
 ./src/zelcashd
 ```
@@ -124,10 +124,49 @@ source ~/.cargo/env
 
 4. Compile for windows
 ```
-# pull
+# Pull
 git clone https://github.com/zelcash/zelcash.git
 cd zelcash
 # Build
 ./zcutil/build-win.sh -j$(nproc)
 ```
 This will create zelcashd.exe zelcash-cli.exe and zelcash-tx.exe in src directory.
+
+
+
+## Build for Mac
+1. Get dependencies
+```{r, engine='bash'}
+#install xcode
+xcode-select --install
+
+/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+brew install cmake autoconf libtool automake coreutils pkgconfig gmp wget
+
+brew install gcc5 --without-multilib
+```
+
+2. Install
+```{r, engine='bash'}
+# Pull
+git clone https://github.com/zelcash/zelcash.git
+cd zelcash
+# Build
+./zcutil/build.sh -j$(sysctl -n hw.ncpu)
+```
+
+3. Fetch keys
+```{r, engine='bash'}
+./zcutil/fetch-params.sh
+```
+
+4. Run ZelCash Node
+```{r, engine='bash'}
+./src/zelcashd
+```
+
+### Known errors
+**autoreconf: failed to run libtoolize: No such file or directory**
+```{r, engine='bash'}
+sudo ln -s /usr/local/bin/glibtoolize /usr/local/bin/libtoolize
+```
