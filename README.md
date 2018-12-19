@@ -1,5 +1,5 @@
 =======
-# ZelCash
+# ZelCash [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
 =======
 # ZelCash 2.0.0
 INNOVATIVE  INTELLIGENT  INSPIRING
