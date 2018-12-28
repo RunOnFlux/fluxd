@@ -15,6 +15,25 @@ To speed up synchronisation you can also download our blockchain (state Fri 6. 7
 
 # Build Guides
 ## Build for Linux
+#### Install dependencies
+
+On Ubuntu/Debian-based systems:
+
+```
+$ sudo apt-get install \
+      build-essential pkg-config libc6-dev m4 g++-multilib \
+      autoconf libtool ncurses-dev unzip git python python-zmq \
+      zlib1g-dev wget curl bsdmainutils automake 
+```
+
+On Fedora-based systems:
+
+```
+$ sudo dnf install \
+      git pkgconfig automake autoconf ncurses-devel python \
+      python-zmq wget gtest-devel gcc gcc-c++ libtool curl patch
+```
+
 #### Build
 ```
 git clone https://github.com/zelcash/zelcash.git
@@ -50,6 +69,17 @@ cd zelcash
 
 
 ## Build for Windows
+#### Install dependencies
+
+Windows:
+
+```
+sudo apt-get install \
+    build-essential pkg-config libc6-dev m4 g++-multilib \
+    autoconf libtool ncurses-dev unzip git python \
+    zlib1g-dev wget bsdmainutils automake mingw-w64
+```
+
 #### Build
 ```
 git clone https://github.com/zelcash/zelcash.git
@@ -86,8 +116,10 @@ zelcashd.exe
 ```
 
 ## Build for Mac
-#### Build
-1. Get dependencies
+#### Install dependencies
+
+macOS:
+
 ```{r, engine='bash'}
 #install xcode
 xcode-select --install
@@ -97,8 +129,8 @@ brew install cmake autoconf libtool automake coreutils pkgconfig gmp wget
 
 brew install gcc5 --without-multilib
 ```
+#### Build
 
-2. Build
 ```{r, engine='bash'}
 # Pull
 git clone https://github.com/zelcash/zelcash.git
