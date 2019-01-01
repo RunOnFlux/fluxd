@@ -10,7 +10,7 @@ POW asic resistant with Equihash (144,5) also known as Zhash with personalisatio
 
 Fork to Acadia will be at the blockheight 250 000 which is estimated to occur on the 12th of January 2019. Please update to the latest release prior this date. Acadia release activates latest Zcash technology - Overwinter and Sapling upgrade. We are also modifying our difficulty algorithm to its next generation from LWMA to LWMA3. It is also neccesarry to download new Zcash network parameters via /zcutil/fetch-params.sh script.
 
-To speed up synchronisation you can also download our blockchain (state Fri 6. 7. 2018) at https://drive.google.com/file/d/1Vn8HWau24wjTtUc9QZU2stliKevaEFx1/view?usp=sharing (pw: zelcash).
+To speed up synchronisation you can also download our blockchain (state 18. 12. 2018) at https://zelcore.io/Zelcash.zip 
 
 
 # Build Guides
