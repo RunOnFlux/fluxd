@@ -223,6 +223,16 @@ BITCOIN_CORE_H = \
   wallet/wallet.h \
   wallet/wallet_ismine.h \
   wallet/walletdb.h \
+  zelnode/activezelnode.h \
+  zelnode/obfuscation.h \
+  zelnode/obfuscationrelay.h \
+  zelnode/payments.h \
+  zelnode/spork.h \
+  zelnode/sporkdb.h \
+  zelnode/zelnode.h \
+  zelnode/zelnodeconfig.h \
+  zelnode/zelnodeman.h \
+  zelnode/zelnodesync.h \
   zmq/zmqabstractnotifier.h \
   zmq/zmqconfig.h\
   zmq/zmqnotificationinterface.h \
@@ -270,12 +280,23 @@ libbitcoin_server_a_SOURCES = \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
   rpc/server.cpp \
+  rpc/zelnode.cpp \
   script/sigcache.cpp \
   timedata.cpp \
   torcontrol.cpp \
   txdb.cpp \
   txmempool.cpp \
   validationinterface.cpp \
+  zelnode/activezelnode.cpp \
+  zelnode/obfuscation.cpp \
+  zelnode/obfuscationrelay.cpp \
+  zelnode/payments.cpp \
+  zelnode/spork.cpp \
+  zelnode/sporkdb.cpp \
+  zelnode/zelnode.cpp \
+  zelnode/zelnodeconfig.cpp \
+  zelnode/zelnodeman.cpp \
+  zelnode/zelnodesync.cpp \
   $(BITCOIN_CORE_H) \
   $(LIBZELCASH_H)
 

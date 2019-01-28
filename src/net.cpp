@@ -353,16 +353,17 @@ CNode* FindNode(const CService& addr)
     return NULL;
 }
 
-CNode* ConnectNode(CAddress addrConnect, const char *pszDest)
+CNode* ConnectNode(CAddress addrConnect, const char *pszDest, bool obfuScationMaster)
 {
     if (pszDest == NULL) {
-        if (IsLocal(addrConnect))
+        if (IsLocal(addrConnect) && !obfuScationMaster)
             return NULL;
 
         // Look for an existing connection
         CNode* pnode = FindNode((CService)addrConnect);
         if (pnode)
         {
+            pnode->fObfuScationMaster = obfuScationMaster;
             pnode->AddRef();
             return pnode;
         }
@@ -397,6 +398,7 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest)
         }
 
         pnode->nTimeConnected = GetTime();
+        if (obfuScationMaster) pnode->fObfuScationMaster = true;
 
         return pnode;
     } else if (!proxyConnectionFailed) {
@@ -1888,6 +1890,19 @@ void RelayTransaction(const CTransaction& tx, const CDataStream& ss)
             if (pnode->pfilter->IsRelevantAndUpdate(tx))
                 pnode->PushInventory(inv);
         } else
+            pnode->PushInventory(inv);
+    }
+}
+
+
+void RelayInv(const CInv& inv)
+{
+    LOCK(cs_vNodes);
+    BOOST_FOREACH(CNode* pnode, vNodes)
+    {
+        if((pnode->nServices==NODE_BLOOM_WITHOUT_ZN) && inv.IsZelnodeType())continue;
+
+        if (pnode->nVersion >= MIN_PEER_PROTO_VERSION)
             pnode->PushInventory(inv);
     }
 }

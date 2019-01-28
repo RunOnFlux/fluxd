@@ -1,0 +1,377 @@
+// Copyright (c) 2014-2015 The Dash developers
+// Copyright (c) 2015-2017 The PIVX developers
+// Copyright (c) 2018 The Zelcash developers
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+#ifndef ZELCASHNODES_PAYMENTS_H
+#define ZELCASHNODES_PAYMENTS_H
+
+#include "key.h"
+#include "main.h"
+#include "zelnode/zelnode.h"
+
+using namespace std;
+
+extern CCriticalSection cs_vecPayments;
+extern CCriticalSection cs_mapZelnodeBlocks;
+extern CCriticalSection cs_mapZelnodePayeeVotes;
+
+
+class Payments;
+class PaymentWinner;
+class BlockPayees;
+
+extern Payments zelnodePayments;
+
+#define ZNPAYMENTS_SIGNATURES_REQUIRED 6
+#define ZNPAYMENTS_SIGNATURES_TOTAL 10
+
+void ProcessMessageZelnodePayments(CNode* pfrom, std::string& strCommand, CDataStream& vRecv);
+bool IsBlockPayeeValid(const CBlock& block, int nBlockHeight);
+std::string GetRequiredPaymentsString(int nBlockHeight);
+bool IsBlockValueValid(const CBlock& block, CAmount nExpectedValue, CAmount nMinted);
+void FillBlockPayee(CMutableTransaction& txNew, CAmount nFees);
+
+void DumpZelnodePayments();
+
+
+/** Save Zelnode payment Data (zelnodepayments.dat)
+ */
+class PaymentDB
+{
+private:
+    boost::filesystem::path pathDB;
+    std::string strMagicMessage;
+
+public:
+    enum ReadResult
+    {
+        Ok,
+        FileError,
+        HashReadError,
+        IncorrectHash,
+        IncorrectMagicMessage,
+        IncorrectMagicNumber,
+        IncorrectFormat
+    };
+
+    PaymentDB();
+    bool Write(const Payments& objToSave);
+    ReadResult Read(Payments& objToLoad, bool fDryRun = false);
+};
+
+class ZelnodePayee
+{
+public:
+    CScript scriptPubKey;
+    int nVotes;
+
+    ZelnodePayee()
+    {
+        scriptPubKey = CScript();
+        nVotes = 0;
+    }
+
+    ZelnodePayee(CScript payee, int nVotesIn)
+    {
+        scriptPubKey = payee;
+        nVotes = nVotesIn;
+    }
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
+    {
+        READWRITE(scriptPubKey);
+        READWRITE(nVotes);
+    }
+};
+
+// Keep track of votes for payees from zelnodes
+class ZelnodeBlockPayees
+{
+public:
+    int nBlockHeight;
+    std::vector<ZelnodePayee> vecBasicPayments;
+    std::vector<ZelnodePayee> vecSuperPayments;
+    std::vector<ZelnodePayee> vecBAMFPayments;
+
+    ZelnodeBlockPayees()
+    {
+        nBlockHeight = 0;
+        vecBasicPayments.clear();
+        vecSuperPayments.clear();
+        vecBAMFPayments.clear();
+    }
+    ZelnodeBlockPayees(int nBlockHeightIn)
+    {
+        nBlockHeight = nBlockHeightIn;
+        vecBasicPayments.clear();
+        vecSuperPayments.clear();
+        vecBAMFPayments.clear();
+    }
+
+    void AddPayee(CScript payeeIn, int nIncrement, int nNodeTier)
+    {
+        LOCK(cs_vecPayments);
+
+        if (nNodeTier == Zelnode::BASIC) {
+            for (ZelnodePayee& payee : vecBasicPayments) {
+                if (payee.scriptPubKey == payeeIn) {
+                    payee.nVotes += nIncrement;
+                    return;
+                }
+            }
+        }
+
+        else if (nNodeTier == Zelnode::SUPER) {
+            for (ZelnodePayee& payee : vecSuperPayments) {
+                if (payee.scriptPubKey == payeeIn) {
+                    payee.nVotes += nIncrement;
+                    return;
+                }
+            }
+        }
+
+        else if (nNodeTier == Zelnode::BAMF) {
+            for (ZelnodePayee& payee : vecBAMFPayments) {
+                if (payee.scriptPubKey == payeeIn) {
+                    payee.nVotes += nIncrement;
+                    return;
+                }
+            }
+        }
+
+        ZelnodePayee c(payeeIn, nIncrement);
+        if (nNodeTier == Zelnode::BASIC) vecBasicPayments.push_back(c);
+        else if (nNodeTier == Zelnode::SUPER) vecSuperPayments.push_back(c);
+        else if (nNodeTier == Zelnode::BAMF) vecBAMFPayments.push_back(c);
+    }
+
+    bool GetBasicPayee(CScript& basicPayee)
+    {
+        LOCK(cs_vecPayments);
+
+        int nVotes = -1;
+        for (ZelnodePayee& p : vecBasicPayments) {
+            if (p.nVotes > nVotes) {
+                basicPayee = p.scriptPubKey;
+                nVotes = p.nVotes;
+            }
+        }
+
+        return (nVotes > -1);
+    }
+
+    bool GetSuperPayee(CScript& superPayee)
+    {
+        LOCK(cs_vecPayments);
+
+        int nVotes = -1;
+        for (ZelnodePayee& p : vecSuperPayments) {
+            if (p.nVotes > nVotes) {
+                superPayee = p.scriptPubKey;
+                nVotes = p.nVotes;
+            }
+        }
+
+        return (nVotes > -1);
+    }
+
+    bool GetBAMFPayee(CScript& BAMFPayee)
+    {
+        LOCK(cs_vecPayments);
+
+        int nVotes = -1;
+        for (ZelnodePayee& p : vecBAMFPayments) {
+            if (p.nVotes > nVotes) {
+                BAMFPayee = p.scriptPubKey;
+                nVotes = p.nVotes;
+            }
+        }
+
+        return (nVotes > -1);
+    }
+
+    bool HasPayeeWithVotes(CScript payee, int nVotesReq)
+    {
+        LOCK(cs_vecPayments);
+
+        for (ZelnodePayee& p : vecBasicPayments) {
+            if (p.nVotes >= nVotesReq && p.scriptPubKey == payee) return true;
+        }
+
+        for (ZelnodePayee& p : vecSuperPayments) {
+            if (p.nVotes >= nVotesReq && p.scriptPubKey == payee) return true;
+        }
+
+        for (ZelnodePayee& p : vecBAMFPayments) {
+            if (p.nVotes >= nVotesReq && p.scriptPubKey == payee) return true;
+        }
+
+        return false;
+    }
+
+    bool IsTransactionValid(const CTransaction& txNew);
+    std::string GetRequiredPaymentsString();
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
+    {
+        READWRITE(nBlockHeight);
+        READWRITE(vecBasicPayments);
+        READWRITE(vecSuperPayments);
+        READWRITE(vecBAMFPayments);
+    }
+};
+
+// for storing the winning payments
+class PaymentWinner
+{
+public:
+    CTxIn vinZelnode;
+
+    int nBlockHeight;
+    CScript payee;
+    std::vector<unsigned char> vchSig;
+
+    PaymentWinner()
+    {
+        nBlockHeight = 0;
+        vinZelnode = CTxIn();
+        payee = CScript();
+    }
+
+    PaymentWinner(CTxIn vinIn)
+    {
+        nBlockHeight = 0;
+        vinZelnode = vinIn;
+        payee = CScript();
+    }
+
+    uint256 GetHash()
+    {
+        CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
+        ss << payee;
+        ss << nBlockHeight;
+        ss << vinZelnode.prevout;
+
+        return ss.GetHash();
+    }
+
+    bool Sign(CKey& keyZelnode, CPubKey& pubKeyZelnode);
+    bool IsValid(CNode* pnode, std::string& strError);
+    bool SignatureValid();
+    void Relay();
+
+    void AddPayee(CScript payeeIn)
+    {
+        payee = payeeIn;
+    }
+
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
+    {
+        READWRITE(vinZelnode);
+        READWRITE(nBlockHeight);
+        READWRITE(payee);
+        READWRITE(vchSig);
+    }
+
+    std::string ToString()
+    {
+        std::string ret = "";
+        ret += vinZelnode.ToString();
+        ret += ", " + std::to_string(nBlockHeight);
+        ret += ", " + payee.ToString();
+        ret += ", " + std::to_string((int)vchSig.size());
+        return ret;
+    }
+};
+
+
+
+//
+// Zelnode Payments Class
+// Keeps track of who should get paid for which blocks
+//
+
+class Payments
+{
+private:
+    int nSyncedFromPeer;
+    int nLastBlockHeight;
+
+public:
+    std::map<uint256, PaymentWinner> mapZelnodePayeeVotes;
+    std::map<int, ZelnodeBlockPayees> mapZelnodeBlocks;
+    std::map<COutPoint, int> mapZelnodeLastVote; //prevout.hash, prevout.n, nBlockHeight
+
+    Payments()
+    {
+        nSyncedFromPeer = 0;
+        nLastBlockHeight = 0;
+    }
+
+    void Clear()
+    {
+        LOCK2(cs_mapZelnodeBlocks, cs_mapZelnodePayeeVotes);
+        mapZelnodeBlocks.clear();
+        mapZelnodePayeeVotes.clear();
+    }
+
+    bool AddWinningZelnode(PaymentWinner& winner, int nNodeTier);
+    bool ProcessBlock(int nBlockHeight);
+
+    void Sync(CNode* node, int nCountNeeded);
+    void CleanPaymentList();
+    int LastPayment(Zelnode& mn);
+
+    bool GetBlockBasicPayee(int nBlockHeight, CScript& payee);
+    bool GetBlockSuperPayee(int nBlockHeight, CScript& payee);
+    bool GetBlockBAMFPayee(int nBlockHeight, CScript& payee);
+    bool IsTransactionValid(const CTransaction& txNew, int nBlockHeight);
+    bool IsScheduled(Zelnode& mn, int nNotBlockHeight);
+
+    bool CanVote(COutPoint outZelnode, int nBlockHeight)
+    {
+        LOCK(cs_mapZelnodePayeeVotes);
+
+        if (mapZelnodeLastVote.count(outZelnode)) {
+            if (mapZelnodeLastVote[outZelnode] == nBlockHeight) {
+                return false;
+            }
+        }
+
+        //record this zelnode voted
+        mapZelnodeLastVote[outZelnode] = nBlockHeight;
+        return true;
+    }
+
+    int GetMinZelnodePaymentsProto();
+    void ProcessMessageZelnodePayments(CNode* pfrom, std::string& strCommand, CDataStream& vRecv);
+    std::string GetRequiredPaymentsString(int nBlockHeight);
+    void FillBlockPayee(CMutableTransaction& txNew, int64_t nFees);
+    std::string ToString() const;
+    int GetOldestBlock();
+    int GetNewestBlock();
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
+    {
+        READWRITE(mapZelnodePayeeVotes);
+        READWRITE(mapZelnodeBlocks);
+    }
+};
+
+
+#endif //ZELCASHNODES_PAYMENTS_H

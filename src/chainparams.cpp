@@ -102,21 +102,21 @@ public:
         consensus.nPowTargetSpacing = 2 * 60;
 
         consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
-        consensus.vUpgrades[Consensus::BASE].nActivationHeight = 
+        consensus.vUpgrades[Consensus::BASE].nActivationHeight =
             Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
 
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-        
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002; 
+
+	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
 	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 125000;
 
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002; 
+	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
 	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 125100;
 
 	consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January 12th 
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January 12th
 
 	consensus.nZawyLWMAAveragingWindow = 60;
 	consensus.eh_epoch_fade_length = 11;
@@ -182,6 +182,10 @@ public:
         fMineBlocksOnDemand = false;
         fTestnetToBeDeprecatedFieldRPC = false;
 
+        strSporkKey = "";
+        nStartZelnodePayments = 1550748576; //Thu, 21 Feb 2019 11:29:36 UTC
+        networkID = CBaseChainParams::Network::MAIN;
+
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
             (0, consensus.hashGenesisBlock)
@@ -231,14 +235,14 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002; 
+	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
 	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 100;
 
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002; 
+	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
 	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 500;
 
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 1000;		
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 1000;
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	consensus.eh_epoch_fade_length = 10;
@@ -255,7 +259,7 @@ public:
         nDefaultPort = 26125;
 
         nPruneAfterHeight = 1000;
-  
+
         genesis = CreateGenesisBlock(
             1521043405,
             uint256S("0x0000000000000000000000000000000000000000000000000000000000000018"),
@@ -269,6 +273,8 @@ public:
         vFixedSeeds.clear();
         vSeeds.clear();
         vSeeds.push_back(CDNSSeedData("vps.testnet.zelcash.online", "dnsseedtestnet.zelcash.online")); // TheTrunk
+        vSeeds.push_back(CDNSSeedData("45.34.187.118", "45.34.187.118")); // Single Node - blondfrogs
+
 
         // guarantees the first 2 characters, when base58 encoded, are "tm"
         base58Prefixes[PUBKEY_ADDRESS]     = {0x1D,0x25};
@@ -298,6 +304,12 @@ public:
         fRequireStandard = true;
         fMineBlocksOnDemand = false;
         fTestnetToBeDeprecatedFieldRPC = true;
+        strSporkKey = "0408c6a3a6cacb673fc38f27c75d79c865e1550441ea8b5295abf21116972379a1b49416da07b7d9b40fb9daf8124f309c608dfc79756a5d3c2a957435642f7f1a";
+        nStartZelnodePayments = 1550748576; //Thu, 21 Feb 2019 11:29:36 UTC
+        networkID = CBaseChainParams::Network::TESTNET;
+        strZelnodeTestingDummyAddress= "tmXxZqbmvrxeSFQsXmm4N9CKyME767r47fS";
+
+
 
 
         checkpointData = (CCheckpointData) {
@@ -344,22 +356,22 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002; 
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 
+	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
+	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight =
 	    Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002; 
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 
+	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
+	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170006;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-    
+
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
-	
+
 	consensus.nZawyLWMAAveragingWindow = 60;
 	consensus.eh_epoch_fade_length = 11;
 
@@ -372,7 +384,7 @@ public:
         pchMessageStart[3] = 0x5f;
         nDefaultPort = 26126;
         nPruneAfterHeight = 1000;
- 
+
 
         genesis = CreateGenesisBlock(
             1296688602,
@@ -392,6 +404,8 @@ public:
         fRequireStandard = false;
         fMineBlocksOnDemand = true;
         fTestnetToBeDeprecatedFieldRPC = false;
+
+        networkID = CBaseChainParams::Network::REGTEST;
 
         checkpointData = (CCheckpointData){
             boost::assign::map_list_of

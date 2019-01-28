@@ -41,9 +41,59 @@ public:
         memset(data, 0, sizeof(data));
     }
 
+    base_blob& operator++()
+    {
+        // prefix operator
+        int i = 0;
+        while (++data[i] == 0 && i < WIDTH - 1)
+            i++;
+        return *this;
+    }
+
+    const base_blob operator++(int)
+    {
+        // postfix operator
+        const base_blob ret = *this;
+        ++(*this);
+        return ret;
+    }
+
+
+    const base_blob operator-() const
+    {
+        base_blob ret;
+        for (int i = 0; i < WIDTH; i++)
+            ret.data[i] = ~data[i];
+        ret++;
+        return ret;
+    }
+
+    base_blob& operator+=(const base_blob& b)
+    {
+        uint64_t carry = 0;
+        for (int i = 0; i < WIDTH; i++) {
+            uint64_t n = carry + data[i] + b.data[i];
+            data[i] = n & 0xffffffff;
+            carry = n >> 32;
+        }
+        return *this;
+    }
+
+
+    base_blob& operator-=(const base_blob& b)
+    {
+        *this += -b;
+        return *this;
+    }
+
+
+
     friend inline bool operator==(const base_blob& a, const base_blob& b) { return memcmp(a.data, b.data, sizeof(a.data)) == 0; }
     friend inline bool operator!=(const base_blob& a, const base_blob& b) { return memcmp(a.data, b.data, sizeof(a.data)) != 0; }
     friend inline bool operator<(const base_blob& a, const base_blob& b) { return memcmp(a.data, b.data, sizeof(a.data)) < 0; }
+    friend inline bool operator>(const base_blob& a, const base_blob& b) { return memcmp(a.data, b.data, sizeof(a.data)) > 0; }
+    friend inline const base_blob operator-(const base_blob& a, const base_blob& b) { return base_blob(a) -= b; }
+    friend inline const base_blob operator+(const base_blob& a, const base_blob& b) { return base_blob(a) += b; }
 
     std::string GetHex() const;
     void SetHex(const char* psz);
