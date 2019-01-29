@@ -70,6 +70,7 @@
 #endif
 
 #include "librustzcash.h"
+#include "zelnode/sporkdb.h"
 
 using namespace std;
 

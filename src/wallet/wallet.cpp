@@ -4441,7 +4441,8 @@ void CWallet::GetFilteredNotes(
     int maxDepth,
     bool ignoreSpent,
     bool requireSpendingKey,
-    bool ignoreLocked)
+    bool ignoreLocked,
+    bool ignoreUnspendable)
 {
     LOCK2(cs_main, cs_wallet);
 
@@ -4734,15 +4735,16 @@ bool CWallet::GetVinAndKeysFromOutput(COutput out, CTxIn& txinRet, CPubKey& pubK
 
     CTxDestination address1;
     ExtractDestination(pubScript, address1);
-    CBitcoinAddress address2(address1);
 
-    CKeyID keyID;
-    if (!address2.GetKeyID(keyID)) {
+    CKeyID* keyID;
+    keyID = boost::get<CKeyID>(&address1);
+
+    if (!keyID) {
         LogPrintf("CWallet::GetVinAndKeysFromOutput -- Address does not refer to a key\n");
         return false;
     }
 
-    if (!GetKey(keyID, keyRet)) {
+    if (!GetKey(*keyID, keyRet)) {
         LogPrintf("CWallet::GetVinAndKeysFromOutput -- Private key for address is not known\n");
         return false;
     }

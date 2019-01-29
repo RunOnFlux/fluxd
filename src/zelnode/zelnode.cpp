@@ -11,6 +11,7 @@
 #include "zelnode/obfuscation.h"
 #include "sync.h"
 #include "util.h"
+#include "key_io.h"
 
 // keep track of the scanning errors I've seen
 map<uint256, int> mapSeenZelnodeScanningErrors;
@@ -434,8 +435,9 @@ bool ZelnodeBroadcast::Create(CTxIn txin, CService service, CKey keyCollateralAd
     // wait for reindex and/or import to finish
     if (fImporting || fReindex) return false;
 
+
     LogPrint("zelnode", "%s -- pubKeyCollateralAddressNew = %s, pubKeyZelnodeNew.GetID() = %s\n", __func__,
-             CBitcoinAddress(pubKeyCollateralAddressNew.GetID()).ToString(),
+             EncodeDestination(pubKeyCollateralAddressNew.GetID()),
              pubKeyZelnodeNew.GetID().ToString());
 
     ZelnodePing znp(txin);

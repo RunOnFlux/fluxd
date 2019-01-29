@@ -9,7 +9,7 @@
  * network protocol versioning
  */
 
-static const int PROTOCOL_VERSION = 170008;
+static const int PROTOCOL_VERSION = 170009;
 
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
@@ -34,6 +34,6 @@ static const int MEMPOOL_GD_VERSION = 60002;
 static const int NO_BLOOM_VERSION = 170004;
 
 //! protocol version that requires zelnode payments
-static const int MIN_PEER_PROTO_VERSION_ZELNODE = 170008;
+static const int MIN_PEER_PROTO_VERSION_ZELNODE = 170009;
 
 #endif // BITCOIN_VERSION_H

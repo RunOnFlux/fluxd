@@ -30,6 +30,7 @@
 #include <boost/assign/list_of.hpp>
 
 #include <univalue.h>
+#include "key_io.h"
 
 using namespace std;
 
@@ -738,19 +739,19 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         if (nCoinbaseOutSize > 1) {
             CTxDestination dest;
             ExtractDestination(pblock->vtx[0].vout[1].scriptPubKey, dest);
-            result.push_back(Pair("basic_zelnode_address", CBitcoinAddress(dest).ToString()));
+            result.push_back(Pair("basic_zelnode_address", EncodeDestination(dest)));
             result.push_back(Pair("basic_zelnode_payout", pblock->vtx[0].vout[1].nValue));
         }
         if (nCoinbaseOutSize > 2) {
             CTxDestination dest;
             ExtractDestination(pblock->vtx[0].vout[2].scriptPubKey, dest);
-            result.push_back(Pair("super_zelnode_address", CBitcoinAddress(dest).ToString()));
+            result.push_back(Pair("super_zelnode_address", EncodeDestination(dest)));
             result.push_back(Pair("super_zelnode_payout", pblock->vtx[0].vout[2].nValue));
         }
         if (nCoinbaseOutSize > 3) {
             CTxDestination dest;
             ExtractDestination(pblock->vtx[0].vout[3].scriptPubKey, dest);
-            result.push_back(Pair("bamf_zelnode_address", CBitcoinAddress(dest).ToString()));
+            result.push_back(Pair("bamf_zelnode_address", EncodeDestination(dest)));
             result.push_back(Pair("bamf_zelnode_payout", pblock->vtx[0].vout[3].nValue));
         }
     } else {

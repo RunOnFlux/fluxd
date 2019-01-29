@@ -12,8 +12,9 @@
 #include "zelnode/zelnodeconfig.h"
 #include "zelnode/zelnodeman.h"
 #include "zelnode/spork.h"
-#include "rpcserver.h"
+#include "rpc/server.h"
 #include "utilmoneystr.h"
+#include "key_io.h"
 
 #include <univalue.h>
 
@@ -35,7 +36,7 @@ UniValue createzelnodekey(const UniValue& params, bool fHelp)
 
     CKey secret;
     secret.MakeNewKey(false);
-    return CBitcoinSecret(secret).ToString();
+    return EncodeSecret(secret);
 }
 
 UniValue getzelnodeoutputs(const UniValue& params, bool fHelp)
@@ -353,7 +354,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
                     if (zn != NULL) {
                         if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
                             zn->Status().find(strFilter) == string::npos &&
-                            CBitcoinAddress(zn->pubKeyCollateralAddress.GetID()).ToString().find(strFilter) == string::npos) continue;
+                            EncodeDestination(zn->pubKeyCollateralAddress.GetID()).find(strFilter) == string::npos) continue;
 
                         std::string strStatus = zn->Status();
                         std::string strTier = zn->Tier();
@@ -369,7 +370,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
                         obj.push_back(Pair("outidx", (uint64_t)oIdx));
                         obj.push_back(Pair("pubkey", HexStr(zn->pubKeyZelnode)));
                         obj.push_back(Pair("status", strStatus));
-                        obj.push_back(Pair("addr", CBitcoinAddress(zn->pubKeyCollateralAddress.GetID()).ToString()));
+                        obj.push_back(Pair("addr", EncodeDestination(zn->pubKeyCollateralAddress.GetID())));
                         obj.push_back(Pair("version", zn->protocolVersion));
                         obj.push_back(Pair("lastseen", (int64_t)zn->lastPing.sigTime));
                         obj.push_back(Pair("activetime", (int64_t)(zn->lastPing.sigTime - zn->sigTime)));
@@ -393,7 +394,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
         if (zn != NULL) {
             if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
                 zn->Status().find(strFilter) == string::npos &&
-                CBitcoinAddress(zn->pubKeyCollateralAddress.GetID()).ToString().find(strFilter) == string::npos) continue;
+                    EncodeDestination(zn->pubKeyCollateralAddress.GetID()).find(strFilter) == string::npos) continue;
 
             std::string strStatus = zn->Status();
             std::string strTier = zn->Tier();
@@ -409,7 +410,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
             obj.push_back(Pair("outidx", (uint64_t)oIdx));
             obj.push_back(Pair("pubkey", HexStr(zn->pubKeyZelnode)));
             obj.push_back(Pair("status", strStatus));
-            obj.push_back(Pair("addr", CBitcoinAddress(zn->pubKeyCollateralAddress.GetID()).ToString()));
+            obj.push_back(Pair("addr", EncodeDestination(zn->pubKeyCollateralAddress.GetID())));
             obj.push_back(Pair("version", zn->protocolVersion));
             obj.push_back(Pair("lastseen", (int64_t)zn->lastPing.sigTime));
             obj.push_back(Pair("activetime", (int64_t)(zn->lastPing.sigTime - zn->sigTime)));
@@ -433,7 +434,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
         if (zn != NULL) {
             if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
                 zn->Status().find(strFilter) == string::npos &&
-                CBitcoinAddress(zn->pubKeyCollateralAddress.GetID()).ToString().find(strFilter) == string::npos) continue;
+                EncodeDestination(zn->pubKeyCollateralAddress.GetID()).find(strFilter) == string::npos) continue;
 
             std::string strStatus = zn->Status();
             std::string strTier = zn->Tier();
@@ -449,7 +450,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
             obj.push_back(Pair("outidx", (uint64_t)oIdx));
             obj.push_back(Pair("pubkey", HexStr(zn->pubKeyZelnode)));
             obj.push_back(Pair("status", strStatus));
-            obj.push_back(Pair("addr", CBitcoinAddress(zn->pubKeyCollateralAddress.GetID()).ToString()));
+            obj.push_back(Pair("addr", EncodeDestination(zn->pubKeyCollateralAddress.GetID())));
             obj.push_back(Pair("version", zn->protocolVersion));
             obj.push_back(Pair("lastseen", (int64_t)zn->lastPing.sigTime));
             obj.push_back(Pair("activetime", (int64_t)(zn->lastPing.sigTime - zn->sigTime)));
@@ -493,7 +494,7 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
         mnObj.push_back(Pair("txhash", activeZelnode.vin.prevout.hash.ToString()));
         mnObj.push_back(Pair("outputidx", (uint64_t)activeZelnode.vin.prevout.n));
         mnObj.push_back(Pair("netaddr", activeZelnode.service.ToString()));
-        mnObj.push_back(Pair("addr", CBitcoinAddress(pmn->pubKeyCollateralAddress.GetID()).ToString()));
+        mnObj.push_back(Pair("addr", EncodeDestination(pmn->pubKeyCollateralAddress.GetID())));
         mnObj.push_back(Pair("status", activeZelnode.status));
         mnObj.push_back(Pair("message", activeZelnode.GetStatus()));
         return mnObj;
@@ -620,7 +621,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
 
         obj.push_back(Pair("protocol", (int64_t)basicWinner.protocolVersion));
         obj.push_back(Pair("txhash", basicWinner.vin.prevout.hash.ToString()));
-        obj.push_back(Pair("pubkey", CBitcoinAddress(basicWinner.pubKeyCollateralAddress.GetID()).ToString()));
+        obj.push_back(Pair("pubkey", EncodeDestination(basicWinner.pubKeyCollateralAddress.GetID())));
         obj.push_back(Pair("lastseen", (basicWinner.lastPing == ZelnodePing()) ? basicWinner.sigTime : (int64_t)basicWinner.lastPing.sigTime));
         obj.push_back(Pair("activeseconds", (basicWinner.lastPing == ZelnodePing()) ? 0 : (int64_t)(basicWinner.lastPing.sigTime - basicWinner.sigTime)));
         ret.push_back(Pair("Basic Winner", obj));
@@ -630,7 +631,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
 
         obj.push_back(Pair("protocol", (int64_t)superWinner.protocolVersion));
         obj.push_back(Pair("txhash", superWinner.vin.prevout.hash.ToString()));
-        obj.push_back(Pair("pubkey", CBitcoinAddress(superWinner.pubKeyCollateralAddress.GetID()).ToString()));
+        obj.push_back(Pair("pubkey", EncodeDestination(superWinner.pubKeyCollateralAddress.GetID())));
         obj.push_back(Pair("lastseen", (superWinner.lastPing == ZelnodePing()) ? superWinner.sigTime : (int64_t)superWinner.lastPing.sigTime));
         obj.push_back(Pair("activeseconds", (superWinner.lastPing == ZelnodePing()) ? 0 : (int64_t)(superWinner.lastPing.sigTime - superWinner.sigTime)));
         ret.push_back(Pair("Super Winner", obj));
@@ -640,7 +641,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
 
         obj.push_back(Pair("protocol", (int64_t)bamfWinner.protocolVersion));
         obj.push_back(Pair("txhash", bamfWinner.vin.prevout.hash.ToString()));
-        obj.push_back(Pair("pubkey", CBitcoinAddress(bamfWinner.pubKeyCollateralAddress.GetID()).ToString()));
+        obj.push_back(Pair("pubkey", EncodeDestination(bamfWinner.pubKeyCollateralAddress.GetID())));
         obj.push_back(Pair("lastseen", (bamfWinner.lastPing == ZelnodePing()) ? bamfWinner.sigTime : (int64_t)bamfWinner.lastPing.sigTime));
         obj.push_back(Pair("activeseconds", (bamfWinner.lastPing == ZelnodePing()) ? 0 : (int64_t)(bamfWinner.lastPing.sigTime - bamfWinner.sigTime)));
         ret.push_back(Pair("BAMF Winner", obj));
@@ -897,3 +898,10 @@ static const CRPCCommand commands[] =
                 { "zelnode",    "getzelnodewinners",      &getzelnodewinners,      false  },
                 { "zelnode",    "getzelnodescores",       &getzelnodescores,       false  },
         };
+
+
+void RegisterZelnodeRPCCommands(CRPCTable &tableRPC)
+{
+    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
+        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
+}

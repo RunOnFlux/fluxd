@@ -11,6 +11,7 @@
 #include "zelnode/zelnodeman.h"
 #include "protocol.h"
 #include "zelnode/spork.h"
+#include "key_io.h"
 
 
 //
@@ -339,15 +340,16 @@ bool ActiveZelnode::GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, C
 
     CTxDestination address1;
     ExtractDestination(pubScript, address1);
-    CBitcoinAddress address2(address1);
 
-    CKeyID keyID;
-    if (!address2.GetKeyID(keyID)) {
+    CKeyID* keyid;
+    keyid = boost::get<CKeyID>(&address1);
+
+    if (!keyid) {
         LogPrintf("%s - Address does not refer to a key\n", __func__);
         return false;
     }
 
-    if (!pwalletMain->GetKey(keyID, secretKey)) {
+    if (!pwalletMain->GetKey(*keyid, secretKey)) {
         LogPrintf("%s - Private key for address is not known\n", __func__);
         return false;
     }

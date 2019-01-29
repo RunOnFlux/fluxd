@@ -12,6 +12,7 @@
 #include "script/sign.h"
 #include "ui_interface.h"
 #include "util.h"
+#include "key_io.h"
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -30,12 +31,13 @@ ActiveZelnode activeZelnode;
 
 bool GetTestingCollateralScript(std::string strAddress, CScript& script)
 {
-    CBitcoinAddress address;
-    if (!address.SetString(strAddress)) {
+    if (!IsValidDestinationString(strAddress)) {
         LogPrintf("GetTestingCollateralScript - Invalid collateral address\n");
         return false;
     }
-    script = GetScriptForDestination(address.Get());
+
+    auto dest = DecodeDestination(strAddress);
+    script = GetScriptForDestination(dest);
     return true;
 }
 
@@ -74,29 +76,25 @@ bool CObfuScationSigner::IsVinAssociatedWithPubkey(CTxIn& vin, CPubKey& pubkey, 
 
 bool CObfuScationSigner::SetKey(std::string strSecret, std::string& errorMessage, CKey& key, CPubKey& pubkey)
 {
-    CBitcoinSecret vchSecret;
-    bool fGood = vchSecret.SetString(strSecret);
+    key = DecodeSecret(strSecret);
 
-    if (!fGood) {
+    if (!key.IsValid()) {
         errorMessage = _("Invalid private key.");
         return false;
     }
 
-    key = vchSecret.GetKey();
     pubkey = key.GetPubKey();
-
     return true;
 }
 
 bool CObfuScationSigner::GetKeysFromSecret(std::string strSecret, CKey& keyRet, CPubKey& pubkeyRet)
 {
-    CBitcoinSecret vchSecret;
+    keyRet = DecodeSecret(strSecret);
 
-    if (!vchSecret.SetString(strSecret)) return false;
-
-    keyRet = vchSecret.GetKey();
+    if (!keyRet.IsValid()) {
+        return error("Failed to get private key from secret");
+    }
     pubkeyRet = keyRet.GetPubKey();
-
     return true;
 }
 

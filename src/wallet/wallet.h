@@ -1297,7 +1297,7 @@ public:
                           int maxDepth=INT_MAX,
                           bool ignoreSpent=true,
                           bool requireSpendingKey=true,
-                          bool ignoreLocked=true);
+                          bool ignoreLocked=true,
                           bool ignoreUnspendable=true);
 
 

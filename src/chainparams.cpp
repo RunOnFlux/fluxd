@@ -205,7 +205,7 @@ public:
 static CMainParams mainParams;
 
 /**
- * Testnet (v5)
+ * Testnet (v6)
  */
 class CTestNetParams : public CChainParams {
 public:
@@ -224,7 +224,7 @@ public:
         assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
-	consensus.nPowAllowMinDifficultyBlocksAfterHeight = 299187;
+        consensus.nPowAllowMinDifficultyBlocksAfterHeight = 299187;
         consensus.nPowTargetSpacing = 2 * 60;
 
         consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
@@ -235,19 +235,20 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 100;
+        consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
+	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 100;
 
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 500;
+	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
+	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 200;
 
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 1000;
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 300;
 
         consensus.nZawyLWMAAveragingWindow = 60;
-	consensus.eh_epoch_fade_length = 10;
+	    consensus.eh_epoch_fade_length = 10;
 
-	eh_epoch_1 = eh96_5;
+	    //eh_epoch_1 = eh96_5;
+	    eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
 
         pchMessageStart[0] = 0xfa;
@@ -261,13 +262,13 @@ public:
         nPruneAfterHeight = 1000;
 
         genesis = CreateGenesisBlock(
-            1521043405,
-            uint256S("0x0000000000000000000000000000000000000000000000000000000000000018"),
-            ParseHex("004a3716c0cc99afe4d9b2eb5075e6fe20c8d45df45cf7a7a877f7a129c80f369f57bd4aab32fbfa4c7d157f9c9114dd977bb50cb7d123cba86e312e7f237e382de3dcd7b49167eea8664fdbe65b5f27d27a8d4902894b9c2f19ea65b842a0d28392be2cdc9e473f1109a143aac1043bb85063b1c036594470799e269e8b040d20de9a42843f3ed4d12b1820d32ccc365d81b428bb15f743f77767ce79f35d01eeaaf280af3dce15016bcc6cba18e00bef535040e7cc41a8b4ffd6568d4614e6d706316b05d39da7acf3dc325efd55fb72e60af5451d8bae6f93b2bef7997a65d6ab8097dfc22a11acad82505d1ef7029fd214ab9dc7a2795119bc0103674a86971cf30f9b473127b70d85627c0ed70b811af10da59d4cf55768eab6f417796652401a7860b10fe7db801058a60d72bd739bc45d453948bd3e54a5373ce1eb1e2f8fc3d7f3e8c5b9f3bfca7bb43c772a027a621d951e19b33f3963165850d1db85433e7d6e0dbe0924fc096b926514c3dd9de188f6e71f3c591307efa52a961eaf295b0dd26318ba0c8967443939d62441b75e9c6ea9eff49ae69a787041cdd9895215fe050b694b39cb4e84953a890d9174e99a5f37b3a066344b7c7b6a8ec72bd8ad24cf2ed3c91584c1f03cd21336dea2972987a55827c93dfa5a5d43416d3d21843a9fdbf1f6de6f31b2f495db1fbe07e5efae5f1435045484c679dad1e1916241f631ca8bd99fba6e338620356c6ed889f5e92b01436836b730a21fe75144f60aeda1876b4d80cf0792329a4a3fbe7ccc3e48aae72ff1d6569badf183b95155ed18eea00e410cf927a108c6e6e5b5d747f19e7e32a05ca0b763a5fdbe863010d5260d01db54acf284820aa5fa7b2cd03e6e68c6240de51d8fd52b3eab6c7360e0be7dde30ea3bbda0394a94f13a0ec76caead88abe7eeb3169c0ab689bd00fa76b347a08773928cc1a33c2365f52878ea436731477d8f602994e7cf03a362b25e0ca4dfa6abfeb50481f40e1312d40b6faca1696790d5450421fe659e1a549404a45083b29806d2a7d4197a32101bd78f3f0e39172065e41f558960f63faacd75a1d075f8c35435d22fa380b6739ff6c6a7fa7ef23ccf0f4ffc8c3a10829ef098a82f0b58c342beb35862c706d81d8a1a11a8ec33092272f9466cf5600f2c84ad8bc3503b9103705b9b004dead88dd6c2cb1fd7b96b04b03d4cd61c151566b9ec3359e5ce285577f70e1eed213b74710ecd7b4837d4bc2d1026d4e6c9fcfb55c9b2d18b3b12b88f31d98bc389652de67384cff141c5fe77719b171eb6579aec2855afd5a266a4fefe125f3fb813603b99f244f7f6e86de2b51696f2ce9fbf85861e659f229e4f715e1b9fd96588125e6fcef40211a1d6f0b826a4b1dfd8f0de9db6ab34986d470205d33cf34055027ee4f2a2e1a68fffda506291987ebe472b1b796b2698b97ab5e14db7169f926e853cba392ed6b927c90fbd82f783a9bc0166e3f431c6537621a26a18c9231cd7e9c02563369147adf3d24335ff4d204054f5590613363f339cb97b714b51b795729fb877a1d209561a54b2570eb57749b23a941569fe3519ca1d2f10dc2dcf9c0b89792bc9d622a44e28629985a3216f9b2b3cb2a38b1a95e0e181df06aa5a603fd3651c9e4282038455c5171a82d2f87225e064508279d704cecccf76d35f53b69f9c35159098205ada592a61053e599512c613cb7619c3e1097134fe2af4a7225bd3b36c4a2873fb0960e3f5dd45473486ecb88522c5083774f707dfabfab35bee979f11f174fe3c8b92136c78381812ba8a3cc2241d3321e2e3a1a33c68f6a1fd36343308c95ecb1882dd1b988ef4d6e27f91e681f29853a21b6badfd39ded1c532558336b7f74b42eb9b39ac93"),
+            1548888451,
+            uint256S("0x000000000000000000000000000000000000000000000000000000000000000b"),
+            ParseHex("0061731d8ec027c60bfe22531440d7f0b2df6642e611ad5ca66dd26fadaa4411c6d2264abcdb8f7ac96908a3046f4443f84d1d5cf0b3d541864870e5d283070ca2977b3e2f1cc59784a0f9f87c2e30b3edee15ee0667406cd7c3ed265448a51bbef8f11e61b8bbcfae07390c57fa683db5c9d423cb94dbe98d70b878eaa51731736a930bb0d3991d81c2b225e1957ba573052b403da4397027b7a7e7937482c5f0a205a7d1b04bb90090f5265458172b56e245b14bd8b6958dd4af75b96cc5458a3f1bfd57838677c96f68f81255687a797402a1e4fbce62865518d4e0e38d10116cc332d281105e623f552b97f40d4d819673df7407be3282f5a28d03d852eb7353bba2e36b20b6862fbf35c9142f1e1c1be72f7da2e5a437dda88445456005b520034d97ae0b11fff3cd61b8eb0fb7d9ac77ec56df56c31fe0391908da23805a6bebd93d56ce20eebcdb9a87fe9543021701b49a8b1c71df5573708cf477ea0ecd50d61d077f968963d4bf5b6eb9b0b8e6f2832e8bfbf9358b0e013dd7635ead3770e40405a6ab9e45a097bed534306aa7b52a9a4680d6e2e739b6f1689661e3f8c54b06136936b756399ef054783d8c6689db0ee97ea4651a441544b0d98913c2af71a6c6b8f4691595dd3f0f0dafff67181bd96351b2311d18174a098eba7dfc38479e05ae4558b55b7b64d5f73ecce129cb553f951b04372d50fbde0687b5a4643797fdac6d3ea0badaae298c672ddabb9e1ff174c35e936ae2c4e4921543ba1be24ea38a9c5b333058220f7dba301890a010584f2467d3a917b6ba81dcf3a6aa8e67e70dce349341921b5dbe6f1c256ab3c73912778241cefe432114c9473d273dd5b84fa29ae85418b48558e79a57d4f92376231614b009d2962eef1727a21d7b408e7c20b58c4e394ecddb061c7f27d2902c06dcfbd6af28c41d49d101d802c0c321be7d6a0cea24b56f3a379dacded1c71a74e35b1e93abff53e102783325d0cb17c63a78953d22fbdd2bfb4861ec33e569cfd02e279dd89df9ff52bd2707fb2d5cc1b7abc67c656faac6524e9d33ee06bfbe9b64d72fe97c8512fd136cde4a69723ba4440d926d7a4ff63203d3b0522fd749baa8a533badab508756ac9e396b5f13f6d6091d841a6ed952591175c2710e4a306a0e1bbfd161728d658118306d11c64ae02edd5ea4b42f456681cc85c3a561fab45a57ed2e8118fde25db14f48d64cd5257ab9d9bc2cd6b1e771d178c947346b00417c678c34a63333bd1a627d63e021f403423dfa2a3a7dbab2522a64341ba65ac174820063b41ccf4826bbc34ae928be6ba8f14bef896c88b0ad8ac0c2083bf24923011afdbe34c50eacb5c446e1903ce949560c95b6bc058fcb9ea3d66cd2f59366028049a05e45cb6b5e804c8b49ee04d5640077259af030e7e53eae787c7528bd71f9b782a4df39bf661c31f8bb683f0a255d5d746544975cbfb115cb32ecb79072176804f056ba0fd58a10cb515063d6c957d8bc836c106299c55c05f9ab3b5e3e3f746e1c00e92c483043c53ba8d60e9f5545b805074242e6d0b023e58030a6e385b5b0ca428d867da6a485e8c73018ebecf231ae77fd3a9a8789b8162221f56993820fad5b647ad23a5ab2ffa10dcb3190486bd285f75d60bf3372884067c13597804d248b67f756c4832611dcd67128e001ee391a2c8893b130b05d2ec7f791534d694ae7fe8289c27c0b8d3d70aeb4b9553ab31a9438d4c7fea55392013e75db239d3d40b64e7af739e458fecb4aad70fd29437b5c932c5635d618c511f0fdc7a8a0f413a2068dd7c17cf9d8f5760f369496536d58009dd37a8101adf29796df65fcec271d153f1ea2ca7b6abab242257c610369c600782a4a924b253caca6321594b1e"),
             0x2007ffff, 4, 0);
         
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256S("0x0092081791f347d184d6d0d7d1544d99d0f51fb2948ffd2d6b3b620d8e18405a"));
+        assert(consensus.hashGenesisBlock == uint256S("0x00c1c5904ead2647d0d56e56165ec568b83bee34ce467ae473e75057327e5805"));
         assert(genesis.hashMerkleRoot == uint256S("0x94c7aed6b2c67f1718006684bfc3b92081a2f19d59075691b189160d6f3aa13a"));
 
         vFixedSeeds.clear();
@@ -315,7 +316,7 @@ public:
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
             (0, consensus.hashGenesisBlock),
-            1521043405,  // * UNIX timestamp of last checkpoint block
+            1548888451,  // * UNIX timestamp of last checkpoint block
             0,           // * total number of transactions between genesis and last checkpoint
                          //   (the tx=... number in the SetBestChain debug.log lines)
             750          // * estimated number of transactions per day after checkpoint 720 newly mined +30 for txs that users are doing

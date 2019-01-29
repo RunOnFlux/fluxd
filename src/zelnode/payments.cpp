@@ -13,6 +13,7 @@
 #include "sync.h"
 #include "util.h"
 #include "utilmoneystr.h"
+#include "key_io.h"
 #include <boost/filesystem.hpp>
 
 
@@ -329,19 +330,16 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees)
 
     CTxDestination basicaddress1;
     ExtractDestination(basicPayee, basicaddress1);
-    CBitcoinAddress basicAddress(basicaddress1);
 
     CTxDestination superaddress1;
     ExtractDestination(superPayee, superaddress1);
-    CBitcoinAddress superAddress(superaddress1);
 
     CTxDestination BAMFaddress1;
     ExtractDestination(BAMFPayee, BAMFaddress1);
-    CBitcoinAddress BAMFAddress(BAMFaddress1);
 
-    LogPrint("zelnode","Zelnode Basic payment of %s to %s\n", FormatMoney(basicZelnodePayment).c_str(), basicAddress.ToString().c_str());
-    LogPrint("zelnode","Zelnode Super payment of %s to %s\n", FormatMoney(superZelnodePayment).c_str(), superAddress.ToString().c_str());
-    LogPrint("zelnode","Zelnode BAMF payment of %s to %s\n", FormatMoney(BAMFZelnodePayment).c_str(), BAMFAddress.ToString().c_str());
+    LogPrint("zelnode","Zelnode Basic payment of %s to %s\n", FormatMoney(basicZelnodePayment).c_str(), EncodeDestination(basicaddress1).c_str());
+    LogPrint("zelnode","Zelnode Super payment of %s to %s\n", FormatMoney(superZelnodePayment).c_str(), EncodeDestination(superaddress1).c_str());
+    LogPrint("zelnode","Zelnode BAMF payment of %s to %s\n", FormatMoney(BAMFZelnodePayment).c_str(), EncodeDestination(BAMFaddress1).c_str());
 }
 
 
@@ -372,11 +370,11 @@ void Payments::ProcessMessageZelnodePayments(CNode* pfrom, std::string& strComma
         LogPrint("zelnodepayments", "znget - Sent Zelnode winners to peer %i\n", pfrom->GetId());
     } else if (strCommand == "znw") { //Zelnode Payments Declare Winner
 
-        PaymentWinner winner;
-        vRecv >> winner;
-
         if (pfrom->nVersion < MIN_PEER_PROTO_VERSION_ZELNODE) return;
 
+        PaymentWinner winner;
+        vRecv >> winner;
+        
         int nHeight;
         {
             TRY_LOCK(cs_main, locked);
@@ -437,9 +435,8 @@ void Payments::ProcessMessageZelnodePayments(CNode* pfrom, std::string& strComma
 
         CTxDestination address1;
         ExtractDestination(winner.payee, address1);
-        CBitcoinAddress address2(address1);
 
-        LogPrint("zelnodepayments", "znw - winning vote - Addr %s Height %d bestHeight %d - %s\n", address2.ToString().c_str(), winner.nBlockHeight, nHeight, winner.vinZelnode.prevout.ToString());
+        LogPrint("zelnodepayments", "znw - winning vote - Addr %s Height %d bestHeight %d - %s\n", EncodeDestination(address1).c_str(), winner.nBlockHeight, nHeight, winner.vinZelnode.prevout.ToString());
 
         if (zelnodePayments.AddWinningZelnode(winner, nWinnersTier)) {
             winner.Relay();
@@ -620,12 +617,11 @@ bool ZelnodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
 
             CTxDestination address1;
             ExtractDestination(payee.scriptPubKey, address1);
-            CBitcoinAddress address2(address1);
 
             if (strBasicPayeesPossible == "") {
-                strBasicPayeesPossible += address2.ToString();
+                strBasicPayeesPossible += EncodeDestination(address1);
             } else {
-                strBasicPayeesPossible += "," + address2.ToString();
+                strBasicPayeesPossible += "," + EncodeDestination(address1);
             }
         }
     }
@@ -646,12 +642,11 @@ bool ZelnodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
 
             CTxDestination address1;
             ExtractDestination(payee.scriptPubKey, address1);
-            CBitcoinAddress address2(address1);
 
             if (strSuperPayeesPossible == "") {
-                strSuperPayeesPossible += address2.ToString();
+                strSuperPayeesPossible += EncodeDestination(address1);
             } else {
-                strSuperPayeesPossible += "," + address2.ToString();
+                strSuperPayeesPossible += "," + EncodeDestination(address1);
             }
         }
     }
@@ -672,12 +667,11 @@ bool ZelnodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
 
             CTxDestination address1;
             ExtractDestination(payee.scriptPubKey, address1);
-            CBitcoinAddress address2(address1);
 
             if (strBAMFPayeesPossible == "") {
-                strBAMFPayeesPossible += address2.ToString();
+                strBAMFPayeesPossible += EncodeDestination(address1);
             } else {
-                strBAMFPayeesPossible += "," + address2.ToString();
+                strBAMFPayeesPossible += "," + EncodeDestination(address1);
             }
         }
     }
@@ -697,36 +691,33 @@ std::string ZelnodeBlockPayees::GetRequiredPaymentsString()
     for (ZelnodePayee& payee : vecBasicPayments) {
         CTxDestination address1;
         ExtractDestination(payee.scriptPubKey, address1);
-        CBitcoinAddress address2(address1);
 
         if (ret != "Unknown") {
-            ret += ",Basic|" + address2.ToString() + ":" + std::to_string(payee.nVotes);
+            ret += ",Basic|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         } else {
-            ret = "Basic|" + address2.ToString() + ":" + std::to_string(payee.nVotes);
+            ret = "Basic|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         }
     }
 
     for (ZelnodePayee& payee : vecSuperPayments) {
         CTxDestination address1;
         ExtractDestination(payee.scriptPubKey, address1);
-        CBitcoinAddress address2(address1);
 
         if (ret != "Unknown") {
-            ret += ",Super|" + address2.ToString() + ":" + std::to_string(payee.nVotes);
+            ret += ",Super|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         } else {
-            ret = "Super|" + address2.ToString() + ":" + std::to_string(payee.nVotes);
+            ret = "Super|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         }
     }
 
     for (ZelnodePayee& payee : vecBAMFPayments) {
         CTxDestination address1;
         ExtractDestination(payee.scriptPubKey, address1);
-        CBitcoinAddress address2(address1);
 
         if (ret != "Unknown") {
-            ret += ",BAMF|" + address2.ToString() + ":" + std::to_string(payee.nVotes);
+            ret += ",BAMF|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         } else {
-            ret = "BAMF|" + address2.ToString() + ":" + std::to_string(payee.nVotes);
+            ret = "BAMF|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         }
     }
 
@@ -856,9 +847,8 @@ bool Payments::ProcessBlock(int nBlockHeight)
 
             CTxDestination address1;
             ExtractDestination(payee, address1);
-            CBitcoinAddress address2(address1);
 
-            LogPrint("zelnode", "%s Winner payee %s nHeight %d. \n", __func__, address2.ToString().c_str(),
+            LogPrint("zelnode", "%s Winner payee %s nHeight %d. \n", __func__, EncodeDestination(address1).c_str(),
                      newWinner.nBlockHeight);
         } else {
             LogPrint("zelnode", "%s Failed to find zelnode to pay\n", __func__);

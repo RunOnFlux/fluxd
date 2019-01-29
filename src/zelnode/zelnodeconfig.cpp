@@ -9,6 +9,7 @@
 #include "zelnodeconfig.h"
 #include "util.h"
 #include "ui_interface.h"
+#include "chainparams.h"
 #include <base58.h>
 
 ZelnodeConfig zelnodeConfig;

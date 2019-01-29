@@ -1707,7 +1707,25 @@ bool AcceptableInputs(CTxMemPool& pool, CValidationState& state, const CTransact
         CAmount nFees = nValueIn-nValueOut;
         double dPriority = view.GetPriority(tx, chainActive.Height());
 
-        CTxMemPoolEntry entry(tx, nFees, GetTime(), dPriority, chainActive.Height());
+
+
+        // Keep track of transactions that spend a coinbase, which we re-scan
+        // during reorgs to ensure COINBASE_MATURITY is still met.
+        bool fSpendsCoinbase = false;
+        BOOST_FOREACH(const CTxIn &txin, tx.vin) {
+            const CCoins *coins = view.AccessCoins(txin.prevout.hash);
+            if (coins->IsCoinBase()) {
+                fSpendsCoinbase = true;
+                break;
+            }
+        }
+
+        // Grab the branch ID we expect this transaction to commit to. We don't
+        // yet know if it does, but if the entry gets added to the mempool, then
+        // it has passed ContextualCheckInputs and therefore this is correct.
+        auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus());
+
+        CTxMemPoolEntry entry(tx, nFees, GetTime(), dPriority, chainActive.Height(), false, fSpendsCoinbase, consensusBranchId);
         unsigned int nSize = entry.GetTxSize();
 
         // Accept a tx if it contains joinsplits and has at least the default fee specified by z_sendmany.
@@ -1755,10 +1773,12 @@ bool AcceptableInputs(CTxMemPool& pool, CValidationState& state, const CTransact
                          hash.ToString(),
                          nFees, ::minRelayTxFee.GetFee(nSize) * 10000);
 
+        PrecomputedTransactionData txdata(tx);
+
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         int flags = STANDARD_SCRIPT_VERIFY_FLAGS;
-        if (!ContextualCheckInputs(tx, state, view, false, flags, true, Params().GetConsensus())) {
+        if (!ContextualCheckInputs(tx, state, view, false, flags, true, txdata, Params().GetConsensus(), consensusBranchId)) {
             return error("AcceptableInputs: : ConnectInputs failed %s", hash.ToString());
         }
 

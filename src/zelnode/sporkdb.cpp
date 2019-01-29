@@ -6,7 +6,7 @@
 #include "zelnode/sporkdb.h"
 #include "zelnode/spork.h"
 
-CSporkDB::CSporkDB(size_t nCacheSize, bool fMemory, bool fWipe) : CLevelDBWrapper(GetDataDir() / "sporks", nCacheSize, fMemory, fWipe) {}
+CSporkDB::CSporkDB(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "sporks", nCacheSize, fMemory, fWipe) {}
 
 bool CSporkDB::WriteSpork(const int nSporkId, const CSporkMessage& spork)
 {

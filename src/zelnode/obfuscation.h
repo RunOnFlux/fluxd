@@ -16,7 +16,6 @@
 
 class CTxIn;
 class CObfuScationSigner;
-class CBitcoinAddress;
 class ActiveZelnode;
 
 
