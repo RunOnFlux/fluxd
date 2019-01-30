@@ -161,27 +161,25 @@ CWalletTx GetValidSproutSpend(ZCJoinSplit& params,
 }
 
 // Sapling
-const Consensus::Params& ActivateAcadia() {
+const Consensus::Params& RegtestActivateAcadia() {
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     return Params().GetConsensus();
 }
 
-void DeactivateAcadia() {
+void RegtestDeactivateAcadia() {
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-    // Consider: Should we be doing the following?
-    // SelectParams(CBaseChainParams::MAIN);
 }
 
-libzelcash::SaplingExtendedSpendingKey GetMasterSaplingSpendingKey() {
+libzelcash::SaplingExtendedSpendingKey GetTestMasterSaplingSpendingKey() {
     std::vector<unsigned char, secure_allocator<unsigned char>> rawSeed(32);
     HDSeed seed(rawSeed);
     return libzelcash::SaplingExtendedSpendingKey::Master(seed);
 }
 
-CKey AddCKeyToKeyStore(CBasicKeyStore& keyStore) {
+CKey AddTestCKeyToKeyStore(CBasicKeyStore& keyStore) {
     CKey tsk = DecodeSecret(T_SECRET_REGTEST);
     keyStore.AddKey(tsk);
     return tsk;
@@ -201,7 +199,7 @@ CWalletTx GetValidSaplingReceive(const Consensus::Params& consensusParams,
                                  const libzelcash::SaplingExtendedSpendingKey &sk,
                                  CAmount value) {
     // From taddr
-    CKey tsk = AddCKeyToKeyStore(keyStore);
+    CKey tsk = AddTestCKeyToKeyStore(keyStore);
     auto scriptPubKey = GetScriptForDestination(tsk.GetPubKey().GetID());
     // To zaddr
     auto fvk = sk.expsk.full_viewing_key();

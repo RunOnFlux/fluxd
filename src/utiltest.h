@@ -35,13 +35,13 @@ struct TestSaplingNote {
     SaplingMerkleTree tree;
 };
 
-const Consensus::Params& ActivateSapling();
+const Consensus::Params& RegtestActivateSapling();
 
-void DeactivateAcadia();
+void RegtestDeactivateAcadia();
 
-libzelcash::SaplingExtendedSpendingKey GetMasterSaplingSpendingKey();
+libzelcash::SaplingExtendedSpendingKey GetTestMasterSaplingSpendingKey();
 
-CKey AddCKeyToKeyStore(CBasicKeyStore& keyStore);
+CKey AddTestCKeyToKeyStore(CBasicKeyStore& keyStore);
 
 /**
  * Generate a dummy SaplingNote and a SaplingMerkleTree with that note's commitment.

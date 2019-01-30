@@ -172,7 +172,7 @@ TEST(checktransaction_tests, BadTxnsOversize) {
 
     {
         // But should be fine again once Sapling activates!
-        ActivateAcadia();
+        RegtestActivateAcadia();
 
         mtx.fOverwintered = true;
         mtx.nVersionGroupId = SAPLING_VERSION_GROUP_ID;
@@ -191,13 +191,12 @@ TEST(checktransaction_tests, BadTxnsOversize) {
         EXPECT_TRUE(ContextualCheckTransaction(tx, state, 1, 100));
 
         // Revert to default
-        DeactivateAcadia();
+        RegtestDeactivateAcadia();
     }
 }
 
 TEST(checktransaction_tests, OversizeSaplingTxns) {
-    SelectParams(CBaseChainParams::REGTEST);
-    DeactivateAcadia();
+    RegtestActivateAcadia();
 
     CMutableTransaction mtx = GetValidTransaction();
     mtx.fOverwintered = true;
@@ -250,7 +249,7 @@ TEST(checktransaction_tests, OversizeSaplingTxns) {
     }
 
     // Revert to default
-    DeactivateAcadia();
+    RegtestDeactivateAcadia();
 }
 
 TEST(checktransaction_tests, bad_txns_vout_negative) {
@@ -965,7 +964,7 @@ TEST(checktransaction_tests, OverwinteredContextualCreateTx) {
     }
 
     // Revert to default
-    DeactivateAcadia();
+    RegtestDeactivateAcadia();
 }
 
 // Test a v1 transaction which has a malformed header, perhaps modified in-flight

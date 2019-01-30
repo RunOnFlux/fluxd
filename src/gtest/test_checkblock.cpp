@@ -73,8 +73,8 @@ protected:
 
     virtual void TearDown() {
         // Revert to test default. No-op on mainnet params.
-        DeactivateAcadia();
-        }
+        RegtestDeactivateAcadia();
+    }
 
     // Returns a valid but empty mutable transaction at block height 1.
     CMutableTransaction GetFirstBlockCoinbaseTx() {

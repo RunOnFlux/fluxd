@@ -198,7 +198,7 @@ TEST(keystore_tests, StoreAndRetrieveSaplingSpendingKey) {
     libzelcash::SaplingFullViewingKey fvkOut;
     libzelcash::SaplingIncomingViewingKey ivkOut;
 
-    auto sk = GetMasterSaplingSpendingKey();
+    auto sk = GetTestMasterSaplingSpendingKey();
     auto fvk = sk.expsk.full_viewing_key();
     auto ivk = fvk.in_viewing_key();
     auto addr = sk.DefaultAddress();
