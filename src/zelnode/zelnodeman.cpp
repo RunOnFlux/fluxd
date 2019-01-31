@@ -877,7 +877,7 @@ bool ZelnodeMan::GetCurrentZelnode(Zelnode& winner, int nNodeTier, int mod, int6
     int64_t score = 0;
 
     if (nNodeTier == Zelnode::BASIC) {
-        bool found;
+        bool found = false;
         for (auto& entry : mapBasicZelnodes) {
             entry.second.Check();
             if (entry.second.protocolVersion < minProtocol || !entry.second.IsEnabled()) continue;
@@ -895,7 +895,7 @@ bool ZelnodeMan::GetCurrentZelnode(Zelnode& winner, int nNodeTier, int mod, int6
         }
         return found;
     } else if (nNodeTier == Zelnode::SUPER) {
-        bool found;
+        bool found = false;
         for (auto& entry : mapSuperZelnodes) {
             entry.second.Check();
             if (entry.second.protocolVersion < minProtocol || !entry.second.IsEnabled()) continue;
@@ -913,7 +913,7 @@ bool ZelnodeMan::GetCurrentZelnode(Zelnode& winner, int nNodeTier, int mod, int6
         }
         return found;
     } else if (nNodeTier == Zelnode::BAMF) {
-        bool found;
+        bool found = false;
         for (auto& entry : mapBAMFZelnodes) {
             entry.second.Check();
             if (entry.second.protocolVersion < minProtocol || !entry.second.IsEnabled()) continue;
