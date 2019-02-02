@@ -132,7 +132,7 @@ public:
     std::vector<unsigned char> sig;
     int activeState;
     int tier;
-    int64_t sigTime; //mnb message time
+    int64_t sigTime; //znb message time
     int cacheInputAge;
     int cacheInputAgeBlock;
     bool unitTest;
@@ -149,7 +149,7 @@ public:
 
     Zelnode();
     Zelnode(const Zelnode& other);
-    Zelnode(const ZelnodeBroadcast& mnb);
+    Zelnode(const ZelnodeBroadcast& znb);
 
 
     void swap(Zelnode& first, Zelnode& second) // nothrow
@@ -222,7 +222,7 @@ public:
 
     int64_t SecondsSincePayment();
 
-    bool UpdateFromNewBroadcast(ZelnodeBroadcast& mnb);
+    bool UpdateFromNewBroadcast(ZelnodeBroadcast& znb);
 
     inline uint64_t SliceHash(uint256& hash, int slice)
     {
@@ -354,8 +354,8 @@ public:
     }
 
     /// Create Zelnode broadcast, needs to be relayed manually after that
-    static bool Create(CTxIn vin, CService service, CKey keyCollateralAddressNew, CPubKey pubKeyCollateralAddressNew, CKey keyZelnodeNew, CPubKey pubKeyZelnodeNew, std::string& strErrorRet, ZelnodeBroadcast& mnbRet);
-    static bool Create(std::string strService, std::string strKey, std::string strTxHash, std::string strOutputIndex, std::string& strErrorRet, ZelnodeBroadcast& mnbRet, bool fOffline = false);
+    static bool Create(CTxIn vin, CService service, CKey keyCollateralAddressNew, CPubKey pubKeyCollateralAddressNew, CKey keyZelnodeNew, CPubKey pubKeyZelnodeNew, std::string& strErrorRet, ZelnodeBroadcast& znbRet);
+    static bool Create(std::string strService, std::string strKey, std::string strTxHash, std::string strOutputIndex, std::string& strErrorRet, ZelnodeBroadcast& znbRet, bool fOffline = false);
     static bool CheckDefaultPort(std::string strService, std::string& strErrorRet, std::string strContext);
 };
 

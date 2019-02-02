@@ -21,6 +21,23 @@
 #include <boost/tokenizer.hpp>
 #include <fstream>
 
+bool DecodeHexZelnodeBroadcast(ZelnodeBroadcast& zelnodeBroadcast, std::string strHexZelnodeBroadcast) {
+
+    if (!IsHex(strHexZelnodeBroadcast))
+        return false;
+
+    vector<unsigned char> zelnodeData(ParseHex(strHexZelnodeBroadcast));
+    CDataStream ssData(zelnodeData, SER_NETWORK, PROTOCOL_VERSION);
+    try {
+        ssData >> zelnodeBroadcast;
+    }
+    catch (const std::exception&) {
+        return false;
+    }
+
+    return true;
+}
+
 UniValue createzelnodekey(const UniValue& params, bool fHelp)
 {
     if (fHelp || (params.size() != 0))
@@ -84,7 +101,7 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
         (params.size() == 2 && (strCommand != "local" && strCommand != "all" && strCommand != "many" && strCommand != "missing" && strCommand != "disabled")) ||
         (params.size() == 3 && strCommand != "alias"))
         throw runtime_error(
-                "startzelnode \"local|all|many|missing|disabled|alias\" lockwallet ( \"alias\" )\n"
+                "startzelnode \"local|all|missing|disabled|alias\" lockwallet ( \"alias\" )\n"
                 "\nAttempts to start one or more zelnode(s)\n"
 
                 "\nArguments:\n"
@@ -128,7 +145,7 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
         return activeZelnode.GetStatus();
     }
 
-    if (strCommand == "all" || strCommand == "many" || strCommand == "missing" || strCommand == "disabled") {
+    if (strCommand == "all" || strCommand == "missing" || strCommand == "disabled") {
         if ((strCommand == "missing" || strCommand == "disabled") &&
             (zelnodeSync.RequestedZelnodeAssets <= ZELNODE_SYNC_LIST ||
                 zelnodeSync.RequestedZelnodeAssets == ZELNODE_SYNC_FAILED)) {
@@ -144,35 +161,38 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
         UniValue resultsObj(UniValue::VARR);
 
         for (ZelnodeConfig::ZelnodeEntry zne : zelnodeConfig.getEntries()) {
-                        std::string errorMessage;
-                        int nIndex;
-                        if(!zne.castOutputIndex(nIndex))
-                            continue;
-                        CTxIn vin = CTxIn(uint256S(zne.getTxHash()), uint32_t(nIndex));
-                        Zelnode* pzn = zelnodeman.Find(vin);
-                        ZelnodeBroadcast znb;
+            std::string errorMessage;
+            int nIndex;
+            if(!zne.castOutputIndex(nIndex))
+                continue;
+            CTxIn vin = CTxIn(uint256S(zne.getTxHash()), uint32_t(nIndex));
+            Zelnode* pzn = zelnodeman.Find(vin);
+            ZelnodeBroadcast znb;
 
-                        if (pzn != NULL) {
-                            if (strCommand == "missing") continue;
-                            if (strCommand == "disabled" && pzn->IsEnabled()) continue;
-                        }
+            if (pzn != NULL) {
+                if (strCommand == "missing") continue;
+                if (strCommand == "disabled" && pzn->IsEnabled()) continue;
+            }
 
-                        bool result = activeZelnode.CreateBroadcast(zne.getIp(), zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, znb);
+            bool result = activeZelnode.CreateBroadcast(zne.getIp(), zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, znb);
 
-                        UniValue statusObj(UniValue::VOBJ);
-                        statusObj.push_back(Pair("alias", zne.getAlias()));
-                        statusObj.push_back(Pair("result", result ? "success" : "failed"));
+            UniValue statusObj(UniValue::VOBJ);
+            statusObj.push_back(Pair("alias", zne.getAlias()));
+            statusObj.push_back(Pair("result", result ? "success" : "failed"));
 
-                        if (result) {
-                            successful++;
-                            statusObj.push_back(Pair("error", ""));
-                        } else {
-                            failed++;
-                            statusObj.push_back(Pair("error", errorMessage));
-                        }
+            if (result) {
+                successful++;
+                zelnodeman.UpdateZelnodeList(znb);
+                znb.Relay();
+                statusObj.push_back(Pair("error", ""));
+            } else {
+                failed++;
+                statusObj.push_back(Pair("error", errorMessage));
+            }
 
-                        resultsObj.push_back(statusObj);
-                    }
+            resultsObj.push_back(statusObj);
+        }
+
         if (fLock)
             pwalletMain->Lock();
 
@@ -881,6 +901,291 @@ UniValue getzelnodescores (const UniValue& params, bool fHelp)
     return obj;
 }
 
+UniValue listzelnodeconf (const UniValue& params, bool fHelp)
+{
+    std::string strFilter = "";
+
+    if (params.size() == 1) strFilter = params[0].get_str();
+
+    if (fHelp || (params.size() > 1))
+        throw runtime_error(
+                "listzelnodeconf ( \"filter\" )\n"
+                "\nPrint zelnode.conf in JSON format\n"
+
+                "\nArguments:\n"
+                "1. \"filter\"    (string, optional) Filter search text. Partial match on alias, address, txHash, or status.\n"
+
+                "\nResult:\n"
+                "[\n"
+                "  {\n"
+                "    \"alias\": \"xxxx\",        (string) zelnode alias\n"
+                "    \"address\": \"xxxx\",      (string) zelnode IP address\n"
+                "    \"privateKey\": \"xxxx\",   (string) zelnode private key\n"
+                "    \"txHash\": \"xxxx\",       (string) transaction hash\n"
+                "    \"outputIndex\": n,       (numeric) transaction output index\n"
+                "    \"status\": \"xxxx\"        (string) zelnode status\n"
+                "  }\n"
+                "  ,...\n"
+                "]\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("listzelnodeconf", "") + HelpExampleRpc("listzelnodeconf", ""));
+
+    std::vector<ZelnodeConfig::ZelnodeEntry> zelnodeEntries;
+    zelnodeEntries = zelnodeConfig.getEntries();
+
+    UniValue ret(UniValue::VARR);
+
+    for (ZelnodeConfig::ZelnodeEntry zelnode : zelnodeEntries) {
+        int nIndex;
+        if(!zelnode.castOutputIndex(nIndex))
+            continue;
+        CTxIn vin = CTxIn(uint256S(zelnode.getTxHash()), uint32_t(nIndex));
+        Zelnode* pzelnode = zelnodeman.Find(vin);
+
+        std::string strStatus = pzelnode ? pzelnode->Status() : "MISSING";
+
+        if (strFilter != "" && zelnode.getAlias().find(strFilter) == string::npos &&
+            zelnode.getIp().find(strFilter) == string::npos &&
+            zelnode.getTxHash().find(strFilter) == string::npos &&
+            strStatus.find(strFilter) == string::npos) continue;
+
+        UniValue object(UniValue::VOBJ);
+        object.push_back(Pair("alias", zelnode.getAlias()));
+        object.push_back(Pair("address", zelnode.getIp()));
+        object.push_back(Pair("privateKey", zelnode.getPrivKey()));
+        object.push_back(Pair("txHash", zelnode.getTxHash()));
+        object.push_back(Pair("outputIndex", zelnode.getOutputIndex()));
+        object.push_back(Pair("status", strStatus));
+        ret.push_back(object);
+    }
+
+    return ret;
+}
+
+UniValue createzelnodebroadcast(const UniValue& params, bool fHelp)
+{
+    string strCommand;
+    if (params.size() >= 1)
+        strCommand = params[0].get_str();
+    if (fHelp || (strCommand != "alias" && strCommand != "all") || (strCommand == "alias" && params.size() < 2))
+        throw runtime_error(
+                "createzelnodebroadcast \"command\" ( \"alias\")\n"
+                "\nCreates a zelnode broadcast message for one or all zelnodes configured in zelnode.conf\n" +
+                HelpRequiringPassphrase() + "\n"
+
+                                            "\nArguments:\n"
+                                            "1. \"command\"      (string, required) \"alias\" for single zelnode, \"all\" for all zelnodes\n"
+                                            "2. \"alias\"        (string, required if command is \"alias\") Alias of the zelnode\n"
+
+                                            "\nResult (all):\n"
+                                            "{\n"
+                                            "  \"overall\": \"xxx\",        (string) Overall status message indicating number of successes.\n"
+                                            "  \"detail\": [                (array) JSON array of broadcast objects.\n"
+                                            "    {\n"
+                                            "      \"alias\": \"xxx\",      (string) Alias of the zelnode.\n"
+                                            "      \"success\": true|false, (boolean) Success status.\n"
+                                            "      \"hex\": \"xxx\"         (string, if success=true) Hex encoded broadcast message.\n"
+                                            "      \"error_message\": \"xxx\"   (string, if success=false) Error message, if any.\n"
+                                            "    }\n"
+                                            "    ,...\n"
+                                            "  ]\n"
+                                            "}\n"
+
+                                            "\nResult (alias):\n"
+                                            "{\n"
+                                            "  \"alias\": \"xxx\",      (string) Alias of the zelnode.\n"
+                                            "  \"success\": true|false, (boolean) Success status.\n"
+                                            "  \"hex\": \"xxx\"         (string, if success=true) Hex encoded broadcast message.\n"
+                                            "  \"error_message\": \"xxx\"   (string, if success=false) Error message, if any.\n"
+                                            "}\n"
+
+                                            "\nExamples:\n" +
+                HelpExampleCli("createzelnodebroadcast", "alias myzn1") + HelpExampleRpc("createzelnodebroadcast", "alias myzn1"));
+
+    EnsureWalletIsUnlocked();
+
+    if (strCommand == "alias")
+    {
+        // wait for reindex and/or import to finish
+        if (fImporting || fReindex)
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Wait for reindex and/or import to finish");
+
+        std::string alias = params[1].get_str();
+        bool found = false;
+
+        std::vector<ZelnodeConfig::ZelnodeEntry> zelnodeEntries;
+        zelnodeEntries = zelnodeConfig.getEntries();
+
+        UniValue statusObj(UniValue::VOBJ);
+        statusObj.push_back(Pair("alias", alias));
+
+        for (ZelnodeConfig::ZelnodeEntry zelnodeEntry : zelnodeEntries) {
+            if(zelnodeEntry.getAlias() == alias) {
+                found = true;
+                std::string errorMessage;
+                ZelnodeBroadcast zelnodeBroadcast;
+
+                bool success = activeZelnode.CreateBroadcast(zelnodeEntry.getIp(), zelnodeEntry.getPrivKey(), zelnodeEntry.getTxHash(), zelnodeEntry.getOutputIndex(), errorMessage, zelnodeBroadcast, true);
+
+                statusObj.push_back(Pair("success", success));
+                if(success) {
+                    CDataStream ssZelnode(SER_NETWORK, PROTOCOL_VERSION);
+                    ssZelnode << zelnodeBroadcast;
+                    statusObj.push_back(Pair("hex", HexStr(ssZelnode.begin(), ssZelnode.end())));
+                } else {
+                    statusObj.push_back(Pair("error_message", errorMessage));
+                }
+                break;
+            }
+        }
+
+        if(!found) {
+            statusObj.push_back(Pair("success", false));
+            statusObj.push_back(Pair("error_message", "Could not find alias in config. Verify with listzelnodeconf."));
+        }
+
+        return statusObj;
+
+    }
+
+    if (strCommand == "all")
+    {
+        // wait for reindex and/or import to finish
+        if (fImporting || fReindex)
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Wait for reindex and/or import to finish");
+
+        std::vector<ZelnodeConfig::ZelnodeEntry> zelnodeEntries;
+        zelnodeEntries = zelnodeConfig.getEntries();
+
+        int successful = 0;
+        int failed = 0;
+
+        UniValue resultsObj(UniValue::VARR);
+
+        for (ZelnodeConfig::ZelnodeEntry zelnodeEntry : zelnodeEntries) {
+            std::string errorMessage;
+
+            CTxIn vin = CTxIn(uint256S(zelnodeEntry.getTxHash()), uint32_t(atoi(zelnodeEntry.getOutputIndex().c_str())));
+            ZelnodeBroadcast zelnodeBroadcast;
+
+            bool success = activeZelnode.CreateBroadcast(zelnodeEntry.getIp(), zelnodeEntry.getPrivKey(), zelnodeEntry.getTxHash(), zelnodeEntry.getOutputIndex(), errorMessage, zelnodeBroadcast, true);
+
+            UniValue statusObj(UniValue::VOBJ);
+            statusObj.push_back(Pair("alias", zelnodeEntry.getAlias()));
+            statusObj.push_back(Pair("success", success));
+
+            if(success) {
+                successful++;
+                CDataStream ssZelnodeBroadcast(SER_NETWORK, PROTOCOL_VERSION);
+                ssZelnodeBroadcast << zelnodeBroadcast;
+                statusObj.push_back(Pair("hex", HexStr(ssZelnodeBroadcast.begin(), ssZelnodeBroadcast.end())));
+            } else {
+                failed++;
+                statusObj.push_back(Pair("error_message", errorMessage));
+            }
+
+            resultsObj.push_back(statusObj);
+        }
+
+        UniValue returnObj(UniValue::VOBJ);
+        returnObj.push_back(Pair("overall", strprintf("Successfully created broadcast messages for %d zelnodes, failed to create %d, total %d", successful, failed, successful + failed)));
+        returnObj.push_back(Pair("detail", resultsObj));
+
+        return returnObj;
+    }
+    return NullUniValue;
+}
+
+
+UniValue decodezelnodebroadcast(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+                "decodezelnodebroadcast \"hexstring\"\n"
+                "\nCommand to decode zelnode broadcast messages\n"
+
+                "\nArgument:\n"
+                "1. \"hexstring\"        (string) The hex encoded zelnode broadcast message\n"
+
+                "\nResult:\n"
+                "{\n"
+                "  \"vin\": \"xxxx\"                (string) The unspent output which is holding the zelnode collateral\n"
+                "  \"addr\": \"xxxx\"               (string) IP address of the zelnode\n"
+                "  \"pubkeycollateral\": \"xxxx\"   (string) Collateral address's public key\n"
+                "  \"pubkeyzelnode\": \"xxxx\"   (string) Zelnode's public key\n"
+                "  \"vchsig\": \"xxxx\"             (string) Base64-encoded signature of this message (verifiable via pubkeycollateral)\n"
+                "  \"sigtime\": \"nnn\"             (numeric) Signature timestamp\n"
+                "  \"protocolversion\": \"nnn\"     (numeric) Zelnodes's protocol version\n"
+                "  \"lastping\" : {                 (object) JSON object with information about the zelnode's last ping\n"
+                "      \"vin\": \"xxxx\"            (string) The unspent output of the zelnode which is signing the message\n"
+                "      \"blockhash\": \"xxxx\"      (string) Current chaintip blockhash minus 12\n"
+                "      \"sigtime\": \"nnn\"         (numeric) Signature time for this ping\n"
+                "      \"vchsig\": \"xxxx\"         (string) Base64-encoded signature of this ping (verifiable via pubkeyzelnode)\n"
+                "}\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("decodezelnodebroadcast", "hexstring") + HelpExampleRpc("decodezelnodebroadcast", "hexstring"));
+
+    ZelnodeBroadcast zelnodeBroadcast;
+
+    if (!DecodeHexZelnodeBroadcast(zelnodeBroadcast, params[0].get_str()))
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Zelnode broadcast message decode failed");
+
+    if(!zelnodeBroadcast.VerifySignature())
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Zelnode broadcast signature verification failed");
+
+    UniValue resultObj(UniValue::VOBJ);
+
+    resultObj.push_back(Pair("vin", zelnodeBroadcast.vin.prevout.ToString()));
+    resultObj.push_back(Pair("addr", zelnodeBroadcast.addr.ToString()));
+    resultObj.push_back(Pair("pubkeycollateral", EncodeDestination(zelnodeBroadcast.pubKeyCollateralAddress.GetID())));
+    resultObj.push_back(Pair("pubkeyzelnode", EncodeDestination(zelnodeBroadcast.pubKeyZelnode.GetID())));
+    resultObj.push_back(Pair("vchsig", EncodeBase64(&zelnodeBroadcast.sig[0], zelnodeBroadcast.sig.size())));
+    resultObj.push_back(Pair("sigtime", zelnodeBroadcast.sigTime));
+    resultObj.push_back(Pair("protocolversion", zelnodeBroadcast.protocolVersion));
+    resultObj.push_back(Pair("nlastdsq", zelnodeBroadcast.nLastDsq));
+
+    UniValue lastPingObj(UniValue::VOBJ);
+    lastPingObj.push_back(Pair("vin", zelnodeBroadcast.lastPing.vin.prevout.ToString()));
+    lastPingObj.push_back(Pair("blockhash", zelnodeBroadcast.lastPing.blockHash.ToString()));
+    lastPingObj.push_back(Pair("sigtime", zelnodeBroadcast.lastPing.sigTime));
+    lastPingObj.push_back(Pair("vchsig", EncodeBase64(&zelnodeBroadcast.lastPing.vchSig[0], zelnodeBroadcast.lastPing.vchSig.size())));
+
+    resultObj.push_back(Pair("lastping", lastPingObj));
+
+    return resultObj;
+}
+
+UniValue relayzelnodebroadcast(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+                "relayzelnodebroadcast \"hexstring\"\n"
+                "\nCommand to relay zelnode broadcast messages\n"
+
+                "\nArguments:\n"
+                "1. \"hexstring\"        (string) The hex encoded zelnode broadcast message\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("relayzelnodebroadcast", "hexstring") + HelpExampleRpc("relayzelnodebroadcast", "hexstring"));
+
+
+    ZelnodeBroadcast zelnodeBroadcast;
+
+    if (!DecodeHexZelnodeBroadcast(zelnodeBroadcast, params[0].get_str()))
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Zelnode broadcast message decode failed");
+
+    if(!zelnodeBroadcast.VerifySignature())
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Zelnode broadcast signature verification failed");
+
+    zelnodeman.UpdateZelnodeList(zelnodeBroadcast);
+    zelnodeBroadcast.Relay();
+
+    return strprintf("Zelnode broadcast sent (service %s, vin %s)", zelnodeBroadcast.addr.ToString(), zelnodeBroadcast.vin.ToString());
+}
+
+
 
 static const CRPCCommand commands[] =
         { //  category              name                      actor (function)         okSafeMode
@@ -897,6 +1202,12 @@ static const CRPCCommand commands[] =
                 { "zelnode",    "getzelnodestatus",       &getzelnodestatus,       false  },
                 { "zelnode",    "getzelnodewinners",      &getzelnodewinners,      false  },
                 { "zelnode",    "getzelnodescores",       &getzelnodescores,       false  },
+                { "zelnode",    "listzelnodeconf",        &listzelnodeconf,        false  },
+                { "zelnode",    "createzelnodebroadcast", &createzelnodebroadcast, false  },
+                { "zelnode",    "relayzelnodebroadcast",  &relayzelnodebroadcast,  false  },
+                { "zelnode",    "decodezelnodebroadcast", &decodezelnodebroadcast, false  },
+
+
         };
 
 
