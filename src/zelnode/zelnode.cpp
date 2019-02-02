@@ -277,19 +277,19 @@ bool Zelnode::IsValidNetAddr()
 //
 // When a new zelnode broadcast is sent, update our information
 //
-bool Zelnode::UpdateFromNewBroadcast(ZelnodeBroadcast& mnb)
+bool Zelnode::UpdateFromNewBroadcast(ZelnodeBroadcast& znb)
 {
-    if (mnb.sigTime > sigTime) {
-        pubKeyZelnode = mnb.pubKeyZelnode;
-        pubKeyCollateralAddress = mnb.pubKeyCollateralAddress;
-        sigTime = mnb.sigTime;
-        sig = mnb.sig;
-        protocolVersion = mnb.protocolVersion;
-        addr = mnb.addr;
+    if (znb.sigTime > sigTime) {
+        pubKeyZelnode = znb.pubKeyZelnode;
+        pubKeyCollateralAddress = znb.pubKeyCollateralAddress;
+        sigTime = znb.sigTime;
+        sig = znb.sig;
+        protocolVersion = znb.protocolVersion;
+        addr = znb.addr;
         lastTimeChecked = 0;
         int nDoS = 0;
-        if (mnb.lastPing == ZelnodePing() || (mnb.lastPing != ZelnodePing() && mnb.lastPing.CheckAndUpdate(nDoS, false))) {
-            lastPing = mnb.lastPing;
+        if (znb.lastPing == ZelnodePing() || (znb.lastPing != ZelnodePing() && znb.lastPing.CheckAndUpdate(nDoS, false))) {
+            lastPing = znb.lastPing;
             zelnodeman.mapSeenZelnodePing.insert(make_pair(lastPing.GetHash(), lastPing));
         }
         return true;
@@ -498,7 +498,7 @@ bool ZelnodeBroadcast::CheckAndUpdate(int& nDos)
         return false;
 
     if (protocolVersion < zelnodePayments.GetMinZelnodePaymentsProto()) {
-        LogPrint("zelnode","mnb - ignoring outdated Zelnode %s protocol version %d\n", vin.prevout.hash.ToString(), protocolVersion);
+        LogPrint("zelnode","znb - ignoring outdated Zelnode %s protocol version %d\n", vin.prevout.hash.ToString(), protocolVersion);
         return false;
     }
 

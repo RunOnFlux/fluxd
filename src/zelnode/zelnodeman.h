@@ -78,7 +78,7 @@ public:
     /// Add an entry
     bool Add(Zelnode& mn);
 
-    /// Ask (source) node for mnb
+    /// Ask (source) node for znb
     void AskForZN(CNode* pnode, CTxIn& vin);
 
     /// Check all Zelnodes

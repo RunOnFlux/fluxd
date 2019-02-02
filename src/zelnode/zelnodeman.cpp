@@ -241,7 +241,7 @@ void ZelnodeMan::AskForZN(CNode* pnode, CTxIn& vin)
         if (GetTime() < t) return; // we've asked recently
     }
 
-    // ask for the mnb info once from the node that sent znp
+    // ask for the znb info once from the node that sent znp
 
     LogPrint("zelnode", "%s - Asking node for missing entry, vin: %s\n", __func__, vin.prevout.hash.ToString());
     pnode->PushMessage("dseg", vin);
@@ -293,7 +293,7 @@ void ZelnodeMan::CheckAndRemove(bool forceExpiredRemoval)
 
             //erase all of the broadcasts we've seen from this vin
             // -- if we missed a few pings and the node was removed, this will allow is to get it back without them
-            //    sending a brand new mnb
+            //    sending a brand new znb
             map<uint256, ZelnodeBroadcast>::iterator it3 = mapSeenZelnodeBroadcast.begin();
             while (it3 != mapSeenZelnodeBroadcast.end()) {
                 if ((*it3).second.vin == (basicIt->second).vin) {
@@ -330,7 +330,7 @@ void ZelnodeMan::CheckAndRemove(bool forceExpiredRemoval)
 
             //erase all of the broadcasts we've seen from this vin
             // -- if we missed a few pings and the node was removed, this will allow is to get it back without them
-            //    sending a brand new mnb
+            //    sending a brand new znb
             map<uint256, ZelnodeBroadcast>::iterator it3 = mapSeenZelnodeBroadcast.begin();
             while (it3 != mapSeenZelnodeBroadcast.end()) {
                 if ((*it3).second.vin == (superIt->second).vin) {
@@ -367,7 +367,7 @@ void ZelnodeMan::CheckAndRemove(bool forceExpiredRemoval)
 
             //erase all of the broadcasts we've seen from this vin
             // -- if we missed a few pings and the node was removed, this will allow is to get it back without them
-            //    sending a brand new mnb
+            //    sending a brand new znb
             map<uint256, ZelnodeBroadcast>::iterator it3 = mapSeenZelnodeBroadcast.begin();
             while (it3 != mapSeenZelnodeBroadcast.end()) {
                 if ((*it3).second.vin == (bamfIt->second).vin) {
@@ -1143,7 +1143,7 @@ void ZelnodeMan::ProcessMessage(CNode* pfrom, std::string& strCommand, CDataStre
         } else {
             // if nothing significant failed, search existing Zelnode list
             Zelnode* pzn = Find(znp.vin);
-            // if it's known, don't ask for the mnb, just return
+            // if it's known, don't ask for the znb, just return
             if (pzn != NULL) return;
         }
 
