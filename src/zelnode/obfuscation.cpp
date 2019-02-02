@@ -136,6 +136,7 @@ void ThreadCheckZelnodes()
 {
     // Make this thread recognisable as the wallet flushing thread
     RenameThread("zelcash-zelnodescheck");
+    LogPrintf("Starting Check Zelnodes Thread\n");
 
     unsigned int c = 0;
 
