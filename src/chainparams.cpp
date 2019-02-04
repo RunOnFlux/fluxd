@@ -182,9 +182,10 @@ public:
         fMineBlocksOnDemand = false;
         fTestnetToBeDeprecatedFieldRPC = false;
 
-        strSporkKey = "";
-        nStartZelnodePayments = 1550748576; //Thu, 21 Feb 2019 11:29:36 UTC
+        strSporkKey = ""; // TODO update this for mainnet launch
+        nStartZelnodePayments = 1550748576; //Thu, 21 Feb 2019 11:29:36 UTC // Not being used, but could be in the future
         networkID = CBaseChainParams::Network::MAIN;
+        strZelnodeTestingDummyAddress= ""; // TODO update this for mainnet launch
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
@@ -274,7 +275,6 @@ public:
         vFixedSeeds.clear();
         vSeeds.clear();
         vSeeds.push_back(CDNSSeedData("vps.testnet.zelcash.online", "dnsseedtestnet.zelcash.online")); // TheTrunk
-        vSeeds.push_back(CDNSSeedData("45.34.187.118", "45.34.187.118")); // Single Node - blondfrogs
 
 
         // guarantees the first 2 characters, when base58 encoded, are "tm"
@@ -306,7 +306,7 @@ public:
         fMineBlocksOnDemand = false;
         fTestnetToBeDeprecatedFieldRPC = true;
         strSporkKey = "0408c6a3a6cacb673fc38f27c75d79c865e1550441ea8b5295abf21116972379a1b49416da07b7d9b40fb9daf8124f309c608dfc79756a5d3c2a957435642f7f1a";
-        nStartZelnodePayments = 1550748576; //Thu, 21 Feb 2019 11:29:36 UTC
+        nStartZelnodePayments = 1550748576; //Thu, 21 Feb 2019 11:29:36 UTC // Currently not being used.
         networkID = CBaseChainParams::Network::TESTNET;
         strZelnodeTestingDummyAddress= "tmXxZqbmvrxeSFQsXmm4N9CKyME767r47fS";
 

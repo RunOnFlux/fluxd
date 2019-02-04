@@ -56,6 +56,36 @@ UniValue createzelnodekey(const UniValue& params, bool fHelp)
     return EncodeSecret(secret);
 }
 
+UniValue createsporkkeys(const UniValue& params, bool fHelp)
+{
+    if (fHelp || (params.size() != 0))
+        throw runtime_error(
+                "createsporkkeys\n"
+                "\nCreate a set of private and public keys used for sporks\n"
+
+                "\nResult:\n"
+                "\"pubkey\"    (string) Spork public key\n"
+                "\"privkey\"    (string) Spork private key\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("createsporkkeys", "") + HelpExampleRpc("createsporkkeys", ""));
+
+    CKey secret;
+    secret.MakeNewKey(false);
+
+    CPubKey pubKey = secret.GetPubKey();
+
+    std::string str;
+    for (int i = 0; i < pubKey.size(); i++) {
+        str += pubKey[i];
+    }
+
+    UniValue ret(UniValue::VOBJ);
+    ret.push_back(Pair("pubkey", HexStr(str)));
+    ret.push_back(Pair("privkey", EncodeSecret(secret)));
+    return ret;
+}
+
 UniValue getzelnodeoutputs(const UniValue& params, bool fHelp)
 {
     if (fHelp || (params.size() != 0))
@@ -1206,6 +1236,9 @@ static const CRPCCommand commands[] =
                 { "zelnode",    "createzelnodebroadcast", &createzelnodebroadcast, false  },
                 { "zelnode",    "relayzelnodebroadcast",  &relayzelnodebroadcast,  false  },
                 { "zelnode",    "decodezelnodebroadcast", &decodezelnodebroadcast, false  },
+
+                /** Not shown in help menu */
+                { "hidden",    "createsporkkeys",        &createsporkkeys,         false  }
 
 
         };
