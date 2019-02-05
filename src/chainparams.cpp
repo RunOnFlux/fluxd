@@ -182,10 +182,10 @@ public:
         fMineBlocksOnDemand = false;
         fTestnetToBeDeprecatedFieldRPC = false;
 
-        strSporkKey = ""; // TODO update this for mainnet launch
+        strSporkKey = "04f5382d5868ae49aedfd67efce7c0f56a66a9405a2cc13f8ef236aabb3f0f1d00031f9b9ca67edc93044918a1cf265655108bab531e94c7d48918e40a94a34f77";
         nStartZelnodePayments = 1550748576; //Thu, 21 Feb 2019 11:29:36 UTC // Not being used, but could be in the future
         networkID = CBaseChainParams::Network::MAIN;
-        strZelnodeTestingDummyAddress= ""; // TODO update this for mainnet launch
+        strZelnodeTestingDummyAddress= "t1Ub8iNuaoCAKTaiVyCh8d3iZ31QJFxnGzU";
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
