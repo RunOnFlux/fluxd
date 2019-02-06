@@ -14,19 +14,19 @@ There are no ZelNode rewards yet. That will come at activation on Feb. 21st.
 Testnet ZelNodes is meant for us to test the entire ZelNodes environment, and for you to get comfortable setting up your node, learning the VPS and control wallet ins and outs, etc. If you are comfortable with the process already, you can wait to set up your node closer to activation to save the VPS costs.
 We have a Github Wiki that will continually be built during the next couple weeks. Right now there is a guide for setting up your VPS/ZelNode and the daemon as your control wallet. In the next day or two you will be able to set up ZelCore as your control wallet.
 
-Wiki: https://github.com/zelcash/zelcash/wiki
-Benchmarking: https://github.com/zelcash/zelcash/wiki/Benchmarking-Synopsis-Beta
-Setup guide using Daemon: https://github.com/zelcash/zelcash/wiki/ZelNode-Setup-Guide-%7C-Daemon
+Wiki: https://github.com/zelcash/zelcash/wiki \
+Benchmarking: https://github.com/zelcash/zelcash/wiki/Benchmarking-Synopsis-Beta \
+Setup guide using Daemon: https://github.com/zelcash/zelcash/wiki/ZelNode-Setup-Guide-%7C-Daemon 
 
-Precompiled binaries
-Mac:
-https://zelcore.io/downloads/nodes/testnetv6/zelcashd-mac
-https://zelcore.io/downloads/nodes/testnetv6/zelcash-cli-mac
-Linux:
-https://zelcore.io/downloads/nodes/testnetv6/zelcashd
-https://zelcore.io/downloads/nodes/testnetv6/zelcash-cli
-Windows:
-https://zelcore.io/downloads/nodes/testnetv6/zelcashd.exe
+Precompiled binaries \
+Mac: \
+https://zelcore.io/downloads/nodes/testnetv6/zelcashd-mac \
+https://zelcore.io/downloads/nodes/testnetv6/zelcash-cli-mac \
+Linux: \
+https://zelcore.io/downloads/nodes/testnetv6/zelcashd \
+https://zelcore.io/downloads/nodes/testnetv6/zelcash-cli \
+Windows: \
+https://zelcore.io/downloads/nodes/testnetv6/zelcashd.exe \
 https://zelcore.io/downloads/nodes/testnetv6/zelcash-cli.exe
 
 Either use the precompiled binaries above or compile from source ensuring that you are on the correct branch by: 
@@ -55,6 +55,8 @@ To speed up synchronisation you can also download our blockchain (state 18. 12. 
 On Ubuntu/Debian-based systems:
 
 ```
+$ sudo apt-get update
+$ sudo apt-get upgrade
 $ sudo apt-get install \
       build-essential pkg-config libc6-dev m4 g++-multilib \
       autoconf libtool ncurses-dev unzip git python python-zmq \
