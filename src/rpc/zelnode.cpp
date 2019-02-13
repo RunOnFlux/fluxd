@@ -15,6 +15,8 @@
 #include "rpc/server.h"
 #include "utilmoneystr.h"
 #include "key_io.h"
+#include "zelnode/benchmarks.h"
+#include "util.h"
 
 #include <univalue.h>
 
@@ -1215,6 +1217,28 @@ UniValue relayzelnodebroadcast(const UniValue& params, bool fHelp)
     return strprintf("Zelnode broadcast sent (service %s, vin %s)", zelnodeBroadcast.addr.ToString(), zelnodeBroadcast.vin.ToString());
 }
 
+UniValue getnodebenchmarks(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+                "getnodebenchmarks\n"
+                "\nCommand to test node benchmarks\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("getnodebenchmarks", "") + HelpExampleRpc("getnodebenchmarks", ""));
+
+    if (!fZelnode)
+        return "Command must be run on a zelnode";
+
+    if (fBenchmarkFailed)
+        return "Benchmarking Failed, please restart your node to try again";
+
+    if (!fBenchmarkComplete)
+        return "Benchmarking isn't completed, please try again in a minute";
+
+    return benchmarks.NenchResultToString() + "Event Per Second : " + std::to_string(benchmarks.nEventsPerSecond) + "\n";
+}
+
 
 
 static const CRPCCommand commands[] =
@@ -1236,6 +1260,7 @@ static const CRPCCommand commands[] =
                 { "zelnode",    "createzelnodebroadcast", &createzelnodebroadcast, false  },
                 { "zelnode",    "relayzelnodebroadcast",  &relayzelnodebroadcast,  false  },
                 { "zelnode",    "decodezelnodebroadcast", &decodezelnodebroadcast, false  },
+                { "zelnode",    "getnodebenchmarks",      &getnodebenchmarks,      false  },
 
                 /** Not shown in help menu */
                 { "hidden",    "createsporkkeys",        &createsporkkeys,         false  }

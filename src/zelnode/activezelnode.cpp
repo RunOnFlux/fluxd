@@ -12,6 +12,7 @@
 #include "protocol.h"
 #include "zelnode/spork.h"
 #include "key_io.h"
+#include "zelnode/benchmarks.h"
 
 
 //
@@ -22,6 +23,18 @@ void ActiveZelnode::ManageStatus()
     std::string errorMessage;
 
     if (!fZelnode) return;
+
+    if (fBenchmarkFailed) {
+        notCapableReason = strprintf("Benchmarking tests failed, please restart the node to try again");
+        LogPrintf("%s - %s\n", __func__, notCapableReason);
+        return;
+    }
+
+    if (!fBenchmarkComplete) {
+        notCapableReason = strprintf("Benchmarking isn't complete yet, please try again in a minute");
+        LogPrintf("%s - %s\n", __func__, notCapableReason);
+        return;
+    }
 
     if (fDebug) LogPrintf("%s - Begin\n", __func__);
 
@@ -38,6 +51,12 @@ void ActiveZelnode::ManageStatus()
         Zelnode* pzn;
         pzn = zelnodeman.Find(pubKeyZelnode);
         if (pzn != NULL) {
+            if (!CheckBenchmarks(pzn->tier)) {
+                status = ACTIVE_ZELNODE_NOT_CAPABLE;
+                notCapableReason = strprintf("Failed benchmarks test for %s", pzn->Tier());
+                LogPrintf("%s - %s\n", __func__, notCapableReason);
+                return;
+            }
             pzn->Check();
             if (pzn->IsEnabled() && pzn->protocolVersion == PROTOCOL_VERSION) EnableHotColdZelnode(pzn->vin, pzn->addr);
         }

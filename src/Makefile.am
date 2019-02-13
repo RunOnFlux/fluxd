@@ -224,6 +224,7 @@ BITCOIN_CORE_H = \
   wallet/wallet_ismine.h \
   wallet/walletdb.h \
   zelnode/activezelnode.h \
+  zelnode/benchmarks.h \
   zelnode/obfuscation.h \
   zelnode/obfuscationrelay.h \
   zelnode/payments.h \
@@ -288,6 +289,7 @@ libbitcoin_server_a_SOURCES = \
   txmempool.cpp \
   validationinterface.cpp \
   zelnode/activezelnode.cpp \
+  zelnode/benchmarks.cpp \
   zelnode/obfuscation.cpp \
   zelnode/obfuscationrelay.cpp \
   zelnode/payments.cpp \

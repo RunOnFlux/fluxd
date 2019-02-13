@@ -18,6 +18,7 @@
 #include "httpserver.h"
 #include "httprpc.h"
 #include "key.h"
+#include "zelnode/benchmarks.h"
 #ifdef ENABLE_MINING
 #include "key_io.h"
 #endif
@@ -1887,6 +1888,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     threadGroup.create_thread(boost::bind(&ThreadCheckZelnodes));
+
+    if (GetBoolArg("-zelnode", false)) {
+        threadGroup.create_thread(boost::bind(&ThreadBenchmarkZelnode));
+    }
 
     // ********************************************************* Step 12: start node
 
