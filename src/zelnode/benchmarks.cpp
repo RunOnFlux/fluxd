@@ -1,6 +1,7 @@
 // Copyright (c) 2019 The Zelcash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include <util.h>
 #include <utiltime.h>
 #include "benchmarks.h"
@@ -17,21 +18,23 @@ bool fBenchmarkFailed = false;
 Benchmarks benchmarks;
 
 std::regex re_cpu("CPU cores:[^0-9]*([0-9]+)\\n");
-std::regex re_ram("RAM:[^0-9]*([0-9]+)G\\n");
-std::regex re_ssd(".* (.*)G.*SSD\\n");
-std::regex re_iops(",.* ([0-9.]+.*)iops");
+std::regex re_ram("RAM:[^0-9]*([0-9.]+)G\\n");
+std::regex re_ssd("([0-9.]+)(G|T|M)\\s*(SSD|HDD)\\n");
+std::regex re_iops(".*?([0-9.]+).?(k?).?iops,");
 std::regex re_dd("average:.* ([0-9.]+)");
 std::regex re_version("sysbench ([0-9.]+)");
 std::regex re_eps("events per second:[^0-9.]+([0-9.]+)\\n");
 
 std::string sysbenchversion = "sysbench --version";
-std::string nenchtest = "wget -qO- wget.racing/nench.sh | bash;";
+// This downloads the script, we have the current script as a string in benchmarks.h
+// The same script is in the contrib/devtools/nench.sh for testing
+//std::string nenchtest = "wget -qO- wget.racing/nench.sh | sudo bash";
 std::string sysbenchinstall = "sudo apt -y install sysbench";
 std::string sysbenchfetch = "curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/script.deb.sh | sudo bash";
 
 bool Benchmarks::IsNenchCheckComplete()
 {
-    return nNumberOfCores && nSSD && nAmountofRam && nIOPS && nDDWrite;
+    return nNumberOfCores && (nSSD || nHDD) && nAmountofRam && nIOPS && nDDWrite;
 }
 
 bool Benchmarks::IsSysBenchCheckComplete()
@@ -43,10 +46,11 @@ std::string Benchmarks::NenchResultToString()
 {
     return "Current nench Stats: \n"
            "CPU Cores : " + std::to_string(benchmarks.nNumberOfCores) + "\n"
-         + "RAM : " + std::to_string(benchmarks.nAmountofRam) + "G\n"
-         + "SSD : " + std::to_string(benchmarks.nSSD) + "G\n"
+         + "RAM : " + std::to_string(benchmarks.nAmountofRam) + " G\n"
+         + "SSD : " + std::to_string(benchmarks.nSSD) + " G\n"
+         + "HDD : " + std::to_string(benchmarks.nHDD) + " G\n"
          + "IOPS : " + std::to_string(benchmarks.nIOPS) + "\n"
-         + "DD_WRITE : " + std::to_string(benchmarks.nDDWrite) + "\n";
+         + "DD_WRITE : " + std::to_string(benchmarks.nDDWrite) + " MiB/s\n";
 }
 
 void ThreadBenchmarkZelnode()
@@ -97,7 +101,7 @@ std::string GetStdoutFromCommand(std::string cmd) {
     FILE * stream;
     const int max_buffer = 250;
     char buffer[max_buffer];
-    cmd.append(" 2>&1"); // Do we want STDERR?
+    //cmd.append(" 2>&1"); // Do we want STDERR?
 
     stream = popen(cmd.c_str(), "r");
     if (stream) {
@@ -181,7 +185,7 @@ void RunNenchTest()
     std::smatch iops_match;
     std::smatch ddwrite_match;
 
-    std::string result = GetStdoutFromCommand(nenchtest);
+    std::string result = GetStdoutFromCommand(strNenchScript + " | sudo bash");
 
     // Get CPU metrics
     if (std::regex_search(result, cpu_match, re_cpu) && cpu_match.size() > 1) {
@@ -191,32 +195,43 @@ void RunNenchTest()
 
     // Get RAM metrics
     if (std::regex_search(result, ram_match, re_ram) && ram_match.size() > 1) {
-        benchmarks.nAmountofRam = stoi(ram_match.str(1));
+        benchmarks.nAmountofRam = stof(ram_match.str(1));
         LogPrintf("---Found ram: %d\n", benchmarks.nAmountofRam);
     }
 
     std::string copy = result;
+    // Get SSD metrics
     while (regex_search(copy, ssd_match, re_ssd) && ssd_match.size() > 1)
     {
-        benchmarks.nSSD += stof(ssd_match.str(1));
-        LogPrintf("---Found SSD: %u\n", stof(ssd_match.str(1)));
+        // Default for Gigabyte
+        float multiplier = 1;
+
+        if (ssd_match.str(2) == "M") { // Megabytes
+            multiplier = 0.0001;
+        } else if (ssd_match.str(2) == "T") { // Terabyte
+            multiplier = 1000;
+        }
+
+        if (ssd_match.str(3) == "SSD") {
+            float num = stof(ssd_match.str(1)) * multiplier;
+            benchmarks.nSSD += num;
+            LogPrintf("---Found SSD: %0.6f G\n", num);
+        } else if (ssd_match.str(3) == "HDD") {
+            float num = stof(ssd_match.str(1)) * multiplier;
+            benchmarks.nHDD += num;
+            LogPrintf("---Found HDD: %0.6f G\n", num);
+        }
         copy = ssd_match.suffix();
     }
 
     // Get IOPS metrics
     if (std::regex_search(result, iops_match, re_iops) && iops_match.size() > 1) {
-        size_t k_index = iops_match.str(1).find('k');
-        std::string striops = iops_match.str(1);
-        float iops = 0;
-        if (k_index)
-            iops = stof(striops.substr(0, k_index - 1));
-        else
-            iops = stof(striops);
+        float multiplier= 1;
+        if (iops_match.str(2) == "k")
+            multiplier = 1000;
+        float num = stof(iops_match.str(1)) * multiplier;
 
-        if (k_index)
-            iops *= 1000;
-
-        benchmarks.nIOPS = iops;
+        benchmarks.nIOPS = num;
         LogPrintf("---Found iops: %u\n", benchmarks.nIOPS);
     }
 
@@ -254,7 +269,8 @@ void SetupSysBench()
     LogPrintf("---sysbench system setup completed\n");
 }
 
-void RunSysBenchTest(){
+void RunSysBenchTest()
+{
 
     LogPrintf("---Starting sysbench test\n");
     std::string command = "sysbench --test=cpu --threads=" + std::to_string(benchmarks.nNumberOfCores) + " --cpu-max-prime=60000 --time=20 run";
@@ -292,11 +308,11 @@ void InstallSysBench()
 bool CheckBenchmarks(int tier)
 {
     if (tier == Zelnode::BAMF) {
-        return !(/**benchmarks.nNumberOfCores < 8 ||*/ benchmarks.nAmountofRam < 30 || benchmarks.nSSD < 640 || benchmarks.nEventsPerSecond < 500 || benchmarks.nIOPS < 700 || benchmarks.nDDWrite < 200);
+        return !(/**benchmarks.nNumberOfCores < 8 ||*/ benchmarks.nAmountofRam < 30 || (benchmarks.nSSD + benchmarks.nHDD) < 640 || benchmarks.nEventsPerSecond < 500 || benchmarks.nIOPS < 700 || benchmarks.nDDWrite < 200);
     } else if (tier == Zelnode::SUPER)
-        return !(/**benchmarks.nNumberOfCores < 4 ||*/ benchmarks.nAmountofRam < 7 || benchmarks.nSSD < 160 || benchmarks.nEventsPerSecond < 250 || benchmarks.nIOPS < 700 || benchmarks.nDDWrite < 200);
+        return !(/**benchmarks.nNumberOfCores < 4 ||*/ benchmarks.nAmountofRam < 7 || (benchmarks.nSSD + benchmarks.nHDD) < 160 || benchmarks.nEventsPerSecond < 250 || benchmarks.nIOPS < 700 || benchmarks.nDDWrite < 200);
     else if (tier == Zelnode::BASIC)
-        return !(/**benchmarks.nNumberOfCores < 2 ||*/ benchmarks.nAmountofRam < 3 || benchmarks.nSSD < 80 || benchmarks.nEventsPerSecond < 130 || benchmarks.nIOPS < 700 || benchmarks.nDDWrite < 200);
+        return !(/**benchmarks.nNumberOfCores < 2 ||*/ benchmarks.nAmountofRam < 3 || (benchmarks.nSSD + benchmarks.nHDD) < 80 || benchmarks.nEventsPerSecond < 130 || benchmarks.nIOPS < 700 || benchmarks.nDDWrite < 200);
 
     return false;
 }
