@@ -308,11 +308,11 @@ void InstallSysBench()
 bool CheckBenchmarks(int tier)
 {
     if (tier == Zelnode::BAMF) {
-        return !(/**benchmarks.nNumberOfCores < 8 ||*/ benchmarks.nAmountofRam < 30 || (benchmarks.nSSD + benchmarks.nHDD) < 640 || benchmarks.nEventsPerSecond < 500 || benchmarks.nIOPS < 700 || benchmarks.nDDWrite < 200);
+        return !(/**benchmarks.nNumberOfCores < 8 ||*/ benchmarks.nAmountofRam < 30 || (benchmarks.nSSD + benchmarks.nHDD) < 600 || benchmarks.nEventsPerSecond < 500 || benchmarks.nIOPS < 700 || benchmarks.nDDWrite < 200); // bamf spec
     } else if (tier == Zelnode::SUPER)
-        return !(/**benchmarks.nNumberOfCores < 4 ||*/ benchmarks.nAmountofRam < 7 || (benchmarks.nSSD + benchmarks.nHDD) < 160 || benchmarks.nEventsPerSecond < 250 || benchmarks.nIOPS < 700 || benchmarks.nDDWrite < 200);
+        return !(/**benchmarks.nNumberOfCores < 4 ||*/ benchmarks.nAmountofRam < 7 || (benchmarks.nSSD + benchmarks.nHDD) < 150 || benchmarks.nEventsPerSecond < 250 || benchmarks.nIOPS < 700 || benchmarks.nDDWrite < 200); // super spec
     else if (tier == Zelnode::BASIC)
-        return !(/**benchmarks.nNumberOfCores < 2 ||*/ benchmarks.nAmountofRam < 3 || (benchmarks.nSSD + benchmarks.nHDD) < 80 || benchmarks.nEventsPerSecond < 130 || benchmarks.nIOPS < 700 || benchmarks.nDDWrite < 200);
+        return !(/**benchmarks.nNumberOfCores < 2 ||*/ benchmarks.nAmountofRam < 3 || (benchmarks.nSSD + benchmarks.nHDD) < 50 || benchmarks.nEventsPerSecond < 130 || benchmarks.nIOPS < 700 || benchmarks.nDDWrite < 200); // basic spec
 
     return false;
 }
