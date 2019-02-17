@@ -18,7 +18,7 @@ matrix:
     - os: linux
       dist: xenial
       sudo: required
-       env: $TRAVIS_OS_NAME="linux"
+      env: $TRAVIS_OS_NAME="linux"
 #    - os: linux
 #      dist: bionic
 #      sudo: required
@@ -43,4 +43,4 @@ script:
 #  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./zcutil/fetch-params.sh -j4; fi
 #  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./src/zelcash-gtest -j4; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./zcutil/build.sh -j4; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then HOST=x86_64-w64-mingw32 ./zcutil/build.sh -j4; fi
+#  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then ./zcutil/build-win.sh -j4; fi

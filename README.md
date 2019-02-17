@@ -1,7 +1,7 @@
 =======
 # ZelCash [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
 =======
-# ZelCash 2.1.0 ZELNODES
+# ZelCash 3.0.0 ZELNODES
 INNOVATIVE  INTELLIGENT  INSPIRING
 
 ## This branch is BETA and hardcoded to access TESTNET for the public testing of ZelNodes. Please use master for any other use case. 
