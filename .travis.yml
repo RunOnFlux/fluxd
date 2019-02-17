@@ -30,7 +30,6 @@ matrix:
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get update; fi
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then rm '/usr/local/include/c++'; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then xcode-select --install; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
@@ -42,5 +41,6 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix; fi
 script:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./zcutil/build.sh -j4; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./src/zelcash-gtest -j4; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./zcutil/build.sh -j4; fi
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then ./zcutil/build-win.sh -j4; fi
