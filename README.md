@@ -4,8 +4,6 @@
 # ZelCash 3.0.0 ZELNODES
 INNOVATIVE  INTELLIGENT  INSPIRING
 
-## This branch is BETA and hardcoded to access TESTNET for the public testing of ZelNodes. Please use master for any other use case. 
-
 ZelCash is a fork of 2.0.2 Zcash aiming to provide decentralised development platform via ZelNodes and ZelCore.
 
 POW asic resistant with Equihash (144,5) also known as Zhash with personalisation string ZelProof and LWMA3 difficulty algorithm.
@@ -49,22 +47,8 @@ mkdir ~/.zelcash
 echo "rpcuser=username" >> ~/.zelcash/zelcash.conf
 echo "rpcpassword=`head -c 32 /dev/urandom | base64`" >> ~/.zelcash/zelcash.conf
 echo "rpcallowip=127.0.0.1" >> ~/.zelcash/zelcash.conf
-echo "listen=1" >> ~/.zelcash/zelcash.conf
-echo "server=1" >> ~/.zelcash/zelcash.conf
-echo "daemon=1" >> ~/.zelcash/zelcash.conf
-echo "logtimestamps=1" >> ~/.zelcash/zelcash.conf
-echo "testnet=1" >> ~/.zelcash/zelcash.conf
-echo "txindex=1" >> ~/.zelcash/zelcash.conf
-echo "addnode=testnet.zel.cash" >> ~/.zelcash/zelcash.conf
-echo "addnode=testnetnodes.zel.cash" >> ~/.zelcash/zelcash.conf
-echo "addnode=188.166.56.40" >> ~/.zelcash/zelcash.conf
-echo "addnode=165.227.163.183" >> ~/.zelcash/zelcash.conf
-echo "addnode=104.248.118.1" >> ~/.zelcash/zelcash.conf
-echo "addnode=167.99.82.56" >> ~/.zelcash/zelcash.conf
-echo "addnode=165.227.156.125" >> ~/.zelcash/zelcash.conf
-echo "addnode=46.101.228.207" >> ~/.zelcash/zelcash.conf
-echo "addnode=46.36.41.83" >> ~/.zelcash/zelcash.conf
-echo "addnode=178.128.195.196" >> ~/.zelcash/zelcash.conf
+echo "addnode=epxlorer.zel.cash" >> ~/.zelcash/zelcash.conf
+echo "addnode=explorer.zel.zelcore.io" >> ~/.zelcash/zelcash.conf
 
 ```
 2. Fetch keys
@@ -106,22 +90,8 @@ Create following zelcash.conf file in %AppData%/Roaming/ZelCash
 rpcuser=randomusername
 rpcpassword=RandomPasswordChangeme
 rpcallowip=127.0.0.1
-listen=1
-server=1
-daemon=1
-logtimestamps=1
-testnet=1
-txindex=1
-addnode=testnet.zel.cash
-addnode=testnetnodes.zel.cash
-addnode=188.166.56.40
-addnode=165.227.163.183
-addnode=104.248.118.1
-addnode=167.99.82.56
-addnode=165.227.156.125
-addnode=46.101.228.207
-addnode=46.36.41.83
-addnode=178.128.195.196
+addnode=explorer.zel.cash
+addnode=explorer.zel.zelcore.io
 ```
 
 2. Download Zcash parameters to  %AppData%/Roaming/ZcashParams
@@ -171,22 +141,8 @@ mkdir ~/Library/Application Support/zelcash/
 echo "rpcuser=username" >> ~/Library/Application Support/zelcash/zelcash.conf
 echo "rpcpassword=`head -c 32 /dev/urandom | base64`" >> ~/Library/Application Support/zelcash/zelcash.conf
 echo "rpcallowip=127.0.0.1" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "listen=1" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "server=1" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "daemon=1" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "logtimestamps=1" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "testnet=1" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "txindex=1" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=testnet.zel.cash" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=testnetnodes.zel.cash" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=188.166.56.40" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=165.227.163.183" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=104.248.118.1" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=167.99.82.56" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=165.227.156.125" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=46.101.228.207" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=46.36.41.83" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=178.128.195.196" >> ~/Library/Application Support/zelcash/zelcash.conf
+echo "addnode=explorer.zel.cash" >> ~/Library/Application Support/zelcash/zelcash.conf
+echo "addnode=explorer.zel.zelcore.io" >> ~/Library/Application Support/zelcash/zelcash.conf
 
 ```
 
