@@ -133,7 +133,7 @@ protected:
 };
 
 
-TEST_F(ContextualCheckBlockTest, BadCoinbaseHeight) {
+TEST_F(ContextualCheckBlockTest, DISABLED_BadCoinbaseHeight) {
     // Put a transaction in a block with no height in scriptSig
     CMutableTransaction mtx = GetFirstBlockCoinbaseTx();
     mtx.vin[0].scriptSig = CScript() << OP_0;
