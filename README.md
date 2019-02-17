@@ -1,52 +1,16 @@
 =======
 # ZelCash [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
 =======
-# ZelCash 2.0.0 BETA ZELNODES TESTNET
+# ZelCash 2.1.0 ZELNODES
 INNOVATIVE  INTELLIGENT  INSPIRING
 
 ## This branch is BETA and hardcoded to access TESTNET for the public testing of ZelNodes. Please use master for any other use case. 
 
-This is beta testnet release. We have done a lot of testing, but there will be things that can break most likely. Use with caution, backup any wallet.dat files on your computer, don;t send real ZelCash to these addresses, etc. The blockchain will sync to a testnet folder within ZelCash folder.
-
-We have testnet Zel available and will set up a channel to request testnet Zel (TEL) to stand up a testnet ZelNode.
-There are no ZelNode rewards yet. That will come at activation on Feb. 21st.
-
-Testnet ZelNodes is meant for us to test the entire ZelNodes environment, and for you to get comfortable setting up your node, learning the VPS and control wallet ins and outs, etc. If you are comfortable with the process already, you can wait to set up your node closer to activation to save the VPS costs.
-We have a Github Wiki that will continually be built during the next couple weeks. Right now there is a guide for setting up your VPS/ZelNode and the daemon as your control wallet. In the next day or two you will be able to set up ZelCore as your control wallet.
-
-Wiki: https://github.com/zelcash/zelcash/wiki \
-Benchmarking: https://github.com/zelcash/zelcash/wiki/Benchmarking-Synopsis-Beta \
-Setup guide using Daemon: https://github.com/zelcash/zelcash/wiki/ZelNode-Setup-Guide-%7C-Daemon 
-
-Precompiled binaries \
-Mac: \
-https://zelcore.io/downloads/nodes/testnetv6/zelcashd-mac \
-https://zelcore.io/downloads/nodes/testnetv6/zelcash-cli-mac \
-Linux: \
-https://zelcore.io/downloads/nodes/testnetv6/zelcashd \
-https://zelcore.io/downloads/nodes/testnetv6/zelcash-cli \
-Windows: \
-https://zelcore.io/downloads/nodes/testnetv6/zelcashd.exe \
-https://zelcore.io/downloads/nodes/testnetv6/zelcash-cli.exe
-
-Either use the precompiled binaries above or compile from source ensuring that you are on the correct branch by: 
-```
-git clone https://github.com/zelcash/zelcash.git
-cd zelcash
-git checkout beta_nodes
-```
-Finally follow this README.md to compile for your OS and create your zelcash.conf
-
-### Join discord to catch up with the community as you test and share your results: https://discord.io/zelcash
-
 ZelCash is a fork of 2.0.2 Zcash aiming to provide decentralised development platform via ZelNodes and ZelCore.
 
-POW asic resistant with Equihash (144,5) also known as Zhash with personalisation string ZelProof.
-
-Fork to Acadia will be at the blockheight 250 000 which is estimated to occur on the 12th of January 2019. Please update to the latest release prior this date. Acadia release activates latest Zcash technology - Overwinter and Sapling upgrade. We are also modifying our difficulty algorithm to its next generation from LWMA to LWMA3. It is also neccesarry to download new Zcash network parameters via /zcutil/fetch-params.sh script.
+POW asic resistant with Equihash (144,5) also known as Zhash with personalisation string ZelProof and LWMA3 difficulty algorithm.
 
 To speed up synchronisation you can also download our blockchain (state 18. 12. 2018) at https://zelcore.io/Zelcash.zip 
-
 
 # Build Guides
 ## Build for Linux
