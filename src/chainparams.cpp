@@ -132,7 +132,7 @@ public:
         pchMessageStart[1] = 0xe9;
         pchMessageStart[2] = 0x27;
         pchMessageStart[3] = 0x64;
-        vAlertPubKey = ParseHex("04025b2cf3a116782a69bb68cb4ae5ba3b7f05069f7139b75573dd28e48f8992d95c118122b618d4943456ad64e7356b0b45b2ef179cbe3d9767a2426662d13d32"); //Zel Technologies
+        vAlertPubKey = ParseHex("04025b2cf3a116782a69bb68cb4ae5ba3b7f05069f7139b75573dd28e48f8992d95c118122b618d4943456ad64e7356b0b45b2ef179cbe3d9767a2426662d13d32"); //Zel Technologies GmbH
         nDefaultPort = 16125;
         nPruneAfterHeight = 100000;
 
@@ -256,7 +256,7 @@ public:
         pchMessageStart[1] = 0x1a;
         pchMessageStart[2] = 0xf9;
         pchMessageStart[3] = 0xbf;
-        vAlertPubKey = ParseHex("044b5cb8fd1db34e2d89a93e7becf3fb35dd08a81bb3080484365e567136403fd4a6682a43d8819522ae35394704afa83de1ef069a3104763fd0ebdbdd505a1386"); //Zel Technologies
+        vAlertPubKey = ParseHex("044b5cb8fd1db34e2d89a93e7becf3fb35dd08a81bb3080484365e567136403fd4a6682a43d8819522ae35394704afa83de1ef069a3104763fd0ebdbdd505a1386"); //Zel Technologies GmbH
 
         nDefaultPort = 26125;
 

@@ -15,16 +15,16 @@
 #define CLIENT_VERSION_IS_RELEASE true
 
 /* Major version */
-#define CLIENT_VERSION_MAJOR 1
+#define CLIENT_VERSION_MAJOR 3
 
 /* Minor version */
-#define CLIENT_VERSION_MINOR 1
+#define CLIENT_VERSION_MINOR 0
 
 /* Build revision */
 #define CLIENT_VERSION_REVISION 0
 
 /* Version is release */
-#define COPYRIGHT_YEAR 2018
+#define COPYRIGHT_YEAR 2019
 
 /* Define to 1 to enable mining functions */
 #define ENABLE_MINING 1
@@ -296,7 +296,7 @@
 #define PACKAGE_NAME "Zelcash"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Zelcash 1.1.0"
+#define PACKAGE_STRING "Zelcash 3.0.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "zelcash"
@@ -305,7 +305,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.1.0"
+#define PACKAGE_VERSION "3.0.0"
 
 /* Define to necessary symbol if this constant uses a non-standard name on
    your system. */
