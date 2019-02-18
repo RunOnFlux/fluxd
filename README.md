@@ -41,7 +41,7 @@ cd zelcash
 ```
 
 #### Run ZelCash 
-1. Create zelcash.conf file (copy and paste this block in one into your terminial)
+1. Create zelcash.conf file (copy and paste this block in one into your terminal)
 ```
 mkdir ~/.zelcash
 echo "rpcuser=username" >> ~/.zelcash/zelcash.conf
