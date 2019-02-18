@@ -12,6 +12,7 @@
 #include "util.h"
 #include "httpserver.h"
 #include "httprpc.h"
+#include "zelnode/zelnodeconfig.h"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
@@ -125,6 +126,13 @@ bool AppInit(int argc, char* argv[])
         // Check for -testnet or -regtest parameter (Params() calls are only valid after this clause)
         if (!SelectParamsFromCommandLine()) {
             fprintf(stderr, "Error: Invalid combination of -regtest and -testnet.\n");
+            return false;
+        }
+
+        // parse zelnode.conf
+        std::string strErr;
+        if (!zelnodeConfig.read(strErr)) {
+            fprintf(stderr, "Error reading zelnode configuration file: %s\n", strErr.c_str());
             return false;
         }
 

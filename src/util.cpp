@@ -99,6 +99,10 @@ namespace boost {
 
 using namespace std;
 
+string strZelnodeAddr = "";
+string strZelnodePrivKey = "";
+bool fZelnode = false;
+
 map<string, string> mapArgs;
 map<string, vector<string> > mapMultiArgs;
 bool fDebug = false;
@@ -601,6 +605,14 @@ boost::filesystem::path GetConfigFile()
     if (!pathConfigFile.is_complete())
         pathConfigFile = GetDataDir(false) / pathConfigFile;
 
+    return pathConfigFile;
+}
+
+boost::filesystem::path GetZelnodeConfigFile()
+{
+    boost::filesystem::path pathConfigFile(GetArg("-znconf", "zelnode.conf"));
+    if (!pathConfigFile.is_complete())
+        pathConfigFile = GetDataDir() / pathConfigFile;
     return pathConfigFile;
 }
 

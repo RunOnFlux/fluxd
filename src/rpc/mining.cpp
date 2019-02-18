@@ -30,6 +30,7 @@
 #include <boost/assign/list_of.hpp>
 
 #include <univalue.h>
+#include "key_io.h"
 
 using namespace std;
 
@@ -729,6 +730,34 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     result.push_back(Pair("curtime", pblock->GetBlockTime()));
     result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
     result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight+1)));
+
+    if (pblock->vtx.size()) {
+        int nCoinbaseOutSize = pblock->vtx[0].vout.size();
+        if (nCoinbaseOutSize > 0) {
+            result.push_back(Pair("miner_reward", pblock->vtx[0].vout[0].nValue));
+        }
+        if (nCoinbaseOutSize > 1) {
+            CTxDestination dest;
+            ExtractDestination(pblock->vtx[0].vout[1].scriptPubKey, dest);
+            result.push_back(Pair("basic_zelnode_address", EncodeDestination(dest)));
+            result.push_back(Pair("basic_zelnode_payout", pblock->vtx[0].vout[1].nValue));
+        }
+        if (nCoinbaseOutSize > 2) {
+            CTxDestination dest;
+            ExtractDestination(pblock->vtx[0].vout[2].scriptPubKey, dest);
+            result.push_back(Pair("super_zelnode_address", EncodeDestination(dest)));
+            result.push_back(Pair("super_zelnode_payout", pblock->vtx[0].vout[2].nValue));
+        }
+        if (nCoinbaseOutSize > 3) {
+            CTxDestination dest;
+            ExtractDestination(pblock->vtx[0].vout[3].scriptPubKey, dest);
+            result.push_back(Pair("bamf_zelnode_address", EncodeDestination(dest)));
+            result.push_back(Pair("bamf_zelnode_payout", pblock->vtx[0].vout[3].nValue));
+        }
+    } else {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Block didn't have any transactions in it...");
+    }
+
 
     return result;
 }

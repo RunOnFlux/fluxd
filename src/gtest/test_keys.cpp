@@ -33,7 +33,7 @@ TEST(Keys, EncodeAndDecodeSapling)
 
             std::string addr_string = EncodePaymentAddress(addr);
             EXPECT_EQ(
-                addr_string.substr(0, 4),
+                addr_string.substr(0, 2),
                 Params().Bech32HRP(CChainParams::SAPLING_PAYMENT_ADDRESS));
 
             auto paymentaddr2 = DecodePaymentAddress(addr_string);
