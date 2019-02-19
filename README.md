@@ -9,6 +9,7 @@ ZelCash is a fork of 2.0.2 Zcash aiming to provide decentralised development pla
 POW asic resistant with Equihash (144,5) also known as Zhash with personalisation string ZelProof and LWMA3 difficulty algorithm.
 
 To speed up synchronisation you can also download our blockchain (state 18. 12. 2018) at https://zelcore.io/Zelcash.zip 
+For ZelNodes/Control Wallets use this bootstrap with txindex enabled (state 18. 02. 2019) https://zelcore.io/zelcashbootstraptxindex.zip
 
 # Build Guides
 ## Build for Linux
