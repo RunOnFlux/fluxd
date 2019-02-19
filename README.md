@@ -48,7 +48,7 @@ mkdir ~/.zelcash
 echo "rpcuser=username" >> ~/.zelcash/zelcash.conf
 echo "rpcpassword=`head -c 32 /dev/urandom | base64`" >> ~/.zelcash/zelcash.conf
 echo "rpcallowip=127.0.0.1" >> ~/.zelcash/zelcash.conf
-echo "addnode=epxlorer.zel.cash" >> ~/.zelcash/zelcash.conf
+echo "addnode=explorer.zel.cash" >> ~/.zelcash/zelcash.conf
 echo "addnode=explorer.zel.zelcore.io" >> ~/.zelcash/zelcash.conf
 
 ```
