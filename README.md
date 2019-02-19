@@ -11,6 +11,20 @@ POW asic resistant with Equihash (144,5) also known as Zhash with personalisatio
 To speed up synchronisation you can also download our blockchain (state 18. 12. 2018) at https://zelcore.io/Zelcash.zip 
 For ZelNodes/Control Wallets use this bootstrap with txindex enabled (state 18. 02. 2019) https://zelcore.io/zelcashbootstraptxindex.zip
 
+# Install and run from APT
+
+On Ubuntu/Debian-based systems:
+
+```
+echo 'deb https://zelcash.github.io/aptrepo/ all main' | sudo tee --append /etc/apt/sources.list.d/zelcash.list
+gpg --keyserver keyserver.ubuntu.com --recv 4B69CA27A986265D
+gpg --export 4B69CA27A986265D | sudo apt-key add -
+
+sudo apt-get update
+sudo apt-get install zelcash
+```
+This installs zelcashd, zelcash-cli, zelcash-tx and zelcash-fetch-params
+
 # Build Guides
 ## Build for Linux
 #### Install dependencies
