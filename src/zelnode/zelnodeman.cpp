@@ -968,7 +968,7 @@ int ZelnodeMan::GetZelnodeRank(const CTxIn& vin, int64_t nBlockHeight, int minPr
         if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)) {
             nZelnode_Age = GetAdjustedTime() - entry.second.sigTime;
             if ((nZelnode_Age) < nZelnode_Min_Age) {
-                if (fDebug) LogPrint("zelnode","Skipping just activated Zelnodec. Age: %ld\n", nZelnode_Age);
+                if (fDebug) LogPrint("zelnode","Skipping just activated Zelnode. Age: %ld Vin: %s\n", nZelnode_Age, entry.second.vin.ToString());
                 continue;                                                   // Skip zelnodes younger than (default) 1 hour
             }
         }

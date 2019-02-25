@@ -238,12 +238,14 @@ public:
     int nBlockHeight;
     CScript payee;
     std::vector<unsigned char> vchSig;
+    int8_t tier;
 
     PaymentWinner()
     {
         nBlockHeight = 0;
         vinZelnode = CTxIn();
         payee = CScript();
+        tier = 0;
     }
 
     PaymentWinner(CTxIn vinIn)
@@ -251,6 +253,7 @@ public:
         nBlockHeight = 0;
         vinZelnode = vinIn;
         payee = CScript();
+        tier = 0;
     }
 
     uint256 GetHash()
@@ -259,6 +262,7 @@ public:
         ss << *(CScriptBase*)(&payee);
         ss << nBlockHeight;
         ss << vinZelnode.prevout;
+        ss << tier;
 
         return ss.GetHash();
     }
@@ -283,6 +287,13 @@ public:
         READWRITE(nBlockHeight);
         READWRITE(*(CScriptBase*)(&payee));
         READWRITE(vchSig);
+        if (ser_action.ForRead()) {
+            if (!s.empty() && s.size() >= sizeof(int8_t)) {
+                ::Unserialize(s, tier);
+            }
+        } else {
+            ::Serialize(s, tier);
+        }
     }
 
     std::string ToString()
@@ -292,6 +303,7 @@ public:
         ret += ", " + std::to_string(nBlockHeight);
         ret += ", " + payee.ToString();
         ret += ", " + std::to_string((int)vchSig.size());
+        ret += ", " + TierToString(tier);
         return ret;
     }
 };
@@ -312,7 +324,10 @@ private:
 public:
     std::map<uint256, PaymentWinner> mapZelnodePayeeVotes;
     std::map<int, ZelnodeBlockPayees> mapZelnodeBlocks;
-    std::map<COutPoint, int> mapZelnodeLastVote; //prevout.hash, prevout.n, nBlockHeight
+    std::map<COutPoint, int> mapBasicZelnodeLastVote; //prevout.hash, prevout.n, nBlockHeight
+    std::map<COutPoint, int> mapSuperZelnodeLastVote; //prevout.hash, prevout.n, nBlockHeight
+    std::map<COutPoint, int> mapBAMFZelnodeLastVote; //prevout.hash, prevout.n, nBlockHeight
+    std::map<COutPoint, pair<int, int>> mapZelnodeLastVoteCount; //prevout.hash, prevout.n, nBlockHeight, count
 
     Payments()
     {
@@ -340,19 +355,58 @@ public:
     bool IsTransactionValid(const CTransaction& txNew, int nBlockHeight);
     bool IsScheduled(Zelnode& mn, int nNotBlockHeight);
 
-    bool CanVote(COutPoint outZelnode, int nBlockHeight)
+    bool CanVote(const PaymentWinner& winner)
     {
         LOCK(cs_mapZelnodePayeeVotes);
 
-        if (mapZelnodeLastVote.count(outZelnode)) {
-            if (mapZelnodeLastVote[outZelnode] == nBlockHeight) {
-                return false;
+        COutPoint out = winner.vinZelnode.prevout;
+
+        if (winner.tier) {
+            if (winner.tier == Zelnode::BASIC) {
+                if (mapBasicZelnodeLastVote.count(out))
+                    if (mapBasicZelnodeLastVote[out] == winner.nBlockHeight)
+                        return false;
+
+                //record this zelnode voted
+                mapBasicZelnodeLastVote[out] = winner.nBlockHeight;
+                return true;
+            }
+
+            else if (winner.tier == Zelnode::SUPER) {
+                if (mapSuperZelnodeLastVote.count(out))
+                    if (mapSuperZelnodeLastVote[out] == winner.nBlockHeight)
+                        return false;
+
+                //record this zelnode voted
+                mapSuperZelnodeLastVote[out] = winner.nBlockHeight;
+                return true;
+            }
+
+            else if (winner.tier == Zelnode::BAMF) {
+                if (mapBAMFZelnodeLastVote.count(out))
+                    if (mapBAMFZelnodeLastVote[out] == winner.nBlockHeight)
+                        return false;
+
+                //record this zelnode voted
+                mapBAMFZelnodeLastVote[out] = winner.nBlockHeight;
+                return true;
+            }
+        } else {
+            if (mapZelnodeLastVoteCount.count(out)) {
+                if (mapZelnodeLastVoteCount[out].first == winner.nBlockHeight) {
+                    if (mapZelnodeLastVoteCount[out].second == 3)
+                        return false;
+                }
+
+                //record this zelnode voted
+                mapZelnodeLastVoteCount[out].second++;
+                return true;
+            } else {
+                //record this zelnode voted
+                mapZelnodeLastVoteCount[out] = make_pair(winner.nBlockHeight, 1);
+                return true;
             }
         }
-
-        //record this zelnode voted
-        mapZelnodeLastVote[outZelnode] = nBlockHeight;
-        return true;
     }
 
     int GetMinZelnodePaymentsProto();

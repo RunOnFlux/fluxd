@@ -313,6 +313,8 @@ public:
     bool IsValidNetAddr();
 };
 
+std::string TierToString(int tier);
+
 /** Note: Zelnode Broadcast contains a different serialize method for the sending zelndoes through the network */
 
 class ZelnodeBroadcast : public Zelnode
