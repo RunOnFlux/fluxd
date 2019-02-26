@@ -438,7 +438,7 @@ void Payments::ProcessMessageZelnodePayments(CNode* pfrom, std::string& strComma
         // Only check this map after we have tried to access the winners tier
         if (zelnodePayments.mapZelnodePayeeVotes.count(winner.GetHash())) {
             LogPrint("zelnodepayments", "znw - Already seen - %s bestHeight %d\n", winner.GetHash().ToString().c_str(), nHeight);
-            LogPrintf("zelnodepayments", "znw - Winner: %s\n", winner.ToString());
+            LogPrint("zelnodepayments", "znw - Winner: %s\n", winner.ToString());
             zelnodeSync.AddedZelnodeWinner(winner.GetHash());
             return;
         }
