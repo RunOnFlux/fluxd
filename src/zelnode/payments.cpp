@@ -866,6 +866,11 @@ bool Payments::ProcessBlock(int nBlockHeight)
             continue;
         }
 
+        if (newWinner.tier == Zelnode::NONE) {
+            LogPrint("zelnode", "%s - Zelnode vote doesn't contain a tier\n", __func__);
+            continue;
+        }
+
         LogPrint("zelnode", "%s - Signing Winner\n", __func__);
         if (newWinner.Sign(keyZelnode, pubKeyZelnode)) {
             LogPrint("zelnode", "%s - AddWinningZelnode\n", __func__);
