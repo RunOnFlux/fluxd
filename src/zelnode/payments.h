@@ -24,7 +24,7 @@ class BlockPayees;
 
 extern Payments zelnodePayments;
 
-#define ZNPAYMENTS_SIGNATURES_REQUIRED 6
+#define ZNPAYMENTS_SIGNATURES_REQUIRED 16
 #define ZNPAYMENTS_SIGNATURES_TOTAL 10
 
 void ProcessMessageZelnodePayments(CNode* pfrom, std::string& strCommand, CDataStream& vRecv);
@@ -327,7 +327,6 @@ public:
     std::map<COutPoint, int> mapBasicZelnodeLastVote; //prevout.hash, prevout.n, nBlockHeight
     std::map<COutPoint, int> mapSuperZelnodeLastVote; //prevout.hash, prevout.n, nBlockHeight
     std::map<COutPoint, int> mapBAMFZelnodeLastVote; //prevout.hash, prevout.n, nBlockHeight
-    std::map<COutPoint, pair<int, int>> mapZelnodeLastVoteCount; //prevout.hash, prevout.n, nBlockHeight, count
 
     Payments()
     {
@@ -361,52 +360,37 @@ public:
 
         COutPoint out = winner.vinZelnode.prevout;
 
-        if (winner.tier) {
-            if (winner.tier == Zelnode::BASIC) {
-                if (mapBasicZelnodeLastVote.count(out))
-                    if (mapBasicZelnodeLastVote[out] == winner.nBlockHeight)
-                        return false;
+        if (winner.tier == Zelnode::BASIC) {
+            if (mapBasicZelnodeLastVote.count(out))
+                if (mapBasicZelnodeLastVote[out] == winner.nBlockHeight)
+                    return false;
 
-                //record this zelnode voted
-                mapBasicZelnodeLastVote[out] = winner.nBlockHeight;
-                return true;
-            }
-
-            else if (winner.tier == Zelnode::SUPER) {
-                if (mapSuperZelnodeLastVote.count(out))
-                    if (mapSuperZelnodeLastVote[out] == winner.nBlockHeight)
-                        return false;
-
-                //record this zelnode voted
-                mapSuperZelnodeLastVote[out] = winner.nBlockHeight;
-                return true;
-            }
-
-            else if (winner.tier == Zelnode::BAMF) {
-                if (mapBAMFZelnodeLastVote.count(out))
-                    if (mapBAMFZelnodeLastVote[out] == winner.nBlockHeight)
-                        return false;
-
-                //record this zelnode voted
-                mapBAMFZelnodeLastVote[out] = winner.nBlockHeight;
-                return true;
-            }
-        } else {
-            if (mapZelnodeLastVoteCount.count(out)) {
-                if (mapZelnodeLastVoteCount[out].first == winner.nBlockHeight) {
-                    if (mapZelnodeLastVoteCount[out].second == 3)
-                        return false;
-                }
-
-                //record this zelnode voted
-                mapZelnodeLastVoteCount[out].second++;
-                return true;
-            } else {
-                //record this zelnode voted
-                mapZelnodeLastVoteCount[out] = make_pair(winner.nBlockHeight, 1);
-                return true;
-            }
+            //record this zelnode voted
+            mapBasicZelnodeLastVote[out] = winner.nBlockHeight;
+            return true;
         }
+
+        else if (winner.tier == Zelnode::SUPER) {
+            if (mapSuperZelnodeLastVote.count(out))
+                if (mapSuperZelnodeLastVote[out] == winner.nBlockHeight)
+                    return false;
+
+            //record this zelnode voted
+            mapSuperZelnodeLastVote[out] = winner.nBlockHeight;
+            return true;
+        }
+
+        else if (winner.tier == Zelnode::BAMF) {
+            if (mapBAMFZelnodeLastVote.count(out))
+                if (mapBAMFZelnodeLastVote[out] == winner.nBlockHeight)
+                    return false;
+
+            //record this zelnode voted
+            mapBAMFZelnodeLastVote[out] = winner.nBlockHeight;
+            return true;
+        }
+
+        return false;
     }
 
     int GetMinZelnodePaymentsProto();
