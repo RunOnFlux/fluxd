@@ -115,6 +115,7 @@ int64_t GetSporkValue(int nSporkID)
         r = mapSporksActive[nSporkID].nValue;
     } else {
         if (nSporkID == SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT) r = SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT_DEFAULT;
+        if (nSporkID == SPORK_2_ZELNODE_UPGRADE_VOTE_ENFORCEMENT) r = SPORK_2_ZELNODE_UPGRADE_VOTE_ENFORCEMENT_DEFAULT;
 
         if (r == -1) LogPrintf("%s : Unknown Spork %d\n", __func__, nSporkID);
     }
@@ -214,6 +215,7 @@ bool CSporkManager::SetPrivKey(std::string strPrivKey)
 int CSporkManager::GetSporkIDByName(std::string strName)
 {
     if (strName == "SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT") return SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT;
+    if (strName == "SPORK_2_ZELNODE_UPGRADE_VOTE_ENFORCEMENT") return SPORK_2_ZELNODE_UPGRADE_VOTE_ENFORCEMENT;
 
     return -1;
 }
@@ -221,6 +223,7 @@ int CSporkManager::GetSporkIDByName(std::string strName)
 std::string CSporkManager::GetSporkNameByID(int id)
 {
     if (id == SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT) return "SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT";
+    if (id == SPORK_2_ZELNODE_UPGRADE_VOTE_ENFORCEMENT) return "SPORK_2_ZELNODE_UPGRADE_VOTE_ENFORCEMENT";
 
     return "Unknown";
 }

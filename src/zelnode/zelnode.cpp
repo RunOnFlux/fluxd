@@ -821,4 +821,18 @@ void ZelnodePing::Relay()
 }
 
 
+std::string TierToString(int tier)
+{
+    std::string strStatus = "NONE";
+
+    if (tier == Zelnode::BASIC) strStatus = "BASIC";
+    if (tier == Zelnode::SUPER) strStatus = "SUPER";
+    if (tier == Zelnode::BAMF) strStatus = "BAMF";
+
+    if (strStatus == "NONE" && tier != 0) strStatus = "UNKNOWN TIER (" + std::to_string(tier) + ")";
+
+    return strStatus;
+}
+
+
 

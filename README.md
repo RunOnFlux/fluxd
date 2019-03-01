@@ -1,7 +1,7 @@
 =======
 # ZelCash [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
 =======
-# ZelCash 3.0.0 ZELNODES
+# ZelCash 3.1.0 ZELNODES
 INNOVATIVE  INTELLIGENT  INSPIRING
 
 ZelCash is a fork of 2.0.2 Zcash aiming to provide decentralised development platform via ZelNodes and ZelCore.
