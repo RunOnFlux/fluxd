@@ -374,18 +374,12 @@ void Payments::ProcessMessageZelnodePayments(CNode* pfrom, std::string& strComma
 
         PaymentWinner winner;
         vRecv >> winner;
-        
+
         int nHeight;
         {
             TRY_LOCK(cs_main, locked);
             if (!locked || chainActive.Tip() == NULL) return;
             nHeight = chainActive.Tip()->nHeight;
-        }
-
-        if (zelnodePayments.mapZelnodePayeeVotes.count(winner.GetHash())) {
-            LogPrint("zelnodepayments", "znw - Already seen - %s bestHeight %d\n", winner.GetHash().ToString().c_str(), nHeight);
-            zelnodeSync.AddedZelnodeWinner(winner.GetHash());
-            return;
         }
 
         int nFirstBlock = nHeight - (zelnodeman.CountEnabled() * 1.25);
@@ -401,8 +395,15 @@ void Payments::ProcessMessageZelnodePayments(CNode* pfrom, std::string& strComma
             return;
         }
 
+        if (zelnodePayments.mapZelnodePayeeVotes.count(winner.GetHash())) {
+            LogPrint("zelnodepayments", "znw - Already seen - %s bestHeight %d\n", winner.GetHash().ToString().c_str(), nHeight);
+            LogPrint("zelnodepayments", "znw - Winner: %s\n", winner.ToString());
+            zelnodeSync.AddedZelnodeWinner(winner.GetHash());
+            return;
+        }
+
         // Check to make sure the voter hasn't voted before
-        if (!zelnodePayments.CanVote(winner.vinZelnode.prevout, winner.nBlockHeight)) {
+        if (!zelnodePayments.CanVote(winner)) {
             LogPrint("zelnodepayments","znw - zelnode already voted - %s\n", winner.vinZelnode.prevout.ToString());
             return;
         }
@@ -417,28 +418,12 @@ void Payments::ProcessMessageZelnodePayments(CNode* pfrom, std::string& strComma
             return;
         }
 
-        int nWinnersTier = 0;
-        vector<Zelnode> vzelnodes = zelnodeman.GetAllZelnodeVector();
-        for (auto& entry : vzelnodes){
-            CScript mnpayee;
-            mnpayee = GetScriptForDestination(entry.pubKeyCollateralAddress.GetID());
-            if (mnpayee == winner.payee) {
-                nWinnersTier = entry.tier;
-                break;
-            }
-        }
-
-        if (nWinnersTier != Zelnode::BASIC && nWinnersTier != Zelnode::SUPER && nWinnersTier != Zelnode::BAMF) {
-            LogPrint("zelnodepayments","znw - zelnode winners tier not found - %s\n", winner.vinZelnode.prevout.ToString());
-            return;
-        }
-
         CTxDestination address1;
         ExtractDestination(winner.payee, address1);
 
         LogPrint("zelnodepayments", "znw - winning vote - Addr %s Height %d bestHeight %d - %s\n", EncodeDestination(address1).c_str(), winner.nBlockHeight, nHeight, winner.vinZelnode.prevout.ToString());
 
-        if (zelnodePayments.AddWinningZelnode(winner, nWinnersTier)) {
+        if (zelnodePayments.AddWinningZelnode(winner, winner.tier)) {
             winner.Relay();
             zelnodeSync.AddedZelnodeWinner(winner.GetHash());
         }
@@ -584,7 +569,7 @@ bool ZelnodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
     CAmount requiredBAMFZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::BAMF);
 
 
-    //require at least 6 signatures
+    //require at least 16 signatures
 
     for (ZelnodePayee& payee : vecBasicPayments)
         if (payee.nVotes >= nMaxBasicSignatures && payee.nVotes >= ZNPAYMENTS_SIGNATURES_REQUIRED)
@@ -781,7 +766,7 @@ bool PaymentWinner::IsValid(CNode* pnode, std::string& strError)
 
     if (!pzn) {
         strError = strprintf("Unknown Zelnode %s", vinZelnode.prevout.hash.ToString());
-        LogPrint("zelnode","%s - %s\n", __func__, strError);
+        LogPrint("zelnode","%s - hash: %s prevout: %s\n", __func__, strError, vinZelnode.ToString());
         zelnodeman.AskForZN(pnode, vinZelnode);
         return false;
     }
@@ -801,6 +786,18 @@ bool PaymentWinner::IsValid(CNode* pnode, std::string& strError)
             strError = strprintf("Zelnode not in the top %d (%d)", ZNPAYMENTS_SIGNATURES_TOTAL * 2, n);
             LogPrint("zelnode","%s - %s\n", __func__, strError);
         }
+        return false;
+    }
+
+    if (tier < Zelnode::NONE || tier > Zelnode::BAMF) {
+        strError = strprintf("Zelnode winner tier is %s", TierToString(tier));
+        LogPrint("zelnode","%s - %s\n", __func__, strError);
+        return false;
+    }
+
+    if (tier == Zelnode::NONE && IsSporkActive(SPORK_2_ZELNODE_UPGRADE_VOTE_ENFORCEMENT)) {
+        strError = strprintf("Zelnode winner tier is %s and %s is active", TierToString(tier), sporkManager.GetSporkNameByID(SPORK_2_ZELNODE_UPGRADE_VOTE_ENFORCEMENT));
+        LogPrint("zelnode","%s - %s\n", __func__, strError);
         return false;
     }
 
@@ -841,6 +838,7 @@ bool Payments::ProcessBlock(int nBlockHeight)
             LogPrint("zelnode", "%s Found by FindOldestNotInVec \n", __func__);
 
             newWinner.nBlockHeight = nBlockHeight;
+            newWinner.tier = pzn->tier;
 
             CScript payee = GetScriptForDestination(pzn->pubKeyCollateralAddress.GetID());
             newWinner.AddPayee(payee);
@@ -848,7 +846,7 @@ bool Payments::ProcessBlock(int nBlockHeight)
             CTxDestination address1;
             ExtractDestination(payee, address1);
 
-            LogPrint("zelnode", "%s Winner payee %s nHeight %d. \n", __func__, EncodeDestination(address1).c_str(),
+            LogPrint("zelnode", "%s %s Winner payee %s nHeight %d. \n", __func__, TierToString(newWinner.tier), EncodeDestination(address1).c_str(),
                      newWinner.nBlockHeight);
         } else {
             LogPrint("zelnode", "%s Failed to find zelnode to pay\n", __func__);
@@ -860,7 +858,7 @@ bool Payments::ProcessBlock(int nBlockHeight)
 
         if (!obfuScationSigner.SetKey(strZelnodePrivKey, errorMessage, keyZelnode, pubKeyZelnode)) {
             LogPrint("zelnode", "%s - Error upon calling SetKey: %s\n", __func__, errorMessage.c_str());
-            return false;
+            continue;
         }
 
         if (!pzn) {
@@ -868,11 +866,16 @@ bool Payments::ProcessBlock(int nBlockHeight)
             continue;
         }
 
+        if (newWinner.tier == Zelnode::NONE) {
+            LogPrint("zelnode", "%s - Zelnode vote doesn't contain a tier\n", __func__);
+            continue;
+        }
+
         LogPrint("zelnode", "%s - Signing Winner\n", __func__);
         if (newWinner.Sign(keyZelnode, pubKeyZelnode)) {
             LogPrint("zelnode", "%s - AddWinningZelnode\n", __func__);
 
-            if (AddWinningZelnode(newWinner, pzn->tier)) {
+            if (AddWinningZelnode(newWinner, newWinner.tier)) {
                 newWinner.Relay();
                 nLastBlockHeight = nBlockHeight;
             }
