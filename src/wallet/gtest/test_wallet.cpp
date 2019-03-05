@@ -1662,7 +1662,7 @@ TEST(WalletTests, SetBestChainIgnoresTxsWithoutShieldedData) {
     mtxSapling.nVersion = SAPLING_TX_VERSION;
     mtxSapling.nVersionGroupId = SAPLING_VERSION_GROUP_ID;
     mtxSapling.vShieldedOutput.resize(1);
-    mtxSapling.vShieldedOutput[0].cv = libzcash::random_uint256();
+    mtxSapling.vShieldedOutput[0].cv = libzelcash::random_uint256();
     CWalletTx wtxSapling {nullptr, mtxSapling};
     SetSaplingNoteData(wtxSapling);
     wallet.AddToWallet(wtxSapling, true, nullptr);
@@ -1673,7 +1673,7 @@ TEST(WalletTests, SetBestChainIgnoresTxsWithoutShieldedData) {
     mtxSaplingTransparent.nVersion = SAPLING_TX_VERSION;
     mtxSaplingTransparent.nVersionGroupId = SAPLING_VERSION_GROUP_ID;
     mtxSaplingTransparent.vShieldedOutput.resize(1);
-    mtxSaplingTransparent.vShieldedOutput[0].cv = libzcash::random_uint256();
+    mtxSaplingTransparent.vShieldedOutput[0].cv = libzelcash::random_uint256();
     CWalletTx wtxSaplingTransparent {nullptr, mtxSaplingTransparent};
     wallet.AddToWallet(wtxSaplingTransparent, true, nullptr);
 
