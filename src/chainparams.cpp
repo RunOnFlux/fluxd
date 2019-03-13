@@ -323,6 +323,13 @@ public:
             750          // * estimated number of transactions per day after checkpoint 720 newly mined +30 for txs that users are doing
                          //   total number of tx / (checkpoint block height / (24 * 24))
         };
+
+    // Hardcoded fallback value for the Sprout shielded value pool balance
+        // for nodes that have not reindexed since the introduction of monitoring
+        // in #2795.
+        nSproutValuePoolCheckpointHeight = 440329;
+        nSproutValuePoolCheckpointBalance = 40000029096803;
+
     }
 };
 static CTestNetParams testNetParams;
