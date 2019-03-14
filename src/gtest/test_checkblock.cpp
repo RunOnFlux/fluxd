@@ -31,7 +31,7 @@ TEST(CheckBlock, VersionTooLow) {
 
     MockCValidationState state;
     EXPECT_CALL(state, DoS(100, false, REJECT_INVALID, "version-too-low", false)).Times(1);
-    EXPECT_FALSE(CheckBlock(block, state, verifier, false, false));
+    EXPECT_FALSE(CheckBlock(block, state, Params(), verifier, false, false));
 }
 
 
@@ -61,7 +61,7 @@ TEST(CheckBlock, BlockSproutRejectsBadVersion) {
     auto verifier = libzelcash::ProofVerifier::Strict();
 
     EXPECT_CALL(state, DoS(100, false, REJECT_INVALID, "bad-txns-version-too-low", false)).Times(1);
-    EXPECT_FALSE(CheckBlock(block, state, verifier, false, false));
+    EXPECT_FALSE(CheckBlock(block, state, Params(), verifier, false, false));
 }
 
 
