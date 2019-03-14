@@ -124,6 +124,8 @@ public:
 	eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
 
+        // The best chain should have at least this much work.
+        consensus.nMinimumChainWork = uint256S("0x00");
 
         /**
          * The message start string should be awesome! ⓩ❤
