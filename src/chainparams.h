@@ -85,6 +85,7 @@ public:
 
     CAmount SproutValuePoolCheckpointHeight() const { return nSproutValuePoolCheckpointHeight; }
     CAmount SproutValuePoolCheckpointBalance() const { return nSproutValuePoolCheckpointBalance; }
+    bool SproutValuePoolCheckpointEnabled() const { return fSproutValuePoolCheckpointEnabled; }
 
     const CBlock& GenesisBlock() const { return genesis; }
     /** Make miner wait to have peers to avoid wasting work */
@@ -157,7 +158,8 @@ protected:
 
     CAmount nSproutValuePoolCheckpointHeight = 0;
     CAmount nSproutValuePoolCheckpointBalance = 0;
-
+    bool fSproutValuePoolCheckpointEnabled = false;
+    
     /** Zelnode params **/
     std::string strSporkKey;
     std::string strZelnodeTestingDummyAddress;
