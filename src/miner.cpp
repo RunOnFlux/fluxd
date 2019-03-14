@@ -339,7 +339,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
                 CAmount sproutValueDummy = sproutValue;
                 CAmount saplingValueDummy = saplingValue;
 
-                sproutValueDummy += -tx.valueBalance;
+                saplingValueDummy += -tx.valueBalance;
 
                 for (auto js : tx.vjoinsplit) {
                     sproutValueDummy += js.vpub_old;
