@@ -2688,7 +2688,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     }
 
     // Reject a block that results in a negative shielded value pool balance.
-    if (Params().SproutValuePoolCheckpointEnabled()) {
+    if (chainparams.SproutValuePoolCheckpointEnabled()) {
         // Sprout
         //
         // We can expect nChainSproutValue to be valid after the hardcoded
