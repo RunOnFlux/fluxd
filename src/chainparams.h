@@ -86,7 +86,7 @@ public:
     CAmount SproutValuePoolCheckpointHeight() const { return nSproutValuePoolCheckpointHeight; }
     CAmount SproutValuePoolCheckpointBalance() const { return nSproutValuePoolCheckpointBalance; }
     uint256 SproutValuePoolCheckpointBlockHash() const { return hashSproutValuePoolCheckpointBlock; }
-    bool SproutValuePoolCheckpointEnabled() const { return fSproutValuePoolCheckpointEnabled; }
+    bool ZIP209Enabled() const { return fZIP209Enabled; }
 
     const CBlock& GenesisBlock() const { return genesis; }
     /** Make miner wait to have peers to avoid wasting work */
@@ -160,7 +160,7 @@ protected:
     CAmount nSproutValuePoolCheckpointHeight = 0;
     CAmount nSproutValuePoolCheckpointBalance = 0;
     uint256 hashSproutValuePoolCheckpointBlock;
-    bool fSproutValuePoolCheckpointEnabled = false;
+    bool fZIP209Enabled = false;
     
     /** Zelnode params **/
     std::string strSporkKey;
