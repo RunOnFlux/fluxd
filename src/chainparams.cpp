@@ -442,13 +442,6 @@ public:
         bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviewregtestsapling";
         bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivkregtestsapling";
         bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-regtest";
-
-        // Enable Sprout shielded value pool checkpointing on
-        // regtest.
-        nSproutValuePoolCheckpointHeight = 0;
-        nSproutValuePoolCheckpointBalance = 0;
-        fZIP209Enabled = true;
-        hashSproutValuePoolCheckpointBlock = consensus.hashGenesisBlock;
     }
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)
