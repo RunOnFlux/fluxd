@@ -19,7 +19,12 @@ CWalletTx GetValidSproutReceive(ZCJoinSplit& params,
                                 CAmount value,
                                 bool randomInputs,
                                 int32_t version = 2);
-libzelcash::SproutNote GetSproutNote(ZCJoinSplit& params,
+CWalletTx GetInvalidCommitmentSproutReceive(ZCJoinSplit& params,
+                                const libzelcash::SproutSpendingKey& sk,
+                                CAmount value,
+                                bool randomInputs,
+                                int32_t version = 2);
+libelcash::SproutNote GetSproutNote(ZCJoinSplit& params,
                                    const libzelcash::SproutSpendingKey& sk,
                                    const CTransaction& tx, size_t js, size_t n);
 CWalletTx GetValidSproutSpend(ZCJoinSplit& params,

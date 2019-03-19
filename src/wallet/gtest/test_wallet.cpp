@@ -75,6 +75,10 @@ CWalletTx GetValidSproutReceive(const libzelcash::SproutSpendingKey& sk, CAmount
     return GetValidSproutReceive(*params, sk, value, randomInputs, version);
 }
 
+CWalletTx GetInvalidCommitmentSproutReceive(const libzelcash::SproutSpendingKey& sk, CAmount value, bool randomInputs, int32_t version = 2) {
+    return GetInvalidCommitmentSproutReceive(*params, sk, value, randomInputs, version);
+}
+
 libzelcash::SproutNote GetSproutNote(const libzelcash::SproutSpendingKey& sk,
                        const CTransaction& tx, size_t js, size_t n) {
     return GetSproutNote(*params, sk, tx, js, n);
@@ -434,6 +438,27 @@ TEST(WalletTests, SetInvalidSaplingNoteDataInCWalletTx) {
     noteData.insert(std::make_pair(op, nd));
 
     EXPECT_THROW(wtx.SetSaplingNoteData(noteData), std::logic_error);
+}
+
+TEST(WalletTests, CheckSproutNoteCommitmentAgainstNotePlaintext) {
+    CWallet wallet;
+
+    auto sk = libzelcash::SproutSpendingKey::random();
+    auto address = sk.address();
+    auto dec = ZCNoteDecryption(sk.receiving_key());
+
+    auto wtx = GetInvalidCommitmentSproutReceive(sk, 10, true);
+    auto note = GetSproutNote(sk, wtx, 0, 1);
+    auto nullifier = note.nullifier(sk);
+
+    auto hSig = wtx.vjoinsplit[0].h_sig(
+        *params, wtx.joinSplitPubKey);
+
+    ASSERT_THROW(wallet.GetSproutNoteNullifier(
+        wtx.vjoinsplit[0],
+        address,
+        dec,
+        hSig, 1), libzelcash::note_decryption_failed);
 }
 
 TEST(WalletTests, GetSproutNoteNullifier) {
