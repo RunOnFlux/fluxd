@@ -23,7 +23,6 @@ class CKeyStore
 {
 protected:
     mutable CCriticalSection cs_KeyStore;
-    mutable CCriticalSection cs_SpendingKeyStore;
 
 public:
     virtual ~CKeyStore() {}
@@ -185,7 +184,7 @@ public:
     {
         bool result;
         {
-            LOCK(cs_SpendingKeyStore);
+            LOCK(cs_KeyStore);
             result = (mapSproutSpendingKeys.count(address) > 0);
         }
         return result;
@@ -194,7 +193,7 @@ public:
     bool GetSproutSpendingKey(const libzelcash::SproutPaymentAddress &address, libzelcash::SproutSpendingKey &skOut) const
     {
         {
-            LOCK(cs_SpendingKeyStore);
+            LOCK(cs_KeyStore);
             SproutSpendingKeyMap::const_iterator mi = mapSproutSpendingKeys.find(address);
             if (mi != mapSproutSpendingKeys.end())
             {
@@ -208,7 +207,7 @@ public:
     bool GetNoteDecryptor(const libzelcash::SproutPaymentAddress &address, ZCNoteDecryption &decOut) const
     {
         {
-            LOCK(cs_SpendingKeyStore);
+            LOCK(cs_KeyStore);
             NoteDecryptorMap::const_iterator mi = mapNoteDecryptors.find(address);
             if (mi != mapNoteDecryptors.end())
             {
@@ -223,7 +222,7 @@ public:
     {
         setAddress.clear();
         {
-            LOCK(cs_SpendingKeyStore);
+            LOCK(cs_KeyStore);
             SproutSpendingKeyMap::const_iterator mi = mapSproutSpendingKeys.begin();
             while (mi != mapSproutSpendingKeys.end())
             {
@@ -247,7 +246,7 @@ public:
     {
         bool result;
         {
-            LOCK(cs_SpendingKeyStore);
+            LOCK(cs_KeyStore);
             result = (mapSaplingSpendingKeys.count(fvk) > 0);
         }
         return result;
@@ -255,7 +254,7 @@ public:
     bool GetSaplingSpendingKey(const libzelcash::SaplingFullViewingKey &fvk, libzelcash::SaplingExtendedSpendingKey &skOut) const
     {
         {
-            LOCK(cs_SpendingKeyStore);
+            LOCK(cs_KeyStore);
             
             SaplingSpendingKeyMap::const_iterator mi = mapSaplingSpendingKeys.find(fvk);
             if (mi != mapSaplingSpendingKeys.end())
@@ -291,7 +290,7 @@ public:
     {
         setAddress.clear();
         {
-            LOCK(cs_SpendingKeyStore);
+            LOCK(cs_KeyStore);
             auto mi = mapSaplingIncomingViewingKeys.begin();
             while (mi != mapSaplingIncomingViewingKeys.end())
             {

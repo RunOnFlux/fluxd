@@ -187,7 +187,7 @@ static bool DecryptSaplingSpendingKey(const CKeyingMaterial& vMasterKey,
 
 bool CCryptoKeyStore::SetCrypted()
 {
-    LOCK2(cs_KeyStore, cs_SpendingKeyStore);
+    LOCK(cs_KeyStore);
     if (fUseCrypto)
         return true;
     if (!(mapKeys.empty() && mapSproutSpendingKeys.empty() && mapSaplingSpendingKeys.empty()))
@@ -213,7 +213,7 @@ bool CCryptoKeyStore::Lock()
 bool CCryptoKeyStore::Unlock(const CKeyingMaterial& vMasterKeyIn)
 {
     {
-        LOCK2(cs_KeyStore, cs_SpendingKeyStore);
+        LOCK(cs_KeyStore);
         if (!SetCrypted())
             return false;
 
@@ -290,7 +290,7 @@ bool CCryptoKeyStore::Unlock(const CKeyingMaterial& vMasterKeyIn)
 bool CCryptoKeyStore::SetHDSeed(const HDSeed& seed)
 {
     {
-        LOCK(cs_SpendingKeyStore);
+        LOCK(cs_KeyStore);
         if (!IsCrypted()) {
             return CBasicKeyStore::SetHDSeed(seed);
         }
@@ -317,7 +317,7 @@ bool CCryptoKeyStore::SetCryptedHDSeed(
     const std::vector<unsigned char>& vchCryptedSecret)
 {
     {
-        LOCK(cs_SpendingKeyStore);
+        LOCK(cs_KeyStore);
         if (!IsCrypted()) {
             return false;
         }
@@ -335,7 +335,7 @@ bool CCryptoKeyStore::SetCryptedHDSeed(
 
 bool CCryptoKeyStore::HaveHDSeed() const
 {
-    LOCK(cs_SpendingKeyStore);
+    LOCK(cs_KeyStore);
     if (!IsCrypted())
         return CBasicKeyStore::HaveHDSeed();
 
@@ -344,7 +344,7 @@ bool CCryptoKeyStore::HaveHDSeed() const
 
 bool CCryptoKeyStore::GetHDSeed(HDSeed& seedOut) const
 {
-    LOCK(cs_SpendingKeyStore);
+    LOCK(cs_KeyStore);
     if (!IsCrypted())
         return CBasicKeyStore::GetHDSeed(seedOut);
 
@@ -427,7 +427,7 @@ bool CCryptoKeyStore::GetPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) co
 bool CCryptoKeyStore::AddSproutSpendingKey(const libzelcash::SproutSpendingKey &sk)
 {
     {
-        LOCK(cs_SpendingKeyStore);
+        LOCK(cs_KeyStore);
         if (!IsCrypted())
             return CBasicKeyStore::AddSproutSpendingKey(sk);
 
@@ -454,7 +454,7 @@ bool CCryptoKeyStore::AddSaplingSpendingKey(
     const libzelcash::SaplingPaymentAddress &defaultAddr)
 {
     {
-        LOCK(cs_SpendingKeyStore);
+        LOCK(cs_KeyStore);
         if (!IsCrypted()) {
             return CBasicKeyStore::AddSaplingSpendingKey(sk, defaultAddr);
         }
@@ -485,7 +485,7 @@ bool CCryptoKeyStore::AddCryptedSproutSpendingKey(
     const std::vector<unsigned char> &vchCryptedSecret)
 {
     {
-        LOCK(cs_SpendingKeyStore);
+        LOCK(cs_KeyStore);
         if (!SetCrypted())
             return false;
 
@@ -502,7 +502,7 @@ bool CCryptoKeyStore::AddCryptedSaplingSpendingKey(
     const libzelcash::SaplingPaymentAddress &defaultAddr)
 {
     {
-        LOCK(cs_SpendingKeyStore);
+        LOCK(cs_KeyStore);
         if (!SetCrypted()) {
             return false;
         }
@@ -520,7 +520,7 @@ bool CCryptoKeyStore::AddCryptedSaplingSpendingKey(
 bool CCryptoKeyStore::GetSproutSpendingKey(const libzelcash::SproutPaymentAddress &address, libzelcash::SproutSpendingKey &skOut) const
 {
     {
-        LOCK(cs_SpendingKeyStore);
+        LOCK(cs_KeyStore);
         if (!IsCrypted())
             return CBasicKeyStore::GetSproutSpendingKey(address, skOut);
 
@@ -537,7 +537,7 @@ bool CCryptoKeyStore::GetSproutSpendingKey(const libzelcash::SproutPaymentAddres
 bool CCryptoKeyStore::GetSaplingSpendingKey(const libzelcash::SaplingFullViewingKey &fvk, libzelcash::SaplingExtendedSpendingKey &skOut) const
 {
     {
-        LOCK(cs_SpendingKeyStore);
+        LOCK(cs_KeyStore);
         if (!IsCrypted())
             return CBasicKeyStore::GetSaplingSpendingKey(fvk, skOut);
 
@@ -554,7 +554,7 @@ bool CCryptoKeyStore::GetSaplingSpendingKey(const libzelcash::SaplingFullViewing
 bool CCryptoKeyStore::EncryptKeys(CKeyingMaterial& vMasterKeyIn)
 {
     {
-        LOCK2(cs_KeyStore, cs_SpendingKeyStore);
+        LOCK(cs_KeyStore);
         if (!mapCryptedKeys.empty() || IsCrypted())
             return false;
 
