@@ -541,7 +541,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     if (vNodes.empty())
         throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Zelcash is not connected!");
 
-    if (IsInitialBlockDownload())
+    if (IsInitialBlockDownload(Params()))
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Zelcash is downloading blocks...");
 
     // when enforcement is on we need information about a zelnode payee or otherwise our block is going to be orphaned by the network
