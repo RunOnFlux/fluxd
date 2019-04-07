@@ -50,9 +50,7 @@ bool ZelnodeSync::IsBlockchainSynced()
     CBlockIndex* pindex = chainActive.Tip();
     if (pindex == NULL) return false;
 
-
-    // TODO, remove this constraint after testing on TESTNET which doesn't have a solid block schedule
-    if (pindex->nTime + 60 * 60 * 48 < GetTime())
+    if (pindex->nTime + 60 * 60 < GetTime())
         return false;
 
     fBlockchainSynced = true;
@@ -74,7 +72,7 @@ void ZelnodeSync::Reset()
     countZelnodeWinner = 0;
     RequestedZelnodeAssets = ZELNODE_SYNC_INITIAL;
     RequestedZelnodeAttempt = 0;
-    nAssetSyncStarted = GetTime();
+    nTimeAssetSyncStarted = GetTime();
 }
 
 void ZelnodeSync::AddedZelnodeList(uint256 hash)
@@ -106,35 +104,41 @@ void ZelnodeSync::AddedZelnodeWinner(uint256 hash)
 void ZelnodeSync::GetNextAsset()
 {
     switch (RequestedZelnodeAssets) {
-        case (ZELNODE_SYNC_INITIAL):
         case (ZELNODE_SYNC_FAILED): // should never be used here actually, use Reset() instead
             ClearFulfilledRequest();
+            RequestedZelnodeAssets = ZELNODE_SYNC_INITIAL;
+            LogPrintf("ZelnodeSync::GetNextAsset -- Starting %s\n", GetSyncStatus());
+            break;
+        case(ZELNODE_SYNC_INITIAL):
             RequestedZelnodeAssets = ZELNODE_SYNC_SPORKS;
+            LogPrintf("ZelnodeSync::GetNextAsset -- Starting %s\n", GetSyncStatus());
             break;
         case (ZELNODE_SYNC_SPORKS):
             RequestedZelnodeAssets = ZELNODE_SYNC_LIST;
+            LogPrintf("ZelnodeSync::GetNextAsset -- Starting %s\n", GetSyncStatus());
             break;
         case (ZELNODE_SYNC_LIST):
             RequestedZelnodeAssets = ZELNODE_SYNC_MNW;
+            LogPrintf("ZelnodeSync::GetNextAsset -- Starting %s\n", GetSyncStatus());
             break;
         case (ZELNODE_SYNC_MNW):
             RequestedZelnodeAssets = ZELNODE_SYNC_FINISHED;
-            LogPrintf("%s - Sync has finished\n", __func__);
+            LogPrintf("ZelnodeSync - Sync has finished\n");
             break;
     }
     RequestedZelnodeAttempt = 0;
-    nAssetSyncStarted = GetTime();
+    nTimeAssetSyncStarted = GetTime();
 }
 
 std::string ZelnodeSync::GetSyncStatus()
 {
     switch (zelnodeSync.RequestedZelnodeAssets) {
         case ZELNODE_SYNC_INITIAL:
-            return _("Synchronization pending...");
+            return _("Synchronization initializing...");
         case ZELNODE_SYNC_SPORKS:
             return _("Synchronizing sporks...");
         case ZELNODE_SYNC_LIST:
-            return _("Synchronizing zelnodes...");
+            return _("Synchronizing zelnode list...");
         case ZELNODE_SYNC_MNW:
             return _("Synchronizing zelnode winners...");
         case ZELNODE_SYNC_FAILED:
@@ -207,7 +211,7 @@ void ZelnodeSync::Process()
         return;
     }
 
-    LogPrint("zelnode", "%s - tick %d RequestedZelnodeAssets %d\n", __func__, tick, RequestedZelnodeAssets);
+    LogPrintf("%s::Process -- Tick %d nCurrentAsset %d\n", __func__, tick, RequestedZelnodeAssets);
 
     if (RequestedZelnodeAssets == ZELNODE_SYNC_INITIAL) GetNextAsset();
 
@@ -220,6 +224,7 @@ void ZelnodeSync::Process()
         return;
 
     for (CNode* pnode : vNodes) {
+
         if (Params().NetworkID() == CBaseChainParams::REGTEST) {
             if (RequestedZelnodeAttempt <= 2) {
                 pnode->PushMessage("getsporks"); //get current network sporks
@@ -262,9 +267,9 @@ void ZelnodeSync::Process()
 
                 // timeout
                 if (lastZelnodeList == 0 &&
-                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 5)) {
+                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 5)) {
                     if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)) {
-                        LogPrintf("%s - ERROR - Sync has failed, will retry later\n", __func__);
+                        LogPrintf("%s - ERROR - Syncing zelnode list has failed, will retry later\n", __func__);
                         RequestedZelnodeAssets = ZELNODE_SYNC_FAILED;
                         RequestedZelnodeAttempt = 0;
                         lastFailure = GetTime();
@@ -293,9 +298,9 @@ void ZelnodeSync::Process()
 
                 // timeout
                 if (lastZelnodeWinner == 0 &&
-                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 5)) {
+                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 5)) {
                     if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)) {
-                        LogPrintf("%s - ERROR - Sync has failed, will retry later\n", __func__);
+                        LogPrintf("%s - ERROR - Syncing zelnode winners has failed, will retry later\n", __func__);
                         RequestedZelnodeAssets = ZELNODE_SYNC_FAILED;
                         RequestedZelnodeAttempt = 0;
                         lastFailure = GetTime();
