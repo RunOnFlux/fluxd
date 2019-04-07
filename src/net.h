@@ -71,7 +71,7 @@ CNode* FindNode(const CNetAddr& ip);
 CNode* FindNode(const CSubNet& subNet);
 CNode* FindNode(const std::string& addrName);
 CNode* FindNode(const CService& ip);
-CNode* ConnectNode(CAddress addrConnect, const char *pszDest = NULL);
+CNode* ConnectNode(CAddress addrConnect, const char *pszDest = NULL,  bool obfuScationMaster = false);
 bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false);
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
@@ -294,6 +294,8 @@ protected:
     static std::map<CSubNet, int64_t> setBanned;
     static CCriticalSection cs_setBanned;
 
+    std::set<std::string> setRequestsFulfilled; //keep track of what client has asked for
+
     // Whitelisted ranges. Any node connecting from these is automatically
     // whitelisted (as well as those connecting to whitelisted binds).
     static std::vector<CSubNet> vWhitelistedRange;
@@ -333,6 +335,9 @@ public:
 
     CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
     ~CNode();
+
+
+    bool fObfuScationMaster; // TODO, might remove this.
 
 private:
     // Network usage totals
@@ -598,6 +603,26 @@ public:
         }
     }
 
+    bool HasFulfilledRequest(std::string strRequest)
+    {
+        return setRequestsFulfilled.count(strRequest);
+    }
+
+    void ClearFulfilledRequest(std::string strRequest)
+    {
+        auto it = setRequestsFulfilled.find(strRequest);
+
+        if (it != setRequestsFulfilled.end()) {
+            setRequestsFulfilled.erase(it);
+            return;
+        }
+    }
+
+    void FulfilledRequest(std::string strRequest)
+    {
+        setRequestsFulfilled.insert(strRequest);
+    }
+
     void CloseSocketDisconnect();
 
     // Denial-of-service detection/prevention
@@ -641,6 +666,7 @@ public:
 class CTransaction;
 void RelayTransaction(const CTransaction& tx);
 void RelayTransaction(const CTransaction& tx, const CDataStream& ss);
+void RelayInv(const CInv& inv);
 
 /** Access to the (IP) address database (peers.dat) */
 class CAddrDB

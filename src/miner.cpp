@@ -40,6 +40,8 @@
 #include <functional>
 #endif
 #include <mutex>
+#include "zelnode/payments.h"
+#include "zelnode/spork.h"
 
 using namespace std;
 
@@ -360,6 +362,9 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         // Set to 0 so expiry height does not apply to coinbase txs
         txNew.nExpiryHeight = 0;
 
+        //Zelnode payments
+        FillBlockPayee(txNew, nFees);
+
         // Add fees
         txNew.vout[0].nValue += nFees;
         txNew.vin[0].scriptSig = CScript() << nHeight << OP_0;
@@ -542,7 +547,7 @@ void static BitcoinMiner()
                         LOCK(cs_vNodes);
                         fvNodesEmpty = vNodes.empty();
                     }
-                    if (!fvNodesEmpty && !IsInitialBlockDownload())
+                    if (!fvNodesEmpty && !IsInitialBlockDownload() || !zelnodeSync.IsSynced())
                         break;
                     MilliSleep(1000);
                 } while (true);

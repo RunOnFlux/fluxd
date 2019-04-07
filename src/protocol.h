@@ -77,6 +77,10 @@ enum {
     // but no longer do as of protocol version 170004 (= NO_BLOOM_VERSION)
     NODE_BLOOM = (1 << 2),
 
+    // NODE_BLOOM_WITHOUT_ZN means the node has the same features as NODE_BLOOM with the only difference
+    // that the node doens't want to receive zelnode nodes messages. (the 1<<3 was not picked as constant because on bitcoin 0.14 is witness and we want that update here )
+    NODE_BLOOM_WITHOUT_ZN = (1 << 4),
+
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
     // isn't getting used, or one not being used much, and notify the
     // bitcoin-development mailing list. Remember that service bits are just
@@ -140,6 +144,7 @@ public:
     friend bool operator<(const CInv& a, const CInv& b);
 
     bool IsKnownType() const;
+    bool IsZelnodeType() const;
     const char* GetCommand() const;
     std::string ToString() const;
 
@@ -155,6 +160,13 @@ enum {
     // Nodes may always request a MSG_FILTERED_BLOCK in a getdata, however,
     // MSG_FILTERED_BLOCK should not appear in any invs except as a part of getdata.
     MSG_FILTERED_BLOCK,
+    MSG_SPORK,
+    MSG_ZELNODE_WINNER,
+    MSG_ZELNODE_SCANNING_ERROR,
+    MSG_ZELNODE_QUORUM,
+    MSG_ZELNODE_ANNOUNCE,
+    MSG_ZELNODE_PING,
+    MSG_DSTX
 };
 
 #endif // BITCOIN_PROTOCOL_H
