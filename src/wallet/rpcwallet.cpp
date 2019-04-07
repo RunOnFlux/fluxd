@@ -3652,8 +3652,8 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
             "\nResult:\n"
             "\"operationid\"          (string) An operationid to pass to z_getoperationstatus to get the result of the operation.\n"
             "\nExamples:\n"
-            + HelpExampleCli("z_sendmany", "\"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" '[{\"address\": \"ztfaW34Gj9FrnGUEf833ywDVL62NWXBM81u6EQnM6VR45eYnXhwztecW1SjxA7JrmAXKJhxhj3vDNEpVCQoSvVoSpmbhtjf\" ,\"amount\": 5.0}]'")
-            + HelpExampleRpc("z_sendmany", "\"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", [{\"address\": \"ztfaW34Gj9FrnGUEf833ywDVL62NWXBM81u6EQnM6VR45eYnXhwztecW1SjxA7JrmAXKJhxhj3vDNEpVCQoSvVoSpmbhtjf\" ,\"amount\": 5.0}]")
+            + HelpExampleCli("z_sendmany", "\"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" '[{\"address\": \"ztestacadia14jfkht4zc5c68vnn7f0699xh6qtk5su2fkcy88k8jlp0km0m0mw7heyvxp20wr8v3wpsxhgyrxs\" ,\"amount\": 5.0}]'")
+            + HelpExampleRpc("z_sendmany", "\"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", [{\"address\": \"ztestacadia14jfkht4zc5c68vnn7f0699xh6qtk5su2fkcy88k8jlp0km0m0mw7heyvxp20wr8v3wpsxhgyrxs\" ,\"amount\": 5.0}]")
         );
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
@@ -3950,8 +3950,8 @@ UniValue z_shieldcoinbase(const UniValue& params, bool fHelp)
             "  \"opid\": xxx          (string) An operationid to pass to z_getoperationstatus to get the result of the operation.\n"
             "}\n"
             "\nExamples:\n"
-            + HelpExampleCli("z_shieldcoinbase", "\"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"ztfaW34Gj9FrnGUEf833ywDVL62NWXBM81u6EQnM6VR45eYnXhwztecW1SjxA7JrmAXKJhxhj3vDNEpVCQoSvVoSpmbhtjf\"")
-            + HelpExampleRpc("z_shieldcoinbase", "\"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"ztfaW34Gj9FrnGUEf833ywDVL62NWXBM81u6EQnM6VR45eYnXhwztecW1SjxA7JrmAXKJhxhj3vDNEpVCQoSvVoSpmbhtjf\"")
+            + HelpExampleCli("z_shieldcoinbase", "\"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\" \"ztestacadia14jfkht4zc5c68vnn7f0699xh6qtk5su2fkcy88k8jlp0km0m0mw7heyvxp20wr8v3wpsxhgyrxs\"")
+            + HelpExampleRpc("z_shieldcoinbase", "\"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", \"ztestacadia14jfkht4zc5c68vnn7f0699xh6qtk5su2fkcy88k8jlp0km0m0mw7heyvxp20wr8v3wpsxhgyrxs\"")
         );
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
@@ -4195,8 +4195,8 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
             "  \"opid\": xxx                         (string) An operationid to pass to z_getoperationstatus to get the result of the operation.\n"
             "}\n"
             "\nExamples:\n"
-            + HelpExampleCli("z_mergetoaddress", "'[\"ANY_SAPLING\", \"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"]' ztfaW34Gj9FrnGUEf833ywDVL62NWXBM81u6EQnM6VR45eYnXhwztecW1SjxA7JrmAXKJhxhj3vDNEpVCQoSvVoSpmbhtjf")
-            + HelpExampleRpc("z_mergetoaddress", "[\"ANY_SAPLING\", \"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"], \"ztfaW34Gj9FrnGUEf833ywDVL62NWXBM81u6EQnM6VR45eYnXhwztecW1SjxA7JrmAXKJhxhj3vDNEpVCQoSvVoSpmbhtjf\"")
+            + HelpExampleCli("z_mergetoaddress", "'[\"ANY_SAPLING\", \"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"]' ztestacadia14jfkht4zc5c68vnn7f0699xh6qtk5su2fkcy88k8jlp0km0m0mw7heyvxp20wr8v3wpsxhgyrxs")
+            + HelpExampleRpc("z_mergetoaddress", "[\"ANY_SAPLING\", \"t1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\"], \"ztestacadia14jfkht4zc5c68vnn7f0699xh6qtk5su2fkcy88k8jlp0km0m0mw7heyvxp20wr8v3wpsxhgyrxs\"")
         );
 
     if (!fEnableMergeToAddress) {
