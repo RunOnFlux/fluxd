@@ -157,19 +157,14 @@ public:
 
     bool IsCrypted() const
     {
+        LOCK(cs_KeyStore);
         return fUseCrypto;
     }
 
     bool IsLocked() const
     {
-        if (!IsCrypted())
-            return false;
-        bool result;
-        {
-            LOCK(cs_KeyStore);
-            result = vMasterKey.empty();
-        }
-        return result;
+        LOCK(cs_KeyStore);
+        return fUseCrypto && vMasterKey.empty();
     }
 
     bool Lock();
@@ -183,19 +178,17 @@ public:
     bool AddKeyPubKey(const CKey& key, const CPubKey &pubkey);
     bool HaveKey(const CKeyID &address) const
     {
-        {
-            LOCK(cs_KeyStore);
-            if (!IsCrypted())
-                return CBasicKeyStore::HaveKey(address);
-            return mapCryptedKeys.count(address) > 0;
-        }
-        return false;
+        LOCK(cs_KeyStore);
+        if (!fUseCrypto)
+            return CBasicKeyStore::HaveKey(address);
+        return mapCryptedKeys.count(address) > 0;
     }
     bool GetKey(const CKeyID &address, CKey& keyOut) const;
     bool GetPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) const;
     void GetKeys(std::set<CKeyID> &setAddress) const
     {
-        if (!IsCrypted())
+        LOCK(cs_KeyStore);
+        if (!fUseCrypto)
         {
             CBasicKeyStore::GetKeys(setAddress);
             return;
@@ -216,19 +209,17 @@ public:
     bool AddSproutSpendingKey(const libzelcash::SproutSpendingKey &sk);
     bool HaveSproutSpendingKey(const libzelcash::SproutPaymentAddress &address) const
     {
-        {
-            LOCK(cs_KeyStore);
-            if (!IsCrypted())
-                return CBasicKeyStore::HaveSproutSpendingKey(address);
-            return mapCryptedSproutSpendingKeys.count(address) > 0;
-        }
-        return false;
+        LOCK(cs_KeyStore);
+        if (!fUseCrypto)
+            return CBasicKeyStore::HaveSproutSpendingKey(address);
+        return mapCryptedSproutSpendingKeys.count(address) > 0;
     }
 
     bool GetSproutSpendingKey(const libzelcash::SproutPaymentAddress &address, libzelcash::SproutSpendingKey &skOut) const;
     void GetSproutPaymentAddresses(std::set<libzelcash::SproutPaymentAddress> &setAddress) const
     {
-        if (!IsCrypted())
+        LOCK(cs_KeyStore);
+        if (!fUseCrypto)
         {
             CBasicKeyStore::GetSproutPaymentAddresses(setAddress);
             return;
@@ -251,14 +242,12 @@ public:
         const libzelcash::SaplingPaymentAddress &defaultAddr);
     bool HaveSaplingSpendingKey(const libzelcash::SaplingFullViewingKey &fvk) const
     {
-        {
-            LOCK(cs_KeyStore);
-            if (!IsCrypted())
-                return CBasicKeyStore::HaveSaplingSpendingKey(fvk);
-            for (auto entry : mapCryptedSaplingSpendingKeys) {
-                if (entry.first.fvk == fvk) {
-                    return true;
-                }
+        LOCK(cs_KeyStore);
+        if (!fUseCrypto)
+            return CBasicKeyStore::HaveSaplingSpendingKey(fvk);
+        for (auto entry : mapCryptedSaplingSpendingKeys) {
+            if (entry.first.fvk == fvk) {
+                return true;
             }
         }
         return false;
