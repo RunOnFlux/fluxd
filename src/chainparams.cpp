@@ -86,7 +86,7 @@ public:
     CMainParams() {
         strNetworkID = "main";
         strCurrencyUnits = "ZEL";
-	bip44CoinType = 133;
+	bip44CoinType = 19167;
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 5000;
         consensus.nSubsidyHalvingInterval = 655350; // 2.5 years
