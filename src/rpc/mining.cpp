@@ -1,5 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
+// Copyright (c) 2019 The Zelcash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -21,6 +22,7 @@
 #include "txmempool.h"
 #include "util.h"
 #include "validationinterface.h"
+#include "zelnode/spork.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif
@@ -567,6 +569,11 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
 
     if (IsInitialBlockDownload())
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Zelcash is downloading blocks...");
+
+    // when enforcement is on we need information about a zelnode payee or otherwise our block is going to be orphaned by the network
+    if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)
+        && !zelnodeSync.IsZelnodeWinnersSynced())
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Zelcash is downloading zelnode winners...");
 
     static unsigned int nTransactionsUpdatedLast;
 

@@ -315,6 +315,7 @@ UniValue znsync(const UniValue& params, bool fHelp)
                 "  \"countZelnodeWinner\": n,    (numeric) Number of ZN winner messages (local)\n"
                 "  \"RequestedZelnodeAssets\": n, (numeric) Status code of last sync phase\n"
                 "  \"RequestedZelnodeAttempt\": n, (numeric) Status code of last sync attempt\n"
+                "  \"Status\": xxxx,               (string) Status as a string \n"
                 "}\n"
 
                 "\nResult ('reset' mode):\n"
@@ -338,6 +339,7 @@ UniValue znsync(const UniValue& params, bool fHelp)
         obj.push_back(Pair("countZelnodeWinner", zelnodeSync.countZelnodeWinner));
         obj.push_back(Pair("RequestedZelnodeAssets", zelnodeSync.RequestedZelnodeAssets));
         obj.push_back(Pair("RequestedZelnodeAttempt", zelnodeSync.RequestedZelnodeAttempt));
+        obj.push_back(Pair("Status", zelnodeSync.GetSyncStatus()));
 
         return obj;
     }
