@@ -10,11 +10,11 @@
 #include <map>
 #include "uint256.h"
 
+#define ZELNODE_SYNC_FAILED -1
 #define ZELNODE_SYNC_INITIAL 0
 #define ZELNODE_SYNC_SPORKS 1
 #define ZELNODE_SYNC_LIST 2
 #define ZELNODE_SYNC_MNW 3
-#define ZELNODE_SYNC_FAILED 998
 #define ZELNODE_SYNC_FINISHED 999
 
 #define ZELNODE_SYNC_TIMEOUT 5
@@ -50,7 +50,7 @@ public:
     int RequestedZelnodeAttempt;
 
     // Time when current zelnode asset sync started
-    int64_t nAssetSyncStarted;
+    int64_t nTimeAssetSyncStarted;
 
     ZelnodeSync();
 
@@ -65,6 +65,8 @@ public:
     bool IsSynced();
     bool IsBlockchainSynced();
     bool IsZelnodeListSynced() { return RequestedZelnodeAssets > ZELNODE_SYNC_LIST; }
+    bool IsZelnodeWinnersSynced() { return RequestedZelnodeAssets > ZELNODE_SYNC_MNW; }
+    bool IsFailed() { return RequestedZelnodeAssets == ZELNODE_SYNC_FAILED; }
     void ClearFulfilledRequest();
 };
 

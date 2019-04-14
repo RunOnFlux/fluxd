@@ -86,7 +86,7 @@ public:
     CMainParams() {
         strNetworkID = "main";
         strCurrencyUnits = "ZEL";
-	bip44CoinType = 133;
+	bip44CoinType = 19167;
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 5000;
         consensus.nSubsidyHalvingInterval = 655350; // 2.5 years
@@ -148,9 +148,10 @@ public:
 
         vFixedSeeds.clear();
         vSeeds.clear();
-        vSeeds.push_back(CDNSSeedData("zelcash.tech", "dnsseed.zelcash.tech")); // Zelcash
-        vSeeds.push_back(CDNSSeedData("node.zel.cash", "seed.zel.cash")); // Zelcash
-        vSeeds.push_back(CDNSSeedData("node1.zel.cash", "dns.zel.cash")); // Zelcash
+        vSeeds.push_back(CDNSSeedData("vps.zel.network", "singapore.zel.network")); // MilesManley
+        vSeeds.push_back(CDNSSeedData("vpsone.zel.network", "bangalore.zel.network")); // MilesManley
+        vSeeds.push_back(CDNSSeedData("vpstwo.zel.network", "frankfurt.zel.network")); // MilesManley
+        vSeeds.push_back(CDNSSeedData("vpsthree.zel.network", "newyork.zel.network")); // MilesManley
         vSeeds.push_back(CDNSSeedData("vps.zelcash.online", "dnsseed.zelcash.online")); // TheTrunk
 
         // guarantees the first 2 characters, when base58 encoded, are "t1"

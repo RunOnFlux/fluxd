@@ -83,6 +83,7 @@ void ThreadSendAlert()
     // 170007 : 2.0.0
     // 170009 : 3.0.0
     // 170010 : 3.1.0
+    // 170011 : 3.1.1
     alert.nMinVer       = 170002;
     alert.nMaxVer       = 170009;
 
@@ -94,7 +95,7 @@ void ThreadSendAlert()
     //  4000 or higher will put the RPC into safe mode
     alert.nPriority     = 5000;
     alert.strComment    = "";
-    alert.strStatusBar  = "Your client is outdated. ZelNodes have been released. Please update to the most recent version of ZelCash (3.1.0 or later).";
+    alert.strStatusBar  = "Your client is outdated. Please update to the most recent version of ZelCash (3.1.0 or later).";
     alert.strRPCError   = alert.strStatusBar;
 
     // Set specific client version/versions here. If setSubVer is empty, no filtering on subver is done:

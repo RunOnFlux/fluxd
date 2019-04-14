@@ -59,7 +59,7 @@ void LoadSporksFromDB()
 void ProcessSpork(CNode* pfrom, std::string& strCommand, CDataStream& vRecv)
 {
     if (strCommand == "spork") {
-        LogPrintf("ProcessSpork::spork\n");
+        if (fDebug) LogPrintf("%s : spork\n", __func__);
         CDataStream vMsg(vRecv);
         CSporkMessage spork;
         vRecv >> spork;
