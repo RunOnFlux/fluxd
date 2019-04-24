@@ -204,6 +204,13 @@ public:
                             //   total number of tx / (checkpoint block height / (24 * 24))
         };
 
+        // Hardcoded fallback value for the Sprout shielded value pool balance
+        // for nodes that have not reindexed since the introduction of monitoring
+        // in #2795.
+        // nSproutValuePoolCheckpointHeight = 520633;
+        // nSproutValuePoolCheckpointBalance = 22145062442933;
+        // fZIP209Enabled = true;
+        // hashSproutValuePoolCheckpointBlock = uint256S("0000000000c7b46b6bc04b4cbf87d8bb08722aebd51232619b214f7273f8460e");
     }
 };
 static CMainParams mainParams;
