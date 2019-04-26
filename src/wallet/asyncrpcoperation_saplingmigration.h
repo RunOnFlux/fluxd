@@ -16,6 +16,8 @@ public:
     AsyncRPCOperation_saplingmigration& operator=(AsyncRPCOperation_saplingmigration const&) = delete; // Copy assign
     AsyncRPCOperation_saplingmigration& operator=(AsyncRPCOperation_saplingmigration&&) = delete;      // Move assign
 
+    static libzelcash::SaplingPaymentAddress getMigrationDestAddress(const HDSeed& seed);
+
     virtual void main();
 
     virtual UniValue getStatus() const;
@@ -28,6 +30,4 @@ private:
     void setMigrationResult(int numTxCreated);
 
     CAmount chooseAmount(const CAmount& availableFunds);
-
-    libzelcash::SaplingPaymentAddress getMigrationDestAddress(const HDSeed& seed);
 };
