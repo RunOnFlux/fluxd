@@ -114,6 +114,15 @@ public:
     std::string GetFoundersRewardAddressAtIndex(int i) const;
     /** Enforce coinbase consensus rule in regtest mode */
     void SetRegTestCoinbaseMustBeProtected() { consensus.fCoinbaseMustBeProtected = true; }
+
+
+    /** Zelnode Handling **/
+    std::string SporkKey() const { return strSporkKey; }
+    std::string ZelnodeTestingDummyAddress() const { return strZelnodeTestingDummyAddress; }
+    int64_t StartZelnodePayments() const { return nStartZelnodePayments; }
+    CBaseChainParams::Network NetworkID() const { return networkID; }
+
+
 protected:
     CChainParams() {}
 
@@ -142,6 +151,13 @@ protected:
     bool fTestnetToBeDeprecatedFieldRPC = false;
     CCheckpointData checkpointData;
     std::vector<std::string> vFoundersRewardAddress;
+
+
+    /** Zelnode params **/
+    std::string strSporkKey;
+    std::string strZelnodeTestingDummyAddress;
+    int64_t nStartZelnodePayments;
+    CBaseChainParams::Network networkID;
 };
 
 /**

@@ -18,6 +18,7 @@
 #include "httpserver.h"
 #include "httprpc.h"
 #include "key.h"
+#include "zelnode/benchmarks.h"
 #ifdef ENABLE_MINING
 #include "key_io.h"
 #endif
@@ -28,6 +29,7 @@
 #include "rpc/server.h"
 #include "rpc/register.h"
 #include "script/standard.h"
+#include "script/sigcache.h"
 #include "scheduler.h"
 #include "txdb.h"
 #include "torcontrol.h"
@@ -35,6 +37,8 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
+#include "zelnode/sporkdb.h"
+#include "zelnode/zelnodeconfig.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
@@ -68,6 +72,7 @@
 #endif
 
 #include "librustzcash.h"
+#include "zelnode/sporkdb.h"
 
 using namespace std;
 
@@ -211,6 +216,9 @@ void Shutdown()
 #endif
     StopNode();
     StopTorControl();
+    DumpZelnodes();
+    DumpZelnodePayments();
+
     UnregisterNodeSignals(GetNodeSignals());
 
     if (fFeeEstimatesInitialized)
@@ -237,6 +245,8 @@ void Shutdown()
         pcoinsdbview = NULL;
         delete pblocktree;
         pblocktree = NULL;
+        delete pSporkDB;
+        pSporkDB = NULL;
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
@@ -470,7 +480,7 @@ std::string HelpMessage(HelpMessageMode mode)
     {
         strUsage += HelpMessageOpt("-limitfreerelay=<n>", strprintf("Continuously rate-limit free transactions to <n>*1000 bytes per minute (default: %u)", 15));
         strUsage += HelpMessageOpt("-relaypriority", strprintf("Require high priority for relaying free or low-fee transactions (default: %u)", 0));
-        strUsage += HelpMessageOpt("-maxsigcachesize=<n>", strprintf("Limit size of signature cache to <n> entries (default: %u)", 50000));
+        strUsage += HelpMessageOpt("-maxsigcachesize=<n>", strprintf("Limit size of signature cache to <n> MiB (default: %u)", DEFAULT_MAX_SIG_CACHE_SIZE));
         strUsage += HelpMessageOpt("-maxtipage=<n>", strprintf("Maximum tip age in seconds to consider node in initial block download (default: %u)", DEFAULT_MAX_TIP_AGE));
     }
     strUsage += HelpMessageOpt("-minrelaytxfee=<amt>", strprintf(_("Fees (in %s/kB) smaller than this are considered zero fee for relaying (default: %s)"),
@@ -536,6 +546,9 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-metricsui", _("Set to 1 for a persistent metrics screen, 0 for sequential metrics output (default: 1 if running in a console, 0 otherwise)"));
         strUsage += HelpMessageOpt("-metricsrefreshtime", strprintf(_("Number of seconds between metrics refreshes (default: %u if running in a console, %u otherwise)"), 1, 600));
     }
+
+    strUsage += HelpMessageOpt("-sporkkey=<privkey>", _("Enable spork administration functionality with the appropriate private key."));
+
 
     return strUsage;
 }
@@ -842,6 +855,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             return InitError(_("Payment disclosure requires -experimentalfeatures."));
         } else if (mapArgs.count("-zmergetoaddress")) {
             return InitError(_("RPC method z_mergetoaddress requires -experimentalfeatures."));
+        } else if (mapArgs.count("-savesproutr1cs")) {
+            return InitError(_("Saving the Sprout R1CS requires -experimentalfeatures."));
         }
     }
 
@@ -1198,6 +1213,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             threadGroup.create_thread(&ThreadScriptCheck);
     }
 
+    if (mapArgs.count("-sporkkey")) // spork priv key
+    {
+        if (!sporkManager.SetPrivKey(GetArg("-sporkkey", "")))
+            return InitError(_("Unable to sign spork message, wrong key?"));
+    }
+
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
     threadGroup.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
@@ -1220,6 +1241,14 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Initialize Zelcash circuit parameters
     ZC_LoadParams(chainparams);
+
+    if (GetBoolArg("-savesproutr1cs", false)) {
+        boost::filesystem::path r1cs_path = ZC_GetParamsDir() / "r1cs";
+
+        LogPrintf("Saving Sprout R1CS to %s\n", r1cs_path.string());
+
+        pzelcashParams->saveR1CS(r1cs_path.string());
+    }
 
     /* Start the RPC server already.  It will be started in "warmup" mode
      * and not really process calls already (but it will signify connections
@@ -1451,7 +1480,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         bool fReset = fReindex;
         std::string strLoadError;
 
-        uiInterface.InitMessage(_("Loading block index..."));
+
 
         nStart = GetTimeMillis();
         do {
@@ -1461,6 +1490,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete pcoinsdbview;
                 delete pcoinscatcher;
                 delete pblocktree;
+                delete pSporkDB;
+
+                /** Zelnode Sporks */
+                pSporkDB = new CSporkDB(0, false, false);
 
                 pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
@@ -1474,6 +1507,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                         CleanupBlockRevFiles();
                 }
 
+                uiInterface.InitMessage(_("Loading sporks..."));
+                LoadSporksFromDB();
+
+                uiInterface.InitMessage(_("Loading block index..."));
                 if (!LoadBlockIndex()) {
                     strLoadError = _("Error loading block database");
                     break;
@@ -1779,7 +1816,95 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             MilliSleep(10);
     }
 
-    // ********************************************************* Step 11: start node
+
+    // ********************************************************* Step 11: setup zelnode
+
+    uiInterface.InitMessage(_("Loading zelnode cache..."));
+
+    ZelnodeDB zndb;
+    ZelnodeDB::ReadResult readResult = zndb.Read(zelnodeman);
+    if (readResult == ZelnodeDB::FileError)
+        LogPrintf("Missing zelnode cache file - zncache.dat, will try to recreate\n");
+    else if (readResult != ZelnodeDB::Ok) {
+        LogPrintf("Error reading zncache.dat: ");
+        if (readResult == ZelnodeDB::IncorrectFormat)
+            LogPrintf("magic is ok but data has invalid format, will try to recreate\n");
+        else
+            LogPrintf("file format is unknown or invalid, please fix it manually\n");
+    }
+
+    uiInterface.InitMessage(_("Loading zelnode payment cache..."));
+
+    PaymentDB znpayments;
+    PaymentDB::ReadResult readResult3 = znpayments.Read(zelnodePayments);
+
+    if (readResult3 == PaymentDB::FileError)
+        LogPrintf("Missing zelnode payment cache - znpayments.dat, will try to recreate\n");
+    else if (readResult3 != PaymentDB::Ok) {
+        LogPrintf("Error reading znpayments.dat: ");
+        if (readResult3 == PaymentDB::IncorrectFormat)
+            LogPrintf("magic is ok but data has invalid format, will try to recreate\n");
+        else
+            LogPrintf("file format is unknown or invalid, please fix it manually\n");
+    }
+
+    fZelnode = GetBoolArg("-zelnode", false);
+
+    if ((fZelnode || zelnodeConfig.getCount() > -1) && fTxIndex == false) {
+        return InitError("Enabling Zelnode support requires turning on transaction indexing."
+                         "Please add txindex=1 to your configuration and start with -reindex");
+    }
+
+    if (fZelnode) {
+        LogPrintf("IS ZELNODE\n");
+        strZelnodeAddr = GetArg("-zelnodeaddr", "");
+
+        LogPrintf(" addr %s\n", strZelnodeAddr.c_str());
+
+        if (!strZelnodeAddr.empty()) {
+            CService addrTest = CService(strZelnodeAddr);
+            if (!addrTest.IsValid()) {
+                return InitError("Invalid -zelnodeaddr address: " + strZelnodeAddr);
+            }
+        }
+
+        strZelnodePrivKey = GetArg("-zelnodeprivkey", "");
+        if (!strZelnodePrivKey.empty()) {
+            std::string errorMessage;
+
+            CKey key;
+            CPubKey pubkey;
+
+            if (!obfuScationSigner.SetKey(strZelnodePrivKey, errorMessage, key, pubkey)) {
+                return InitError(_("Invalid zelnodeprivkey. Please see documenation."));
+            }
+
+            activeZelnode.pubKeyZelnode = pubkey;
+
+        } else {
+            return InitError(_("You must specify a zelnodeprivkey in the configuration. Please see documentation for help."));
+        }
+    }
+
+    if (GetBoolArg("-znconflock", true) && pwalletMain) {
+        LOCK(pwalletMain->cs_wallet);
+        LogPrintf("Locking Zelnodes:\n");
+        uint256 znTxHash;
+        for (ZelnodeConfig::ZelnodeEntry zne : zelnodeConfig.getEntries()) {
+            LogPrintf("  %s %s\n", zne.getTxHash(), zne.getOutputIndex());
+            znTxHash.SetHex(zne.getTxHash());
+            COutPoint outpoint = COutPoint(znTxHash, (unsigned int) std::stoul(zne.getOutputIndex().c_str()));
+            pwalletMain->LockCoin(outpoint);
+        }
+    }
+
+    threadGroup.create_thread(boost::bind(&ThreadCheckZelnodes));
+
+    if (GetBoolArg("-zelnode", false)) {
+        threadGroup.create_thread(boost::bind(&ThreadBenchmarkZelnode));
+    }
+
+    // ********************************************************* Step 12: start node
 
     if (!CheckDiskSpace())
         return false;
@@ -1817,7 +1942,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
  #endif
 #endif
 
-    // ********************************************************* Step 11: finished
+    // ********************************************************* Step 12: finished
 
     SetRPCWarmupFinished();
     uiInterface.InitMessage(_("Done loading"));

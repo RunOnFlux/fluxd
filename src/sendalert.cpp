@@ -81,8 +81,11 @@ void ThreadSendAlert()
     // 170002 : 1.0.0
     // 170006 : 1.1.2
     // 170007 : 2.0.0
+    // 170009 : 3.0.0
+    // 170010 : 3.1.0
+    // 170011 : 3.1.1
     alert.nMinVer       = 170002;
-    alert.nMaxVer       = 170007;
+    alert.nMaxVer       = 170009;
 
     //
     // main.cpp:
@@ -90,9 +93,9 @@ void ThreadSendAlert()
     //  2000 for longer invalid proof-of-work chain
     //  Higher numbers mean higher priority
     //  4000 or higher will put the RPC into safe mode
-    alert.nPriority     = 4000;
+    alert.nPriority     = 5000;
     alert.strComment    = "";
-    alert.strStatusBar  = "Your client version 1.1.0 has degraded networking behavior. Please update to the most recent version of Zelcash (2.0.0 or later).";
+    alert.strStatusBar  = "Your client is outdated. Please update to the most recent version of ZelCash (3.1.0 or later).";
     alert.strRPCError   = alert.strStatusBar;
 
     // Set specific client version/versions here. If setSubVer is empty, no filtering on subver is done:

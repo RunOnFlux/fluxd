@@ -1,8 +1,26 @@
+zelcash (3.1.1) stable; urgency=medium
+
+  * 3.1.1 release.
+
+ -- Zel Foundation <info@zel.cash>  Fri, 5 Apr 2019 12:00:00 +0100
+
+zelcash (3.1.0) stable; urgency=medium
+
+  * 3.1.0 release.
+
+ -- Zel Foundation <info@zel.cash>  Fri, 1 Mar 2019 12:00:00 +0100
+
+zelcash (3.0.0) stable; urgency=medium
+
+  * 3.0.0 release.
+
+ -- Zel Foundation <info@zel.cash>  Mon, 18 Feb 2019 12:00:00 +0100
+
 zelcash (2.0.0) stable; urgency=medium
 
   * 2.0.0 release.
 
- -- Zelcash Company <team@zel.cash>  Wed, 5 Dec 2018 12:00:00 -0100
+ -- Zel Foundation <info@zel.cash>  Wed, 5 Dec 2018 12:00:00 -0100
 
 zcash (2.0.2) stable; urgency=medium
 
@@ -80,7 +98,7 @@ Zelcash (1.1.0) Initial stable; urgency=medium
 
   * 1.1.0 release.
 
-  -- Zel Technologies LLC <info@zel.cash>  Fri, 13 Jul 2018 12:00:00 +0000
+  -- Zel Foundation <info@zel.cash>  Fri, 13 Jul 2018 12:00:00 +0000
 
 Zelcash (1.0.14) Initial stable; urgency=medium
 
@@ -158,7 +176,7 @@ zcash (1.0.9) stable; urgency=medium
 
   * 1.0.9 release.
 
- -- Zcash Company <team@zel.cash>  Wed, 24 May 2017 12:51:06 -0700
+ -- Zcash Company <team@z.cash>  Wed, 24 May 2017 12:51:06 -0700
 
 zcash (1.0.8+1) jessie; urgency=high
 

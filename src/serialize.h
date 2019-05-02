@@ -26,6 +26,7 @@
 #include <boost/optional.hpp>
 
 #include "prevector.h"
+#include "script/script.h"
 
 static const unsigned int MAX_SIZE = 0x02000000;
 
@@ -568,7 +569,15 @@ template<typename Stream, typename T> void Unserialize(Stream& os, std::shared_p
  * unique_ptr
  */
 template<typename Stream, typename T> void Serialize(Stream& os, const std::unique_ptr<const T>& p);
-template<typename Stream, typename T> void Unserialize(Stream& os, std::unique_ptr<const T>& p);
+template<typename Stream, typename T> void Unserialize(Stream& is, std::unique_ptr<const T>& p);
+
+/**
+ * others derived from vector
+ */
+template <typename Stream>
+void Serialize(Stream& os, const CScript& v);
+template <typename Stream>
+void Unserialize(Stream& is, CScript& v);
 
 
 
@@ -745,6 +754,21 @@ template<typename Stream, typename T, typename A>
 inline void Unserialize(Stream& is, std::vector<T, A>& v)
 {
     Unserialize_impl(is, v, T());
+}
+
+/**
+ * others derived from vector
+ */
+template <typename Stream>
+void Serialize(Stream& os, const CScript& v)
+{
+    Serialize(os, (const std::vector<unsigned char>&)v);
+}
+
+template <typename Stream>
+void Unserialize(Stream& is, CScript& v)
+{
+    Unserialize(is, (std::vector<unsigned char>&)v);
 }
 
 

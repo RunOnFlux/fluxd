@@ -215,17 +215,14 @@ bool CheckEquihashSolution(const CBlockHeader *pblock, const CChainParams& param
     // Hash state
     crypto_generichash_blake2b_state state;
     EhInitialiseState(n, k, state);
-
     // I = the block header minus nonce and solution.
     CEquihashInput I{*pblock};
     // I||V
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss << I;
     ss << pblock->nNonce;
-
     // H(I||V||...
     crypto_generichash_blake2b_update(&state, (unsigned char*)&ss[0], ss.size());
-
     bool isValid;
     EhIsValidSolution(n, k, state, pblock->nSolution, isValid);
     if (!isValid)

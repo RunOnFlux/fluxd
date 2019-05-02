@@ -1,5 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
+// Copyright (c) 2019 The Zelcash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -21,6 +22,7 @@
 #include "txmempool.h"
 #include "util.h"
 #include "validationinterface.h"
+#include "zelnode/spork.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif
@@ -30,6 +32,7 @@
 #include <boost/assign/list_of.hpp>
 
 #include <univalue.h>
+#include "key_io.h"
 
 using namespace std;
 
@@ -567,6 +570,11 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     if (IsInitialBlockDownload())
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Zelcash is downloading blocks...");
 
+    // when enforcement is on we need information about a zelnode payee or otherwise our block is going to be orphaned by the network
+    if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)
+        && !zelnodeSync.IsZelnodeWinnersSynced())
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Zelcash is downloading zelnode winners...");
+
     static unsigned int nTransactionsUpdatedLast;
 
     if (!lpval.isNull())
@@ -729,6 +737,34 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     result.push_back(Pair("curtime", pblock->GetBlockTime()));
     result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
     result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight+1)));
+
+    if (pblock->vtx.size()) {
+        int nCoinbaseOutSize = pblock->vtx[0].vout.size();
+        if (nCoinbaseOutSize > 0) {
+            result.push_back(Pair("miner_reward", pblock->vtx[0].vout[0].nValue));
+        }
+        if (nCoinbaseOutSize > 1) {
+            CTxDestination dest;
+            ExtractDestination(pblock->vtx[0].vout[1].scriptPubKey, dest);
+            result.push_back(Pair("basic_zelnode_address", EncodeDestination(dest)));
+            result.push_back(Pair("basic_zelnode_payout", pblock->vtx[0].vout[1].nValue));
+        }
+        if (nCoinbaseOutSize > 2) {
+            CTxDestination dest;
+            ExtractDestination(pblock->vtx[0].vout[2].scriptPubKey, dest);
+            result.push_back(Pair("super_zelnode_address", EncodeDestination(dest)));
+            result.push_back(Pair("super_zelnode_payout", pblock->vtx[0].vout[2].nValue));
+        }
+        if (nCoinbaseOutSize > 3) {
+            CTxDestination dest;
+            ExtractDestination(pblock->vtx[0].vout[3].scriptPubKey, dest);
+            result.push_back(Pair("bamf_zelnode_address", EncodeDestination(dest)));
+            result.push_back(Pair("bamf_zelnode_payout", pblock->vtx[0].vout[3].nValue));
+        }
+    } else {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Block didn't have any transactions in it...");
+    }
+
 
     return result;
 }

@@ -291,8 +291,8 @@ def gen_release_notes(release, releasefrom):
 
 @phase('Updating debian changelog.')
 def update_debian_changelog(release):
-    os.environ['DEBEMAIL'] = 'team@zel.cash'
-    os.environ['DEBFULLNAME'] = 'Zelcash Company'
+    os.environ['DEBEMAIL'] = 'info@zel.cash'
+    os.environ['DEBFULLNAME'] = 'Zel Foundation'
     sh_log(
         'debchange',
         '--newversion', release.debversion,

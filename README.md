@@ -1,17 +1,29 @@
 =======
 # ZelCash [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
 =======
-# ZelCash 2.0.0
+# ZelCash 3.1.1 ZelNodes
 INNOVATIVE  INTELLIGENT  INSPIRING
 
-ZelCash is a fork of 2.0.2 Zcash aiming to provide decentralised development platform via ZelNodes and ZelCore.
+ZelCash is a fork of 2.0.3 Zcash aiming to provide decentralised development platform via ZelNodes and ZelCore.
 
-POW asic resistant with Equihash (144,5) also known as Zhash with personalisation string ZelProof.
-
-Fork to Acadia will be at the blockheight 250 000 which is estimated to occur on the 12th of January 2019. Please update to the latest release prior this date. Acadia release activates latest Zcash technology - Overwinter and Sapling upgrade. We are also modifying our difficulty algorithm to its next generation from LWMA to LWMA3. It is also neccesarry to download new Zcash network parameters via /zcutil/fetch-params.sh script.
+POW asic resistant with Equihash (144,5) also known as Zhash with personalisation string ZelProof and LWMA3 difficulty algorithm.
 
 To speed up synchronisation you can also download our blockchain (state 18. 12. 2018) at https://zelcore.io/Zelcash.zip 
+For ZelNodes/Control Wallets use this bootstrap with txindex enabled (state 18. 02. 2019) https://zelcore.io/zelcashbootstraptxindex.zip
 
+# Install and run from APT
+
+On Ubuntu/Debian-based systems:
+
+```
+echo 'deb https://zelcash.github.io/aptrepo/ all main' | sudo tee --append /etc/apt/sources.list.d/zelcash.list
+gpg --keyserver keyserver.ubuntu.com --recv 4B69CA27A986265D
+gpg --export 4B69CA27A986265D | sudo apt-key add -
+
+sudo apt-get update
+sudo apt-get install zelcash
+```
+This installs zelcashd, zelcash-cli, zelcash-tx and zelcash-fetch-params
 
 # Build Guides
 ## Build for Linux
@@ -20,6 +32,8 @@ To speed up synchronisation you can also download our blockchain (state 18. 12. 
 On Ubuntu/Debian-based systems:
 
 ```
+$ sudo apt-get update
+$ sudo apt-get upgrade
 $ sudo apt-get install \
       build-essential pkg-config libc6-dev m4 g++-multilib \
       autoconf libtool ncurses-dev unzip git python python-zmq \
@@ -42,20 +56,16 @@ cd zelcash
 ```
 
 #### Run ZelCash 
-1. Create zelcash.conf file
+1. Create zelcash.conf file (copy and paste this block in one into your terminal)
 ```
 mkdir ~/.zelcash
 echo "rpcuser=username" >> ~/.zelcash/zelcash.conf
 echo "rpcpassword=`head -c 32 /dev/urandom | base64`" >> ~/.zelcash/zelcash.conf
-echo "addnode=node.zel.cash" >> ~/.zelcash/zelcash.conf
+echo "rpcallowip=127.0.0.1" >> ~/.zelcash/zelcash.conf
 echo "addnode=explorer.zel.cash" >> ~/.zelcash/zelcash.conf
-echo "addnode=explorer2.zel.cash" >> ~/.zelcash/zelcash.conf
-echo "addnode=explorer.zelcash.online" >> ~/.zelcash/zelcash.conf
-echo "addnode=node-eu.zelcash.com" >> ~/.zelcash/zelcash.conf
-echo "addnode=node-uk.zelcash.com" >> ~/.zelcash/zelcash.conf
-echo "addnode=node-asia.zelcash.com" >> ~/.zelcash/zelcash.conf
-```
+echo "addnode=explorer.zel.zelcore.io" >> ~/.zelcash/zelcash.conf
 
+```
 2. Fetch keys
 ```
 cd zelcash
@@ -76,8 +86,8 @@ Windows:
 ```
 sudo apt-get install \
     build-essential pkg-config libc6-dev m4 g++-multilib \
-    autoconf libtool ncurses-dev unzip git python \
-    zlib1g-dev wget bsdmainutils automake mingw-w64
+    autoconf libtool ncurses-dev cmake unzip git python \
+    zlib1g-dev wget bsdmainutils automake mingw-w64 curl
 ```
 
 #### Build
@@ -92,15 +102,11 @@ This will create zelcashd.exe zelcash-cli.exe and zelcash-tx.exe in src director
 
 Create following zelcash.conf file in %AppData%/Roaming/ZelCash 
 ```
-rpcuser=username
-rpcpassword=RandomPasswordChangeME
-addnode=node.zel.cash
+rpcuser=randomusername
+rpcpassword=RandomPasswordChangeme
+rpcallowip=127.0.0.1
 addnode=explorer.zel.cash
-addnode=explorer2.zel.cash
-addnode=explorer.zelcash.online
-addnode=node-eu.zelcash.com
-addnode=node-uk.zelcash.com
-addnode=node-asia.zelcash.com
+addnode=explorer.zel.zelcore.io
 ```
 
 2. Download Zcash parameters to  %AppData%/Roaming/ZcashParams
@@ -146,16 +152,13 @@ cd zelcash
 
 2. Create configuration file
 ```{r, engine='bash'}
-mkdir  ~/Library/Application Support/zelcash/
+mkdir ~/Library/Application Support/zelcash/
 echo "rpcuser=username" >> ~/Library/Application Support/zelcash/zelcash.conf
 echo "rpcpassword=`head -c 32 /dev/urandom | base64`" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=node.zel.cash" >> ~/Library/Application Support/zelcash/zelcash.conf
+echo "rpcallowip=127.0.0.1" >> ~/Library/Application Support/zelcash/zelcash.conf
 echo "addnode=explorer.zel.cash" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=explorer2.zel.cash" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=explorer.zelcash.online" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=node-eu.zelcash.com" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=node-uk.zelcash.com" >> ~/Library/Application Support/zelcash/zelcash.conf
-echo "addnode=node-asia.zelcash.com" >> ~/Library/Application Support/zelcash/zelcash.conf
+echo "addnode=explorer.zel.zelcore.io" >> ~/Library/Application Support/zelcash/zelcash.conf
+
 ```
 
 3. Run ZelCash Node
