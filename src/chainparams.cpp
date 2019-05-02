@@ -285,7 +285,11 @@ public:
 
         vFixedSeeds.clear();
         vSeeds.clear();
-        vSeeds.push_back(CDNSSeedData("vps.testnet.zelcash.online", "dnsseedtestnet.zelcash.online")); // TheTrunk
+        vSeeds.push_back(CDNSSeedData("test.vps.zel.network", "test.singapore.zel.network")); // MilesManley
+        vSeeds.push_back(CDNSSeedData("test.vpsone.zel.network", "test.bangalore.zel.network")); // MilesManley
+        vSeeds.push_back(CDNSSeedData("test.vpstwo.zel.network", "test.frankfurt.zel.network")); // MilesManley
+        vSeeds.push_back(CDNSSeedData("test.vpsthree.zel.network", "test.newyork.zel.network")); // MilesManley
+        //vSeeds.push_back(CDNSSeedData("vps.testnet.zelcash.online", "dnsseedtestnet.zelcash.online")); // TheTrunk
 
 
         // guarantees the first 2 characters, when base58 encoded, are "tm"
