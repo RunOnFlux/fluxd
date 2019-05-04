@@ -1,4 +1,6 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
+
+import sys; assert sys.version_info < (3,), ur"This script does not run under Python 3. Please use Python 2.7.x."
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_true, initialize_chain_clean, start_node
@@ -25,12 +27,12 @@ class SignOfflineTest (BitcoinTestFramework):
 
         assert_equal(0, len(offline_node.getpeerinfo())) # make sure node 1 has no peers
 
-        privkeys = [self.nodes[0].dumpprivkey(self.nodes[0].getnewaddress())]
         taddr = self.nodes[0].getnewaddress()
 
         tx = self.nodes[0].listunspent()[0]
         txid = tx['txid']
         scriptpubkey = tx['scriptPubKey']
+        privkeys = [self.nodes[0].dumpprivkey(tx['address'])]
 
         create_inputs = [{'txid': txid, 'vout': 0}]
         sign_inputs = [{'txid': txid, 'vout': 0, 'scriptPubKey': scriptpubkey, 'amount': 10}]
