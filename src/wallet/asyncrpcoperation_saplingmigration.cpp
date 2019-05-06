@@ -191,6 +191,10 @@ libzelcash::SaplingPaymentAddress AsyncRPCOperation_saplingmigration::getMigrati
     return toAddress;
 }
 
+void AsyncRPCOperation_saplingmigration::cancel() {
+    set_state(OperationStatus::CANCELLED);
+}
+
 UniValue AsyncRPCOperation_saplingmigration::getStatus() const {
     UniValue v = AsyncRPCOperation::getStatus();
     UniValue obj = v.get_obj();
