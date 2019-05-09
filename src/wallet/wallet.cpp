@@ -612,7 +612,7 @@ void CWallet::RunSaplingMigration(int blockHeight) {
     // height N-5
     if (blockHeight % 500 == 495) {
         std::shared_ptr<AsyncRPCQueue> q = getAsyncRPCQueue();
-        std::shared_ptr<AsyncRPCOperation> lastOperation = q->popOperationForId(saplingMigrationOperationId);
+        std::shared_ptr<AsyncRPCOperation> lastOperation = q->getOperationForId(saplingMigrationOperationId);
         if (lastOperation != nullptr) {
             lastOperation->cancel();
         }
@@ -622,7 +622,7 @@ void CWallet::RunSaplingMigration(int blockHeight) {
         q->addOperation(operation);
     } else if (blockHeight % 500 == 499) {
         std::shared_ptr<AsyncRPCQueue> q = getAsyncRPCQueue();
-        std::shared_ptr<AsyncRPCOperation> lastOperation = q->popOperationForId(saplingMigrationOperationId);
+        std::shared_ptr<AsyncRPCOperation> lastOperation = q->getOperationForId(saplingMigrationOperationId);
         if (lastOperation != nullptr) {
             lastOperation->cancel();
         }
