@@ -13,6 +13,7 @@
 #include "wallet.h"
 
 const CAmount FEE = 10000;
+const int MIGRATION_EXPIRY_DELTA = 450;
 
 AsyncRPCOperation_saplingmigration::AsyncRPCOperation_saplingmigration(int targetHeight) : targetHeight_(targetHeight) {}
 
@@ -98,7 +99,7 @@ bool AsyncRPCOperation_saplingmigration::main_impl() {
     CCoinsViewCache coinsView(pcoinsTip);
     do {
         CAmount amountToSend = chooseAmount(availableFunds);
-        auto builder = TransactionBuilder(consensusParams, targetHeight_, expiryDelta, pwalletMain, pzelcashParams,
+        auto builder = TransactionBuilder(consensusParams, targetHeight_, MIGRATION_EXPIRY_DELTA, pwalletMain, pzelcashParams,
                                           &coinsView, &cs_main);
         std::vector<CSproutNotePlaintextEntry> fromNotes;
         CAmount fromNoteAmount = 0;
@@ -183,7 +184,7 @@ libzelcash::SaplingPaymentAddress AsyncRPCOperation_saplingmigration::getMigrati
     libzelcash::SaplingExtendedSpendingKey xsk = m_32h_cth.Derive(0 | ZIP32_HARDENED_KEY_LIMIT);
 
     libzelcash::SaplingPaymentAddress toAddress = xsk.DefaultAddress();
-    
+
     // Refactor: this is similar logic as in the visitor HaveSpendingKeyForPaymentAddress and is used elsewhere
     libzelcash::SaplingIncomingViewingKey ivk;
     libzelcash::SaplingFullViewingKey fvk;
