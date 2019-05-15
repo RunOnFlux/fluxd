@@ -32,6 +32,7 @@ struct EHparameters {
 //EH sol size = (pow(2, k) * ((n/(k+1))+1)) / 8;
 static const EHparameters eh200_9 = {200,9,1344};
 static const EHparameters eh144_5 = {144,5,100};
+static const EHparameters zelHash = {125,4,52};
 static const EHparameters eh96_5 = {96,5,68};
 static const EHparameters eh48_5 = {48,5,36};
 static const unsigned int MAX_EH_PARAM_LIST_LEN = 2;
@@ -93,8 +94,11 @@ public:
     int64_t PruneAfterHeight() const { return nPruneAfterHeight; }
     EHparameters eh_epoch_1_params() const { return eh_epoch_1; }
     EHparameters eh_epoch_2_params() const { return eh_epoch_2; }
+    EHparameters eh_epoch_3_params() const { return eh_epoch_3; }
     unsigned long eh_epoch_1_end() const {   return GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight + GetConsensus().eh_epoch_fade_length - 1; }
     unsigned long eh_epoch_2_start() const { return GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight; }
+    unsigned long eh_epoch_2_end() const {   return GetConsensus().vUpgrades[Consensus::UPGRADE_ZELHASH].nActivationHeight + GetConsensus().eh_epoch_fade_length - 1; }
+    unsigned long eh_epoch_3_start() const { return GetConsensus().vUpgrades[Consensus::UPGRADE_ZELHASH].nActivationHeight; }
     std::string CurrencyUnits() const { return strCurrencyUnits; }
     uint32_t BIP44CoinType() const { return bip44CoinType; }
     /** Make miner stop after a block is found. In RPC, don't return until nGenProcLimit blocks are generated */
@@ -134,7 +138,8 @@ protected:
     uint64_t nPruneAfterHeight = 0;
     EHparameters eh_epoch_1 = eh200_9;
     EHparameters eh_epoch_2 = eh144_5;
-   // unsigned long eh_epoch_1_endblock = 0;		// Replaced by epoch fade
+    EHparameters eh_epoch_3 = zelHash;
+    // unsigned long eh_epoch_1_endblock = 0;		// Replaced by epoch fade
    // unsigned long eh_epoch_2_startblock = 0;		// Moved to consensus
     std::vector<CDNSSeedData> vSeeds;
     std::vector<unsigned char> base58Prefixes[MAX_BASE58_TYPES];
