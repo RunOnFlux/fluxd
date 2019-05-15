@@ -1,5 +1,5 @@
-// Copyright (c) 2018 The Zelcash developers
-// Copyright (c) 2016 The Zcash developers
+// Copyright (c) 2019 The Zel developers
+// Copyright (c) 2019 The Zcash developers
 
 // Original code from: https://gist.github.com/laanwj/0e689cfa37b52bcbbb44
 
@@ -84,8 +84,9 @@ void ThreadSendAlert()
     // 170009 : 3.0.0
     // 170010 : 3.1.0
     // 170011 : 3.1.1
+    // 170012 : 3.2.0
     alert.nMinVer       = 170002;
-    alert.nMaxVer       = 170009;
+    alert.nMaxVer       = 170011;
 
     //
     // main.cpp:
@@ -95,7 +96,7 @@ void ThreadSendAlert()
     //  4000 or higher will put the RPC into safe mode
     alert.nPriority     = 5000;
     alert.strComment    = "";
-    alert.strStatusBar  = "Your client is outdated. Please update to the most recent version of ZelCash (3.1.0 or later).";
+    alert.strStatusBar  = "Your client is outdated. Please update to the most recent version of ZelCash (3.2.0 or later).";
     alert.strRPCError   = alert.strStatusBar;
 
     // Set specific client version/versions here. If setSubVer is empty, no filtering on subver is done:

@@ -1,3 +1,9 @@
+zelcash (3.2.0) stable; urgency=medium
+
+  * 3.2.0 release.
+
+ -- Zel Foundation <info@zel.cash>  Fri, 31 May 2019 12:00:00 +0100
+
 zelcash (3.1.1) stable; urgency=medium
 
   * 3.1.1 release.
@@ -20,7 +26,7 @@ zelcash (2.0.0) stable; urgency=medium
 
   * 2.0.0 release.
 
- -- Zel Foundation <info@zel.cash>  Wed, 5 Dec 2018 12:00:00 -0100
+ -- Zel Foundation <info@zel.cash>  Wed, 5 Dec 2018 12:00:00 +0100
 
 zcash (2.0.2) stable; urgency=medium
 
