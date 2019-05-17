@@ -289,7 +289,7 @@ double benchmark_try_decrypt_sprout_notes(size_t nAddrs)
     }
 
     auto sk = libzelcash::SproutSpendingKey::random();
-    auto tx = GetValidSporutReceive(*pzelcashParams, sk, 10, true);
+    auto tx = GetValidSproutReceive(*pzelcashParams, sk, 10, true);
 
     struct timeval tv_start;
     timer_start(tv_start);
@@ -304,7 +304,7 @@ double benchmark_try_decrypt_sapling_notes(size_t nAddrs)
 
     std::vector<unsigned char, secure_allocator<unsigned char>> rawSeed(32);
     HDSeed seed(rawSeed);
-    auto masterKey = libzcash::SaplingExtendedSpendingKey::Master(seed);
+    auto masterKey = libzelcash::SaplingExtendedSpendingKey::Master(seed);
 
     CWallet wallet;
     wallet.AddSaplingSpendingKey(masterKey, masterKey.DefaultAddress());

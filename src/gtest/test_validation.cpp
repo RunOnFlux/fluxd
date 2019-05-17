@@ -98,7 +98,7 @@ TEST(Validation, ReceivedBlockTransactions) {
     // Create a fake child block
     CBlock block2;
     block2.hashPrevBlock = block1.GetHash();
-    block2.vtx.push_back(GetValidSporutReceive(*params, sk, 10, true));
+    block2.vtx.push_back(GetValidSproutReceive(*params, sk, 10, true));
     block2.hashMerkleRoot = block2.BuildMerkleTree();
     CBlockIndex fakeIndex2 {block2};
     fakeIndex2.pprev = &fakeIndex1;

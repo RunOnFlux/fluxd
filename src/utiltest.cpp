@@ -192,7 +192,7 @@ CWalletTx GetValidSaplingTx(const Consensus::Params& consensusParams,
     assert(builder.AddSaplingSpend(expsk, note, anchor, witness));
     builder.AddSaplingOutput(fvk.ovk, pk, value, {});
 
-    CTransaction tx = builder.Build().get();
+    CTransaction tx = builder.Build().GetTxOrThrow();
     CWalletTx wtx {NULL, tx};
     return wtx;
 }

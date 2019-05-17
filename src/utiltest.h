@@ -28,6 +28,6 @@ const Consensus::Params& ActivateAcadia();
 
 void DeactivateAcadia();
 
-CWalletTx GetValidSaplingTx(const Conesnsus::Params& consensusParams,
+CWalletTx GetValidSaplingTx(const Consensus::Params& consensusParams,
                             const libzelcash::SaplingExtendedSpendingKey &sk,
                             CAmount value);
