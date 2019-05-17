@@ -3,6 +3,7 @@
 
 #include "consensus/validation.h"
 #include "main.h"
+#include "utiltest.h"
 #include "zelcash/Proof.hpp"
 
 class MockCValidationState : public CValidationState {
@@ -72,9 +73,8 @@ protected:
 
     virtual void TearDown() {
         // Revert to test default. No-op on mainnet params.
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-    }
+        DeactivateAcadia();
+        }
 
     // Returns a valid but empty mutable transaction at block height 1.
     CMutableTransaction GetFirstBlockCoinbaseTx() {

@@ -5,6 +5,7 @@
 #include "main.h"
 #include "primitives/transaction.h"
 #include "consensus/validation.h"
+#include "utiltest.h"
 
 extern ZCJoinSplit* params;
 
@@ -171,8 +172,7 @@ TEST(checktransaction_tests, BadTxnsOversize) {
 
     {
         // But should be fine again once Sapling activates!
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+        ActivateAcadia();
 
         mtx.fOverwintered = true;
         mtx.nVersionGroupId = SAPLING_VERSION_GROUP_ID;
@@ -191,15 +191,13 @@ TEST(checktransaction_tests, BadTxnsOversize) {
         EXPECT_TRUE(ContextualCheckTransaction(tx, state, 1, 100));
 
         // Revert to default
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+        DeactivateAcadia();
     }
 }
 
 TEST(checktransaction_tests, OversizeSaplingTxns) {
     SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+    DeactivateAcadia();
 
     CMutableTransaction mtx = GetValidTransaction();
     mtx.fOverwintered = true;
@@ -252,8 +250,7 @@ TEST(checktransaction_tests, OversizeSaplingTxns) {
     }
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    DeactivateAcadia();
 }
 
 TEST(checktransaction_tests, bad_txns_vout_negative) {
@@ -968,7 +965,7 @@ TEST(checktransaction_tests, OverwinteredContextualCreateTx) {
     }
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    DeactivateAcadia();
 }
 
 // Test a v1 transaction which has a malformed header, perhaps modified in-flight

@@ -6,6 +6,7 @@
 #include "pubkey.h"
 #include "rpc/protocol.h"
 #include "transaction_builder.h"
+#include "utiltest.h"
 #include "zelcash/Address.hpp"
 
 #include <gmock/gmock.h>
@@ -15,10 +16,7 @@ static const std::string tSecretRegtest = "cND2ZvtabDbJ1gucx9GWH6XT9kgTAqfb6cotP
 
 TEST(TransactionBuilder, Invoke)
 {
-    SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    auto consensusParams = Params().GetConsensus();
+    auto consensusParams = ActivateAcadia();
 
     CBasicKeyStore keystore;
     CKey tsk = DecodeSecret(tSecretRegtest);
@@ -87,8 +85,7 @@ TEST(TransactionBuilder, Invoke)
     EXPECT_EQ(state.GetRejectReason(), "");
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    DeactivateAcadia();
 }
 
 TEST(TransactionBuilder, ThrowsOnTransparentInputWithoutKeyStore)
@@ -124,10 +121,7 @@ TEST(TransactionBuilder, RejectsInvalidTransparentChangeAddress)
 
 TEST(TransactionBuilder, FailsWithNegativeChange)
 {
-    SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    auto consensusParams = Params().GetConsensus();
+    auto consensusParams = ActivateAcadia();
 
     // Generate dummy Sapling address
     auto sk = libzelcash::SaplingSpendingKey::random();
@@ -173,16 +167,12 @@ TEST(TransactionBuilder, FailsWithNegativeChange)
     EXPECT_TRUE(builder.Build().IsTx());
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    DeactivateAcadia();
 }
 
 TEST(TransactionBuilder, ChangeOutput)
 {
-    SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    auto consensusParams = Params().GetConsensus();
+    auto consensusParams = ActivateAcadia();
 
     // Generate dummy Sapling address
     auto sk = libzelcash::SaplingSpendingKey::random();
@@ -264,16 +254,12 @@ TEST(TransactionBuilder, ChangeOutput)
     }
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    DeactivateAcadia();
 }
 
 TEST(TransactionBuilder, SetFee)
 {
-    SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    auto consensusParams = Params().GetConsensus();
+    auto consensusParams = ActivateAcadia();
 
     // Generate dummy Sapling address
     auto sk = libzelcash::SaplingSpendingKey::random();
@@ -321,8 +307,7 @@ TEST(TransactionBuilder, SetFee)
     }
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    DeactivateAcadia();
 }
 
 TEST(TransactionBuilder, CheckSaplingTxVersion)

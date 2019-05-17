@@ -24,6 +24,10 @@ CWalletTx GetValidSproutSpend(ZCJoinSplit& params,
                               CAmount value);
 
 // Sapling
+const Consensus::Params& ActivateAcadia();
+
+void DeactivateAcadia();
+
 CWalletTx GetValidSaplingTx(const Conesnsus::Params& consensusParams,
                             const libzelcash::SaplingExtendedSpendingKey &sk,
                             CAmount value);

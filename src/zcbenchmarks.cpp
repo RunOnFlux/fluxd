@@ -300,9 +300,7 @@ double benchmark_try_decrypt_sprout_notes(size_t nAddrs)
 double benchmark_try_decrypt_sapling_notes(size_t nAddrs)
 {
     // Set params
-    SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    auto consensusParams = Params().GetConsensus();
+    auto consensusParams = ActivateAcadia();
 
     std::vector<unsigned char, secure_allocator<unsigned char>> rawSeed(32);
     HDSeed seed(rawSeed);
@@ -326,8 +324,8 @@ double benchmark_try_decrypt_sapling_notes(size_t nAddrs)
     double tv_stop = timer_stop(tv_start);
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-
+    DeactivateAcadia();
+    
     return tv_stop;
 }
 

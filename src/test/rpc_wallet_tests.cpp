@@ -20,6 +20,7 @@
 #include "wallet/asyncrpcoperation_shieldcoinbase.h"
 
 #include "init.h"
+#include "utiltest.h"
 
 #include <array>
 #include <chrono>
@@ -1252,9 +1253,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_internals)
 
 BOOST_AUTO_TEST_CASE(rpc_z_sendmany_taddr_to_sapling)
 {
-    SelectParams(CBaseChainParams::REGTEST);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+    ActivateAcadia();
 
     LOCK(pwalletMain->cs_wallet);
 
@@ -1347,8 +1346,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_taddr_to_sapling)
     mapArgs.erase("-experimentalfeatures");
 
     // Revert to default
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    DeactivateAcadia();
 }
 
 
