@@ -33,6 +33,11 @@ const struct NUInfo NetworkUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
         /*.nBranchId =*/ 0x76b809bb,
         /*.strName =*/ "Acadia",
         /*.strInfo =*/ "The Zelcash Acadia Update",
+    },
+    {
+        /*.nBranchId =*/ 0x76b809bb,
+        /*.strName =*/ "ZelHash",
+        /*.strInfo =*/ "Zel PoW change to ZelHash, part of Kamiooka",
     }
 };
 

@@ -118,8 +118,8 @@ public:
 	consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January 12th
     
-    consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170012;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 360000;  // Approx June 15th
+    consensus.vUpgrades[Consensus::UPGRADE_ZELHASH].nProtocolVersion = 170012;
+        consensus.vUpgrades[Consensus::UPGRADE_ZELHASH].nActivationHeight = 360000;  // Approx June 15th
 
 	consensus.nZawyLWMAAveragingWindow = 60;
 	consensus.eh_epoch_fade_length = 11;
@@ -545,7 +545,7 @@ int validEHparameterList(EHparameters *ehparams, unsigned long blockheight, cons
        && (blockheight >= (params.GetConsensus().vUpgrades[Consensus::UPGRADE_ZELHASH].nActivationHeight)) ) {
         ehparams[0]=params.eh_epoch_3_params();
 	    ehparams[1]=params.eh_epoch_2_params();
-        return 1;
+        return 2;
     }
 
     if(blockheight>=(params.GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight + params.GetConsensus().eh_epoch_fade_length)){
