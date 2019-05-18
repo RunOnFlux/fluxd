@@ -14,7 +14,7 @@
 
 TEST(TransactionBuilder, Invoke)
 {
-    auto consensusParams = RegtestActivateSapling();
+    auto consensusParams = RegtestActivateAcadia();
 
     CBasicKeyStore keystore;
     CKey tsk = AddTestCKeyToKeyStore(keystore);

@@ -35,7 +35,7 @@ struct TestSaplingNote {
     SaplingMerkleTree tree;
 };
 
-const Consensus::Params& RegtestActivateSapling();
+const Consensus::Params& RegtestActivateAcadia();
 
 void RegtestDeactivateAcadia();
 
