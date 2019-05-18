@@ -198,7 +198,9 @@ TEST(keystore_tests, StoreAndRetrieveSaplingSpendingKey) {
     libzelcash::SaplingFullViewingKey fvkOut;
     libzelcash::SaplingIncomingViewingKey ivkOut;
 
-    auto sk = GetTestMasterSaplingSpendingKey();
+    std::vector<unsigned char, secure_allocator<unsigned char>> rawSeed(32);
+    HDSeed seed(rawSeed);
+    auto sk = libzelcash::SaplingExtendedSpendingKey::Master(seed);
     auto fvk = sk.expsk.full_viewing_key();
     auto ivk = fvk.in_viewing_key();
     auto addr = sk.DefaultAddress();
