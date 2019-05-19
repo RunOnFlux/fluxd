@@ -536,27 +536,37 @@ int validEHparameterList(EHparameters *ehparams, unsigned long blockheight, cons
     //The upcoming version of EH is preferred so will always be first element
     //returns number of elements in list
 
-    if(blockheight>=(params.GetConsensus().vUpgrades[Consensus::UPGRADE_ZELHASH].nActivationHeight + params.GetConsensus().eh_epoch_fade_length)){
+    // check to see if the block height is greater then the overlap period ( height - fade depth >= Upgrade Height)
+    if (NetworkUpgradeActive(blockheight - params.GetConsensus().eh_epoch_fade_length, Params().GetConsensus(), Consensus::UPGRADE_ZELHASH)) {
         ehparams[0]=params.eh_epoch_3_params();
         return 1;
     }
 
-    if (  (blockheight  < (params.GetConsensus().vUpgrades[Consensus::UPGRADE_ZELHASH].nActivationHeight + params.GetConsensus().eh_epoch_fade_length))
-       && (blockheight >= (params.GetConsensus().vUpgrades[Consensus::UPGRADE_ZELHASH].nActivationHeight)) ) {
+    // check to see if the blockheight is in the overlap period.
+    // The above if statement shows us that we are already below the upgrade height + the fade depth, so now we check
+    // to see if we are above just the upgrade height
+    if (NetworkUpgradeActive(blockheight, Params().GetConsensus(), Consensus::UPGRADE_ZELHASH)) {
         ehparams[0]=params.eh_epoch_3_params();
-	    ehparams[1]=params.eh_epoch_2_params();
+        ehparams[1]=params.eh_epoch_2_params();
         return 2;
     }
 
-    if(blockheight>=(params.GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight + params.GetConsensus().eh_epoch_fade_length)){
+    // check to see if the blockheight is greater then the overlap period (height - fade depth >= Upgrade Height)
+    if (NetworkUpgradeActive(blockheight - params.GetConsensus().eh_epoch_fade_length, Params().GetConsensus(), Consensus::UPGRADE_EQUI144_5)) {
         ehparams[0]=params.eh_epoch_2_params();
         return 1;
     }
-    if(blockheight<params.GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight){
-        ehparams[0]=params.eh_epoch_1_params();
-        return 1;
+
+    // check to see if the blockheight is in the overlap period
+    // The above if statement shows us that we are already below the upgrade height + the fade depth, so now we check
+    // to see if we are above just the upgrade height
+    if (NetworkUpgradeActive(blockheight, Params().GetConsensus(), Consensus::UPGRADE_EQUI144_5)) {
+        ehparams[0]=params.eh_epoch_2_params();
+        ehparams[1]=params.eh_epoch_1_params();
+        return 2;
     }
-    ehparams[0]=params.eh_epoch_2_params();
-    ehparams[1]=params.eh_epoch_1_params();
-    return 2;
+
+    // return the block height is less than the upgrade height params
+    ehparams[0]=params.eh_epoch_1_params();
+    return 1;
 }
