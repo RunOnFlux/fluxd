@@ -24,8 +24,10 @@ class BlockPayees;
 
 extern Payments zelnodePayments;
 
-#define ZNPAYMENTS_SIGNATURES_REQUIRED 16
+#define ZNPAYMENTS_SIGNATURES_REQUIRED 16 // TODO Remove after Zelnode Upgrade
 #define ZNPAYMENTS_SIGNATURES_TOTAL 10
+
+#define ZNPAYMENTS_SIGNATURES_REQUIRED_AFTER_UPGRADE 6
 
 void ProcessMessageZelnodePayments(CNode* pfrom, std::string& strCommand, CDataStream& vRecv);
 bool IsBlockPayeeValid(const CBlock& block, int nBlockHeight);

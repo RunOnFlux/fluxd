@@ -116,7 +116,10 @@ public:
 	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 125100;
 
 	consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January 12th
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January
+
+    consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nProtocolVersion = 170007;
+    consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nActivationHeight = Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;		// Approx January 12th
 
 	consensus.nZawyLWMAAveragingWindow = 60;
 	consensus.eh_epoch_fade_length = 11;
@@ -246,6 +249,9 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 300;
 
+        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nProtocolVersion = 170007;
+        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nActivationHeight = 100000;
+
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 10;
 
@@ -369,6 +375,9 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170006;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nProtocolVersion = 170007;
+        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nActivationHeight = Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 
         // The best chain should have at least this much work.

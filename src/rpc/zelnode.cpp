@@ -346,6 +346,7 @@ UniValue znsync(const UniValue& params, bool fHelp)
 
     if (strMode == "reset") {
         zelnodeSync.Reset();
+        zelnodeman.Clear();
         return "success";
     }
     return "failure";
