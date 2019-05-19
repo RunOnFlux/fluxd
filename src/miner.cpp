@@ -480,9 +480,6 @@ void static BitcoinMiner(const CChainParams& chainparams)
     boost::shared_ptr<CReserveScript> coinbaseScript;
     GetMainSignals().ScriptForMining(coinbaseScript);
 
-        unsigned int n = ehparams[0].n;
-        unsigned int k = ehparams[0].k;
-
     std::string solver = GetArg("-equihashsolver", "default");
     assert(solver == "tromp" || solver == "default");
 
