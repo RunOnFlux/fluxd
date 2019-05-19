@@ -117,7 +117,7 @@ public:
 
 	consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January 12th
-    
+
     consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
         consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 360000;  // Approx June 15th
 
@@ -383,7 +383,7 @@ public:
     consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170006;
     consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-    
+
     consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
     consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
