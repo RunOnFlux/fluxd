@@ -110,11 +110,11 @@ TEST(TransactionBuilder, TransparentToSapling)
     EXPECT_EQ(state.GetRejectReason(), "");
 
     // Revert to default
-    RegtestDeactivateSapling();
+    RegtestDeactivateAcadia();
 }
 
 TEST(TransactionBuilder, SaplingToSapling) {
-    auto consensusParams = RegtestActivateSapling();
+    auto consensusParams = RegtestActivateAcadia();
 
     auto sk = libzelcash::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
@@ -147,11 +147,11 @@ TEST(TransactionBuilder, SaplingToSapling) {
     EXPECT_EQ(state.GetRejectReason(), "");
 
     // Revert to default
-    RegtestDeactivateSapling();
+    RegtestDeactivateAcadia();
 }
 
 TEST(TransactionBuilder, SaplingToSprout) {
-    auto consensusParams = RegtestActivateSapling();
+    auto consensusParams = RegtestActivateAcadia();
 
     auto sk = libzelcash::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
@@ -185,11 +185,11 @@ TEST(TransactionBuilder, SaplingToSprout) {
     EXPECT_EQ(state.GetRejectReason(), "");
 
     // Revert to default
-    RegtestDeactivateSapling();
+    RegtestDeactivateAcadia();
 }
 
 TEST(TransactionBuilder, SproutToSproutAndSapling) {
-    auto consensusParams = RegtestActivateSapling();
+    auto consensusParams = RegtestActivateAcadia();
 
     auto sk = libzelcash::SaplingSpendingKey::random();
     auto fvk = sk.full_viewing_key();
