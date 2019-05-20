@@ -1704,7 +1704,7 @@ boost::optional<uint256> CWallet::GetSproutNoteNullifier(const JSDescription &js
 
     // Check note plaintext against note commitment
     if (note.cm() != jsdesc.commitments[n]) {
-        throw libzcash::note_decryption_failed();
+        throw libzelcash::note_decryption_failed();
     }
 
     // SpendingKeys are only available if:
