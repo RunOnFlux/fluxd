@@ -584,6 +584,8 @@ extern CSporkDB* pSporkDB;
  */
 int GetSpendHeight(const CCoinsViewCache& inputs);
 
+uint64_t CalculateCurrentUsage();
+
 /** Return a CMutableTransaction with contextual default values based on set of consensus rules at height */
 CMutableTransaction CreateNewContextualCMutableTransaction(const Consensus::Params& consensusParams, int nHeight);
 bool AcceptableInputs(CTxMemPool& pool, CValidationState& state, const CTransaction& tx, bool fLimitFree, bool* pfMissingInputs, bool fRejectInsaneFee = false);
