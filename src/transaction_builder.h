@@ -104,7 +104,7 @@ public:
 
     // Throws if the anchor does not match the anchor used by
     // previously-added Sapling spends.
-    bool AddSaplingSpend(
+    void AddSaplingSpend(
         libzelcash::SaplingExpandedSpendingKey expsk,
         libzelcash::SaplingNote note,
         uint256 anchor,
