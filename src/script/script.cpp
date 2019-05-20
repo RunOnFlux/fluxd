@@ -301,3 +301,5 @@ std::string CScript::ToString() const
             str += GetOpName(opcode);
     }
     return str;
+}
+
