@@ -78,7 +78,7 @@ bool AsyncRPCOperation_saplingmigration::main_impl() {
     for (const CSproutNotePlaintextEntry& sproutEntry : sproutEntries) {
         availableFunds = sproutEntry.plaintext.value();
     }
-    // If the remaining amount to be migrated is less than 0.01 ZEC, end the migration.
+    // If the remaining amount to be migrated is less than 0.01 ZEL, end the migration.
     if (availableFunds < CENT) {
         setMigrationResult(0);
         return true;
@@ -100,7 +100,7 @@ bool AsyncRPCOperation_saplingmigration::main_impl() {
     int noteIndex = 0;
     do {
         CAmount amountToSend = chooseAmount(availableFunds);
-        auto builder = TransactionBuilder(consensusParams, targetHeight_, pwalletMain, pzcashParams);
+        auto builder = TransactionBuilder(consensusParams, targetHeight_, pwalletMain, pzelcashParams);
         std::vector<CSproutNotePlaintextEntry> fromNotes;
         CAmount fromNoteAmount = 0;
         while (fromNoteAmount < amountToSend) {
@@ -116,14 +116,14 @@ bool AsyncRPCOperation_saplingmigration::main_impl() {
             std::vector<JSOutPoint> vOutPoints = {sproutEntry.jsop};
             // Each migration transaction SHOULD specify an anchor at height N-10
             // for each Sprout JoinSplit description
-            // TODO: the above functionality (in comment) is not implemented in zcashd
+            // TODO: the above functionality (in comment) is not implemented in zelcashd
             uint256 inputAnchor;
             std::vector<boost::optional<SproutWitness>> vInputWitnesses;
             pwalletMain->GetSproutNoteWitnesses(vOutPoints, vInputWitnesses, inputAnchor);
             builder.AddSproutInput(sproutSk, sproutNote, vInputWitnesses[0].get());
         }
-        // The amount chosen *includes* the 0.0001 ZEC fee for this transaction, i.e.
-        // the value of the Sapling output will be 0.0001 ZEC less.
+        // The amount chosen *includes* the 0.0001 ZEL fee for this transaction, i.e.
+        // the value of the Sapling output will be 0.0001 ZEL less.
         builder.SetFee(FEE);
         builder.AddSaplingOutput(ovkForShieldingFromTaddr(seed), migrationDestAddress, amountToSend - FEE);
         CTransaction tx = builder.Build().GetTxOrThrow();

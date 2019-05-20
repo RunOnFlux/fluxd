@@ -591,7 +591,7 @@ void CWallet::ChainTip(const CBlockIndex *pindex,
 }
 
 void CWallet::RunSaplingMigration(int blockHeight) {
-    if (!NetworkUpgradeActive(blockHeight, Params().GetConsensus(), Consensus::UPGRADE_SAPLING)) {
+    if (!NetworkUpgradeActive(blockHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
         return;
     }
     LOCK(cs_wallet);
