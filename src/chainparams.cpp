@@ -124,6 +124,8 @@ public:
 	eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
 
+        // The best chain should have at least this much work.
+        consensus.nMinimumChainWork = uint256S("0x00");
 
         /**
          * The message start string should be awesome! ⓩ❤
@@ -323,6 +325,15 @@ public:
             750          // * estimated number of transactions per day after checkpoint 720 newly mined +30 for txs that users are doing
                          //   total number of tx / (checkpoint block height / (24 * 24))
         };
+
+    // Hardcoded fallback value for the Sprout shielded value pool balance
+        // for nodes that have not reindexed since the introduction of monitoring
+        // in #2795.
+        //nSproutValuePoolCheckpointHeight = 440329;
+        //nSproutValuePoolCheckpointBalance = 40000029096803;
+        //fZIP209Enabled = true;
+        //hashSproutValuePoolCheckpointBlock = uint256S("000a95d08ba5dcbabe881fc6471d11807bcca7df5f1795c99f3ec4580db4279b");
+
     }
 };
 static CTestNetParams testNetParams;
