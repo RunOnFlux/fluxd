@@ -241,6 +241,35 @@ bool CScript::IsPushOnly() const
     return true;
 }
 
+// insightexplorer
+int CScript::Type() const
+{
+    if (this->IsPayToPublicKeyHash())
+        return 1;
+    if (this->IsPayToScriptHash())
+        return 2;
+    // We don't know this script
+    return 0;
+}
+
+// insightexplorer
+uint160 CScript::AddressHash() const
+{
+    // where the address bytes begin depends on the script type
+    int start;
+    if (this->IsPayToPublicKeyHash())
+        start = 3;
+    else if (this->IsPayToScriptHash())
+        start = 2;
+    else {
+        // unknown script type; return an empty vector
+        vector<unsigned char> hashBytes;
+        return uint160(hashBytes);
+    }
+    vector<unsigned char> hashBytes(this->begin()+start, this->begin()+start+20);
+    return uint160(hashBytes);
+    }
+
 namespace {
     inline std::string ValueString(const std::vector<unsigned char>& vch)
     {
@@ -272,32 +301,5 @@ std::string CScript::ToString() const
             str += GetOpName(opcode);
     }
     return str;
-
-// insightexplorer
-int CScript::Type() const
-{
-    if (this->IsPayToPublicKeyHash())
-        return 1;
-    if (this->IsPayToScriptHash())
-        return 2;
-    // We don't know this script
-    return 0;
 }
 
-// insightexplorer
-uint160 CScript::AddressHash() const
-{
-    // where the address bytes begin depends on the script type
-    int start;
-    if (this->IsPayToPublicKeyHash())
-        start = 3;
-    else if (this->IsPayToScriptHash())
-        start = 2;
-    else {
-        // unknown script type; return an empty vector
-        vector<unsigned char> hashBytes;
-        return uint160(hashBytes);
-    }
-    vector<unsigned char> hashBytes(this->begin()+start, this->begin()+start+20);
-    return uint160(hashBytes);
-}
