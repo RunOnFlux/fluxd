@@ -28,7 +28,7 @@ enum UpgradeIndex {
     UPGRADE_LWMA,
     UPGRADE_EQUI144_5,	
     UPGRADE_ACADIA,
-    UPGRADE_ZELHASH,
+    UPGRADE_KAMIOOKA,
     // NOTE: Also add new upgrades to NetworkUpgradeInfo in upgrades.cpp
     MAX_NETWORK_UPGRADES
 };

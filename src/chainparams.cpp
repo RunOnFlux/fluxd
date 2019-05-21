@@ -118,8 +118,8 @@ public:
 	consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January 12th
     
-    consensus.vUpgrades[Consensus::UPGRADE_ZELHASH].nProtocolVersion = 170012;
-        consensus.vUpgrades[Consensus::UPGRADE_ZELHASH].nActivationHeight = 360000;  // Approx June 15th
+    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 360000;  // Approx June 15th
 
 	consensus.nZawyLWMAAveragingWindow = 60;
 	consensus.eh_epoch_fade_length = 11;
@@ -211,13 +211,13 @@ public:
 static CMainParams mainParams;
 
 /**
- * Testnet (v7) Kamiooka Testnet
+ * Kamiooka-testnet
  */
 class CTestNetParams : public CChainParams {
 public:
     CTestNetParams() {
         strNetworkID = "test";
-        strCurrencyUnits = "TEL";
+        strCurrencyUnits = "TESTZEL";
         bip44CoinType = 1;
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 5000;
@@ -242,16 +242,16 @@ public:
         Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
-	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 100;
+	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 60;
 
 	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
-	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 200;
+	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 120;
 
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 300;
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 180;
 
-	    consensus.vUpgrades[Consensus::UPGRADE_ZELHASH].nProtocolVersion = 170012;
-        consensus.vUpgrades[Consensus::UPGRADE_ZELHASH].nActivationHeight = 400;
+	    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 2100;
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
@@ -380,8 +380,8 @@ public:
     consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
     
-    consensus.vUpgrades[Consensus::UPGRADE_ZELHASH].nProtocolVersion = 170012;
-    consensus.vUpgrades[Consensus::UPGRADE_ZELHASH].nActivationHeight =
+    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
+    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 
@@ -537,7 +537,7 @@ int validEHparameterList(EHparameters *ehparams, unsigned long blockheight, cons
     //returns number of elements in list
 
     // check to see if the block height is greater then the overlap period ( height - fade depth >= Upgrade Height)
-    if (NetworkUpgradeActive(blockheight - params.GetConsensus().eh_epoch_fade_length, Params().GetConsensus(), Consensus::UPGRADE_ZELHASH)) {
+    if (NetworkUpgradeActive(blockheight - params.GetConsensus().eh_epoch_fade_length, Params().GetConsensus(), Consensus::UPGRADE_KAMIOOKA)) {
         ehparams[0]=params.eh_epoch_3_params();
         return 1;
     }
@@ -545,7 +545,7 @@ int validEHparameterList(EHparameters *ehparams, unsigned long blockheight, cons
     // check to see if the blockheight is in the overlap period.
     // The above if statement shows us that we are already below the upgrade height + the fade depth, so now we check
     // to see if we are above just the upgrade height
-    if (NetworkUpgradeActive(blockheight, Params().GetConsensus(), Consensus::UPGRADE_ZELHASH)) {
+    if (NetworkUpgradeActive(blockheight, Params().GetConsensus(), Consensus::UPGRADE_KAMIOOKA)) {
         ehparams[0]=params.eh_epoch_3_params();
         ehparams[1]=params.eh_epoch_2_params();
         return 2;
