@@ -97,8 +97,8 @@ public:
     EHparameters eh_epoch_3_params() const { return eh_epoch_3; }
     unsigned long eh_epoch_1_end() const {   return GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight + GetConsensus().eh_epoch_fade_length - 1; }
     unsigned long eh_epoch_2_start() const { return GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight; }
-    unsigned long eh_epoch_2_end() const {   return GetConsensus().vUpgrades[Consensus::UPGRADE_ZELHASH].nActivationHeight + GetConsensus().eh_epoch_fade_length - 1; }
-    unsigned long eh_epoch_3_start() const { return GetConsensus().vUpgrades[Consensus::UPGRADE_ZELHASH].nActivationHeight; }
+    unsigned long eh_epoch_2_end() const {   return GetConsensus().vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight + GetConsensus().eh_epoch_fade_length - 1; }
+    unsigned long eh_epoch_3_start() const { return GetConsensus().vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight; }
     std::string CurrencyUnits() const { return strCurrencyUnits; }
     uint32_t BIP44CoinType() const { return bip44CoinType; }
     /** Make miner stop after a block is found. In RPC, don't return until nGenProcLimit blocks are generated */
