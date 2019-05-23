@@ -319,12 +319,13 @@ public:
 typedef std::map<JSOutPoint, SproutNoteData> mapSproutNoteData_t;
 typedef std::map<SaplingOutPoint, SaplingNoteData> mapSaplingNoteData_t;
 
-/** Decrypted note, its location in a transaction, and number of confirmations. */
-struct CSproutNotePlaintextEntry
+/** Sprout note, its location in a transaction, and number of confirmations. */
+struct SproutNoteEntry
 {
     JSOutPoint jsop;
     libzelcash::SproutPaymentAddress address;
-    libzelcash::SproutNotePlaintext plaintext;
+    libzelcash::SproutNote note;
+    std::array<unsigned char, ZC_MEMO_SIZE> memo;
     int confirmations;
 };
 
@@ -1308,7 +1309,7 @@ public:
     bool LoadCryptedHDSeed(const uint256& seedFp, const std::vector<unsigned char>& seed);
 
     /* Find notes filtered by payment address, min depth, ability to spend */
-    void GetFilteredNotes(std::vector<CSproutNotePlaintextEntry>& sproutEntries,
+    void GetFilteredNotes(std::vector<SproutNoteEntry>& sproutEntries,
                           std::vector<SaplingNoteEntry>& saplingEntries,
                           std::string address,
                           int minDepth=1,
@@ -1317,7 +1318,7 @@ public:
 
     /* Find notes filtered by payment addresses, min depth, max depth, if they are spent,
        if a spending key is required, and if they are locked */
-    void GetFilteredNotes(std::vector<CSproutNotePlaintextEntry>& sproutEntries,
+    void GetFilteredNotes(std::vector<SproutNoteEntry>& sproutEntries,
                           std::vector<SaplingNoteEntry>& saplingEntries,
                           std::set<libzelcash::PaymentAddress>& filterAddresses,
                           int minDepth=1,
