@@ -1,6 +1,6 @@
 // Copyright (c) 2014-2015 The Dash developers
 // Copyright (c) 2015-2017 The PIVX developers
-// Copyright (c) 2018 The Zelcash developers
+// Copyright (c) 2019 The Zel developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -24,8 +24,10 @@ class BlockPayees;
 
 extern Payments zelnodePayments;
 
-#define ZNPAYMENTS_SIGNATURES_REQUIRED 16
+#define ZNPAYMENTS_SIGNATURES_REQUIRED 16 // TODO Remove after Zelnode Upgrade
 #define ZNPAYMENTS_SIGNATURES_TOTAL 10
+
+#define ZNPAYMENTS_SIGNATURES_REQUIRED_AFTER_UPGRADE 6
 
 void ProcessMessageZelnodePayments(CNode* pfrom, std::string& strCommand, CDataStream& vRecv);
 bool IsBlockPayeeValid(const CBlock& block, int nBlockHeight);

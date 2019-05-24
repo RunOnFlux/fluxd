@@ -1,5 +1,6 @@
 // Copyright (c) 2016 Jack Grigg
 // Copyright (c) 2016 The Zcash developers
+// Copyright (c) 2019 The Zel Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -34,7 +35,7 @@ int Equihash<N,K>::InitialiseState(eh_HashState& base_state)
     uint32_t le_N = htole32(N);
     uint32_t le_K = htole32(K);
     unsigned char personalization[crypto_generichash_blake2b_PERSONALBYTES] = {};
-    if(N==144 && K==5)
+    if ((N==144 && K==5) || (N==125 && K==4))
         memcpy(personalization, "ZelProof", 8);
     else
         memcpy(personalization, "ZcashPoW", 8);
@@ -42,20 +43,48 @@ int Equihash<N,K>::InitialiseState(eh_HashState& base_state)
     memcpy(personalization+12, &le_K, 4);
     return crypto_generichash_blake2b_init_salt_personal(&base_state,
                                                          NULL, 0, // No key.
-                                                         (512/N)*N/8,
+                                                         (512/N)*((N+7)/8),
                                                          NULL,    // No salt.
                                                          personalization);
 }
 
 void GenerateHash(const eh_HashState& base_state, eh_index g,
-                  unsigned char* hash, size_t hLen)
+                  unsigned char* hash, size_t hLen, bool twist)
 {
-    eh_HashState state;
-    state = base_state;
-    eh_index lei = htole32(g);
-    crypto_generichash_blake2b_update(&state, (const unsigned char*) &lei,
-                                      sizeof(eh_index));
-    crypto_generichash_blake2b_final(&state, hash, hLen);
+    
+    if (!twist) {	
+	    eh_HashState state;
+	    state = base_state;
+	    eh_index lei = htole32(g);
+	    crypto_generichash_blake2b_update(&state, (const unsigned char*) &lei,
+		                              sizeof(eh_index));
+	    crypto_generichash_blake2b_final(&state, hash, hLen);
+    } else {
+	    uint32_t myHash[16] = {0};
+	    uint32_t startIndex = g & 0xFFFFFFF0;
+
+	    for (uint32_t g2 = startIndex; g2 <= g; g2++) {
+		    uint32_t tmpHash[16] = {0};
+
+		    eh_HashState state;	
+		    state = base_state;
+		    eh_index lei = htole32(g2);
+		    crypto_generichash_blake2b_update(&state, (const unsigned char*) &lei,
+				                      sizeof(eh_index));
+
+		    crypto_generichash_blake2b_final(&state, (unsigned char*)&tmpHash[0], hLen);
+
+		    for (uint32_t idx = 0; idx < 16; idx++) myHash[idx] += tmpHash[idx];
+	    }
+
+	    uint8_t * hashBytes = (uint8_t *) &myHash[0]; 
+
+	    for (uint32_t i=15; i<hLen; i+=16) hashBytes[i] &= 0xF8;	
+
+	    memcpy(hash, &myHash[0], hLen);	
+
+
+    }
 }
 
 void ExpandArray(const unsigned char* in, size_t in_len,
@@ -63,9 +92,12 @@ void ExpandArray(const unsigned char* in, size_t in_len,
                  size_t bit_len, size_t byte_pad)
 {
     assert(bit_len >= 8);
-    assert(8*sizeof(uint32_t) >= 7+bit_len);
+    assert(8*sizeof(uint32_t) >= bit_len);
 
     size_t out_width { (bit_len+7)/8 + byte_pad };
+
+    //LogPrint("pow", "%d %d %d %d %d \n", out_len, out_width, in_len, bit_len, byte_pad);
+
     assert(out_len == 8*out_width*in_len/bit_len);
 
     uint32_t bit_len_mask { ((uint32_t)1 << bit_len) - 1 };
@@ -106,7 +138,7 @@ void CompressArray(const unsigned char* in, size_t in_len,
                    size_t bit_len, size_t byte_pad)
 {
     assert(bit_len >= 8);
-    assert(8*sizeof(uint32_t) >= 7+bit_len);
+    assert(8*sizeof(uint32_t) >= bit_len);
 
     size_t in_width { (bit_len+7)/8 + byte_pad };
     assert(out_len == bit_len*in_len/(8*in_width));
@@ -342,10 +374,13 @@ bool Equihash<N,K>::BasicSolve(const eh_HashState& base_state,
     std::vector<FullStepRow<FullWidth>> X;
     X.reserve(init_size);
     unsigned char tmpHash[HashOutput];
+
+    bool twist = ((N == 125) && (K == 4));
+
     for (eh_index g = 0; X.size() < init_size; g++) {
-        GenerateHash(base_state, g, tmpHash, HashOutput);
+        GenerateHash(base_state, g, tmpHash, HashOutput, twist);
         for (eh_index i = 0; i < IndicesPerHashOutput && X.size() < init_size; i++) {
-            X.emplace_back(tmpHash+(i*N/8), N/8, HashLength,
+            X.emplace_back(tmpHash+(i*((N+7)/8)), ((N+7)/8), HashLength,
                            CollisionBitLength, (g*IndicesPerHashOutput)+i);
         }
         if (cancelled(ListGeneration)) throw solver_cancelled;
@@ -509,6 +544,8 @@ bool Equihash<N,K>::OptimisedSolve(const eh_HashState& base_state,
 
     // First run the algorithm with truncated indices
 
+    bool twist = ((N == 125) && (K ==4));
+
     const eh_index soln_size { 1 << K };
     std::vector<std::shared_ptr<eh_trunc>> partialSolns;
     int invalidCount = 0;
@@ -520,11 +557,12 @@ bool Equihash<N,K>::OptimisedSolve(const eh_HashState& base_state,
         size_t lenIndices = sizeof(eh_trunc);
         std::vector<TruncatedStepRow<TruncatedWidth>> Xt;
         Xt.reserve(init_size);
+
         unsigned char tmpHash[HashOutput];
         for (eh_index g = 0; Xt.size() < init_size; g++) {
-            GenerateHash(base_state, g, tmpHash, HashOutput);
+            GenerateHash(base_state, g, tmpHash, HashOutput, twist);
             for (eh_index i = 0; i < IndicesPerHashOutput && Xt.size() < init_size; i++) {
-                Xt.emplace_back(tmpHash+(i*N/8), N/8, HashLength, CollisionBitLength,
+                Xt.emplace_back(tmpHash+(i*((N+7)/8)), ((N+7)/8), HashLength, CollisionBitLength,
                                 (g*IndicesPerHashOutput)+i, CollisionBitLength + 1);
             }
             if (cancelled(ListGeneration)) throw solver_cancelled;
@@ -651,10 +689,10 @@ bool Equihash<N,K>::OptimisedSolve(const eh_HashState& base_state,
                 eh_index newIndex { UntruncateIndex(partialSoln.get()[i], j, CollisionBitLength + 1) };
                 if (j == 0 || newIndex % IndicesPerHashOutput == 0) {
                     GenerateHash(base_state, newIndex/IndicesPerHashOutput,
-                                 tmpHash, HashOutput);
+                                 tmpHash, HashOutput, twist);
                 }
-                icv.emplace_back(tmpHash+((newIndex % IndicesPerHashOutput) * N/8),
-                                 N/8, HashLength, CollisionBitLength, newIndex);
+                icv.emplace_back(tmpHash+((newIndex % IndicesPerHashOutput) * ((N+7)/8)),
+                                 ((N+7)/8), HashLength, CollisionBitLength, newIndex);
                 if (cancelled(PartialGeneration)) throw solver_cancelled;
             }
             boost::optional<std::vector<FullStepRow<FinalFullWidth>>> ic = icv;
@@ -707,6 +745,7 @@ bool Equihash<N,K>::OptimisedSolve(const eh_HashState& base_state,
             solns.insert(soln);
         }
         for (auto soln : solns) {
+            LogPrint("pow", "Testing Solution \n");
             if (validBlock(soln))
                 return true;
         }
@@ -731,13 +770,15 @@ bool Equihash<N,K>::IsValidSolution(const eh_HashState& base_state, std::vector<
         return false;
     }
 
+    bool twist = ((N == 125) && (K ==4));   
+
     std::vector<FullStepRow<FinalFullWidth>> X;
     X.reserve(1 << K);
     unsigned char tmpHash[HashOutput];
     for (eh_index i : GetIndicesFromMinimal(soln, CollisionBitLength)) {
-        GenerateHash(base_state, i/IndicesPerHashOutput, tmpHash, HashOutput);
-        X.emplace_back(tmpHash+((i % IndicesPerHashOutput) * N/8),
-                       N/8, HashLength, CollisionBitLength, i);
+        GenerateHash(base_state, i/IndicesPerHashOutput, tmpHash, HashOutput, twist);
+        X.emplace_back(tmpHash+((i % IndicesPerHashOutput) * ((N+7)/8)),
+                       ((N+7)/8), HashLength, CollisionBitLength, i);
     }
 
     size_t hashLen = HashLength;
@@ -793,6 +834,18 @@ template bool Equihash<144,5>::OptimisedSolve(const eh_HashState& base_state,
                                               const std::function<bool(EhSolverCancelCheck)> cancelled);
 #endif
 template bool Equihash<144,5>::IsValidSolution(const eh_HashState& base_state, std::vector<unsigned char> soln);
+
+// Explicit instantiations for ZelHash
+template int Equihash<125,4>::InitialiseState(eh_HashState& base_state);
+#ifdef ENABLE_MINING
+template bool Equihash<125,4>::BasicSolve(const eh_HashState& base_state,
+                                          const std::function<bool(std::vector<unsigned char>)> validBlock,
+                                          const std::function<bool(EhSolverCancelCheck)> cancelled);
+template bool Equihash<125,4>::OptimisedSolve(const eh_HashState& base_state,
+                                              const std::function<bool(std::vector<unsigned char>)> validBlock,
+                                              const std::function<bool(EhSolverCancelCheck)> cancelled);
+#endif
+template bool Equihash<125,4>::IsValidSolution(const eh_HashState& base_state, std::vector<unsigned char> soln);
 
 // Explicit instantiations for Equihash<200,9>
 template int Equihash<200,9>::InitialiseState(eh_HashState& base_state);

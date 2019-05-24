@@ -1,6 +1,6 @@
 // Copyright (c) 2014-2015 The Dash developers
 // Copyright (c) 2015-2017 The PIVX developers
-// Copyright (c) 2018 The Zelcash developers
+// Copyright (c) 2019 The Zel developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -73,6 +73,7 @@ void ZelnodeSync::Reset()
     RequestedZelnodeAssets = ZELNODE_SYNC_INITIAL;
     RequestedZelnodeAttempt = 0;
     nTimeAssetSyncStarted = GetTime();
+    zelnodeman.Clear();
 }
 
 void ZelnodeSync::AddedZelnodeList(uint256 hash)
@@ -267,20 +268,21 @@ void ZelnodeSync::Process()
 
                 // timeout
                 if (lastZelnodeList == 0 &&
-                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 5)) {
+                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 9 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 15)) {
                     if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)) {
                         LogPrintf("%s - ERROR - Syncing zelnode list has failed, will retry later\n", __func__);
                         RequestedZelnodeAssets = ZELNODE_SYNC_FAILED;
                         RequestedZelnodeAttempt = 0;
                         lastFailure = GetTime();
                         nCountFailures++;
+                        zelnodeman.Clear();
                     } else {
                         GetNextAsset();
                     }
                     return;
                 }
 
-                if (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3) return;
+                if (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 9) return;
 
                 zelnodeman.DsegUpdate(pnode);
                 RequestedZelnodeAttempt++;

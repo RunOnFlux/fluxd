@@ -927,7 +927,7 @@ std::string LicenseInfo()
     return "\n" +
            FormatParagraph(strprintf(_("Copyright (C) 2009-%i The Bitcoin Core Developers"), COPYRIGHT_YEAR)) + "\n" +
            FormatParagraph(strprintf(_("Copyright (C) 2015-%i The Zcash Developers"), COPYRIGHT_YEAR)) + "\n" +
-	   FormatParagraph(strprintf(_("Copyright (C) 2018-%i The Zelcash Developers"), COPYRIGHT_YEAR)) + "\n" +	
+	   FormatParagraph(strprintf(_("Copyright (C) 2018-%i The Zel Developers"), COPYRIGHT_YEAR)) + "\n" +	
            "\n" +
            FormatParagraph(_("This is experimental software.")) + "\n" +
            "\n" +

@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Zcash developers
+// Copyright (c) 2019 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -33,6 +33,11 @@ const struct NUInfo NetworkUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
         /*.nBranchId =*/ 0x76b809bb,
         /*.strName =*/ "Acadia",
         /*.strInfo =*/ "The Zelcash Acadia Update",
+    },
+    {
+        /*.nBranchId =*/ 0x76b809bb,
+        /*.strName =*/ "Kamiooka",
+        /*.strInfo =*/ "Zel Kamiooka Upgrade, PoW change to ZelHash and update for ZelNodes",
     }
 };
 

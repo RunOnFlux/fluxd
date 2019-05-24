@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Zelcash developers
+// Copyright (c) 2019 The Zel developers
 // Copyright (c) 2017 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -10,7 +10,7 @@
 // * Shut down 16 weeks' worth of blocks after the estimated release block height.
 // * A warning is shown during the 2 weeks' worth of blocks prior to shut down.
 
-static const int APPROX_RELEASE_HEIGHT = 350000;
+static const int APPROX_RELEASE_HEIGHT = 360000;
 static const int WEEKS_UNTIL_DEPRECATION = 26;
 static const int DEPRECATION_HEIGHT = APPROX_RELEASE_HEIGHT + (WEEKS_UNTIL_DEPRECATION * 7 * 24 * 30);
 
