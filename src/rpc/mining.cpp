@@ -730,8 +730,11 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         if (payout.first == Zelnode::SUPER) start = "super";
         else if (payout.first == Zelnode::BAMF) start = "bamf";
 
-        result.push_back(Pair(std::string(start + "_zelnode_address"), EncodeDestination(payout.second.first)));
-        result.push_back(Pair(std::string(start + "_zelnode_payout"), (payout.second.second)));
+        CTxDestination dest;
+        ExtractDestination(payout.second.first, dest);
+
+        result.push_back(Pair(std::string(start + "_zelnode_address"), EncodeDestination(dest)));
+        result.push_back(Pair(std::string(start + "_zelnode_payout"), payout.second.second));
     }
 
     return result;
