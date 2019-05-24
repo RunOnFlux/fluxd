@@ -33,7 +33,7 @@ void ProcessMessageZelnodePayments(CNode* pfrom, std::string& strCommand, CDataS
 bool IsBlockPayeeValid(const CBlock& block, int nBlockHeight);
 std::string GetRequiredPaymentsString(int nBlockHeight);
 bool IsBlockValueValid(const CBlock& block, CAmount nExpectedValue, CAmount nMinted);
-void FillBlockPayee(CMutableTransaction& txNew, CAmount nFees);
+void FillBlockPayee(CMutableTransaction& txNew, CAmount nFees, std::map<int, std::pair<CScript, CAmount>>* payments = nullptr);
 
 void DumpZelnodePayments();
 
@@ -398,7 +398,7 @@ public:
     int GetMinZelnodePaymentsProto();
     void ProcessMessageZelnodePayments(CNode* pfrom, std::string& strCommand, CDataStream& vRecv);
     std::string GetRequiredPaymentsString(int nBlockHeight);
-    void FillBlockPayee(CMutableTransaction& txNew, int64_t nFees);
+    void FillBlockPayee(CMutableTransaction& txNew, int64_t nFees, std::map<int, std::pair<CScript, CAmount>>* payments = nullptr);
     std::string ToString() const;
     int GetOldestBlock();
     int GetNewestBlock();
