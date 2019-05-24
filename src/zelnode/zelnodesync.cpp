@@ -268,7 +268,7 @@ void ZelnodeSync::Process()
 
                 // timeout
                 if (lastZelnodeList == 0 &&
-                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 9 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 15)) {
+                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 10)) {
                     if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)) {
                         LogPrintf("%s - ERROR - Syncing zelnode list has failed, will retry later\n", __func__);
                         RequestedZelnodeAssets = ZELNODE_SYNC_FAILED;
@@ -282,7 +282,7 @@ void ZelnodeSync::Process()
                     return;
                 }
 
-                if (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 9) return;
+                if (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3) return;
 
                 zelnodeman.DsegUpdate(pnode);
                 RequestedZelnodeAttempt++;
@@ -300,7 +300,7 @@ void ZelnodeSync::Process()
 
                 // timeout
                 if (lastZelnodeWinner == 0 &&
-                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 5)) {
+                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 10)) {
                     if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)) {
                         LogPrintf("%s - ERROR - Syncing zelnode winners has failed, will retry later\n", __func__);
                         RequestedZelnodeAssets = ZELNODE_SYNC_FAILED;

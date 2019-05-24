@@ -597,6 +597,9 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         // TODO: Maybe recheck connections/IBD and (if something wrong) send an expires-immediately template to stop miners?
     }
 
+    // Create map to hold zelnodepayouts
+    std::map<int, std::pair<CScript, CAmount>> zelnodePayouts;
+
     // Update block
     static CBlockIndex* pindexPrev;
     static int64_t nStart;
@@ -626,7 +629,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         if (!coinbaseScript->reserveScript.size())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet or -mineraddress)");
 
-        pblocktemplate = CreateNewBlock(coinbaseScript->reserveScript);
+        pblocktemplate = CreateNewBlock(coinbaseScript->reserveScript, &zelnodePayouts);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -723,28 +726,18 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         if (nCoinbaseOutSize > 0) {
             result.push_back(Pair("miner_reward", pblock->vtx[0].vout[0].nValue));
         }
-        if (nCoinbaseOutSize > 1) {
-            CTxDestination dest;
-            ExtractDestination(pblock->vtx[0].vout[1].scriptPubKey, dest);
-            result.push_back(Pair("basic_zelnode_address", EncodeDestination(dest)));
-            result.push_back(Pair("basic_zelnode_payout", pblock->vtx[0].vout[1].nValue));
-        }
-        if (nCoinbaseOutSize > 2) {
-            CTxDestination dest;
-            ExtractDestination(pblock->vtx[0].vout[2].scriptPubKey, dest);
-            result.push_back(Pair("super_zelnode_address", EncodeDestination(dest)));
-            result.push_back(Pair("super_zelnode_payout", pblock->vtx[0].vout[2].nValue));
-        }
-        if (nCoinbaseOutSize > 3) {
-            CTxDestination dest;
-            ExtractDestination(pblock->vtx[0].vout[3].scriptPubKey, dest);
-            result.push_back(Pair("bamf_zelnode_address", EncodeDestination(dest)));
-            result.push_back(Pair("bamf_zelnode_payout", pblock->vtx[0].vout[3].nValue));
-        }
     } else {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Block didn't have any transactions in it...");
     }
 
+    for (auto payout : zelnodePayouts) {
+        std::string start = "basic";
+        if (payout.first == Zelnode::SUPER) start = "super";
+        else if (payout.first == Zelnode::BAMF) start = "bamf";
+
+        result.push_back(Pair(std::string(start + "_zelnode_address"), EncodeDestination(payout.second.first)));
+        result.push_back(Pair(std::string(start + "_zelnode_payout"), (payout.second.second)));
+    }
 
     return result;
 }
