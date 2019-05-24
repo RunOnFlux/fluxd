@@ -108,7 +108,7 @@ void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, 
     }
 }
 
-CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
+CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn, std::map<int, std::pair<CScript, CAmount>>* zelnodePayouts)
 {
     const CChainParams& chainparams = Params();
     // Create new block
@@ -361,7 +361,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         txNew.nExpiryHeight = 0;
 
         //Zelnode payments
-        FillBlockPayee(txNew, nFees);
+        FillBlockPayee(txNew, nFees, zelnodePayouts);
 
         // Add fees
         txNew.vout[0].nValue += nFees;
