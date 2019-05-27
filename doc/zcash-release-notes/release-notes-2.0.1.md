@@ -85,7 +85,7 @@ Jack Grigg (83):
       configure: Don't require RELRO and BIND_NOW when cross-compiling
       Measure Windows console size for metrics UI
       Use -O1 for darwin and mingw32 release builds
-      Clean up libzelcash CPPFLAGS, CXXFLAGS, and LDFLAGS
+      Clean up libzcash CPPFLAGS, CXXFLAGS, and LDFLAGS
       zcutil/build.sh: Use config.site to set default ./configure settings
       zcutil/build.sh: Remove --enable-werror from default configuration
       Pass correct compiler, linker, and flags into libsnark
