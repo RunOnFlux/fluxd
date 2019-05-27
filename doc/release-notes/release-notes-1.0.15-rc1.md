@@ -10,7 +10,7 @@ funds from t-addresses, z-addresses, or both, and sends them to a single
 t-address or z-address.
 
 Unlike most other RPC methods, `z_mergetoaddress` operates over a particular
-quantity of UTXOs and notes, instead of a particular amount of ZEC. By default,
+quantity of UTXOs and notes, instead of a particular amount of ZEL. By default,
 it will merge 50 UTXOs and 10 notes at a time; these limits can be adjusted with
 the parameters `transparent_limit` and `shielded_limit`.
 

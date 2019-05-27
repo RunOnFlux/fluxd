@@ -1,15 +1,14 @@
 =======
 # ZelCash [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
 =======
-# ZelCash 3.2.0 Kamiooka ZelHash
-INNOVATIVE  INTELLIGENT  INSPIRING
+# ZelCash 3.2.0 Kamiooka / ZelHash
 
-ZelCash is a fork of 2.0.3 Zcash aiming to provide decentralised development platform via ZelNodes and ZelCore.
+Zel (ZelCash) is a fork of 2.0.5-2 Zcash aiming to provide a decentralized development platform via ZelNodes and ZelCore.
 
-POW asic resistant with Equihash (144,5) also known as Zhash with personalisation string ZelProof and LWMA3 difficulty algorithm.
+Zel is PoW asic resistant with ZelHash (Modified Equihash 125,4) with the personalisation string ZelProof and LWMA3 difficulty algorithm.
 
-To speed up synchronisation you can also download our blockchain (state 18. 12. 2018) at https://zelcore.io/Zelcash.zip 
-For ZelNodes/Control Wallets use this bootstrap with txindex enabled (state 18. 02. 2019) https://zelcore.io/zelcashbootstraptxindex.zip
+To speed up synchronisation you can download the Zel blockchain (state 18. 12. 2018) here https://zelcore.io/Zelcash.zip 
+For ZelNodes/Control Wallets you need to use this bootstrap with txindex enabled (state 18. 02. 2019) https://zelcore.io/zelcashbootstraptxindex.zip
 
 # Install and run from APT
 
@@ -109,7 +108,7 @@ addnode=explorer.zel.cash
 addnode=explorer.zel.zelcore.io
 ```
 
-2. Download Zcash parameters to  %AppData%/Roaming/ZcashParams
+2. Download the Zcash parameters to  %AppData%/Roaming/ZcashParams
 https://zelcore.io/zelcore/sapling-output.params \
 https://zelcore.io/zelcore/sapling-spend.params \
 https://zelcore.io/zelcore/sprout-groth16.params \
@@ -171,3 +170,4 @@ echo "addnode=explorer.zel.zelcore.io" >> ~/Library/Application Support/zelcash/
 ```{r, engine='bash'}
 sudo ln -s /usr/local/bin/glibtoolize /usr/local/bin/libtoolize
 ```
+

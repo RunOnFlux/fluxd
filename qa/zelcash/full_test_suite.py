@@ -64,7 +64,7 @@ def check_security_hardening():
     ret &= subprocess.call(['make', '-C', repofile('src'), 'check-security']) == 0
 
     # The remaining checks are only for ELF binaries
-    # Assume that if zcashd is an ELF binary, they all are
+    # Assume that if zelcashd is an ELF binary, they all are
     with open(repofile('src/zelcashd'), 'rb') as f:
         magic = f.read(4)
         if not magic.startswith(b'\x7fELF'):

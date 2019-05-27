@@ -1,10 +1,10 @@
-Zelcash Contributors
+Zel Contributors
 ==================
 
 Tadeas Kmenta (9)
-Wilke Trei (6)
-Jeremy Anderson (4)
-Miles Manley (2)
+Wilke Trei (7)
+Jeremy Anderson (7)
+Miles Manley (7)
 
 Zcash Contributors
 ==================

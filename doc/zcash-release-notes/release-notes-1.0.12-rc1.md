@@ -14,7 +14,7 @@ Bjorn Hjortsberg (2):
 Jack Grigg (20):
       ci-workers: Enable pipelining, and use root to set admin and host details
       Variable overrides for Arch Linux
-      Rationalize currency unit to "ZEC"
+      Rationalize currency unit to "ZEL"
       ci-workers: Fail if Python is not version 2.7
       ci-workers: Variable overrides and process tweaks for CentOS 7
       Add build progress to the release script if progressbar module is available
