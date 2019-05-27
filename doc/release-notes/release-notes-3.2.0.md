@@ -7,7 +7,12 @@ ZelHash is a modified varient of Equihash 125_4 (more info and links to paper he
 
 ZelNodes 
 ---------------------------------------
-Fix and changes in voting
+Restructured zelnode winner votes from casting 30 votes to 10 votes per zelnode tier.
+Votes are only cast and accept by zelnodes of the same tier e.g. (Basic are voting for Basic’s)
+Moved required zelnodes votes for mandatory payout checks from 16 to 6 votes
+Update zelnode sync to retry more effectively when failing to sync
+Added additional logging to help trace why some nodes are failing to sync the zelnode data
+
 
 Upstream Zcash - v2.0.5-2
 ------------------------------------------
