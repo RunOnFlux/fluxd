@@ -233,9 +233,9 @@ bool IsBlockPayeeValid(const CBlock& block, int nBlockHeight)
 }
 
 
-void FillBlockPayee(CMutableTransaction& txNew, CAmount nFees)
+void FillBlockPayee(CMutableTransaction& txNew, CAmount nFees, std::map<int, std::pair<CScript, CAmount>>* payments)
 {
-    zelnodePayments.FillBlockPayee(txNew, nFees);
+    zelnodePayments.FillBlockPayee(txNew, nFees, payments);
 }
 
 std::string GetRequiredPaymentsString(int nBlockHeight)
@@ -243,7 +243,7 @@ std::string GetRequiredPaymentsString(int nBlockHeight)
     return zelnodePayments.GetRequiredPaymentsString(nBlockHeight);
 }
 
-void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees)
+void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees, std::map<int, std::pair<CScript, CAmount>>* payments)
 {
     CBlockIndex* pindexPrev = chainActive.Tip();
     if (!pindexPrev) return;
@@ -311,6 +311,9 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees)
         txNew.vout[currentIndex].nValue = basicZelnodePayment;
         nMinerReward -= basicZelnodePayment;
         currentIndex++;
+
+        if (payments)
+            payments->insert(std::make_pair(Zelnode::BASIC, std::make_pair(basicPayee, basicZelnodePayment)));
     }
 
     if (hasSuperPayment) {
@@ -318,12 +321,18 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees)
         txNew.vout[currentIndex].nValue = superZelnodePayment;
         nMinerReward -= superZelnodePayment;
         currentIndex++;
+
+        if (payments)
+            payments->insert(std::make_pair(Zelnode::SUPER, std::make_pair(superPayee, superZelnodePayment)));
     }
 
     if (hasBAMFPayment) {
         txNew.vout[currentIndex].scriptPubKey = BAMFPayee;
         txNew.vout[currentIndex].nValue = BAMFZelnodePayment;
         nMinerReward -= BAMFZelnodePayment;
+
+        if (payments)
+            payments->insert(std::make_pair(Zelnode::BAMF, std::make_pair(BAMFPayee, BAMFZelnodePayment)));
     }
 
     txNew.vout[0].nValue = nMinerReward;
