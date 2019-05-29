@@ -82,7 +82,7 @@ public:
     CMainParams() {
         strNetworkID = "main";
         strCurrencyUnits = "ZER";
-        bip44CoinType = 133; // As registered in https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+        bip44CoinType = 323; // As registered in https://github.com/satoshilabs/slips/blob/master/slip-0044.md
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nFeeStartBlockHeight = 412300;
         consensus.nSubsidyHalvingInterval = 800000;
@@ -106,7 +106,9 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight = 492850;
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight = 492850;
-
+        consensus.vUpgrades[Consensus::UPGRADE_COSMOS].nProtocolVersion = 170008;
+        consensus.vUpgrades[Consensus::UPGRADE_COSMOS].nActivationHeight = 620450;
+        
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
 
@@ -126,6 +128,13 @@ public:
         nEquihashN = N;
         nEquihashK = K;
 
+        //Start Zeronode
+        nZeronodeCountDrift = 0;
+        strSporkKey = "0477f4d5094e70c26bf998ba0d0e06af8c31b399c5b794895da2158dac086260353c50eaf477e7c5ec6b87349fc63bacdd56f0ffe4dcc112dca71d8335cd1ad2c1";
+        strZeronodeDummyAddress = "t1TLNF3seMZennWmmxik8r1PVEKj5zudgRw";
+        nBudget_Fee_Confirmations = 6; // Number of confirmations for the finalization fee
+        //End Zeronode
+
         genesis = CreateGenesisBlock(
             1487500000,
             uint256S("4c697665206c6f6e6720616e642070726f7370657221014592005a64336e336b"),
@@ -140,11 +149,16 @@ public:
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_main, pnSeed6_main + ARRAYLEN(pnSeed6_main));
 
         vSeeds.clear();
+        vSeeds.push_back(CDNSSeedData("zerocurrency0", "seed0.zerocurrency.io"));
         vSeeds.push_back(CDNSSeedData("zerocurrency1", "seed1.zerocurrency.io"));
         vSeeds.push_back(CDNSSeedData("zerocurrency2", "seed2.zerocurrency.io"));
         vSeeds.push_back(CDNSSeedData("zerocurrency3", "seed3.zerocurrency.io"));
         vSeeds.push_back(CDNSSeedData("zerocurrency4", "seed4.zerocurrency.io"));
         vSeeds.push_back(CDNSSeedData("zerocurrency5", "seed5.zerocurrency.io"));
+        vSeeds.push_back(CDNSSeedData("zerocurrency6", "seed6.zerocurrency.io"));
+        vSeeds.push_back(CDNSSeedData("zerocurrency7", "seed7.zerocurrency.io"));
+        vSeeds.push_back(CDNSSeedData("zerocurrency8", "seed8.zerocurrency.io"));
+        vSeeds.push_back(CDNSSeedData("zerocurrency9", "seed9.zerocurrency.io"));
 
         // guarantees the first 2 characters, when base58 encoded, are "t1"
         base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0xB8};
@@ -175,10 +189,19 @@ public:
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
-            ( 0, consensus.hashGenesisBlock),
-            genesis.nTime,
-            0,
-            0
+            ( 0, consensus.hashGenesisBlock)
+            ( 60000, uint256S("0x00002ae1f476c997f3800d6c7fc733efaa0fc6172d91075724a60a9fd42dcf3a"))
+            ( 140000, uint256S("0x00000eb02cca5b05f4be1ee4016790e5b1a3817eb12b1aba605024602665ce7e"))
+            ( 200000, uint256S("0x0000090d945b23a43b757d57f8f396ac748861f22bf1d8914cba440fd59a5c43"))
+            ( 300000, uint256S("0x000001e0b15c1f74af391c39bcb2d61ea879238b53ba738a45303cccd84c2c3f"))
+            ( 400000, uint256S("0x000001ebcc62c257dd00d70bb7fbc210580875e8dbc9f1f9c9aafdb4dc1d8a4e"))
+            ( 500000, uint256S("0x000000c642fda400a464c50dcf310e65efa2627799b9b0c378524205ba2307b7"))
+            ( 550000, uint256S("0x000003cb1f3c128819bdf84632fd31058014542af64eea8959d5139fc26c21cd")),
+            1553590617,     // * UNIX timestamp of last checkpoint block
+            1067556,         // * total number of transactions between genesis and last checkpoint
+                                        //   (the tx=... number in the SetBestChain debug.log lines)
+            1118            // * estimated number of transactions per day after checkpoint
+                                        //   total number of tx / (checkpoint block height / (24 * 24))
         };
 
         // Founders reward script expects a vector of 2-of-3 multisig addresses
@@ -232,6 +255,8 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight = 50;
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight = 50;
+        consensus.vUpgrades[Consensus::UPGRADE_COSMOS].nProtocolVersion = 170008;
+        consensus.vUpgrades[Consensus::UPGRADE_COSMOS].nActivationHeight =47925;
 
 
         // The best chain should have at least this much work.
@@ -249,6 +274,13 @@ public:
         BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
         nEquihashN = N;
         nEquihashK = K;
+
+        //Start Zeronode
+        nZeronodeCountDrift = 0;
+        strSporkKey = "04f249a25f6708898afead4e01fc726269ffbdcbbecad7f675ed2470f68571e57ac32bde7111781e476b0c0256cc5e7b71cc5fd56fcffbfb1ead0cb6fe89d91303";
+        strZeronodeDummyAddress = "tmWuQ8Yh3pHDa8MingmN8ECPRBxo2n8uZRs";
+        nBudget_Fee_Confirmations = 6; // Number of confirmations for the finalization fee
+        //End Zeronode
 
         genesis = CreateGenesisBlock(
             1542244402,
@@ -370,6 +402,9 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_COSMOS].nProtocolVersion = 170008;
+        consensus.vUpgrades[Consensus::UPGRADE_COSMOS].nActivationHeight = 
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 
         // The best chain should have at least this much work.
@@ -387,6 +422,13 @@ public:
         BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
         nEquihashN = N;
         nEquihashK = K;
+
+        //Start Zeronode
+        nZeronodeCountDrift = 0;
+        strSporkKey = "045da9271f5d9df405d9e83c7c7e62e9c831cc85c51ffaa6b515c4f9c845dec4bf256460003f26ba9d394a17cb57e6759fe231eca75b801c20bccd19cbe4b7942d";
+        strZeronodeDummyAddress = "s1eQnJdoWDhKhxDrX8ev3aFjb1J6ZwXCxUT";
+        nBudget_Fee_Confirmations = 6; // Number of confirmations for the finalization fee
+        //End Zeronode
 
         genesis = CreateGenesisBlock(
             1531037936,

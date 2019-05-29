@@ -9,6 +9,7 @@
 
 #include "init.h"
 #include "crypto/common.h"
+#include "zeronode/activezeronode.h"
 #include "addrman.h"
 #include "amount.h"
 #include "checkpoints.h"
@@ -22,6 +23,10 @@
 #include "key_io.h"
 #endif
 #include "main.h"
+#include "zeronode/budget.h"
+#include "zeronode/payments.h"
+#include "zeronode/zeronodeconfig.h"
+#include "zeronode/zeronodeman.h"
 #include "metrics.h"
 #include "miner.h"
 #include "net.h"
@@ -29,6 +34,8 @@
 #include "rpc/register.h"
 #include "script/standard.h"
 #include "script/sigcache.h"
+#include "zeronode/spork.h"
+#include "zeronode/sporkdb.h"
 #include "scheduler.h"
 #include "txdb.h"
 #include "torcontrol.h"
@@ -208,6 +215,9 @@ void Shutdown()
 #endif
     StopNode();
     StopTorControl();
+    DumpZeronodes();
+    DumpBudgets();
+    DumpZeronodePayments();
     UnregisterNodeSignals(GetNodeSignals());
 
     if (fFeeEstimatesInitialized)
@@ -234,6 +244,8 @@ void Shutdown()
         pcoinsdbview = NULL;
         delete pblocktree;
         pblocktree = NULL;
+        delete pSporkDB;
+        pSporkDB = NULL;
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
@@ -487,6 +499,13 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-shrinkdebugfile", _("Shrink debug.log file on client startup (default: 1 when no -debug)"));
     strUsage += HelpMessageOpt("-testnet", _("Use the test network"));
 
+    strUsage += HelpMessageGroup(_("Zeronode options:"));
+    strUsage += HelpMessageOpt("-zeronode=<n>", strprintf(_("Enable the client to act as a zeronode (0-1, default: %u)"), 0));
+    strUsage += HelpMessageOpt("-znconf=<file>", strprintf(_("Specify zeronode configuration file (default: %s)"), "zeronode.conf"));
+    strUsage += HelpMessageOpt("-znconflock=<n>", strprintf(_("Lock zeronodes from zeronode configuration file (default: %u)"), 1));
+    strUsage += HelpMessageOpt("-zeronodeprivkey=<n>", _("Set the zeronode private key"));
+    strUsage += HelpMessageOpt("-zeronodeaddr=<n>", strprintf(_("Set external address:port to get to this zeronode (example: %s)"), "128.127.106.235:60020"));
+    strUsage += HelpMessageOpt("-budgetvotemode=<mode>", _("Change automatic finalized budget voting behavior. mode=auto: Vote for only exact finalized budget match to my generated budget. (string, default: auto)"));
     strUsage += HelpMessageGroup(_("Node relay options:"));
     strUsage += HelpMessageOpt("-datacarrier", strprintf(_("Relay and mine data carrier transactions (default: %u)"), 1));
     strUsage += HelpMessageOpt("-datacarriersize", strprintf(_("Maximum size of data in data carrier transactions we relay and mine (default: %u)"), MAX_OP_RETURN_RELAY));
@@ -537,6 +556,8 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-metricsui", _("Set to 1 for a persistent metrics screen, 0 for sequential metrics output (default: 1 if running in a console, 0 otherwise)"));
         strUsage += HelpMessageOpt("-metricsrefreshtime", strprintf(_("Number of seconds between metrics refreshes (default: %u if running in a console, %u otherwise)"), 1, 600));
     }
+
+    strUsage += HelpMessageOpt("-sporkkey=<privkey>", _("Enable spork administration functionality with the appropriate private key."));
 
     return strUsage;
 }
@@ -701,9 +722,9 @@ static void ZC_LoadParams(
         boost::filesystem::exists(sprout_groth16)
     )) {
         uiInterface.ThreadSafeMessageBox(strprintf(
-            _("Cannot find the Zcash network parameters in the following directory:\n"
+            _("Cannot find the Zero network parameters in the following directory:\n"
               "%s\n"
-              "Please run 'zcash-fetch-params' or './zcutil/fetch-params.sh' and then restart."),
+              "Please run 'zero-fetch-params' or './zcutil/fetch-params.sh' and then restart."),
                 ZC_GetParamsDir()),
             "", CClientUIInterface::MSG_ERROR);
         StartShutdown();
@@ -854,7 +875,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     fLogIPs = GetBoolArg("-logips", false);
 
     LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-    LogPrintf("Zcash version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
+    LogPrintf("Zero version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
 
     // when specifying an explicit binding address, you want to listen on it
     // even when -connect or -proxy is specified
@@ -1153,7 +1174,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Sanity check
     if (!InitSanityCheck())
-        return InitError(_("Initialization sanity check failed. Zcash is shutting down."));
+        return InitError(_("Initialization sanity check failed. Zero is shutting down."));
 
     std::string strDataDir = GetDataDir().string();
 #ifdef ENABLE_WALLET
@@ -1169,9 +1190,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     try {
         static boost::interprocess::file_lock lock(pathLockFile.string().c_str());
         if (!lock.try_lock())
-            return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zcash is probably already running."), strDataDir));
+            return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zero is probably already running."), strDataDir));
     } catch(const boost::interprocess::interprocess_exception& e) {
-        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zcash is probably already running.") + " %s.", strDataDir, e.what()));
+        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zero is probably already running.") + " %s.", strDataDir, e.what()));
     }
 
 #ifndef WIN32
@@ -1201,6 +1222,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             threadGroup.create_thread(&ThreadScriptCheck);
     }
 
+    if (mapArgs.count("-sporkkey")) // spork priv key
+    {
+        if (!sporkManager.SetPrivKey(GetArg("-sporkkey", "")))
+            return InitError(_("Unable to sign spork message, wrong key?"));
+    }
+
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
     threadGroup.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
@@ -1221,7 +1248,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     libsnark::inhibit_profiling_info = true;
     libsnark::inhibit_profiling_counters = true;
 
-    // Initialize Zcash circuit parameters
+    // Initialize Zero circuit parameters
     ZC_LoadParams(chainparams);
 
     if (GetBoolArg("-savesproutr1cs", false)) {
@@ -1462,7 +1489,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         bool fReset = fReindex;
         std::string strLoadError;
 
-        uiInterface.InitMessage(_("Loading block index..."));
+
 
         nStart = GetTimeMillis();
         do {
@@ -1472,7 +1499,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete pcoinsdbview;
                 delete pcoinscatcher;
                 delete pblocktree;
+                delete pSporkDB;
 
+                pSporkDB = new CSporkDB(0, false, false);
                 pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
@@ -1485,6 +1514,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                         CleanupBlockRevFiles();
                 }
 
+                uiInterface.InitMessage(_("Loading sporks..."));
+                LoadSporksFromDB();
+
+                uiInterface.InitMessage(_("Loading block index..."));
                 if (!LoadBlockIndex()) {
                     strLoadError = _("Error loading block database");
                     break;
@@ -1624,7 +1657,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
             else if (nLoadWalletRet == DB_NEED_REWRITE)
             {
-                strErrors << _("Wallet needed to be rewritten: restart Zcash to complete") << "\n";
+                strErrors << _("Wallet needed to be rewritten: restart Zero to complete") << "\n";
                 LogPrintf("%s", strErrors.str());
                 return InitError(strErrors.str());
             }
@@ -1731,10 +1764,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 #ifdef ENABLE_MINING
  #ifndef ENABLE_WALLET
     if (GetBoolArg("-minetolocalwallet", false)) {
-        return InitError(_("Zcash was not built with wallet support. Set -minetolocalwallet=0 to use -mineraddress, or rebuild Zcash with wallet support."));
+        return InitError(_("Zero was not built with wallet support. Set -minetolocalwallet=0 to use -mineraddress, or rebuild Zero with wallet support."));
     }
     if (GetArg("-mineraddress", "").empty() && GetBoolArg("-gen", false)) {
-        return InitError(_("Zcash was not built with wallet support. Set -mineraddress, or rebuild Zcash with wallet support."));
+        return InitError(_("Zero was not built with wallet support. Set -mineraddress, or rebuild Zero with wallet support."));
     }
  #endif // !ENABLE_WALLET
 
@@ -1806,6 +1839,148 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         while (!fRequestShutdown && chainActive.Tip() == NULL)
             MilliSleep(10);
     }
+
+
+    // ********************************************************* Step 10a: setup Zeronode
+
+
+	uiInterface.InitMessage(_("Loading zeronode cache..."));
+
+    CZeronodeDB zndb;
+    CZeronodeDB::ReadResult readResult = zndb.Read(znodeman);
+    if (readResult == CZeronodeDB::FileError)
+        LogPrintf("Missing zeronode cache file - zncache.dat, will try to recreate\n");
+    else if (readResult != CZeronodeDB::Ok) {
+        LogPrintf("Error reading zncache.dat: ");
+        if (readResult == CZeronodeDB::IncorrectFormat)
+            LogPrintf("magic is ok but data has invalid format, will try to recreate\n");
+        else
+            LogPrintf("file format is unknown or invalid, please fix it manually\n");
+    }
+
+    uiInterface.InitMessage(_("Loading budget cache..."));
+
+    CBudgetDB budgetdb;
+    CBudgetDB::ReadResult readResult2 = budgetdb.Read(budget);
+
+    if (readResult2 == CBudgetDB::FileError)
+        LogPrintf("Missing budget cache - budget.dat, will try to recreate\n");
+    else if (readResult2 != CBudgetDB::Ok) {
+        LogPrintf("Error reading budget.dat: ");
+        if (readResult2 == CBudgetDB::IncorrectFormat)
+            LogPrintf("magic is ok but data has invalid format, will try to recreate\n");
+        else
+            LogPrintf("file format is unknown or invalid, please fix it manually\n");
+    }
+
+    //flag our cached items so we send them to our peers
+    budget.ResetSync();
+    budget.ClearSeen();
+
+
+    uiInterface.InitMessage(_("Loading zeronode payment cache..."));
+
+    CZeronodePaymentDB znpayments;
+    CZeronodePaymentDB::ReadResult readResult3 = znpayments.Read(zeronodePayments);
+
+    if (readResult3 == CZeronodePaymentDB::FileError)
+        LogPrintf("Missing zeronode payment cache - znpayments.dat, will try to recreate\n");
+    else if (readResult3 != CZeronodePaymentDB::Ok) {
+        LogPrintf("Error reading znpayments.dat: ");
+        if (readResult3 == CZeronodePaymentDB::IncorrectFormat)
+            LogPrintf("magic is ok but data has invalid format, will try to recreate\n");
+        else
+            LogPrintf("file format is unknown or invalid, please fix it manually\n");
+    }
+
+    fZeroNode = GetBoolArg("-zeronode", false);
+
+    if ((fZeroNode || zeronodeConfig.getCount() > -1) && fTxIndex == false) {
+        return InitError("Enabling Zeronode support requires turning on transaction indexing."
+                         "Please add txindex=1 to your configuration and start with -reindex");
+    }
+
+    if (fZeroNode) {
+        LogPrintf("IS MASTER NODE\n");
+        strZeroNodeAddr = GetArg("-zeronodeaddr", "");
+
+        LogPrintf(" addr %s\n", strZeroNodeAddr.c_str());
+
+        if (!strZeroNodeAddr.empty()) {
+            CService addrTest = CService(strZeroNodeAddr);
+            if (!addrTest.IsValid()) {
+                return InitError("Invalid -zeronodeaddr address: " + strZeroNodeAddr);
+            }
+        }
+
+        strZeroNodePrivKey = GetArg("-zeronodeprivkey", "");
+        if (!strZeroNodePrivKey.empty()) {
+            std::string errorMessage;
+
+            CKey key;
+            CPubKey pubkey;
+
+            if (!obfuScationSigner.SetKey(strZeroNodePrivKey, errorMessage, key, pubkey)) {
+                return InitError(_("Invalid zeronodeprivkey. Please see documenation."));
+            }
+
+            activeZeronode.pubKeyZeronode = pubkey;
+
+        } else {
+            return InitError(_("You must specify a zeronodeprivkey in the configuration. Please see documentation for help."));
+        }
+    }
+
+    //get the mode of budget voting for this zeronode
+    strBudgetMode = GetArg("-budgetvotemode", "auto");
+
+    if (GetBoolArg("-znconflock", true) && pwalletMain) {
+        LOCK(pwalletMain->cs_wallet);
+        LogPrintf("Locking Zeronodes:\n");
+        uint256 znTxHash;
+        BOOST_FOREACH (CZeronodeConfig::CZeronodeEntry zne, zeronodeConfig.getEntries()) {
+            LogPrintf("  %s %s\n", zne.getTxHash(), zne.getOutputIndex());
+            znTxHash.SetHex(zne.getTxHash());
+            COutPoint outpoint = COutPoint(znTxHash, boost::lexical_cast<unsigned int>(zne.getOutputIndex()));
+            pwalletMain->LockCoin(outpoint);
+        }
+    }
+
+    //lite mode disables all Zeronode and Obfuscation related functionality
+    fLiteMode = GetBoolArg("-litemode", false);
+    if (fZeroNode && fLiteMode) {
+        return InitError("You can not start a zeronode in litemode");
+    }
+
+    fEnableSwiftTX = GetBoolArg("-enableswifttx", fEnableSwiftTX);
+    nSwiftTXDepth = GetArg("-swifttxdepth", nSwiftTXDepth);
+    nSwiftTXDepth = std::min(std::max(nSwiftTXDepth, 0), 60);
+
+    LogPrintf("fLiteMode %d\n", fLiteMode);
+    LogPrintf("nSwiftTXDepth %d\n", nSwiftTXDepth);
+    LogPrintf("Budget Mode %s\n", strBudgetMode.c_str());
+
+    /* Denominations
+
+       A note about convertability. Within Obfuscation pools, each denomination
+       is convertable to another.
+
+       For example:
+       1XLR+1000 == (.1XLR+100)*10
+       10XLR+10000 == (1XLR+1000)*10
+    */
+    obfuScationDenominations.push_back((10000 * COIN) + 10000000);
+    obfuScationDenominations.push_back((1000 * COIN) + 1000000);
+    obfuScationDenominations.push_back((100 * COIN) + 100000);
+    obfuScationDenominations.push_back((10 * COIN) + 10000);
+    obfuScationDenominations.push_back((1 * COIN) + 1000);
+    obfuScationDenominations.push_back((.1 * COIN) + 100);
+    /* Disabled till we need them
+    obfuScationDenominations.push_back( (.01      * COIN)+10 );
+    obfuScationDenominations.push_back( (.001     * COIN)+1 );
+    */
+
+    threadGroup.create_thread(boost::bind(&ThreadCheckObfuScationPool));
 
     // ********************************************************* Step 11: start node
 

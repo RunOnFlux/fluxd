@@ -84,7 +84,12 @@ public:
     std::vector<CTransaction> vtx;
 
     // memory only
+    mutable CScript payee;
     mutable std::vector<uint256> vMerkleTree;
+
+    // memory only for blocktemplate - Zeronode updates
+    mutable CTxOut txoutFounders;
+    mutable CTxOut txoutZeronode;
 
     CBlock()
     {
@@ -109,7 +114,10 @@ public:
     {
         CBlockHeader::SetNull();
         vtx.clear();
+        payee = CScript();
         vMerkleTree.clear();
+        txoutFounders = CTxOut();
+        txoutZeronode = CTxOut();
     }
 
     CBlockHeader GetBlockHeader() const
