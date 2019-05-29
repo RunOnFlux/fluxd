@@ -3,6 +3,7 @@
 
 #include "consensus/validation.h"
 #include "main.h"
+#include "utiltest.h"
 #include "zcash/Proof.hpp"
 
 class MockCValidationState : public CValidationState {
@@ -75,8 +76,7 @@ protected:
 
     virtual void TearDown() {
         // Revert to test default. No-op on mainnet params.
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
-        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+        RegtestDeactivateSapling();
     }
 
     // Returns a valid but empty mutable transaction at block height 1.
@@ -290,7 +290,7 @@ TEST_F(ContextualCheckBlockTest, BlockOverwinterRulesRejectOtherTx) {
 
     {
         SCOPED_TRACE("BlockOverwinterRulesRejectSaplingTx");
-        ExpectInvalidBlockFromTx(CTransaction(mtx), 100, "bad-overwinter-tx-version-group-id");
+        ExpectInvalidBlockFromTx(CTransaction(mtx), 0, "bad-overwinter-tx-version-group-id");
     }
 }
 
@@ -318,6 +318,6 @@ TEST_F(ContextualCheckBlockTest, BlockSaplingRulesRejectOtherTx) {
 
     {
         SCOPED_TRACE("BlockSaplingRulesRejectOverwinterTx");
-        ExpectInvalidBlockFromTx(CTransaction(mtx), 100, "bad-sapling-tx-version-group-id");
+        ExpectInvalidBlockFromTx(CTransaction(mtx), 0, "bad-sapling-tx-version-group-id");
     }
 }

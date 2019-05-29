@@ -12,6 +12,7 @@
 #include "crypto/equihash.h"
 #endif
 #include "init.h"
+#include "key_io.h"
 #include "main.h"
 #include "metrics.h"
 #include "miner.h"
@@ -21,13 +22,12 @@
 #include "txmempool.h"
 #include "util.h"
 #include "validationinterface.h"
-#ifdef ENABLE_WALLET
-#include "wallet/wallet.h"
-#endif
+#include "zeronode/spork.h"
 
 #include <stdint.h>
 
 #include <boost/assign/list_of.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include <univalue.h>
 
@@ -174,15 +174,6 @@ UniValue generate(const UniValue& params, bool fHelp)
             + HelpExampleCli("generate", "11")
         );
 
-    if (GetArg("-mineraddress", "").empty()) {
-#ifdef ENABLE_WALLET
-        if (!pwalletMain) {
-            throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Wallet disabled and -mineraddress not set");
-        }
-#else
-        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "zerod compiled without wallet and -mineraddress not set");
-#endif
-    }
     if (!Params().MineBlocksOnDemand())
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "This method can only be used on regtest");
 
@@ -190,9 +181,13 @@ UniValue generate(const UniValue& params, bool fHelp)
     int nHeightEnd = 0;
     int nHeight = 0;
     int nGenerate = params[0].get_int();
-#ifdef ENABLE_WALLET
-    CReserveKey reservekey(pwalletMain);
-#endif
+
+    boost::shared_ptr<CReserveScript> coinbaseScript;
+    GetMainSignals().ScriptForMining(coinbaseScript);
+
+    //throw an error if no script was provided
+    if (!coinbaseScript->reserveScript.size())
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet or -mineraddress)");
 
     {   // Don't keep cs_main locked
         LOCK(cs_main);
@@ -206,13 +201,9 @@ UniValue generate(const UniValue& params, bool fHelp)
     unsigned int k = Params().EquihashK();
     while (nHeight < nHeightEnd)
     {
-#ifdef ENABLE_WALLET
-        std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey));
-#else
-        std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey());
-#endif
+        std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(coinbaseScript->reserveScript));
         if (!pblocktemplate.get())
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet keypool empty");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         CBlock *pblock = &pblocktemplate->block;
         {
             LOCK(cs_main);
@@ -262,10 +253,12 @@ endloop:
             throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
         ++nHeight;
         blockHashes.push_back(pblock->GetHash().GetHex());
+
+        //mark script as important because it was used at least for one coinbase output
+        coinbaseScript->KeepScript();
     }
     return blockHashes;
 }
-
 
 UniValue setgenerate(const UniValue& params, bool fHelp)
 {
@@ -289,15 +282,6 @@ UniValue setgenerate(const UniValue& params, bool fHelp)
             + HelpExampleRpc("setgenerate", "true, 1")
         );
 
-    if (GetArg("-mineraddress", "").empty()) {
-#ifdef ENABLE_WALLET
-        if (!pwalletMain) {
-            throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Wallet disabled and -mineraddress not set");
-        }
-#else
-        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "zerod compiled without wallet and -mineraddress not set");
-#endif
-    }
     if (Params().MineBlocksOnDemand())
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Use the generate method instead of setgenerate on this network");
 
@@ -315,16 +299,11 @@ UniValue setgenerate(const UniValue& params, bool fHelp)
 
     mapArgs["-gen"] = (fGenerate ? "1" : "0");
     mapArgs ["-genproclimit"] = itostr(nGenProcLimit);
-#ifdef ENABLE_WALLET
-    GenerateBitcoins(fGenerate, pwalletMain, nGenProcLimit);
-#else
-    GenerateBitcoins(fGenerate, nGenProcLimit);
-#endif
+    GenerateBitcoins(fGenerate, nGenProcLimit, Params());
 
     return NullUniValue;
 }
 #endif
-
 
 UniValue getmininginfo(const UniValue& params, bool fHelp)
 {
@@ -482,6 +461,20 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
             "  \"curtime\" : ttt,                  (numeric) current timestamp in seconds since epoch (Jan 1 1970 GMT)\n"
             "  \"bits\" : \"xxx\",                 (string) compressed target of next block\n"
             "  \"height\" : n                      (numeric) The height of the next block\n"
+            "  \"votes\" : [\n                     (array) show vote candidates\n"
+            "        { ... }                       (json object) vote candidate\n"
+            "        ,...\n"
+            "  ],\n"
+            "  \"coinbase_required_outputs\" : [\n (array) required coinbase transactions\n"
+            "      {\n"
+            "         \"payee\" : \"xxxx\",        (string) required payee for the next block\n"
+            "         \"payee_amount\" : \"xxxx\", (numeric) required amount to pay\n"
+            "         \"type\" : \"xxxx\"          (string) payee type, devfee, utilitynode, etc...\n"
+            "      }\n"
+            "  \"payee\" : \"xxx\",                (string) required zeronode payee for the next block\n"
+            "  \"payee_amount\" : n,               (numeric) required amount to pay\n"
+            "  \"zeronode_payments\" : true|false,         (boolean) true, if zeronode payments are enabled\n"
+            "  \"enforce_zeronode_payments\" : true|false  (boolean) true, if zeronode payments are enforced\n"
             "}\n"
 
             "\nExamples:\n"
@@ -555,7 +548,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
 
     if (vNodes.empty())
-        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Zcash is not connected!");
+        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "ZERO is not connected!");
 
     if (IsInitialBlockDownload())
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "ZERO is downloading blocks...");
@@ -629,16 +622,22 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
             delete pblocktemplate;
             pblocktemplate = NULL;
         }
-#ifdef ENABLE_WALLET
-        CReserveKey reservekey(pwalletMain);
-        pblocktemplate = CreateNewBlockWithKey(reservekey);
-#else
-        pblocktemplate = CreateNewBlockWithKey();
-#endif
+
+        boost::shared_ptr<CReserveScript> coinbaseScript;
+        GetMainSignals().ScriptForMining(coinbaseScript);
+
+        // Throw an error if no script was provided
+        if (!coinbaseScript->reserveScript.size())
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet or -mineraddress)");
+
+        pblocktemplate = CreateNewBlock(coinbaseScript->reserveScript);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
-        // Need to update only after we know CreateNewBlockWithKey succeeded
+        // Mark script as important because it was used at least for one coinbase output
+        coinbaseScript->KeepScript();
+
+        // Need to update only after we know CreateNewBlock succeeded
         pindexPrev = pindexPrevNew;
     }
     CBlock* pblock = &pblocktemplate->block; // pointer for convenience
@@ -680,9 +679,9 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
 
         if (tx.IsCoinBase()) {
             // Show founders' reward if it is required
-            if (pblock->vtx[0].vout.size() > 1) {
+            if (pblock->txoutFounders != CTxOut()) {
                 // Correct this if GetBlockTemplate changes the order
-                entry.push_back(Pair("foundersreward", (int64_t)tx.vout[1].nValue));
+                entry.push_back(Pair("foundersreward", (int64_t)pblock->txoutFounders.nValue));
             }
             entry.push_back(Pair("required", true));
             txCoinbase = entry;
@@ -704,6 +703,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         aMutable.push_back("prevblock");
     }
 
+    UniValue aVotes(UniValue::VARR);
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("capabilities", aCaps));
     result.push_back(Pair("version", pblock->nVersion));
@@ -727,6 +727,43 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     result.push_back(Pair("curtime", pblock->GetBlockTime()));
     result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
     result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight+1)));
+    result.push_back(Pair("votes", aVotes));
+
+    //List of all required coinbase transactions
+    UniValue requiredCoinbaseArr(UniValue::VARR);
+    if (pblock->txoutFounders != CTxOut()) {
+      UniValue rqCoinbase(UniValue::VOBJ);
+      CTxDestination dest;
+      ExtractDestination(pblock->txoutFounders.scriptPubKey, dest);
+      rqCoinbase.push_back(Pair("payee", EncodeDestination(dest)));
+      rqCoinbase.push_back(Pair("script", HexStr(pblock->txoutFounders.scriptPubKey.begin(), pblock->txoutFounders.scriptPubKey.end())));
+      rqCoinbase.push_back(Pair("amount", pblock->txoutFounders.nValue));
+      rqCoinbase.push_back(Pair("type", "foundersreward"));
+      rqCoinbase.push_back(Pair("enforced", true));
+      requiredCoinbaseArr.push_back(rqCoinbase);
+    }
+
+    if(pblock->txoutZeronode != CTxOut()) {
+      UniValue rqCoinbase(UniValue::VOBJ);
+      CTxDestination dest;
+      ExtractDestination(pblock->txoutZeronode.scriptPubKey, dest);
+      rqCoinbase.push_back(Pair("payee", EncodeDestination(dest)));
+      rqCoinbase.push_back(Pair("script", HexStr(pblock->txoutZeronode.scriptPubKey.begin(), pblock->txoutZeronode.scriptPubKey.end())));
+      rqCoinbase.push_back(Pair("amount", pblock->txoutZeronode.nValue));
+      rqCoinbase.push_back(Pair("type", "zeronode"));
+      rqCoinbase.push_back(Pair("enforced", IsSporkActive(SPORK_8_ZERONODE_PAYMENT_ENFORCEMENT)));
+      requiredCoinbaseArr.push_back(rqCoinbase);
+      // Legacy Masternode blocktemplate
+      result.push_back(Pair("payee", EncodeDestination(dest)));
+      result.push_back(Pair("payee_amount", pblock->txoutZeronode.nValue));
+    } else {
+      // Legacy Masternode blocktemplate
+      result.push_back(Pair("payee", ""));
+      result.push_back(Pair("payee_amount", ""));
+    }
+    result.push_back(Pair("masternode_payments", IsSporkActive(SPORK_7_ZERONODE_PAYMENT_ENABLED)));
+    result.push_back(Pair("enforce_masternode_payments", IsSporkActive(SPORK_8_ZERONODE_PAYMENT_ENFORCEMENT)));
+    result.push_back(Pair("coinbase_required_outputs",requiredCoinbaseArr));
 
     return result;
 }

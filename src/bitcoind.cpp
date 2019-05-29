@@ -7,6 +7,7 @@
 #include "rpc/server.h"
 #include "init.h"
 #include "main.h"
+#include "zeronode/zeronodeconfig.h"
 #include "noui.h"
 #include "scheduler.h"
 #include "util.h"
@@ -72,7 +73,7 @@ bool AppInit(int argc, char* argv[])
     // Process help and version before taking care about datadir
     if (mapArgs.count("-?") || mapArgs.count("-h") ||  mapArgs.count("-help") || mapArgs.count("-version"))
     {
-        std::string strUsage = _("Zcash Daemon") + " " + _("version") + " " + FormatFullVersion() + "\n" + PrivacyInfo();
+        std::string strUsage = _("Zero Daemon") + " " + _("version") + " " + FormatFullVersion() + "\n" + PrivacyInfo();
 
         if (mapArgs.count("-version"))
         {
@@ -81,7 +82,7 @@ bool AppInit(int argc, char* argv[])
         else
         {
             strUsage += "\n" + _("Usage:") + "\n" +
-                  "  zerod [options]                     " + _("Start Zcash Daemon") + "\n";
+                  "  zerod [options]                     " + _("Start Zero Daemon") + "\n";
 
             strUsage += "\n" + HelpMessage(HMM_BITCOIND);
         }
@@ -111,7 +112,7 @@ bool AppInit(int argc, char* argv[])
                    "\n"
                    "You can look at the example configuration file for suggestions of default\n"
                    "options that you may want to change. It should be in one of these locations,\n"
-                   "depending on how you installed Zcash:\n") +
+                   "depending on how you installed Zero:\n") +
                  _("- Source code:  %s\n"
                    "- .deb package: %s\n")).c_str(),
                 GetConfigFile().string().c_str(),
@@ -128,10 +129,19 @@ bool AppInit(int argc, char* argv[])
             return false;
         }
 
+        //Start Zeronode
+        // parse zeronode.conf
+        std::string strErr;
+        if (!zeronodeConfig.read(strErr)) {
+            fprintf(stderr, "Error reading zeronode configuration file: %s\n", strErr.c_str());
+            return false;
+        }
+        //End Zeronode
+
         // Command-line RPC
         bool fCommandLine = false;
         for (int i = 1; i < argc; i++)
-            if (!IsSwitchChar(argv[i][0]) && !boost::algorithm::istarts_with(argv[i], "zcash:"))
+            if (!IsSwitchChar(argv[i][0]) && !boost::algorithm::istarts_with(argv[i], "zero:"))
                 fCommandLine = true;
 
         if (fCommandLine)
@@ -143,7 +153,7 @@ bool AppInit(int argc, char* argv[])
         fDaemon = GetBoolArg("-daemon", false);
         if (fDaemon)
         {
-            fprintf(stdout, "Zcash server starting\n");
+            fprintf(stdout, "Zero server starting\n");
 
             // Daemonize
             pid_t pid = fork();

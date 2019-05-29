@@ -24,14 +24,13 @@
 #include "zcash/IncrementalMerkleTree.hpp"
 #include "sodium.h"
 #include "miner.h"
+#include "wallet/paymentdisclosuredb.h"
 
 #include <array>
 #include <iostream>
 #include <chrono>
 #include <thread>
 #include <string>
-
-#include "paymentdisclosuredb.h"
 
 using namespace libzcash;
 
@@ -135,11 +134,7 @@ void AsyncRPCOperation_sendmany::main() {
     bool success = false;
 
 #ifdef ENABLE_MINING
-  #ifdef ENABLE_WALLET
-    GenerateBitcoins(false, NULL, 0);
-  #else
-    GenerateBitcoins(false, 0);
-  #endif
+    GenerateBitcoins(false, 0, Params());
 #endif
 
     try {
@@ -164,11 +159,7 @@ void AsyncRPCOperation_sendmany::main() {
     }
 
 #ifdef ENABLE_MINING
-  #ifdef ENABLE_WALLET
-    GenerateBitcoins(GetBoolArg("-gen",false), pwalletMain, GetArg("-genproclimit", 1));
-  #else
-    GenerateBitcoins(GetBoolArg("-gen",false), GetArg("-genproclimit", 1));
-  #endif
+    GenerateBitcoins(GetBoolArg("-gen", false), GetArg("-genproclimit", 1), Params());
 #endif
 
     stop_execution_clock();
@@ -394,7 +385,7 @@ bool AsyncRPCOperation_sendmany::main_impl() {
             if (!pwalletMain->GetHDSeed(seed)) {
                 throw JSONRPCError(
                     RPC_WALLET_ERROR,
-                    "CWallet::GenerateNewSaplingZKey(): HD seed not found");
+                    "AsyncRPCOperation_sendmany::main_impl(): HD seed not found");
             }
             ovk = ovkForShieldingFromTaddr(seed);
         }
@@ -416,7 +407,7 @@ bool AsyncRPCOperation_sendmany::main_impl() {
             }
 
             CTxDestination changeAddr = vchPubKey.GetID();
-            assert(builder_.SendChangeTo(changeAddr));
+            builder_.SendChangeTo(changeAddr);
         }
 
         // Select Sapling notes
@@ -445,7 +436,7 @@ bool AsyncRPCOperation_sendmany::main_impl() {
             if (!witnesses[i]) {
                 throw JSONRPCError(RPC_WALLET_ERROR, "Missing witness for Sapling note");
             }
-            assert(builder_.AddSaplingSpend(expsk, notes[i], anchor, witnesses[i].get()));
+            builder_.AddSaplingSpend(expsk, notes[i], anchor, witnesses[i].get());
         }
 
         // Add Sapling outputs
@@ -469,17 +460,11 @@ bool AsyncRPCOperation_sendmany::main_impl() {
             auto amount = std::get<1>(r);
 
             auto address = DecodeDestination(outputAddress);
-            if (!builder_.AddTransparentOutput(address, amount)) {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid output address, not a valid taddr.");
-            }
+            builder_.AddTransparentOutput(address, amount);
         }
 
         // Build the transaction
-        auto maybe_tx = builder_.Build();
-        if (!maybe_tx) {
-            throw JSONRPCError(RPC_WALLET_ERROR, "Failed to build transaction.");
-        }
-        tx_ = maybe_tx.get();
+        tx_ = builder_.Build().GetTxOrThrow();
 
         // Send the transaction
         // TODO: Use CWallet::CommitTransaction instead of sendrawtransaction
@@ -1039,9 +1024,9 @@ bool AsyncRPCOperation_sendmany::find_utxos(bool fAcceptCoinbase=false) {
         t_inputs_.push_back(utxo);
     }
 
-    // sort in ascending order, so smaller utxos appear first
+    // sort in ascending order, so larger utxos appear first
     std::sort(t_inputs_.begin(), t_inputs_.end(), [](SendManyInputUTXO i, SendManyInputUTXO j) -> bool {
-        return ( std::get<2>(i) < std::get<2>(j));
+        return ( std::get<2>(i) > std::get<2>(j));
     });
 
     return t_inputs_.size() > 0;
@@ -1333,7 +1318,8 @@ void AsyncRPCOperation_sendmany::add_taddr_change_output_to_tx(CAmount amount) {
 }
 
 std::array<unsigned char, ZC_MEMO_SIZE> AsyncRPCOperation_sendmany::get_memo_from_hex_string(std::string s) {
-    std::array<unsigned char, ZC_MEMO_SIZE> memo = {{0x00}};
+    // initialize to default memo (no_memo), see section 5.5 of the protocol spec
+    std::array<unsigned char, ZC_MEMO_SIZE> memo = {{0xF6}};
 
     std::vector<unsigned char> rawMemo = ParseHex(s.c_str());
 
