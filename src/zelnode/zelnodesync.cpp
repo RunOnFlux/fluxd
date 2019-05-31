@@ -73,7 +73,6 @@ void ZelnodeSync::Reset()
     RequestedZelnodeAssets = ZELNODE_SYNC_INITIAL;
     RequestedZelnodeAttempt = 0;
     nTimeAssetSyncStarted = GetTime();
-    zelnodeman.Clear();
 }
 
 void ZelnodeSync::AddedZelnodeList(uint256 hash)
@@ -225,7 +224,6 @@ void ZelnodeSync::Process()
         return;
 
     for (CNode* pnode : vNodes) {
-
         if (Params().NetworkID() == CBaseChainParams::REGTEST) {
             if (RequestedZelnodeAttempt <= 2) {
                 pnode->PushMessage("getsporks"); //get current network sporks
@@ -275,7 +273,6 @@ void ZelnodeSync::Process()
                         RequestedZelnodeAttempt = 0;
                         lastFailure = GetTime();
                         nCountFailures++;
-                        zelnodeman.Clear();
                     } else {
                         GetNextAsset();
                     }
