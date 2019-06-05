@@ -220,7 +220,7 @@ public:
 static CMainParams mainParams;
 
 /**
- * Kamiooka-testnet
+ * testnet-kamiooka
  */
 class CTestNetParams : public CChainParams {
 public:

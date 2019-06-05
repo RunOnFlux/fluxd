@@ -23,7 +23,7 @@ public:
 static CBaseMainParams mainParams;
 
 /**
- * Kamiooka-testnet
+ * testnet-kamiooka
  */
 class CBaseTestNetParams : public CBaseChainParams
 {
@@ -31,7 +31,7 @@ public:
     CBaseTestNetParams()
     {
         nRPCPort = 26124;
-        strDataDir = "kamiooka-testnet";
+        strDataDir = "testnet-kamiooka";
     }
 };
 static CBaseTestNetParams testNetParams;
