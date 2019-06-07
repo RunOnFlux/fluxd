@@ -32,6 +32,25 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         return nProofOfWorkLimit;
     }	
 
+    // Reset the difficulty for ZelHash fork 
+     if (pindexLast->nHeight > chainParams.eh_epoch_2_end() - 1
+        && pindexLast->nHeight < chainParams.eh_epoch_2_end() + 64) {
+
+	// Get the currently calculated difficulty following LWMA3
+	arith_uint256 fullTarget;
+	fullTarget.SetCompact(Lwma3CalculateNextWorkRequired(pindexLast, params)); 
+
+	// (1/32th) of the calculated diff
+	arith_uint256 targetStep = fullTarget >> 5;
+
+	// maximum: 64*(1/32)*target = 2*target
+	targetStep *= (chainParams.eh_epoch_2_end() + 61 - pindexLast->nHeight);
+	
+	fullTarget += targetStep; 
+	return fullTarget.GetCompact();
+	
+    }		
+
     {
         // Comparing to pindexLast->nHeight with >= because this function
         // returns the work required for the block after pindexLast.
