@@ -400,23 +400,15 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
 
 #ifdef ENABLE_MINING
 
-class MinerAddressScript : public CReserveScript
-{
-    void KeepScript() {}
-};
-
-void GetScriptForMinerAddress(boost::shared_ptr<CReserveScript> &script)
+void GetScriptForMinerAddress(CScript &script)
 {
     CTxDestination addr = DecodeDestination(GetArg("-mineraddress", ""));
     if (!IsValidDestination(addr)) {
         return;
     }
 
-    boost::shared_ptr<MinerAddressScript> mAddr(new MinerAddressScript());
     CKeyID keyID = boost::get<CKeyID>(addr);
-
-    script = mAddr;
-    script->reserveScript = CScript() << OP_DUP << OP_HASH160 << ToByteVector(keyID) << OP_EQUALVERIFY << OP_CHECKSIG;
+    script = CScript() << OP_DUP << OP_HASH160 << ToByteVector(keyID) << OP_EQUALVERIFY << OP_CHECKSIG;
 }
 
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce)
@@ -463,7 +455,7 @@ static bool ProcessBlockFound(CBlock* pblock, const CChainParams& chainparams)
     return true;
 }
 
-void static BitcoinMiner(const CChainParams& chainparams)
+void static BitcoinMiner(const CChainParams& chainparams, const CScript& coinbaseScript)
 {
     LogPrintf("ZelcashMiner started\n");
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
@@ -472,11 +464,6 @@ void static BitcoinMiner(const CChainParams& chainparams)
     // Each thread has its own counter
     unsigned int nExtraNonce = 0;
 
-    boost::shared_ptr<CReserveScript> coinbaseScript;
-    GetMainSignals().ScriptForMining(coinbaseScript);
-
-        unsigned int n = ehparams[0].n;
-        unsigned int k = ehparams[0].k;
 
     std::string solver = GetArg("-equihashsolver", "default");
     assert(solver == "tromp" || solver == "default");
@@ -492,10 +479,6 @@ void static BitcoinMiner(const CChainParams& chainparams)
     miningTimer.start();
 
     try {
-        //throw an error if no script was provided
-        if (!coinbaseScript->reserveScript.size())
-            throw std::runtime_error("No coinbase script available (mining requires a wallet or -mineraddress)");
-
         while (true) {
             if (chainparams.MiningRequiresPeers()) {
                 // Busy-wait for the network to come online so we don't waste time mining
@@ -535,7 +518,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
             unsigned int k = ehparams[0].k;
             LogPrint("pow", "Using Equihash solver \"%s\" with n = %u, k = %u\n", solver, n, k);
 
-            unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(coinbaseScript->reserveScript));
+            unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(coinbaseScript));
             if (!pblocktemplate.get())
             {
                 if (GetArg("-mineraddress", "").empty()) {
@@ -583,7 +566,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
                          solver, pblock->nNonce.ToString());
 
                 std::function<bool(std::vector<unsigned char>)> validBlock =
-                        [&pblock, &hashTarget, &chainparams, &m_cs, &cancelSolver, &coinbaseScript]
+                        [&pblock, &hashTarget, &chainparams, &m_cs, &cancelSolver]
                         (std::vector<unsigned char> soln) {
                     // Write the solution to the hash and compute the result.
                     LogPrint("pow", "- Checking solution against target\n");
@@ -604,7 +587,6 @@ void static BitcoinMiner(const CChainParams& chainparams)
                         cancelSolver = false;
                     }
                     SetThreadPriority(THREAD_PRIORITY_LOWEST);
-                    coinbaseScript->KeepScript();
 
                     // In regression test mode, stop mining after a block is found.
                     if (chainparams.MineBlocksOnDemand()) {
@@ -727,9 +709,16 @@ void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams& chainpar
     if (nThreads == 0 || !fGenerate)
         return;
 
+    CScript coinbaseScript;
+    GetMainSignals().ScriptForMining(coinbaseScript);
+
+    //throw an error if no script was provided
+    if (!coinbaseScript.size())
+        throw std::runtime_error("No coinbase script available (mining requires a wallet or -mineraddress)");
+
     minerThreads = new boost::thread_group();
     for (int i = 0; i < nThreads; i++) {
-        minerThreads->create_thread(boost::bind(&BitcoinMiner, boost::cref(chainparams)));
+        minerThreads->create_thread(boost::bind(&BitcoinMiner, boost::cref(chainparams), coinbaseScript));
     }
 }
 

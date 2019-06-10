@@ -28,7 +28,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn);
 
 #ifdef ENABLE_MINING
 /** Get script for -mineraddress */
-void GetScriptForMinerAddress(boost::shared_ptr<CReserveScript> &script);
+void GetScriptForMinerAddress(CScript &script);
 /** Modify the extranonce in a block */
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
 /** Run the miner threads */
