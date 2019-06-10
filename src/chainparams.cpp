@@ -339,8 +339,9 @@ public:
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
-            (0, consensus.hashGenesisBlock),
-            1548888451,  // * UNIX timestamp of last checkpoint block
+            (0, consensus.hashGenesisBlock)
+            (3, uint256S("0x07e441f9f675fc69c5567f6470bdce27b9a9bcff3c25cea1f93a401157544660")),
+            1560190235,  // * UNIX timestamp of last checkpoint block
             0,           // * total number of transactions between genesis and last checkpoint
                          //   (the tx=... number in the SetBestChain debug.log lines)
             750          // * estimated number of transactions per day after checkpoint 720 newly mined +30 for txs that users are doing
