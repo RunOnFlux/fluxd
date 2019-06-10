@@ -43,7 +43,7 @@ protected:
     virtual void ResendWalletTransactions(int64_t nBestBlockTime) {}
     virtual void BlockChecked(const CBlock&, const CValidationState&) {}
     virtual void GetScriptForMining(boost::shared_ptr<CReserveScript>&) {};
-    virtual void ResetRequestCount(const uint256 &hash) {};
+    virtual void UpdateRequestCount(const CBlock&) {};
     friend void ::RegisterValidationInterface(CValidationInterface*);
     friend void ::UnregisterValidationInterface(CValidationInterface*);
     friend void ::UnregisterAllValidationInterfaces();
@@ -71,7 +71,7 @@ struct CMainSignals {
     /** Notifies listeners that a key for mining is required (coinbase) */
     boost::signals2::signal<void (boost::shared_ptr<CReserveScript>&)> ScriptForMining;
     /** Notifies listeners that a block has been successfully mined */
-    boost::signals2::signal<void (const uint256 &)> BlockFound;
+    boost::signals2::signal<void (const CBlock&)> BlockFound;
 };
 
 CMainSignals& GetMainSignals();
