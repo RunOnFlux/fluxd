@@ -119,7 +119,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January 12th
 
     consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
-        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 373500;  // Approx July 4th - Zel Team Boulder Meetup 
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 372500;  // Approx July 2nd - Zel Team Boulder Meetup 
 
 	consensus.nZawyLWMAAveragingWindow = 60;
 	consensus.eh_epoch_fade_length = 11;
