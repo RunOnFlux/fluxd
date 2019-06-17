@@ -597,13 +597,16 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         // TODO: Maybe recheck connections/IBD and (if something wrong) send an expires-immediately template to stop miners?
     }
 
-    // Create map to hold zelnodepayouts
-    std::map<int, std::pair<CScript, CAmount>> zelnodePayouts;
+
 
     // Update block
     static CBlockIndex* pindexPrev;
     static int64_t nStart;
     static CBlockTemplate* pblocktemplate;
+
+    // Create map to hold zelnodepayouts
+    static std::map<int, std::pair<CScript, CAmount>> mapZelnodePayouts;
+
     if (pindexPrev != chainActive.Tip() ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5))
     {
@@ -620,6 +623,8 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         {
             delete pblocktemplate;
             pblocktemplate = NULL;
+
+            mapZelnodePayouts.clear();
         }
 
         boost::shared_ptr<CReserveScript> coinbaseScript;
@@ -629,7 +634,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         if (!coinbaseScript->reserveScript.size())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet or -mineraddress)");
 
-        pblocktemplate = CreateNewBlock(coinbaseScript->reserveScript, &zelnodePayouts);
+        pblocktemplate = CreateNewBlock(coinbaseScript->reserveScript, &mapZelnodePayouts);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -730,7 +735,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Block didn't have any transactions in it...");
     }
 
-    for (auto payout : zelnodePayouts) {
+    for (auto payout : mapZelnodePayouts) {
         std::string start = "basic";
         if (payout.first == Zelnode::SUPER) start = "super";
         else if (payout.first == Zelnode::BAMF) start = "bamf";
