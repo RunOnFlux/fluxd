@@ -119,7 +119,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January 12th
 
     consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
-        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 360000;  // Approx June 15th
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 372500;  // Approx July 2nd - Zel Team Boulder Meetup 
 
 	consensus.nZawyLWMAAveragingWindow = 60;
 	consensus.eh_epoch_fade_length = 11;
@@ -220,7 +220,7 @@ public:
 static CMainParams mainParams;
 
 /**
- * Kamiooka-testnet
+ * testnet-kamiooka
  */
 class CTestNetParams : public CChainParams {
 public:
@@ -251,16 +251,16 @@ public:
         Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
-	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 60;
+	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 70;
 
 	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
-	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 120;
+	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 100;
 
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 180;
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 120;
 
 	    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
-        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 2100;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 720;
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
@@ -339,8 +339,9 @@ public:
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
-            (0, consensus.hashGenesisBlock),
-            1548888451,  // * UNIX timestamp of last checkpoint block
+            (0, consensus.hashGenesisBlock)
+            (3, uint256S("0x07e441f9f675fc69c5567f6470bdce27b9a9bcff3c25cea1f93a401157544660")),
+            1560190235,  // * UNIX timestamp of last checkpoint block
             0,           // * total number of transactions between genesis and last checkpoint
                          //   (the tx=... number in the SetBestChain debug.log lines)
             750          // * estimated number of transactions per day after checkpoint 720 newly mined +30 for txs that users are doing
@@ -567,31 +568,41 @@ int validEHparameterList(EHparameters *ehparams, unsigned long blockheight, cons
     //The upcoming version of EH is preferred so will always be first element
     //returns number of elements in list
 
+    int current_height = (int)blockheight;
+    if (current_height < 0)
+        current_height = 0;
+
+    // When checking to see if the activation height is above the fade length, we subtract the fade length from the
+    // current height and run it through the NetworkUpgradeActive method
+    int modified_height = (int)(current_height - params.GetConsensus().eh_epoch_fade_length);
+    if (modified_height < 0)
+        modified_height = 0;
+
     // check to see if the block height is greater then the overlap period ( height - fade depth >= Upgrade Height)
-    if (NetworkUpgradeActive(blockheight - params.GetConsensus().eh_epoch_fade_length, Params().GetConsensus(), Consensus::UPGRADE_KAMIOOKA)) {
+    if (NetworkUpgradeActive(modified_height, Params().GetConsensus(), Consensus::UPGRADE_KAMIOOKA)) {
         ehparams[0]=params.eh_epoch_3_params();
         return 1;
     }
 
-    // check to see if the blockheight is in the overlap period.
+    // check to see if the block height is in the overlap period.
     // The above if statement shows us that we are already below the upgrade height + the fade depth, so now we check
     // to see if we are above just the upgrade height
-    if (NetworkUpgradeActive(blockheight, Params().GetConsensus(), Consensus::UPGRADE_KAMIOOKA)) {
+    if (NetworkUpgradeActive(current_height, Params().GetConsensus(), Consensus::UPGRADE_KAMIOOKA)) {
         ehparams[0]=params.eh_epoch_3_params();
         ehparams[1]=params.eh_epoch_2_params();
         return 2;
     }
 
-    // check to see if the blockheight is greater then the overlap period (height - fade depth >= Upgrade Height)
-    if (NetworkUpgradeActive(blockheight - params.GetConsensus().eh_epoch_fade_length, Params().GetConsensus(), Consensus::UPGRADE_EQUI144_5)) {
+    // check to see if the block height is greater then the overlap period (height - fade depth >= Upgrade Height)
+    if (NetworkUpgradeActive(modified_height, Params().GetConsensus(), Consensus::UPGRADE_EQUI144_5)) {
         ehparams[0]=params.eh_epoch_2_params();
         return 1;
     }
 
-    // check to see if the blockheight is in the overlap period
+    // check to see if the block height is in the overlap period
     // The above if statement shows us that we are already below the upgrade height + the fade depth, so now we check
     // to see if we are above just the upgrade height
-    if (NetworkUpgradeActive(blockheight, Params().GetConsensus(), Consensus::UPGRADE_EQUI144_5)) {
+    if (NetworkUpgradeActive(current_height, Params().GetConsensus(), Consensus::UPGRADE_EQUI144_5)) {
         ehparams[0]=params.eh_epoch_2_params();
         ehparams[1]=params.eh_epoch_1_params();
         return 2;
