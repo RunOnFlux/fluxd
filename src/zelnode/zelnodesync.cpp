@@ -1,6 +1,6 @@
 // Copyright (c) 2014-2015 The Dash developers
 // Copyright (c) 2015-2017 The PIVX developers
-// Copyright (c) 2018 The Zelcash developers
+// Copyright (c) 2019 The Zel developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -224,7 +224,6 @@ void ZelnodeSync::Process()
         return;
 
     for (CNode* pnode : vNodes) {
-
         if (Params().NetworkID() == CBaseChainParams::REGTEST) {
             if (RequestedZelnodeAttempt <= 2) {
                 pnode->PushMessage("getsporks"); //get current network sporks
@@ -267,9 +266,9 @@ void ZelnodeSync::Process()
 
                 // timeout
                 if (lastZelnodeList == 0 &&
-                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 5)) {
+                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 10)) {
                     if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)) {
-                        LogPrintf("%s - ERROR - Syncing zelnode list has failed, will retry later\n", __func__);
+                        LogPrintf("%s - ERROR - Syncing zelnode list has failed, failed because %s, will try again\n", __func__, (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3) ? "Requested zelnode attempt greater than threshold" : "nTimeAsset Sync timeout");
                         RequestedZelnodeAssets = ZELNODE_SYNC_FAILED;
                         RequestedZelnodeAttempt = 0;
                         lastFailure = GetTime();
@@ -298,9 +297,9 @@ void ZelnodeSync::Process()
 
                 // timeout
                 if (lastZelnodeWinner == 0 &&
-                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 5)) {
+                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 10)) {
                     if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)) {
-                        LogPrintf("%s - ERROR - Syncing zelnode winners has failed, will retry later\n", __func__);
+                        LogPrintf("%s - ERROR - Syncing zelnode winners has failed, failed because %s, will try again\n", __func__, (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3) ? "Requested zelnode attempt greater than threshold" : "nTimeAsset Sync timeout");
                         RequestedZelnodeAssets = ZELNODE_SYNC_FAILED;
                         RequestedZelnodeAttempt = 0;
                         lastFailure = GetTime();

@@ -18,7 +18,7 @@
 #define CLIENT_VERSION_MAJOR 3
 
 /* Minor version */
-#define CLIENT_VERSION_MINOR 1
+#define CLIENT_VERSION_MINOR 2
 
 /* Build revision */
 #define CLIENT_VERSION_REVISION 0
@@ -296,7 +296,7 @@
 #define PACKAGE_NAME "Zelcash"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Zelcash 3.1.0"
+#define PACKAGE_STRING "Zelcash 3.2.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "zelcash"
@@ -305,7 +305,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "3.1.0"
+#define PACKAGE_VERSION "3.2.0"
 
 /* Define to necessary symbol if this constant uses a non-standard name on
    your system. */

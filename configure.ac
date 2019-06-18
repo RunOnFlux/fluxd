@@ -1,13 +1,13 @@
 dnl require autoconf 2.60 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.60])
 define(_CLIENT_VERSION_MAJOR, 3)
-define(_CLIENT_VERSION_MINOR, 1)
-define(_CLIENT_VERSION_REVISION, 1)
+define(_CLIENT_VERSION_MINOR, 2)
+define(_CLIENT_VERSION_REVISION, 0)
 define(_CLIENT_VERSION_BUILD, 50)
 define(_ZC_BUILD_VAL, m4_if(m4_eval(_CLIENT_VERSION_BUILD < 25), 1, m4_incr(_CLIENT_VERSION_BUILD), m4_eval(_CLIENT_VERSION_BUILD < 50), 1, m4_eval(_CLIENT_VERSION_BUILD - 24), m4_eval(_CLIENT_VERSION_BUILD == 50), 1, , m4_eval(_CLIENT_VERSION_BUILD - 50)))
 define(_CLIENT_VERSION_SUFFIX, m4_if(m4_eval(_CLIENT_VERSION_BUILD < 25), 1, _CLIENT_VERSION_REVISION-beta$1, m4_eval(_CLIENT_VERSION_BUILD < 50), 1, _CLIENT_VERSION_REVISION-rc$1, m4_eval(_CLIENT_VERSION_BUILD == 50), 1, _CLIENT_VERSION_REVISION, _CLIENT_VERSION_REVISION-$1)))
 define(_CLIENT_VERSION_IS_RELEASE, true)
-define(_COPYRIGHT_YEAR, 2018)
+define(_COPYRIGHT_YEAR, 2019)
 AC_INIT([Zelcash],[_CLIENT_VERSION_MAJOR._CLIENT_VERSION_MINOR._CLIENT_VERSION_SUFFIX(_ZC_BUILD_VAL)],[https://github.com/zelcash/zelcash/issues],[zelcash])
 
 AC_CONFIG_SRCDIR([src/main.cpp])
@@ -589,9 +589,17 @@ if test x$use_proton = xyes; then
     [],
     [AC_MSG_WARN([Proton headers not found, disabling Proton support])
     use_proton=no])
- AC_CHECK_LIB([qpid-proton-cpp], [main],
-    [PROTON_LIBS="-lqpid-proton-cpp -lqpid-proton"],
-    [AC_MSG_WARN([Proton libraries not found, disabling Proton support])
+ AC_CHECK_LIB([qpid-proton-cpp-static], [main],
+    [PROTON_LIBS="-lqpid-proton-cpp-static"],
+    [AC_MSG_WARN([Proton qpid-proton-cpp-static library not found, disabling Proton support])
+    use_proton=no])
+ AC_CHECK_LIB([qpid-proton-core-static], [main],
+    [PROTON_LIBS+=" -lqpid-proton-core-static"],
+    [AC_MSG_WARN([Proton qpid-proton-core-static library not found, disabling Proton support])
+    use_proton=no])
+ AC_CHECK_LIB([qpid-proton-static], [main],
+    [PROTON_LIBS+=" -lqpid-proton-static"],
+    [AC_MSG_WARN([Proton qpid-proton-static library not found, disabling Proton support])
     use_proton=no])
 fi
 if test x$use_proton = xyes; then
@@ -762,6 +770,9 @@ else
   LIBSNARK_DEPINST="$prefix"
 fi
 
+# Set optimization flags for libsnark
+AX_GCC_ARCHFLAG([no], [LIBSNARK_OPTFLAGS="-O2 $ax_cv_gcc_archflag"], [LIBSNARK_OPTFLAGS="-O2"])
+
 # Additional Zelcash flags
 AX_CHECK_COMPILE_FLAG([-fwrapv],[CXXFLAGS="$CXXFLAGS -fwrapv"])
 AX_CHECK_COMPILE_FLAG([-fno-strict-aliasing],[CXXFLAGS="$CXXFLAGS -fno-strict-aliasing"])
@@ -901,6 +912,7 @@ AC_SUBST(ZMQ_LIBS)
 AC_SUBST(GMP_LIBS)
 AC_SUBST(GMPXX_LIBS)
 AC_SUBST(LIBSNARK_DEPINST)
+AC_SUBST(LIBSNARK_OPTFLAGS)
 AC_SUBST(LIBZELCASH_LIBS)
 AC_SUBST(PROTON_LIBS)
 AC_CONFIG_FILES([Makefile src/Makefile doc/man/Makefile src/test/buildenv.py])

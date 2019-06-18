@@ -7,6 +7,7 @@
 #define BITCOIN_WALLET_WALLET_H
 
 #include "amount.h"
+#include "asyncrpcoperation.h"
 #include "coins.h"
 #include "key.h"
 #include "keystore.h"
@@ -34,6 +35,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <boost/shared_ptr.hpp>
 
 /**
  * Settings
@@ -760,6 +763,9 @@ private:
     TxNullifiers mapTxSproutNullifiers;
     TxNullifiers mapTxSaplingNullifiers;
 
+    std::vector<CTransaction> pendingSaplingMigrationTxs;
+    AsyncRPCOperationId saplingMigrationOperationId;
+
     void AddToTransparentSpends(const COutPoint& outpoint, const uint256& wtxid);
     void AddToSproutSpends(const uint256& nullifier, const uint256& wtxid);
     void AddToSaplingSpends(const uint256& nullifier, const uint256& wtxid);
@@ -772,6 +778,7 @@ public:
      * incremental witness cache in any transaction in mapWallet.
      */
     int64_t nWitnessCacheSize;
+    bool fSaplingMigrationEnabled = false;
 
     void ClearNoteWitnessCache();
 
@@ -837,6 +844,7 @@ protected:
 private:
     template <class T>
     void SyncMetaData(std::pair<typename TxSpendMap<T>::iterator, typename TxSpendMap<T>::iterator>);
+    void ChainTipAdded(const CBlockIndex *pindex, const CBlock *pblock, SproutMerkleTree sproutTree, SaplingMerkleTree saplingTree);
 
 protected:
     bool UpdatedNoteData(const CWalletTx& wtxIn, CWalletTx& wtx);
@@ -1188,6 +1196,8 @@ public:
     CAmount GetCredit(const CTransaction& tx, const isminefilter& filter) const;
     CAmount GetChange(const CTransaction& tx) const;
     void ChainTip(const CBlockIndex *pindex, const CBlock *pblock, SproutMerkleTree sproutTree, SaplingMerkleTree saplingTree, bool added);
+    void RunSaplingMigration(int blockHeight);
+    void AddPendingSaplingMigrationTx(const CTransaction& tx);
     /** Saves witness caches and best block locator to disk. */
     void SetBestChain(const CBlockLocator& loc);
     std::set<std::pair<libzelcash::PaymentAddress, uint256>> GetNullifiersForAddresses(const std::set<libzelcash::PaymentAddress> & addresses);
@@ -1213,6 +1223,13 @@ public:
         }
     }
 
+    void GetScriptForMining(boost::shared_ptr<CReserveScript> &script);
+    void ResetRequestCount(const uint256 &hash)
+    {
+        LOCK(cs_wallet);
+        mapRequestCount[hash] = 0;
+    };
+    
     unsigned int GetKeyPoolSize()
     {
         AssertLockHeld(cs_wallet); // setKeyPool
@@ -1278,6 +1295,9 @@ public:
     bool SetHDSeed(const HDSeed& seed);
     bool SetCryptedHDSeed(const uint256& seedFp, const std::vector<unsigned char> &vchCryptedSecret);
 
+    /* Returns the wallet's HD seed or throw JSONRPCError(...) */
+    HDSeed GetHDSeedForRPC() const;
+
     /* Set the HD chain model (chain child index counters) */
     void SetHDChain(const CHDChain& chain, bool memonly);
     const CHDChain& GetHDChain() const { return hdChain; }
@@ -1317,7 +1337,7 @@ public:
 };
 
 /** A key allocated from the key pool. */
-class CReserveKey
+class CReserveKey : public CReserveScript
 {
 protected:
     CWallet* pwallet;
@@ -1338,6 +1358,7 @@ public:
     void ReturnKey();
     virtual bool GetReservedKey(CPubKey &pubkey);
     void KeepKey();
+    void KeepScript() { KeepKey(); }
 };
 
 

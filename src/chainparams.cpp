@@ -118,12 +118,18 @@ public:
 	consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January 12th
 
+    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 372500;  // Approx July 2nd - Zel Team Boulder Meetup 
+
 	consensus.nZawyLWMAAveragingWindow = 60;
 	consensus.eh_epoch_fade_length = 11;
 
 	eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
+        eh_epoch_3 = zelHash;
 
+        // The best chain should have at least this much work.
+        consensus.nMinimumChainWork = uint256S("0x00");
 
         /**
          * The message start string should be awesome! ⓩ❤
@@ -202,18 +208,25 @@ public:
                             //   total number of tx / (checkpoint block height / (24 * 24))
         };
 
+        // Hardcoded fallback value for the Sprout shielded value pool balance
+        // for nodes that have not reindexed since the introduction of monitoring
+        // in #2795.
+        // nSproutValuePoolCheckpointHeight = 520633;
+        // nSproutValuePoolCheckpointBalance = 22145062442933;
+        // fZIP209Enabled = true;
+        // hashSproutValuePoolCheckpointBlock = uint256S("0000000000c7b46b6bc04b4cbf87d8bb08722aebd51232619b214f7273f8460e");
     }
 };
 static CMainParams mainParams;
 
 /**
- * Testnet (v6)
+ * testnet-kamiooka
  */
 class CTestNetParams : public CChainParams {
 public:
     CTestNetParams() {
         strNetworkID = "test";
-        strCurrencyUnits = "TEL";
+        strCurrencyUnits = "TESTZEL";
         bip44CoinType = 1;
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 5000;
@@ -231,27 +244,33 @@ public:
 
         consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE].nActivationHeight =
-            Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
+        Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
 
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
-            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
-	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 100;
+	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 70;
 
 	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
-	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 200;
+	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 100;
 
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 300;
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 120;
+
+	    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 720;
+
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 10;
 
 	    //eh_epoch_1 = eh96_5;
-	    eh_epoch_1 = eh200_9;
+    eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
+        eh_epoch_3 = zelHash;
+
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -275,7 +294,11 @@ public:
 
         vFixedSeeds.clear();
         vSeeds.clear();
-        vSeeds.push_back(CDNSSeedData("vps.testnet.zelcash.online", "dnsseedtestnet.zelcash.online")); // TheTrunk
+        vSeeds.push_back(CDNSSeedData("test.vps.zel.network", "test.singapore.zel.network")); // MilesManley
+        vSeeds.push_back(CDNSSeedData("test.vpsone.zel.network", "test.bangalore.zel.network")); // MilesManley
+        vSeeds.push_back(CDNSSeedData("test.vpstwo.zel.network", "test.frankfurt.zel.network")); // MilesManley
+        vSeeds.push_back(CDNSSeedData("test.vpsthree.zel.network", "test.newyork.zel.network")); // MilesManley
+        //vSeeds.push_back(CDNSSeedData("vps.testnet.zelcash.online", "dnsseedtestnet.zelcash.online")); // TheTrunk
 
 
         // guarantees the first 2 characters, when base58 encoded, are "tm"
@@ -316,13 +339,23 @@ public:
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
-            (0, consensus.hashGenesisBlock),
-            1548888451,  // * UNIX timestamp of last checkpoint block
+            (0, consensus.hashGenesisBlock)
+            (3, uint256S("0x07e441f9f675fc69c5567f6470bdce27b9a9bcff3c25cea1f93a401157544660")),
+            1560190235,  // * UNIX timestamp of last checkpoint block
             0,           // * total number of transactions between genesis and last checkpoint
                          //   (the tx=... number in the SetBestChain debug.log lines)
             750          // * estimated number of transactions per day after checkpoint 720 newly mined +30 for txs that users are doing
                          //   total number of tx / (checkpoint block height / (24 * 24))
         };
+
+    // Hardcoded fallback value for the Sprout shielded value pool balance
+        // for nodes that have not reindexed since the introduction of monitoring
+        // in #2795.
+        //nSproutValuePoolCheckpointHeight = 440329;
+        //nSproutValuePoolCheckpointBalance = 40000029096803;
+        //fZIP209Enabled = true;
+        //hashSproutValuePoolCheckpointBlock = uint256S("000a95d08ba5dcbabe881fc6471d11807bcca7df5f1795c99f3ec4580db4279b");
+
     }
 };
 static CTestNetParams testNetParams;
@@ -366,8 +399,12 @@ public:
 	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170006;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight =
+    consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170006;
+    consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight =
+            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
+    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 
@@ -438,6 +475,10 @@ public:
         assert(idx > Consensus::BASE && idx < Consensus::MAX_NETWORK_UPGRADES);
         consensus.vUpgrades[idx].nActivationHeight = nActivationHeight;
     }
+
+    void SetRegTestZIP209Enabled() {
+        fZIP209Enabled = true;
+    }
 };
 static CRegTestParams regTestParams;
 
@@ -469,6 +510,11 @@ void SelectParams(CBaseChainParams::Network network) {
     // Some python qa rpc tests need to enforce the coinbase consensus rule
     if (network == CBaseChainParams::REGTEST && mapArgs.count("-regtestprotectcoinbase")) {
         regTestParams.SetRegTestCoinbaseMustBeProtected();
+    }
+
+    // When a developer is debugging turnstile violations in regtest mode, enable ZIP209
+    if (network == CBaseChainParams::REGTEST && mapArgs.count("-developersetpoolsizezero")) {
+        regTestParams.SetRegTestZIP209Enabled();
     }
 }
 
@@ -521,15 +567,48 @@ int validEHparameterList(EHparameters *ehparams, unsigned long blockheight, cons
     //if in overlap period, there will be two valid solutions, else 1.
     //The upcoming version of EH is preferred so will always be first element
     //returns number of elements in list
-    if(blockheight>=(params.GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight + params.GetConsensus().eh_epoch_fade_length)){
+
+    int current_height = (int)blockheight;
+    if (current_height < 0)
+        current_height = 0;
+
+    // When checking to see if the activation height is above the fade length, we subtract the fade length from the
+    // current height and run it through the NetworkUpgradeActive method
+    int modified_height = (int)(current_height - params.GetConsensus().eh_epoch_fade_length);
+    if (modified_height < 0)
+        modified_height = 0;
+
+    // check to see if the block height is greater then the overlap period ( height - fade depth >= Upgrade Height)
+    if (NetworkUpgradeActive(modified_height, Params().GetConsensus(), Consensus::UPGRADE_KAMIOOKA)) {
+        ehparams[0]=params.eh_epoch_3_params();
+        return 1;
+    }
+
+    // check to see if the block height is in the overlap period.
+    // The above if statement shows us that we are already below the upgrade height + the fade depth, so now we check
+    // to see if we are above just the upgrade height
+    if (NetworkUpgradeActive(current_height, Params().GetConsensus(), Consensus::UPGRADE_KAMIOOKA)) {
+        ehparams[0]=params.eh_epoch_3_params();
+        ehparams[1]=params.eh_epoch_2_params();
+        return 2;
+    }
+
+    // check to see if the block height is greater then the overlap period (height - fade depth >= Upgrade Height)
+    if (NetworkUpgradeActive(modified_height, Params().GetConsensus(), Consensus::UPGRADE_EQUI144_5)) {
         ehparams[0]=params.eh_epoch_2_params();
         return 1;
     }
-    if(blockheight<params.GetConsensus().vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight){
-        ehparams[0]=params.eh_epoch_1_params();
-        return 1;
+
+    // check to see if the block height is in the overlap period
+    // The above if statement shows us that we are already below the upgrade height + the fade depth, so now we check
+    // to see if we are above just the upgrade height
+    if (NetworkUpgradeActive(current_height, Params().GetConsensus(), Consensus::UPGRADE_EQUI144_5)) {
+        ehparams[0]=params.eh_epoch_2_params();
+        ehparams[1]=params.eh_epoch_1_params();
+        return 2;
     }
-    ehparams[0]=params.eh_epoch_2_params();
-    ehparams[1]=params.eh_epoch_1_params();
-    return 2;
+
+    // return the block height is less than the upgrade height params
+    ehparams[0]=params.eh_epoch_1_params();
+    return 1;
 }
