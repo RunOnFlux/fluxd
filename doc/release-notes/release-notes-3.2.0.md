@@ -18,14 +18,17 @@ Upstream Zcash - v2.0.5-2
 ------------------------------------------
 Upstreamed Zcash including from v2.0.3 up to v2.0.5-2
 
-Changelog (wip - need to head out so will clean up and fill in when back)
+Changelog 
 =========
 
-Jeremy "Blondfrogs" (1)
+Jeremy "Blondfrogs" (2)
       ZelNodes fix
+      GetBlockTemplate fix
 
-Miles Manley (1)
+Miles Manley (3)
       Upstream Zcash
+      Docs
+      Testnet
       
 Wilke "Lollidieb" Trei (1)
       Implementation of ZelHash
