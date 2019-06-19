@@ -13,7 +13,7 @@ For ZelNodes/Control Wallets you need to use this bootstrap with txindex enabled
 
 
 <p align="center">
-  <img src="doc/imgs/kamiooka-network-upgrade.png" height=500 >
+  <img src="doc/imgs/mandatory-kamiooka.png" height=500 >
 </p>
 
 ## Getting Started
