@@ -69,7 +69,7 @@ Eirik Ogilvie-Wigley (7):
       Coinbase transactions can not have shielded spend or output
 
 Jack Grigg (50):
-      Disable building libzelcashconsensus by default
+      Disable building libzcashconsensus by default
       depends: Upgrade Rust to 1.26.0-beta.3
       depends: Add support for unpackaged Rust crates
       depends: Update to latest librustzcash with sapling-crypto dependencies
@@ -249,8 +249,8 @@ Sean Bowe (49):
 Simon Liu (14):
       Part of #2966, extending Sprout tests to other epochs.
       Closes #3134 - Least Authority Issue E
-      Refactoring: libzelcash::Note is now a subclass of libzelcash::BaseNote.
-      Refactoring: Rename class libzelcash::Note to libzelcash::SproutNote.
+      Refactoring: libzcash::Note is now a subclass of libzcash::BaseNote.
+      Refactoring: Rename class libzcash::Note to libzcash::SproutNote.
       Refactoring: SproutNote member variable value moved to BaseNote.
       Add virtual destructor to SproutNote and BaseNote
       Remove unused SproutNote variables.

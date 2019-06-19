@@ -46,7 +46,7 @@ Enabling this feature even on the loopback interface only (e.g. binding
 it to localhost or 127.0.0.1) will still expose it to the wilds of the
 Internet, because of an attack vector called DNS rebinding. DNS
 rebinding allows an attacker located remotely on the Internet to trick
-applications that you're running on the same computer as Zcashd to
+applications that you're running on the same computer as Zelcashd to
 contact your supposedly localhost-only AMQP port, then, depending on the
 program they may be able to attempt to attack it.
 

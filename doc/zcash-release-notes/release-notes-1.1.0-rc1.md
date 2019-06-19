@@ -65,7 +65,7 @@ Jack Grigg (43):
       Don't require RELRO and BIND_NOW for Darwin
       Only set multicore flags if OpenMP is available
       Revert "remove -mt suffix from boost libraries built by depends"
-      Use correct Boost::System linker flag for libzelcash
+      Use correct Boost::System linker flag for libzcash
       depends: Remove -mt suffix from Boost libraries
       snark: Remove -mt suffix from Boost library
       cleanup: Ensure code is pyflakes-clean for CI

@@ -17,13 +17,13 @@
 # when experimental feature -developersetpoolsizezero is switched on.
 #
 # To perform a manual turnstile test on testnet:
-# 1. Launch zcashd
+# 1. Launch zelcashd
 # 2. Shield transparent funds
 # 3. Wait for transaction to be mined
-# 4. Restart zcashd, enabling experimental feature -developersetpoolsizezero
+# 4. Restart zelcashd, enabling experimental feature -developersetpoolsizezero
 # 5. Unshield funds
 # 6. Wait for transaction to be mined (using testnet explorer or another node)
-# 7. Verify zcashd rejected the block
+# 7. Verify zelcashd rejected the block
 #
 
 import sys; assert sys.version_info < (3,), ur"This script does not run under Python 3. Please use Python 2.7.x."

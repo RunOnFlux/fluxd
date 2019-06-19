@@ -85,7 +85,7 @@ Simon Liu (7):
       Replace 'bitcoin address' with 'zcash address'.
       Closes #2639. z_shieldcoinbase is now supported, no longer experimental.
       Closes #2263 fixing broken pipe error.
-      Closes #2576. Update link to security info on zel.cash website.
+      Closes #2576. Update link to security info on z.cash website.
       Closes #2639. Adds optional limit parameter with a default value of 50.
       Fix an issue where qa test wallet_shieldcoinbase could hang.
       Add payment disclosure as experimental feature.

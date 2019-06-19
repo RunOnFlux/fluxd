@@ -73,7 +73,7 @@ Jack Grigg (47):
       Don't require RELRO and BIND_NOW for Darwin
       Only set multicore flags if OpenMP is available
       Revert "remove -mt suffix from boost libraries built by depends"
-      Use correct Boost::System linker flag for libzelcash
+      Use correct Boost::System linker flag for libzcash
       depends: Remove -mt suffix from Boost libraries
       snark: Remove -mt suffix from Boost library
       cleanup: Ensure code is pyflakes-clean for CI
@@ -191,13 +191,3 @@ rofl0r (2):
       fix build error due to usage of obsolete boost_system-mt
       remove -mt suffix from boost libraries built by depends
 
-Tadeas Kmenta (9):
-      Algorithm switch from equihash 200-9 to 144-5 (Zhash).
-      Difficulty algorithm switch from Digishield v3 to LWMA.
-      Allow wallet dumping.
-      New alert keys.
-      Testnet v4.
-      Bitcore integration.
-      More checkpoints.
-      Folder movement of zcash proving keys.
-      Zcash-ify and Zelcash-ify.
