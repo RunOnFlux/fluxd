@@ -16,7 +16,7 @@ For ZelNodes/Control Wallets you need to use this bootstrap with txindex enabled
   <img src="doc/imgs/mandatory-kamiooka.png" height=500 >
 </p>
 
-## Getting Started
+## :rocket: Getting Started
 
 Please see our [user guide](https://zel.gitbook.io/zeldocs/) for any and all info.
 
