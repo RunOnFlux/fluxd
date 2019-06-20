@@ -97,6 +97,14 @@ then
     shift
 fi
 
+# If --disable-libs is the next argument, build without libs:
+LIBS_ARG=''
+if [ "x${1:-}" = 'x--disable-libs' ]
+then
+    LIBS_ARG='--without-libs'
+    shift
+fi
+
 eval "$MAKE" --version
 as --version
 ld -v
