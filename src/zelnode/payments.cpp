@@ -1,6 +1,6 @@
 // Copyright (c) 2014-2015 The Dash developers
-// Copyright (c) 2015-2018 The PIVX developers
-// Copyright (c) 2018 The Zelcash developers
+// Copyright (c) 2015-2019 The PIVX developers
+// Copyright (c) 2019 The Zel developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -199,7 +199,7 @@ bool IsBlockValueValid(const CBlock& block, CAmount nExpectedValue, CAmount nMin
             return false;
         }
 
-    } else { // we're synced and have data so check the budget schedule
+    } else {
 
         if (nMinted > nExpectedValue) {
             return false;
@@ -233,9 +233,9 @@ bool IsBlockPayeeValid(const CBlock& block, int nBlockHeight)
 }
 
 
-void FillBlockPayee(CMutableTransaction& txNew, CAmount nFees)
+void FillBlockPayee(CMutableTransaction& txNew, CAmount nFees, std::map<int, std::pair<CScript, CAmount>>* payments)
 {
-    zelnodePayments.FillBlockPayee(txNew, nFees);
+    zelnodePayments.FillBlockPayee(txNew, nFees, payments);
 }
 
 std::string GetRequiredPaymentsString(int nBlockHeight)
@@ -243,7 +243,7 @@ std::string GetRequiredPaymentsString(int nBlockHeight)
     return zelnodePayments.GetRequiredPaymentsString(nBlockHeight);
 }
 
-void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees)
+void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees, std::map<int, std::pair<CScript, CAmount>>* payments)
 {
     CBlockIndex* pindexPrev = chainActive.Tip();
     if (!pindexPrev) return;
@@ -311,6 +311,9 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees)
         txNew.vout[currentIndex].nValue = basicZelnodePayment;
         nMinerReward -= basicZelnodePayment;
         currentIndex++;
+
+        if (payments)
+            payments->insert(std::make_pair(Zelnode::BASIC, std::make_pair(basicPayee, basicZelnodePayment)));
     }
 
     if (hasSuperPayment) {
@@ -318,12 +321,18 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees)
         txNew.vout[currentIndex].nValue = superZelnodePayment;
         nMinerReward -= superZelnodePayment;
         currentIndex++;
+
+        if (payments)
+            payments->insert(std::make_pair(Zelnode::SUPER, std::make_pair(superPayee, superZelnodePayment)));
     }
 
     if (hasBAMFPayment) {
         txNew.vout[currentIndex].scriptPubKey = BAMFPayee;
         txNew.vout[currentIndex].nValue = BAMFZelnodePayment;
         nMinerReward -= BAMFZelnodePayment;
+
+        if (payments)
+            payments->insert(std::make_pair(Zelnode::BAMF, std::make_pair(BAMFPayee, BAMFZelnodePayment)));
     }
 
     txNew.vout[0].nValue = nMinerReward;
@@ -555,6 +564,8 @@ bool ZelnodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
 {
     LOCK(cs_vecPayments);
 
+    bool fKamiookaUpgradeActive = NetworkUpgradeActive(chainActive.Height(), Params().GetConsensus(), Consensus::UPGRADE_KAMIOOKA);
+
     int nMaxBasicSignatures = 0;
     int nMaxSuperSignatures = 0;
     int nMaxBAMFSignatures = 0;
@@ -563,95 +574,131 @@ bool ZelnodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
     std::string strSuperPayeesPossible = "";
     std::string strBAMFPayeesPossible = "";
 
+    bool fBasicSigCountFound = false;
+    bool fSuperSigCountFound = false;
+    bool fBAMFSigCountFound = false;
+
+    ZelnodePayee selectedBasicPayee;
+    ZelnodePayee selectedSuperPayee;
+    ZelnodePayee selectedBAMFPayee;
+
     CAmount nReward = GetBlockSubsidy(nBlockHeight, Params().GetConsensus());
     CAmount requiredBasicZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::BASIC);
     CAmount requiredSuperZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::SUPER);
     CAmount requiredBAMFZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::BAMF);
 
-
-    //require at least 16 signatures
+    // Get the required amount of signatures based on if the upgrade is active or not
+    int nSignaturesRequired = fKamiookaUpgradeActive ? ZNPAYMENTS_SIGNATURES_REQUIRED_AFTER_UPGRADE : ZNPAYMENTS_SIGNATURES_REQUIRED;
 
     for (ZelnodePayee& payee : vecBasicPayments)
-        if (payee.nVotes >= nMaxBasicSignatures && payee.nVotes >= ZNPAYMENTS_SIGNATURES_REQUIRED)
+        if (payee.nVotes >= nMaxBasicSignatures) {
             nMaxBasicSignatures = payee.nVotes;
+            selectedBasicPayee = payee;
+        }
 
     for (ZelnodePayee& payee : vecSuperPayments)
-        if (payee.nVotes >= nMaxSuperSignatures && payee.nVotes >= ZNPAYMENTS_SIGNATURES_REQUIRED)
+        if (payee.nVotes >= nMaxSuperSignatures) {
             nMaxSuperSignatures = payee.nVotes;
+            selectedSuperPayee = payee;
+        }
 
     for (ZelnodePayee& payee : vecBAMFPayments)
-        if (payee.nVotes >= nMaxBAMFSignatures && payee.nVotes >= ZNPAYMENTS_SIGNATURES_REQUIRED)
+        if (payee.nVotes >= nMaxBAMFSignatures) {
             nMaxBAMFSignatures = payee.nVotes;
+            selectedBAMFPayee = payee;
+        }
 
-    // if we don't have at least 6 signatures on a payee, approve whichever is the longest chain
-    if (nMaxBasicSignatures < ZNPAYMENTS_SIGNATURES_REQUIRED || nMaxSuperSignatures <  ZNPAYMENTS_SIGNATURES_REQUIRED || nMaxBAMFSignatures < ZNPAYMENTS_SIGNATURES_REQUIRED) return true;
+    if (fKamiookaUpgradeActive) {
+        fBasicSigCountFound = nMaxBasicSignatures >= nSignaturesRequired;
+        fSuperSigCountFound = nMaxSuperSignatures >= nSignaturesRequired;
+        fBAMFSigCountFound = nMaxBAMFSignatures >= nSignaturesRequired;
+    }
 
-    bool foundBasic = false;
-    for (ZelnodePayee& payee : vecBasicPayments) {
+    if (fKamiookaUpgradeActive) {
+        // If we don't have at least 6 signatures on each payee tier, follow the longest chain.
+        if (!fBasicSigCountFound && !fSuperSigCountFound && !fBAMFSigCountFound)
+            return true;
+    }
+
+    if (!fKamiookaUpgradeActive) {
+        // if we don't have at least 16 signatures on a payee, approve whichever is the longest chain
+        if (nMaxBasicSignatures < nSignaturesRequired || nMaxSuperSignatures < nSignaturesRequired || nMaxBAMFSignatures < nSignaturesRequired)
+            return true;
+    }
+
+    bool fFoundBasic = false;
+    if(!fKamiookaUpgradeActive || fBasicSigCountFound) {
         for (CTxOut out : txNew.vout) {
-            if (payee.scriptPubKey == out.scriptPubKey) {
-                if(out.nValue == requiredBasicZelnodePayment)
-                    foundBasic = true;
+            if (selectedBasicPayee.scriptPubKey == out.scriptPubKey) {
+                if (out.nValue == requiredBasicZelnodePayment)
+                    fFoundBasic = true;
                 else
-                    LogPrint("zelnode","Basic Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n", FormatMoney(out.nValue).c_str(), FormatMoney(requiredBasicZelnodePayment).c_str());
+                    LogPrint("zelnode", "Basic Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n",
+                             FormatMoney(out.nValue).c_str(), FormatMoney(requiredBasicZelnodePayment).c_str());
             }
         }
 
-        if (payee.nVotes >= ZNPAYMENTS_SIGNATURES_REQUIRED) {
-            if (foundBasic) break;
+        if (selectedBasicPayee.nVotes >= nSignaturesRequired) {
+            if (!fFoundBasic) {
+                CTxDestination address1;
+                ExtractDestination(selectedBasicPayee.scriptPubKey, address1);
 
-            CTxDestination address1;
-            ExtractDestination(payee.scriptPubKey, address1);
-
-            if (strBasicPayeesPossible == "") {
-                strBasicPayeesPossible += EncodeDestination(address1);
-            } else {
-                strBasicPayeesPossible += "," + EncodeDestination(address1);
+                if (strBasicPayeesPossible == "") {
+                    strBasicPayeesPossible += EncodeDestination(address1);
+                } else {
+                    strBasicPayeesPossible += "," + EncodeDestination(address1);
+                }
             }
         }
     }
 
-    bool foundSuper = false;
-    for (ZelnodePayee& payee : vecSuperPayments) {
+    bool fFoundSuper = false;
+    if(!fKamiookaUpgradeActive || fSuperSigCountFound) {
         for (CTxOut out : txNew.vout) {
-            if (payee.scriptPubKey == out.scriptPubKey) {
-                if(out.nValue == requiredSuperZelnodePayment)
-                    foundSuper = true;
+            if (selectedSuperPayee.scriptPubKey == out.scriptPubKey) {
+                if (out.nValue == requiredSuperZelnodePayment)
+                    fFoundSuper = true;
                 else
-                    LogPrint("zelnode","Super Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n", FormatMoney(out.nValue).c_str(), FormatMoney(requiredSuperZelnodePayment).c_str());
+                    LogPrint("zelnode", "Super Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n",
+                             FormatMoney(out.nValue).c_str(), FormatMoney(requiredSuperZelnodePayment).c_str());
             }
         }
 
-        if (payee.nVotes >= ZNPAYMENTS_SIGNATURES_REQUIRED) {
-            if (foundSuper) break;
+        if (selectedSuperPayee.nVotes >= nSignaturesRequired) {
+            if (!fFoundSuper) {
 
-            CTxDestination address1;
-            ExtractDestination(payee.scriptPubKey, address1);
+                CTxDestination address1;
+                ExtractDestination(selectedSuperPayee.scriptPubKey, address1);
 
-            if (strSuperPayeesPossible == "") {
-                strSuperPayeesPossible += EncodeDestination(address1);
-            } else {
-                strSuperPayeesPossible += "," + EncodeDestination(address1);
+                if (strSuperPayeesPossible == "") {
+                    strSuperPayeesPossible += EncodeDestination(address1);
+                } else {
+                    strSuperPayeesPossible += "," + EncodeDestination(address1);
+                }
             }
         }
     }
 
-    bool foundBAMF = false;
-    for (ZelnodePayee& payee : vecBAMFPayments) {
+    bool fFoundBAMF = false;
+    if(!fKamiookaUpgradeActive || fBAMFSigCountFound) {
         for (CTxOut out : txNew.vout) {
-            if (payee.scriptPubKey == out.scriptPubKey) {
-                if(out.nValue == requiredBAMFZelnodePayment)
-                    foundBAMF = true;
+            if (selectedBAMFPayee.scriptPubKey == out.scriptPubKey) {
+                if (out.nValue == requiredBAMFZelnodePayment)
+                    fFoundBAMF = true;
                 else
-                    LogPrint("zelnode","BAMF Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n", FormatMoney(out.nValue).c_str(), FormatMoney(requiredBAMFZelnodePayment).c_str());
+                    LogPrint("zelnode", "BAMF Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n",
+                             FormatMoney(out.nValue).c_str(), FormatMoney(requiredBAMFZelnodePayment).c_str());
             }
         }
 
-        if (payee.nVotes >= ZNPAYMENTS_SIGNATURES_REQUIRED) {
-            if (foundBAMF && foundSuper && foundBasic) return true;
+        if (selectedBAMFPayee.nVotes >= nSignaturesRequired) {
+            if (fFoundBAMF && fFoundSuper && fFoundBAMF) {
+                if (!fKamiookaUpgradeActive)
+                    return true;
+            }
 
             CTxDestination address1;
-            ExtractDestination(payee.scriptPubKey, address1);
+            ExtractDestination(selectedBAMFPayee.scriptPubKey, address1);
 
             if (strBAMFPayeesPossible == "") {
                 strBAMFPayeesPossible += EncodeDestination(address1);
@@ -661,9 +708,28 @@ bool ZelnodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
         }
     }
 
-    if (!foundBasic) LogPrint("zelnode","%s- Missing required Basic payment of %s to %s\n", __func__, FormatMoney(requiredBasicZelnodePayment).c_str(), strBasicPayeesPossible.c_str());
-    if (!foundSuper) LogPrint("zelnode","%s- Missing required Super payment of %s to %s\n", __func__, FormatMoney(requiredSuperZelnodePayment).c_str(), strSuperPayeesPossible.c_str());
-    if (!foundBAMF) LogPrint("zelnode","%s- Missing required BAMF payment of %s to %s\n", __func__, FormatMoney(requiredBAMFZelnodePayment).c_str(), strBAMFPayeesPossible.c_str());
+    if (fKamiookaUpgradeActive) {
+        bool fFail = false;
+        if (fBasicSigCountFound && !fFoundBasic) {
+            LogPrint("zelnode","%s- Missing required Basic payment of %s to %s\n", __func__, FormatMoney(requiredBasicZelnodePayment).c_str(), strBasicPayeesPossible.c_str());
+            fFail = true;
+        }
+        if (fSuperSigCountFound && !fFoundSuper) {
+            LogPrint("zelnode","%s- Missing required Super payment of %s to %s\n", __func__, FormatMoney(requiredSuperZelnodePayment).c_str(), strSuperPayeesPossible.c_str());
+            fFail = true;
+        }
+        if (fBAMFSigCountFound && !fFoundBAMF) {
+            LogPrint("zelnode","%s- Missing required BAMF payment of %s to %s\n", __func__, FormatMoney(requiredBAMFZelnodePayment).c_str(), strBAMFPayeesPossible.c_str());
+            fFail = true;
+        }
+        return !fFail;
+    }
+
+    // TODO, once upgrade is complete remove
+    if (!fFoundBasic) LogPrint("zelnode","%s- Missing required Basic payment of %s to %s\n", __func__, FormatMoney(requiredBasicZelnodePayment).c_str(), strBasicPayeesPossible.c_str());
+    if (!fFoundSuper) LogPrint("zelnode","%s- Missing required Super payment of %s to %s\n", __func__, FormatMoney(requiredSuperZelnodePayment).c_str(), strSuperPayeesPossible.c_str());
+    if (!fFoundBAMF) LogPrint("zelnode","%s- Missing required BAMF payment of %s to %s\n", __func__, FormatMoney(requiredBAMFZelnodePayment).c_str(), strBAMFPayeesPossible.c_str());
+
     return false;
 }
 
@@ -762,6 +828,8 @@ void Payments::CleanPaymentList()
 
 bool PaymentWinner::IsValid(CNode* pnode, std::string& strError)
 {
+    bool fKamiookaUpgradeActive = NetworkUpgradeActive(nBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_KAMIOOKA);
+
     Zelnode* pzn = zelnodeman.Find(vinZelnode);
 
     if (!pzn) {
@@ -801,6 +869,14 @@ bool PaymentWinner::IsValid(CNode* pnode, std::string& strError)
         return false;
     }
 
+    if (fKamiookaUpgradeActive) {
+        if (pzn->tier != tier) {
+            strError = strprintf("Received zelnode payment winner, but the zelnode is voting for the wrong tier. Zelnode Tier %s, Payment Winner Tier %s", TierToString(pzn->tier), TierToString(tier));
+            LogPrint("zelnode", "%s - %s\n", __func__, strError);
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -809,6 +885,8 @@ bool Payments::ProcessBlock(int nBlockHeight)
     if (!fZelnode) return false;
 
     //reference node - hybrid mode
+
+    bool fKamiookaUpgradeActive = NetworkUpgradeActive(nBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_KAMIOOKA);
 
     int n = zelnodeman.GetZelnodeRank(activeZelnode.vin, nBlockHeight - 100, MIN_PEER_PROTO_VERSION_ZELNODE);
 
@@ -830,6 +908,9 @@ bool Payments::ProcessBlock(int nBlockHeight)
     int nBasicCount = 0;
     int nSuperCount = 0;
     int nBAMFCount = 0;
+
+
+    auto activeNode = zelnodeman.Find(activeZelnode.pubKeyZelnode);
     vector<Zelnode*> vpzn = zelnodeman.GetNextZelnodeInQueueForPayment(nBlockHeight, true, nBasicCount, nSuperCount, nBAMFCount);
 
     for (Zelnode * pzn : vpzn) {
@@ -838,6 +919,10 @@ bool Payments::ProcessBlock(int nBlockHeight)
             LogPrint("zelnode", "%s Found by FindOldestNotInVec \n", __func__);
 
             newWinner.nBlockHeight = nBlockHeight;
+            if (fKamiookaUpgradeActive) {
+                if (activeNode == NULL || activeNode->tier != pzn->tier)
+                    continue;
+            }
             newWinner.tier = pzn->tier;
 
             CScript payee = GetScriptForDestination(pzn->pubKeyCollateralAddress.GetID());

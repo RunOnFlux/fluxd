@@ -23,13 +23,11 @@
 #include "util.h"
 #include "validationinterface.h"
 #include "zelnode/spork.h"
-#ifdef ENABLE_WALLET
-#include "wallet/wallet.h"
-#endif
 
 #include <stdint.h>
 
 #include <boost/assign/list_of.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include <univalue.h>
 #include "key_io.h"
@@ -177,15 +175,6 @@ UniValue generate(const UniValue& params, bool fHelp)
             + HelpExampleCli("generate", "11")
         );
 
-    if (GetArg("-mineraddress", "").empty()) {
-#ifdef ENABLE_WALLET
-        if (!pwalletMain) {
-            throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Wallet disabled and -mineraddress not set");
-        }
-#else
-        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "zelcashd compiled without wallet and -mineraddress not set");
-#endif
-    }
     if (!Params().MineBlocksOnDemand())
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "This method can only be used on regtest");
 
@@ -193,9 +182,13 @@ UniValue generate(const UniValue& params, bool fHelp)
     int nHeightEnd = 0;
     int nHeight = 0;
     int nGenerate = params[0].get_int();
-#ifdef ENABLE_WALLET
-    CReserveKey reservekey(pwalletMain);
-#endif
+
+    boost::shared_ptr<CReserveScript> coinbaseScript;
+    GetMainSignals().ScriptForMining(coinbaseScript);
+
+    //throw an error if no script was provided
+    if (!coinbaseScript->reserveScript.size())
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet or -mineraddress)");
 
     {   // Don't keep cs_main locked
         LOCK(cs_main);
@@ -208,21 +201,14 @@ UniValue generate(const UniValue& params, bool fHelp)
 
     EHparameters ehparams[MAX_EH_PARAM_LIST_LEN]; //allocate on-stack space for parameters list
     const CChainParams& chainparams = Params();
-
-    while (nHeight < nHeightEnd)
-    {
-        validEHparameterList(ehparams,nHeight+1,chainparams);
+    validEHparameterList(ehparams,nHeight+1,chainparams);
             unsigned int n = ehparams[0].n;
             unsigned int k = ehparams[0].k;
-
-
-#ifdef ENABLE_WALLET
-        std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey));
-#else
-        std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey());
-#endif
+    while (nHeight < nHeightEnd)
+    {
+        std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(coinbaseScript->reserveScript));
         if (!pblocktemplate.get())
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet keypool empty");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         CBlock *pblock = &pblocktemplate->block;
         {
             LOCK(cs_main);
@@ -272,10 +258,12 @@ endloop:
             throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
         ++nHeight;
         blockHashes.push_back(pblock->GetHash().GetHex());
+
+        //mark script as important because it was used at least for one coinbase output
+        coinbaseScript->KeepScript();
     }
     return blockHashes;
 }
-
 
 UniValue setgenerate(const UniValue& params, bool fHelp)
 {
@@ -299,15 +287,6 @@ UniValue setgenerate(const UniValue& params, bool fHelp)
             + HelpExampleRpc("setgenerate", "true, 1")
         );
 
-    if (GetArg("-mineraddress", "").empty()) {
-#ifdef ENABLE_WALLET
-        if (!pwalletMain) {
-            throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Wallet disabled and -mineraddress not set");
-        }
-#else
-        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "zelcashd compiled without wallet and -mineraddress not set");
-#endif
-    }
     if (Params().MineBlocksOnDemand())
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Use the generate method instead of setgenerate on this network");
 
@@ -325,16 +304,11 @@ UniValue setgenerate(const UniValue& params, bool fHelp)
 
     mapArgs["-gen"] = (fGenerate ? "1" : "0");
     mapArgs ["-genproclimit"] = itostr(nGenProcLimit);
-#ifdef ENABLE_WALLET
-    GenerateBitcoins(fGenerate, pwalletMain, nGenProcLimit);
-#else
-    GenerateBitcoins(fGenerate, nGenProcLimit);
-#endif
+    GenerateBitcoins(fGenerate, nGenProcLimit, Params());
 
     return NullUniValue;
 }
 #endif
-
 
 UniValue getmininginfo(const UniValue& params, bool fHelp)
 {
@@ -623,10 +597,16 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         // TODO: Maybe recheck connections/IBD and (if something wrong) send an expires-immediately template to stop miners?
     }
 
+
+
     // Update block
     static CBlockIndex* pindexPrev;
     static int64_t nStart;
     static CBlockTemplate* pblocktemplate;
+
+    // Create map to hold zelnodepayouts
+    static std::map<int, std::pair<CScript, CAmount>> mapZelnodePayouts;
+
     if (pindexPrev != chainActive.Tip() ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5))
     {
@@ -643,17 +623,25 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         {
             delete pblocktemplate;
             pblocktemplate = NULL;
+
+            mapZelnodePayouts.clear();
         }
-#ifdef ENABLE_WALLET
-        CReserveKey reservekey(pwalletMain);
-        pblocktemplate = CreateNewBlockWithKey(reservekey);
-#else
-        pblocktemplate = CreateNewBlockWithKey();
-#endif
+
+        boost::shared_ptr<CReserveScript> coinbaseScript;
+        GetMainSignals().ScriptForMining(coinbaseScript);
+
+        // Throw an error if no script was provided
+        if (!coinbaseScript->reserveScript.size())
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet or -mineraddress)");
+
+        pblocktemplate = CreateNewBlock(coinbaseScript->reserveScript, &mapZelnodePayouts);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
-        // Need to update only after we know CreateNewBlockWithKey succeeded
+        // Mark script as important because it was used at least for one coinbase output
+        coinbaseScript->KeepScript();
+
+        // Need to update only after we know CreateNewBlock succeeded
         pindexPrev = pindexPrevNew;
     }
     CBlock* pblock = &pblocktemplate->block; // pointer for convenience
@@ -743,28 +731,21 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         if (nCoinbaseOutSize > 0) {
             result.push_back(Pair("miner_reward", pblock->vtx[0].vout[0].nValue));
         }
-        if (nCoinbaseOutSize > 1) {
-            CTxDestination dest;
-            ExtractDestination(pblock->vtx[0].vout[1].scriptPubKey, dest);
-            result.push_back(Pair("basic_zelnode_address", EncodeDestination(dest)));
-            result.push_back(Pair("basic_zelnode_payout", pblock->vtx[0].vout[1].nValue));
-        }
-        if (nCoinbaseOutSize > 2) {
-            CTxDestination dest;
-            ExtractDestination(pblock->vtx[0].vout[2].scriptPubKey, dest);
-            result.push_back(Pair("super_zelnode_address", EncodeDestination(dest)));
-            result.push_back(Pair("super_zelnode_payout", pblock->vtx[0].vout[2].nValue));
-        }
-        if (nCoinbaseOutSize > 3) {
-            CTxDestination dest;
-            ExtractDestination(pblock->vtx[0].vout[3].scriptPubKey, dest);
-            result.push_back(Pair("bamf_zelnode_address", EncodeDestination(dest)));
-            result.push_back(Pair("bamf_zelnode_payout", pblock->vtx[0].vout[3].nValue));
-        }
     } else {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Block didn't have any transactions in it...");
     }
 
+    for (auto payout : mapZelnodePayouts) {
+        std::string start = "basic";
+        if (payout.first == Zelnode::SUPER) start = "super";
+        else if (payout.first == Zelnode::BAMF) start = "bamf";
+
+        CTxDestination dest;
+        ExtractDestination(payout.second.first, dest);
+
+        result.push_back(Pair(std::string(start + "_zelnode_address"), EncodeDestination(dest)));
+        result.push_back(Pair(std::string(start + "_zelnode_payout"), payout.second.second));
+    }
 
     return result;
 }

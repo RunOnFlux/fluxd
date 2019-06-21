@@ -82,7 +82,7 @@ Simon Liu (5):
       Add AMQP 1.0 support via Apache Qpid Proton C++ API 0.17.0
       Add --disable-proton flag to build.sh.  Proton has build/linker issues with gcc 4.9.2 and requires gcc 5.x.
       Fix proton build issue with debian jessie, as used on CI servers.
-      Change regtest port to 26126.  Closes #2269.
+      Change regtest port to 18344.  Closes #2269.
       Patch to build Proton with minimal dependencies.
 
 emilrus (1):

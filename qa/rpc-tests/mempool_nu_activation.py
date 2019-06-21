@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2018 The Zcash developers
+# Copyright (c) 2019 The Zcash developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,7 +7,8 @@ import sys; assert sys.version_info < (3,), ur"This script does not run under Py
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, initialize_chain_clean, \
-    start_node, connect_nodes, wait_and_assert_operationid_status
+    start_node, connect_nodes, wait_and_assert_operationid_status, \
+    get_coinbase_address
 from test_framework.authproxy import JSONRPCException
 
 from decimal import Decimal
@@ -42,8 +43,8 @@ class MempoolUpgradeActivationTest(BitcoinTestFramework):
         self.nodes[0].generate(97)
         self.sync_all()
 
-        # Shield some ZEC
-        node1_taddr = self.nodes[1].getnewaddress()
+        # Shield some ZEL
+        node1_taddr = get_coinbase_address(self.nodes[1])
         node0_zaddr = self.nodes[0].z_getnewaddress('sprout')
         recipients = [{'address': node0_zaddr, 'amount': Decimal('10')}]
         myopid = self.nodes[1].z_sendmany(node1_taddr, recipients, 1, Decimal('0'))

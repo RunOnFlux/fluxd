@@ -7,10 +7,10 @@
 
 #include "amount.h"
 #include "asyncrpcoperation.h"
-#include "paymentdisclosure.h"
 #include "primitives/transaction.h"
 #include "transaction_builder.h"
 #include "wallet.h"
+#include "wallet/paymentdisclosure.h"
 #include "zelcash/Address.hpp"
 #include "zelcash/JoinSplit.hpp"
 

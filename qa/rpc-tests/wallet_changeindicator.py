@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2018 The Zcash developers
+# Copyright (c) 2019 The Zcash developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -26,7 +26,7 @@ class WalletChangeIndicatorTest (BitcoinTestFramework):
         self.nodes[0].sendtoaddress(taddr, Decimal('1.0'))
         self.generate_and_sync()
 
-        # Send 1 ZEC to a zaddr
+        # Send 1 ZEL to a zaddr
         wait_and_assert_operationid_status(self.nodes[1], self.nodes[1].z_sendmany(taddr, [{'address': zaddr1, 'amount': 1.0, 'memo': 'c0ffee01'}], 1, 0))
         self.generate_and_sync()
 

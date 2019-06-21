@@ -1,47 +1,6 @@
 Notable changes
 ===============
 
-Sapling network upgrade
------------------------
-
-The consensus code preparations for the Sapling network upgrade, as described
-in [ZIP 243](https://github.com/zcash/zips/blob/master/zip-0243.rst) and the
-[Sapling spec](https://github.com/zcash/zips/blob/master/protocol/sapling.pdf)
-are finished and included in this release. Sapling support in the wallet and
-RPC is ongoing, and is expected to land in master over the next few weeks.
-
-The [Sapling MPC](https://blog.z.cash/announcing-the-sapling-mpc/) is currently
-working on producing the final Sapling parameters. In the meantime, Sapling will
-activate on testnet with dummy Sapling parameters at height 252500. This
-activation will be temporary, and the testnet will be rolled back by version
-2.0.0 so that both mainnet and testnet will be using the same parameters.
-Users who want to continue testing Overwinter should continue to run version
-1.1.0 on testnet, and then upgrade to 2.0.0 (which will be released after
-Overwinter activates).
-
-Sapling can also be activated at a specific height in regtest mode by
-setting the config options `-nuparams=5ba81b19:HEIGHT -nuparams=76b809bb:HEIGHT`.
-These config options will change when the testnet is rolled back for 2.0.0
-(because the branch ID for Sapling will change, due to us following the safe
-upgrade conventions we introduced in Overwinter).
-
-Users running testnet or regtest nodes will need to run
-`./zcutil/fetch-params.sh --testnet` (for users building from source) or
-`zcash-fetch-params --testnet` (for binary / Debian users).
-
-As a reminder, because the Sapling activation height is not yet specified for
-mainnet, version 1.1.1 will behave similarly as other pre-Sapling releases even
-after a future activation of Sapling on the network. Upgrading from 1.1.1 will
-be required in order to follow the Sapling network upgrade on mainnet.
-
-Sapling transaction format
---------------------------
-
-Once Sapling has activated, transactions must use the new v4 format (including
-coinbase transactions). All RPC methods that create new transactions (such as
-`createrawtransaction` and `getblocktemplate`) will create v4 transactions once
-the Sapling activation height has been reached.
-
 zcash-cli: arguments privacy
 ----------------------------
 
@@ -109,8 +68,8 @@ Eirik Ogilvie-Wigley (7):
       Make sure transactions have non-empty outputs
       Coinbase transactions can not have shielded spend or output
 
-Jack Grigg (55):
-      Disable building libzelcashconsensus by default
+Jack Grigg (52):
+      Disable building libzcashconsensus by default
       depends: Upgrade Rust to 1.26.0-beta.3
       depends: Add support for unpackaged Rust crates
       depends: Update to latest librustzcash with sapling-crypto dependencies
@@ -162,9 +121,6 @@ Jack Grigg (55):
       make-release.py: Updated manpages for 1.1.1-rc1.
       make-release.py: Updated release notes and changelog for 1.1.1-rc1.
       Comment out Gitian library handling while we don't build any libraries
-      Add Sapling details to release notes
-      make-release.py: Versioning changes for 1.1.1.
-      make-release.py: Updated manpages for 1.1.1.
 
 Jay Graber (1):
       Add test for dependent txs to mempool_tx_expiry.py
@@ -292,11 +248,11 @@ Sean Bowe (49):
       Update merkle tree and pedersen hash tests to account for new encoding
       Change txdb prefixes for sapling and avoid writing unnecessary information.
 
-Simon Liu (18):
+Simon Liu (16):
       Part of #2966, extending Sprout tests to other epochs.
       Closes #3134 - Least Authority Issue E
-      Refactoring: libzelcash::Note is now a subclass of libzelcash::BaseNote.
-      Refactoring: Rename class libzelcash::Note to libzelcash::SproutNote.
+      Refactoring: libzcash::Note is now a subclass of libzcash::BaseNote.
+      Refactoring: Rename class libzcash::Note to libzcash::SproutNote.
       Refactoring: SproutNote member variable value moved to BaseNote.
       Add virtual destructor to SproutNote and BaseNote
       Remove unused SproutNote variables.
@@ -309,8 +265,6 @@ Simon Liu (18):
       Closes #3250. Memo getter should return by reference, not by value.
       make-release.py: Versioning changes for 1.1.1-rc2.
       make-release.py: Updated manpages for 1.1.1-rc2.
-      make-release.py: Updated release notes and changelog for 1.1.1-rc2.
-      Closes #3301. Non-void function should not have empty definition.
 
 Tom Harding (1):
       Add optional locktime to createrawtransaction
