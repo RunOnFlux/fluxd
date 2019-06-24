@@ -4053,7 +4053,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
 
         // Because some peers could not have enough data to see that this block is invalid, don't ban them
         // Because we might not have enough data to tell if the block is indeed valid, Issue an initial reject message
-        if (nHeight != 0 && !IsInitialBlockDownload()) {
+        if (nHeight != 0 && !IsInitialBlockDownload(chainparams)) {
             if (!IsBlockPayeeValid(block, nHeight)) {
                 LogPrint("zelnode", "%s : Couldn't find zelnode payment", __func__);
                 return state.DoS(0, false, REJECT_INVALID, "bad-cb-payee");
