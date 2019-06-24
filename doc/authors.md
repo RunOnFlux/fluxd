@@ -4,7 +4,7 @@ Zel Contributors
 Tadeas Kmenta (9)
 Wilke Trei (7)
 Jeremy Anderson (7)
-Miles Manley (7)
+Miles Manley (8)
 
 Zcash Contributors
 ==================
