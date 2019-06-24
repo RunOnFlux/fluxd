@@ -1808,6 +1808,8 @@ bool AcceptableInputs(CTxMemPool& pool, CValidationState& state, const CTransact
     // SyncWithWallets(tx, NULL);
 
     return true;
+}
+
 bool GetSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value)
 {
     AssertLockHeld(cs_main);
