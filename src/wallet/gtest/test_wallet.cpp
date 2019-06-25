@@ -71,12 +71,24 @@ public:
     }
 };
 
-CWalletTx GetValidSproutReceive(const libzelcash::SproutSpendingKey& sk, CAmount value, bool randomInputs, int32_t version = 2) {
-    return GetValidSproutReceive(*params, sk, value, randomInputs, version);
+CWalletTx GetValidSproutReceive(
+    const libzelcash::SproutSpendingKey& sk,
+    CAmount value,
+    bool randomInputs,
+    int32_t versionGroupId = SAPLING_VERSION_GROUP_ID,
+    int32_t version = SAPLING_TX_VERSION)
+{
+    return GetValidSproutReceive(*params, sk, value, randomInputs, versionGroupId, version);
 }
 
-CWalletTx GetInvalidCommitmentSproutReceive(const libzelcash::SproutSpendingKey& sk, CAmount value, bool randomInputs, int32_t version = 2) {
-    return GetInvalidCommitmentSproutReceive(*params, sk, value, randomInputs, version);
+CWalletTx GetInvalidCommitmentSproutReceive(
+    const libzelcash::SproutSpendingKey& sk,
+    CAmount value,
+    bool randomInputs,
+    int32_t versionGroupId = SAPLING_VERSION_GROUP_ID,
+    int32_t version = SAPLING_TX_VERSION)
+{
+    return GetInvalidCommitmentSproutReceive(*params, sk, value, randomInputs, versionGroupId, version);
 }
 
 libzelcash::SproutNote GetSproutNote(const libzelcash::SproutSpendingKey& sk,
@@ -105,7 +117,7 @@ std::pair<JSOutPoint, SaplingOutPoint> CreateValidBlock(TestWallet& wallet,
                             CBlock& block,
                             SproutMerkleTree& sproutTree,
                             SaplingMerkleTree& saplingTree) {
-    auto wtx = GetValidSproutReceive(sk, 50, true, 4);
+    auto wtx = GetValidSproutReceive(sk, 50, true);
     auto note = GetSproutNote(sk, wtx, 0, 1);
     auto nullifier = note.nullifier(sk);
 
@@ -1062,7 +1074,7 @@ TEST(WalletTests, SpentSaplingNoteIsFromMe) {
     auto nullifier2 = maybe_nf.get();
 
     // NOTE: Not updating the anchor results in a core dump.  Shouldn't builder just return error?
-    // *** Error in `./zcash-gtest': double free or corruption (out): 0x00007ffd8755d990 ***
+    // *** Error in `./zelcash-gtest': double free or corruption (out): 0x00007ffd8755d990 ***
     anchor = saplingTree.root();
 
     // Create transaction to spend note B
@@ -1121,7 +1133,7 @@ TEST(WalletTests, CachedWitnessesEmptyChain) {
     auto sk = libzelcash::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
-    auto wtx = GetValidSproutReceive(sk, 10, true, 4);
+    auto wtx = GetValidSproutReceive(sk, 10, true);
     auto note = GetSproutNote(sk, wtx, 0, 0);
     auto note2 = GetSproutNote(sk, wtx, 0, 1);
     auto nullifier = note.nullifier(sk);
@@ -1202,7 +1214,7 @@ TEST(WalletTests, CachedWitnessesChainTip) {
 
     {
         // Second transaction
-        auto wtx = GetValidSproutReceive(sk, 50, true, 4);
+        auto wtx = GetValidSproutReceive(sk, 50, true);
         auto note = GetSproutNote(sk, wtx, 0, 1);
         auto nullifier = note.nullifier(sk);
 
@@ -1311,7 +1323,7 @@ TEST(WalletTests, CachedWitnessesDecrementFirst) {
 
 {
         // Third transaction - never mined
-        auto wtx = GetValidSproutReceive(sk, 20, true, 4);
+        auto wtx = GetValidSproutReceive(sk, 20, true);
         auto note = GetSproutNote(sk, wtx, 0, 1);
         auto nullifier = note.nullifier(sk);
 
@@ -1449,7 +1461,7 @@ TEST(WalletTests, ClearNoteWitnessCache) {
     auto sk = libzelcash::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
-    auto wtx = GetValidSproutReceive(sk, 10, true, 4);
+    auto wtx = GetValidSproutReceive(sk, 10, true);
     auto hash = wtx.GetHash();
     auto note = GetSproutNote(sk, wtx, 0, 0);
     auto nullifier = note.nullifier(sk);
