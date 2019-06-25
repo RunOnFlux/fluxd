@@ -555,13 +555,7 @@ libzelcash_a_SOURCES = \
   zelcash/Note.cpp \
   zelcash/prf.cpp \
   zelcash/util.cpp \
-  zelcash/zip32.cpp \
-  zelcash/circuit/commitment.tcc \
-  zelcash/circuit/gadget.tcc \
-  zelcash/circuit/merkle.tcc \
-  zelcash/circuit/note.tcc \
-  zelcash/circuit/prfs.tcc \
-  zelcash/circuit/utils.tcc
+  zelcash/zip32.cpp
 
 libzelcash_a_CPPFLAGS = $(AM_CPPFLAGS) $(PIC_FLAGS) -DBINARY_OUTPUT -DCURVE_ALT_BN128 -DBOOST_SPIRIT_THREADSAFE -fvisibility=hidden -DSTATIC $(BITCOIN_INCLUDES)
 libzelcash_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
@@ -569,6 +563,7 @@ libzelcash_a_LDFLAGS = $(AM_LDFLAGS)
 
 libzelcash_a_CPPFLAGS += -DMONTGOMERY_OUTPUT
 
+# zelcashconsensus library #
 if BUILD_BITCOIN_LIBS
 include_HEADERS = script/zelcashconsensus.h
 libzelcashconsensus_la_SOURCES = \
