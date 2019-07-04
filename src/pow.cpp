@@ -47,6 +47,8 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
 	targetStep *= (chainParams.eh_epoch_2_end() + 61 - pindexLast->nHeight);
 	
 	fullTarget += targetStep; 
+
+	if (fullTarget > nProofOfWorkLimit) { return nProofOfWorkLimit.GetCompact(); }
 	return fullTarget.GetCompact();
 	
     }		
