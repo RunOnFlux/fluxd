@@ -21,7 +21,8 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
 {
     const CChainParams& chainParams = Params();
     unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
-
+     const arith_uint256 powLimit = UintToArith256(params.powLimit);
+	
     // Genesis block
     if (pindexLast == NULL)
         return nProofOfWorkLimit;
@@ -47,6 +48,8 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
 	targetStep *= (chainParams.eh_epoch_2_end() + 61 - pindexLast->nHeight);
 	
 	fullTarget += targetStep; 
+
+	if (fullTarget > powLimit) { fullTarget = powLimit; }
 	return fullTarget.GetCompact();
 	
     }		
