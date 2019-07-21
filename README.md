@@ -1,7 +1,5 @@
-# Zel 3.2.0 Kamiooka - ZelHash [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
+# Zel 3.3.1 Kamiooka - ZelHash [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
 <img align="right" height=112 width=562 src="doc/imgs/Kamiooka.png">
-
-## Mandatory Upgrade - Activation: 372,500 ≈ July 2nd 2019
 
 What is Zel?
 --------------
@@ -12,6 +10,7 @@ Zel is PoW asic resistant with ZelHash (Modified Equihash 125,4) with the person
 
 To speed up synchronisation you can download the Zel blockchain (state 18. 12. 2018) here https://zelcore.io/Zelcash.zip 
 For ZelNodes/Control Wallets you need to use this bootstrap with txindex enabled (state 18. 02. 2019) https://zelcore.io/zelcashbootstraptxindex.zip
+
 
 
 <p align="center">
