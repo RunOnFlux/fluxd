@@ -1607,6 +1607,11 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         if (fAddressIndex) {
             pool.addAddressIndex(entry, view);
         }
+
+        // insightexplorer: Add memory spent index
+        if (fSpentIndex) {
+            pool.addSpentIndex(entry, view);
+        }
     }
 
     SyncWithWallets(tx, NULL);
@@ -1819,6 +1824,8 @@ bool GetSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value)
     AssertLockHeld(cs_main);
     if (!fSpentIndex)
         return false;
+    if (mempool.getSpentIndex(key, value))
+        return true;
     return pblocktree->ReadSpentIndex(key, value);
 }
 
