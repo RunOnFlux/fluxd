@@ -1815,6 +1815,16 @@ bool AcceptableInputs(CTxMemPool& pool, CValidationState& state, const CTransact
     }
 
     // SyncWithWallets(tx, NULL);
+    return true;
+}
+
+bool GetTimestampIndex(unsigned int high, unsigned int low, bool fActiveOnly,
+    std::vector<std::pair<uint256, unsigned int> > &hashes)
+{
+    if (!fTimestampIndex)
+        return error("Timestamp index not enabled");
+    if (!pblocktree->ReadTimestampIndex(high, low, fActiveOnly, hashes))
+        return error("Unable to get hashes for timestamps");
 
     return true;
 }
@@ -4706,6 +4716,7 @@ bool static LoadBlockIndexDB()
     LogPrintf("%s: insight explorer %s\n", __func__, fAddressIndex ? "enabled" : "disabled");
     fAddressIndex = fInsightExplorer;
     fSpentIndex = fInsightExplorer;
+    fTimestampIndex = fInsightExplorer;
 
     // Fill in-memory data
     BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
