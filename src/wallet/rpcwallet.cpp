@@ -105,7 +105,7 @@ void WalletTxToJSON(const CWalletTx& wtx, UniValue& entry)
     BOOST_FOREACH(const PAIRTYPE(string,string)& item, wtx.mapValue)
         entry.push_back(Pair(item.first, item.second));
 
-    entry.push_back(Pair("vjoinsplit", TxJoinSplitToJSON(wtx)));
+    entry.push_back(Pair("vJoinSplit", TxJoinSplitToJSON(wtx)));
 }
 
 string AccountFromValue(const UniValue& value)
@@ -1741,7 +1741,7 @@ UniValue gettransaction(const UniValue& params, bool fHelp)
             "    }\n"
             "    ,...\n"
             "  ],\n"
-            "  \"vjoinsplit\" : [\n"
+            "  \"vJoinSplit\" : [\n"
             "    {\n"
             "      \"anchor\" : \"treestateref\",          (string) Merkle root of note commitment tree\n"
             "      \"nullifiers\" : [ string, ... ]      (string) Nullifiers of input notes\n"
@@ -3063,7 +3063,7 @@ UniValue zc_raw_joinsplit(const UniValue& params, bool fHelp)
         assert(jsdesc.Verify(*pzelcashParams, verifier, joinSplitPubKey));
     }
 
-    mtx.vjoinsplit.push_back(jsdesc);
+    mtx.vJoinSplit.push_back(jsdesc);
 
     // Empty output script.
     CScript scriptCode;
@@ -3830,7 +3830,7 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
             if (mtx.fOverwintered && (mtx.nVersion >= SAPLING_TX_VERSION)) {
                 jsdesc.proof = GrothProof();
             }
-            mtx.vjoinsplit.push_back(jsdesc);
+            mtx.vJoinSplit.push_back(jsdesc);
         }
     }
     CTransaction tx(mtx);
@@ -3898,7 +3898,7 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
     CMutableTransaction contextualTx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nextBlockHeight);
     bool isShielded = !fromTaddr || zaddrRecipients.size() > 0;
     if (contextualTx.nVersion == 1 && isShielded) {
-        contextualTx.nVersion = 2; // Tx format should support vjoinsplits 
+        contextualTx.nVersion = 2; // Tx format should support vJoinSplits 
     }
 
     // Create operation and add to global queue
@@ -3992,9 +3992,9 @@ UniValue z_getmigrationstatus(const UniValue& params, bool fHelp) {
         // * one or more Sprout JoinSplits with nonzero vpub_new field; and
         // * no Sapling Spends, and;
         // * one or more Sapling Outputs.
-        if (tx.vjoinsplit.size() > 0 && tx.vShieldedSpend.empty() && tx.vShieldedOutput.size() > 0) {
+        if (tx.vJoinSplit.size() > 0 && tx.vShieldedSpend.empty() && tx.vShieldedOutput.size() > 0) {
             bool nonZeroVPubNew = false;
-            for (const auto& js : tx.vjoinsplit) {
+            for (const auto& js : tx.vJoinSplit) {
                 if (js.vpub_new > 0) {
                     nonZeroVPubNew = true;
                     break;
@@ -4239,7 +4239,7 @@ UniValue z_shieldcoinbase(const UniValue& params, bool fHelp)
     CMutableTransaction contextualTx = CreateNewContextualCMutableTransaction(
         Params().GetConsensus(), nextBlockHeight);
     if (contextualTx.nVersion == 1) {
-        contextualTx.nVersion = 2; // Tx format should support vjoinsplits 
+        contextualTx.nVersion = 2; // Tx format should support vJoinSplits 
     }
 
     // Create operation and add to global queue
@@ -4654,7 +4654,7 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
         nextBlockHeight);
     bool isSproutShielded = sproutNoteInputs.size() > 0 || isToSproutZaddr;
     if (contextualTx.nVersion == 1 && isSproutShielded) {
-        contextualTx.nVersion = 2; // Tx format should support vjoinsplit
+        contextualTx.nVersion = 2; // Tx format should support vJoinSplit
     }
 
     // Builder (used if Sapling addresses are involved)
@@ -4731,11 +4731,13 @@ UniValue z_listoperationids(const UniValue& params, bool fHelp)
     return ret;
 }
 
+
 extern UniValue dumpprivkey(const UniValue& params, bool fHelp); // in rpcdump.cpp
-extern UniValue importprivkey(const UniValue& params, bool fHelp);
-extern UniValue importaddress(const UniValue& params, bool fHelp);
 extern UniValue dumpwallet(const UniValue& params, bool fHelp);
+extern UniValue importaddress(const UniValue& params, bool fHelp);
+extern UniValue importprivkey(const UniValue& params, bool fHelp);
 extern UniValue importwallet(const UniValue& params, bool fHelp);
+extern UniValue rescanblockchain(const UniValue& params, bool fHelp);
 extern UniValue z_exportkey(const UniValue& params, bool fHelp);
 extern UniValue z_importkey(const UniValue& params, bool fHelp);
 extern UniValue z_exportviewingkey(const UniValue& params, bool fHelp);
@@ -4781,6 +4783,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "listunspent",              &listunspent,              false },
     { "wallet",             "lockunspent",              &lockunspent,              true  },
     { "wallet",             "move",                     &movecmd,                  false },
+    { "wallet",             "rescanblockchain",         &rescanblockchain,         true  },
     { "wallet",             "sendfrom",                 &sendfrom,                 false },
     { "wallet",             "sendmany",                 &sendmany,                 false },
     { "wallet",             "sendtoaddress",            &sendtoaddress,            false },

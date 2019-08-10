@@ -60,9 +60,9 @@ void ScriptPubKeyToJSON(const CScript& scriptPubKey, UniValue& out, bool fInclud
 
 UniValue TxJoinSplitToJSON(const CTransaction& tx) {
     bool useGroth = tx.fOverwintered && tx.nVersion >= SAPLING_TX_VERSION;
-    UniValue vjoinsplit(UniValue::VARR);
-    for (unsigned int i = 0; i < tx.vjoinsplit.size(); i++) {
-        const JSDescription& jsdescription = tx.vjoinsplit[i];
+    UniValue vJoinSplit(UniValue::VARR);
+    for (unsigned int i = 0; i < tx.vJoinSplit.size(); i++) {
+        const JSDescription& jsdescription = tx.vJoinSplit[i];
         UniValue joinsplit(UniValue::VOBJ);
 
         joinsplit.push_back(Pair("vpub_old", ValueFromAmount(jsdescription.vpub_old)));
@@ -110,9 +110,9 @@ UniValue TxJoinSplitToJSON(const CTransaction& tx) {
             joinsplit.push_back(Pair("ciphertexts", ciphertexts));
         }
 
-        vjoinsplit.push_back(joinsplit);
+        vJoinSplit.push_back(joinsplit);
     }
-    return vjoinsplit;
+    return vJoinSplit;
 }
 
 UniValue TxShieldedSpendsToJSON(const CTransaction& tx) {
@@ -212,8 +212,8 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry)
     }
     entry.push_back(Pair("vout", vout));
 
-    UniValue vjoinsplit = TxJoinSplitToJSON(tx);
-    entry.push_back(Pair("vjoinsplit", vjoinsplit));
+    UniValue vJoinSplit = TxJoinSplitToJSON(tx);
+    entry.push_back(Pair("vJoinSplit", vJoinSplit));
 
     if (tx.fOverwintered && tx.nVersion >= SAPLING_TX_VERSION) {
         entry.push_back(Pair("valueBalance", ValueFromAmount(tx.valueBalance)));
@@ -299,7 +299,7 @@ UniValue getrawtransaction(const UniValue& params, bool fHelp)
             "     }\n"
             "     ,...\n"
             "  ],\n"
-            "  \"vjoinsplit\" : [        (array of json objects, only for version >= 2)\n"
+            "  \"vJoinSplit\" : [        (array of json objects, only for version >= 2)\n"
             "     {\n"
             "       \"vpub_old\" : x.xxx,         (numeric) public input value in " + CURRENCY_UNIT + "\n"
             "       \"vpub_new\" : x.xxx,         (numeric) public output value in " + CURRENCY_UNIT + "\n"
@@ -642,7 +642,7 @@ UniValue decoderawtransaction(const UniValue& params, bool fHelp)
             "     }\n"
             "     ,...\n"
             "  ],\n"
-            "  \"vjoinsplit\" : [        (array of json objects, only for version >= 2)\n"
+            "  \"vJoinSplit\" : [        (array of json objects, only for version >= 2)\n"
             "     {\n"
             "       \"vpub_old\" : x.xxx,         (numeric) public input value in " + CURRENCY_UNIT + "\n"
             "       \"vpub_new\" : x.xxx,         (numeric) public output value in " + CURRENCY_UNIT + "\n"

@@ -97,6 +97,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "estimatepriority", 0 },
     { "prioritisetransaction", 1 },
     { "prioritisetransaction", 2 },
+    { "rescanblockchain", 0 },
     { "setban", 2 },
     { "setban", 3 },
     { "zcrawjoinsplit", 1 },
