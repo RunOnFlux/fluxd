@@ -18,7 +18,7 @@
 #define ZELNODE_SYNC_FINISHED 999
 
 #define ZELNODE_SYNC_TIMEOUT 5
-#define ZELNODE_SYNC_THRESHOLD 2
+#define ZELNODE_SYNC_THRESHOLD 4 // Zelcash has a default 16 connections. So we want to communicate with at least 1/4 of them
 
 
 class ZelnodeSync;
