@@ -61,6 +61,7 @@
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/thread.hpp>
 #include <openssl/crypto.h>
+#include <stdlib.h>
 
 #include <libsnark/common/profiling.hpp>
 
@@ -1949,8 +1950,19 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     threadGroup.create_thread(boost::bind(&ThreadCheckZelnodes));
 
-    if (GetBoolArg("-zelnode", false)) {
-        threadGroup.create_thread(boost::bind(&ThreadBenchmarkZelnode));
+    // TODO replace true with `fZelnode` before launch
+    if (true) {
+        SetupSysBench();
+
+        // Check if the benchmark application is running
+        if (!IsBenchmarkdRunning()) {
+            StartBenchmarkd();
+        }
+
+        // Make sure that benchmarkd is running and stop zelcash if it isn't
+        if (!IsBenchmarkdRunning()) {
+            return InitError("Failed to start benchmarkd application");
+        }
     }
 
     // ********************************************************* Step 12: start node

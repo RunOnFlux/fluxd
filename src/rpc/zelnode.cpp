@@ -23,23 +23,6 @@
 #include <boost/tokenizer.hpp>
 #include <fstream>
 
-bool DecodeHexZelnodeBroadcast(ZelnodeBroadcast& zelnodeBroadcast, std::string strHexZelnodeBroadcast) {
-
-    if (!IsHex(strHexZelnodeBroadcast))
-        return false;
-
-    vector<unsigned char> zelnodeData(ParseHex(strHexZelnodeBroadcast));
-    CDataStream ssData(zelnodeData, SER_NETWORK, PROTOCOL_VERSION);
-    try {
-        ssData >> zelnodeBroadcast;
-    }
-    catch (const std::exception&) {
-        return false;
-    }
-
-    return true;
-}
-
 UniValue createzelnodekey(const UniValue& params, bool fHelp)
 {
     if (fHelp || (params.size() != 0))
@@ -1167,8 +1150,8 @@ UniValue decodezelnodebroadcast(const UniValue& params, bool fHelp)
     if (!DecodeHexZelnodeBroadcast(zelnodeBroadcast, params[0].get_str()))
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Zelnode broadcast message decode failed");
 
-    if(!zelnodeBroadcast.VerifySignature())
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Zelnode broadcast signature verification failed");
+//    if(!zelnodeBroadcast.VerifySignature())
+//        throw JSONRPCError(RPC_INVALID_PARAMETER, "Zelnode broadcast signature verification failed");
 
     UniValue resultObj(UniValue::VOBJ);
 
@@ -1180,6 +1163,9 @@ UniValue decodezelnodebroadcast(const UniValue& params, bool fHelp)
     resultObj.push_back(Pair("sigtime", zelnodeBroadcast.sigTime));
     resultObj.push_back(Pair("protocolversion", zelnodeBroadcast.protocolVersion));
     resultObj.push_back(Pair("nlastdsq", zelnodeBroadcast.nLastDsq));
+    resultObj.push_back(Pair("benchmarktier", zelnodeBroadcast.benchmarkTier));
+    resultObj.push_back(Pair("benchmarksigtime", zelnodeBroadcast.benchmarkSigTime));
+    resultObj.push_back(Pair("benchmarksig", EncodeBase64(&zelnodeBroadcast.benchmarkSig[0], zelnodeBroadcast.benchmarkSig.size())));
 
     UniValue lastPingObj(UniValue::VOBJ);
     lastPingObj.push_back(Pair("vin", zelnodeBroadcast.lastPing.vin.prevout.ToString()));
@@ -1214,33 +1200,108 @@ UniValue relayzelnodebroadcast(const UniValue& params, bool fHelp)
     if(!zelnodeBroadcast.VerifySignature())
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Zelnode broadcast signature verification failed");
 
+    if (IsSporkActive(SPORK_3_ZELNODE_BENCHMARKD_ENFORCEMENT)) {
+        if (zelnodeBroadcast.protocolVersion < BENCHMARKD_PROTO_VERSION) {
+            throw JSONRPCError(RPC_INVALID_REQUEST, "Zelnode broadcast benchmarkd protocol version enforcement");
+        }
+    }
+
+    if (zelnodeBroadcast.protocolVersion >= BENCHMARKD_PROTO_VERSION) {
+        if (!zelnodeBroadcast.BenchmarkVerifySignature())
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Zelnode broadcast benchmarkd signature verification failed");
+    }
+
     zelnodeman.UpdateZelnodeList(zelnodeBroadcast);
     zelnodeBroadcast.Relay();
 
     return strprintf("Zelnode broadcast sent (service %s, vin %s)", zelnodeBroadcast.addr.ToString(), zelnodeBroadcast.vin.ToString());
 }
 
-UniValue getnodebenchmarks(const UniValue& params, bool fHelp)
+UniValue getbenchmarks(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
-                "getnodebenchmarks\n"
+                "getbenchmarks\n"
                 "\nCommand to test node benchmarks\n"
 
                 "\nExamples:\n" +
-                HelpExampleCli("getnodebenchmarks", "") + HelpExampleRpc("getnodebenchmarks", ""));
+                HelpExampleCli("getbenchmarks", "") + HelpExampleRpc("getbenchmarks", ""));
 
-    if (!fZelnode)
-        return "Command must be run on a zelnode";
+    return GetBenchmarks();
 
-    if (fBenchmarkFailed)
-        return "Benchmarking Failed, please restart your node to try again";
-
-    if (!fBenchmarkComplete)
-        return "Benchmarking isn't completed, please try again in a minute";
-
-    return benchmarks.NenchResultToString() + "Event Per Second : " + std::to_string(benchmarks.nEventsPerSecond) + "\n";
+//    // TODO used for testing. Remove this before launch
+//    ZelnodeBroadcast znb;
+//    znb.protocolVersion = BENCHMARKD_PROTO_VERSION;
+//
+//    CDataStream ssHEx(SER_NETWORK, PROTOCOL_VERSION);
+//    ssHEx << znb;
+//
+//    LogPrintf("%s\n", HexStr(ssHEx.begin(), ssHEx.end()));
+//
+//    std::string strError;
+//    ZelnodeBroadcast signedBroadcast;
+//    if (!GetSignedBroadcast(znb, signedBroadcast, strError)) {
+//        LogPrintf("%s - %s\n", __func__, strError);
+//        return "failed";
+//    }
+//
+//    CDataStream ssZelnodeBroadcast(SER_NETWORK, PROTOCOL_VERSION);
+//    ssZelnodeBroadcast << signedBroadcast;
+//    std::string znbHexStr = HexStr(ssZelnodeBroadcast.begin(), ssZelnodeBroadcast.end());
+//
+//    return znbHexStr;
 }
+
+UniValue getbenchstatus(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+                "getbenchstatus\n"
+                "\nCommand to get status of benchmarkd\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("getbenchstatus", "") + HelpExampleRpc("getbenchstatus", ""));
+
+    return GetBenchmarkdStatus();
+}
+
+
+UniValue stopbenchmarkd(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+                "stopbenchmarkd\n"
+                "\nStop benchmarkd\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("stopbenchmarkd", "") + HelpExampleRpc("stopbenchmarkd", ""));
+
+    if (IsBenchmarkdRunning()) {
+        StopBenchmarkd();
+        return "Stopping process";
+    }
+
+    return "Not running";
+}
+
+UniValue startbenchmarkd(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+                "startbenchmarkd\n"
+                "\nStart benchmarkd\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("startbenchmarkd", "") + HelpExampleRpc("startbenchmarkd", ""));
+
+    if (!IsBenchmarkdRunning()) {
+        StartBenchmarkd();
+        return "Starting process";
+    }
+
+    return "Already running";
+}
+
 
 
 
@@ -1263,10 +1324,15 @@ static const CRPCCommand commands[] =
                 { "zelnode",    "createzelnodebroadcast", &createzelnodebroadcast, false  },
                 { "zelnode",    "relayzelnodebroadcast",  &relayzelnodebroadcast,  false  },
                 { "zelnode",    "decodezelnodebroadcast", &decodezelnodebroadcast, false  },
-                { "zelnode",    "getnodebenchmarks",      &getnodebenchmarks,      false  },
+
+                { "benchmarks", "getbenchmarks",         &getbenchmarks,           false  },
+                { "benchmarks", "getbenchstatus",        &getbenchstatus,          false  },
+                { "benchmarks", "stopbenchmarkd",        &stopbenchmarkd,          false  },
+                { "benchmarks", "startbenchmarkd",       &startbenchmarkd,         false  },
 
                 /** Not shown in help menu */
                 { "hidden",    "createsporkkeys",        &createsporkkeys,         false  }
+
 
 
         };

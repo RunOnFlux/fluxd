@@ -194,6 +194,9 @@ public:
         networkID = CBaseChainParams::Network::MAIN;
         strZelnodeTestingDummyAddress= "t1Ub8iNuaoCAKTaiVyCh8d3iZ31QJFxnGzU";
 
+        // TODO update with mainnet benchmarking public key
+        strBenchmarkingPublicKey = "044c09cb66c6bbb91e015aaff03707db7dc43b3dcd2fafeedb746a569e279cf63b28c6e2c01f6458c5e50bbefa3f3ebdafcc0ba02c77965ac1d5080becc42f35f1";
+
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
             (0, consensus.hashGenesisBlock)
@@ -333,6 +336,7 @@ public:
         nStartZelnodePayments = 1550748576; //Thu, 21 Feb 2019 11:29:36 UTC // Currently not being used.
         networkID = CBaseChainParams::Network::TESTNET;
         strZelnodeTestingDummyAddress= "tmXxZqbmvrxeSFQsXmm4N9CKyME767r47fS";
+        strBenchmarkingPublicKey = "04f5382d5868ae49aedfd67efce7c0f56a66a9405a2cc13f8ef236aabb3f0f1d00031f9b9ca67edc93044918a1cf265655108bab531e94c7d48918e40a94a34f77";
 
 
 
@@ -445,6 +449,7 @@ public:
         fTestnetToBeDeprecatedFieldRPC = false;
 
         networkID = CBaseChainParams::Network::REGTEST;
+        strBenchmarkingPublicKey = "04f5382d5868ae49aedfd67efce7c0f56a66a9405a2cc13f8ef236aabb3f0f1d00031f9b9ca67edc93044918a1cf265655108bab531e94c7d48918e40a94a34f77";
 
         checkpointData = (CCheckpointData){
             boost::assign::map_list_of

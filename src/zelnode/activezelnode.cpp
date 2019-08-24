@@ -24,18 +24,6 @@ void ActiveZelnode::ManageStatus()
 
     if (!fZelnode) return;
 
-    if (fBenchmarkFailed) {
-        notCapableReason = strprintf("Benchmarking tests failed, please restart the node to try again");
-        LogPrintf("%s - %s\n", __func__, notCapableReason);
-        return;
-    }
-
-    if (!fBenchmarkComplete) {
-        notCapableReason = strprintf("Benchmarking isn't complete yet, please try again in a minute");
-        LogPrintf("%s - %s\n", __func__, notCapableReason);
-        return;
-    }
-
     if (fDebug) LogPrintf("%s - Begin\n", __func__);
 
     //need correct blocks to send ping
@@ -51,14 +39,19 @@ void ActiveZelnode::ManageStatus()
         Zelnode* pzn;
         pzn = zelnodeman.Find(pubKeyZelnode);
         if (pzn != NULL) {
-            if (!CheckBenchmarks(pzn->tier)) {
-                status = ACTIVE_ZELNODE_NOT_CAPABLE;
-                notCapableReason = strprintf("Failed benchmarks test for %s", pzn->Tier());
-                LogPrintf("%s - %s\n", __func__, notCapableReason);
-                return;
-            }
             pzn->Check();
             if (pzn->IsEnabled() && pzn->protocolVersion == PROTOCOL_VERSION) EnableHotColdZelnode(pzn->vin, pzn->addr);
+        }
+    }
+
+    if (status == ACTIVE_ZELNODE_STARTED) {
+        Zelnode* pzn;
+        pzn = zelnodeman.Find(pubKeyZelnode);
+        if (pzn != NULL) {
+            if (GetTime() - pzn->benchmarkSigTime > (ZELNODE_MIN_BENCHMARK_SECONDS / 2) ) {
+                if (!BuildZelnodeBroadcast(errorMessage))
+                    return;
+            }
         }
     }
 
@@ -131,6 +124,14 @@ void ActiveZelnode::ManageStatus()
             ZelnodeBroadcast znb;
             if (!CreateBroadcast(vin, service, keyCollateralAddress, pubKeyCollateralAddress, keyZelnode, pubKeyZelnode, errorMessage, znb)) {
                 notCapableReason = "Error on Register: " + errorMessage;
+                LogPrintf("%s - %s\n", __func__, notCapableReason);
+                return;
+            }
+
+            std::string strError;
+            ZelnodeBroadcast signedBroadcast;
+            if (!GetSignedBroadcast(znb, signedBroadcast, strError)) {
+                notCapableReason = strError;
                 LogPrintf("%s - %s\n", __func__, notCapableReason);
                 return;
             }
@@ -440,4 +441,47 @@ bool ActiveZelnode::EnableHotColdZelnode(CTxIn& newVin, CService& newService)
     LogPrintf("%s - Enabled! You may shut down the cold daemon.\n", __func__);
 
     return true;
+}
+
+bool ActiveZelnode::BuildZelnodeBroadcast(std::string& errorMessage) {
+    // Choose coins to use
+    CPubKey pubKeyCollateralAddress;
+    CKey keyCollateralAddress;
+
+    if (GetZelNodeVin(vin, pubKeyCollateralAddress, keyCollateralAddress)) {
+        LOCK(pwalletMain->cs_wallet);
+        pwalletMain->LockCoin(vin.prevout);
+
+        // send to all nodes
+        CPubKey pubKeyZelnode;
+        CKey keyZelnode;
+
+        if (!obfuScationSigner.SetKey(strZelnodePrivKey, errorMessage, keyZelnode, pubKeyZelnode)) {
+            notCapableReason = "Error upon calling SetKey: " + errorMessage;
+            LogPrintf("Register::ManageStatus() - %s\n", notCapableReason);
+            return false;
+        }
+
+        ZelnodeBroadcast znb;
+        if (!CreateBroadcast(vin, service, keyCollateralAddress, pubKeyCollateralAddress, keyZelnode,
+                             pubKeyZelnode, errorMessage, znb)) {
+            notCapableReason = "Error on Register: " + errorMessage;
+            LogPrintf("%s - %s\n", __func__, notCapableReason);
+            return false;
+        }
+
+        std::string strError;
+        ZelnodeBroadcast signedBroadcast;
+        if (!GetSignedBroadcast(znb, signedBroadcast, strError)) {
+            notCapableReason = strError;
+            LogPrintf("%s - %s\n", __func__, notCapableReason);
+            return false;
+        }
+
+        //send to all peers
+        LogPrintf("%s - Relay broadcast vin = %s\n", __func__, vin.ToString());
+        znb.Relay();
+
+        return true;
+    }
 }

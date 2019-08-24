@@ -12,6 +12,7 @@
 #include "sync.h"
 #include "util.h"
 #include "key_io.h"
+#include "spork.h"
 
 // keep track of the scanning errors I've seen
 map<uint256, int> mapSeenZelnodeScanningErrors;
@@ -229,6 +230,27 @@ void Zelnode::Check(bool forceCheck)
         return;
     }
 
+    if (IsSporkActive(SPORK_3_ZELNODE_BENCHMARKD_ENFORCEMENT)) {
+        if (protocolVersion < BENCHMARKD_PROTO_VERSION) {
+            LogPrintf("%s - Expiring because Spork 3 is active, and the node protocolVersion is %d and needs to b >= %d\n", __func__, protocolVersion, BENCHMARKD_PROTO_VERSION);
+            activeState = ZELNODE_EXPIRED;
+            return;
+        }
+
+        if(lastTimeChecked - benchmarkSigTime > ZELNODE_MIN_BENCHMARK_SECONDS){
+            LogPrintf("%s - Expiring because the benchmarkSigTime is great than the ZELNODE_MIN_BENCHMARK_SECONDS\n", __func__);
+            activeState = ZELNODE_EXPIRED;
+            return;
+        }
+
+        // Check the tier signed in the benchmarking is valid for amount in the vin
+        if (benchmarkTier < tier) {
+            LogPrintf("%s - Expiring because the benchmarkTier isn't enough to support the zel collateral in the VIN. Is %s, needs to be %s\n", __func__, TierToString(benchmarkTier), TierToString(tier));
+            activeState = ZELNODE_EXPIRED;
+            return;
+        }
+    }
+
     if (!unitTest) {
         CValidationState state;
         CMutableTransaction tx = CMutableTransaction();
@@ -291,6 +313,11 @@ bool Zelnode::UpdateFromNewBroadcast(ZelnodeBroadcast& znb)
         if (znb.lastPing == ZelnodePing() || (znb.lastPing != ZelnodePing() && znb.lastPing.CheckAndUpdate(nDoS, false))) {
             lastPing = znb.lastPing;
             zelnodeman.mapSeenZelnodePing.insert(make_pair(lastPing.GetHash(), lastPing));
+        }
+        if (protocolVersion > BENCHMARKD_PROTO_VERSION) {
+            benchmarkTier = znb.benchmarkTier;
+            benchmarkSigTime = znb.benchmarkSigTime;
+            benchmarkSig = znb.benchmarkSig;
         }
         return true;
     }
@@ -502,6 +529,13 @@ bool ZelnodeBroadcast::CheckAndUpdate(int& nDos)
         return false;
     }
 
+    if (IsSporkActive(SPORK_3_ZELNODE_BENCHMARKD_ENFORCEMENT)) {
+        if (protocolVersion < BENCHMARKD_PROTO_VERSION) {
+            LogPrint("zelnode","znb - spork check benchmarkd enforcement ignoring outdated Zelnode %s protocol version %d\n", vin.prevout.hash.ToString(), protocolVersion);
+            return false;
+        }
+    }
+
     CScript pubkeyScript;
     pubkeyScript = GetScriptForDestination(pubKeyCollateralAddress.GetID());
 
@@ -533,6 +567,13 @@ bool ZelnodeBroadcast::CheckAndUpdate(int& nDos)
         return error("%s - Got bad Zelnode address signature : %s", __func__, errorMessage);
     }
 
+    if (IsSporkActive(SPORK_3_ZELNODE_BENCHMARKD_ENFORCEMENT)) {
+        if (!BenchmarkVerifySignature()) {
+            nDos = 100;
+            return error("%s - Got bad benchmarkd signature", __func__);
+        }
+    }
+
     if (Params().NetworkID() == CBaseChainParams::MAIN) {
         if (addr.GetPort() != 16125) return false;
     } else if (addr.GetPort() == 16125)
@@ -550,6 +591,13 @@ bool ZelnodeBroadcast::CheckAndUpdate(int& nDos)
     if(pzn->sigTime >= sigTime) {
         return error("%s - Bad sigTime %d for Zelnode %20s %105s (existing broadcast is at %d)",
                      __func__, sigTime, addr.ToString(), vin.ToString(), pzn->sigTime);
+    }
+
+    if (IsSporkActive(SPORK_3_ZELNODE_BENCHMARKD_ENFORCEMENT)) {
+        if (pzn->benchmarkSigTime >= benchmarkSigTime) {
+            return error("%s - Bad benchmarkSigTime %d for Zelnode %20s %105s (existing broadcast is at %d)",
+                         __func__, benchmarkSigTime, addr.ToString(), vin.ToString(), pzn->benchmarkSigTime);
+        }
     }
 
     // zelnode is not enabled yet/already, nothing to update
@@ -574,6 +622,22 @@ bool ZelnodeBroadcast::CheckAndUpdate(int& nDos)
 // Zelnode broadcast has been checked and has been assigned a tier before this method is called
 bool ZelnodeBroadcast::CheckInputsAndAdd(int& nDoS)
 {
+    if (IsSporkActive(SPORK_3_ZELNODE_BENCHMARKD_ENFORCEMENT)) {
+        // Check the benchmarking signature
+        if (!BenchmarkVerifySignature()) {
+            LogPrintf("%s : znb - invalid benchmarking signature\n", __func__);
+            nDoS = 33;
+            return false;
+        }
+
+        // Check the tier signed in the benchmarking is valid for amount in the vin
+        if (benchmarkTier < tier) {
+            LogPrintf("%s : znb - invalid benchmarking tier. Benchmarking tier is %s but needed to be %s\n", __func__, TierToString(benchmarkTier), TierToString(tier));
+            nDoS = 33;
+            return false;
+        }
+    }
+
     // we are a zelnode with the same vin (i.e. already activated) and this znb is ours (matches our Zelnode privkey)
     // so nothing to do here for us
     if (fZelnode && vin.prevout == activeZelnode.vin.prevout && pubKeyZelnode == activeZelnode.pubKeyZelnode)
@@ -685,6 +749,19 @@ std::string ZelnodeBroadcast::GetStrMessage()
     strMessage = addr.ToString() + std::to_string(sigTime) + pubKeyCollateralAddress.GetID().ToString() + pubKeyZelnode.GetID().ToString() + std::to_string(protocolVersion);
 
     return strMessage;
+}
+
+bool ZelnodeBroadcast::BenchmarkVerifySignature()
+{
+    std::string public_key = Params().BenchmarkingPublicKey();
+    CPubKey pubkey(ParseHex(public_key));
+    std::string errorMessage = "";
+    std::string strMessage = std::string(sig.begin(), sig.end()) + std::to_string(benchmarkTier) + std::to_string(benchmarkSigTime);
+
+    if (!obfuScationSigner.VerifyMessage(pubkey, benchmarkSig, strMessage, errorMessage))
+        return error("%s - Error: %s", __func__, errorMessage);
+
+    return true;
 }
 
 ZelnodePing::ZelnodePing()
@@ -832,6 +909,23 @@ std::string TierToString(int tier)
     if (strStatus == "NONE" && tier != 0) strStatus = "UNKNOWN TIER (" + std::to_string(tier) + ")";
 
     return strStatus;
+}
+
+bool DecodeHexZelnodeBroadcast(ZelnodeBroadcast& zelnodeBroadcast, std::string strHexZelnodeBroadcast) {
+
+    if (!IsHex(strHexZelnodeBroadcast))
+        return false;
+
+    vector<unsigned char> zelnodeData(ParseHex(strHexZelnodeBroadcast));
+    CDataStream ssData(zelnodeData, SER_NETWORK, PROTOCOL_VERSION);
+    try {
+        ssData >> zelnodeBroadcast;
+    }
+    catch (const std::exception&) {
+        return false;
+    }
+
+    return true;
 }
 
 

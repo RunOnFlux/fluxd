@@ -130,6 +130,7 @@ public:
     std::string ZelnodeTestingDummyAddress() const { return strZelnodeTestingDummyAddress; }
     int64_t StartZelnodePayments() const { return nStartZelnodePayments; }
     CBaseChainParams::Network NetworkID() const { return networkID; }
+    std::string BenchmarkingPublicKey() const { return strBenchmarkingPublicKey; }
 
 
 protected:
@@ -172,6 +173,7 @@ protected:
     std::string strZelnodeTestingDummyAddress;
     int64_t nStartZelnodePayments;
     CBaseChainParams::Network networkID;
+    std::string strBenchmarkingPublicKey;
 };
 
 /**

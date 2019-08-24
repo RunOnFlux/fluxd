@@ -13,6 +13,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "asyncrpcqueue.h"
+#include "zelnode/benchmarks.h"
 
 #include <memory>
 
@@ -248,6 +249,8 @@ UniValue stop(const UniValue& params, bool fHelp)
             "\nStop Zelcash server.");
     // Event loop will exit after current HTTP requests have been handled, so
     // this reply will get back to the client.
+    if (fZelStartedBench)
+        StopBenchmarkd();
     StartShutdown();
     return "Zelcash server stopping";
 }

@@ -70,5 +70,6 @@ public:
 
     /// Enable cold wallet mode (run a Zelnode with no funds)
     bool EnableHotColdZelnode(CTxIn& vin, CService& addr);
+    bool BuildZelnodeBroadcast(std::string& errorMessage);
 };
 #endif //ZELCASHNODES_ACTIVEZELNODE_H
