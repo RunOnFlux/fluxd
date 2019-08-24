@@ -173,6 +173,8 @@ public:
     std::map<COutPoint, CInPoint> mapNextTx;
     std::map<uint256, std::pair<double, CAmount> > mapDeltas;
 
+    std::map<COutPoint, uint256> mapZelnodeTxMempool;
+
     CTxMemPool(const CFeeRate& _minRelayFee);
     ~CTxMemPool();
 

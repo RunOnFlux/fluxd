@@ -62,6 +62,7 @@
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/thread.hpp>
 #include <openssl/crypto.h>
+#include <stdlib.h>
 
 #if ENABLE_ZMQ
 #include "zmq/zmqnotificationinterface.h"
@@ -243,6 +244,8 @@ void Shutdown()
         pblocktree = NULL;
         delete pSporkDB;
         pSporkDB = NULL;
+        delete pZelnodeDB;
+        pZelnodeDB = NULL;
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
@@ -1507,9 +1510,11 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete pcoinscatcher;
                 delete pblocktree;
                 delete pSporkDB;
+                delete pZelnodeDB;
 
                 /** Zelnode Sporks */
                 pSporkDB = new CSporkDB(0, false, false);
+                pZelnodeDB = new CDeterministicZelnodeDB(0, false, fReindex);
 
                 pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
@@ -1525,6 +1530,17 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
                 uiInterface.InitMessage(_("Loading sporks..."));
                 LoadSporksFromDB();
+
+                uiInterface.InitMessage(_("Init zelnodecache"));
+                g_zelnodeCache.InitMapZelnodeList();
+
+                uiInterface.InitMessage(_("Loading zelnodecache..."));
+                pZelnodeDB->LoadZelnodeCacheData();
+
+                uiInterface.InitMessage(_("Sorting zelnode list"));
+                g_zelnodeCache.SortList(Zelnode::BASIC);
+                g_zelnodeCache.SortList(Zelnode::SUPER);
+                g_zelnodeCache.SortList(Zelnode::BAMF);
 
                 uiInterface.InitMessage(_("Loading block index..."));
                 if (!LoadBlockIndex()) {
@@ -1913,6 +1929,18 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             }
         }
 
+        std::string strHash = GetArg("-zelnodeoutpoint", "");
+        uint256 hash = uint256S(strHash);
+        int index = GetArg("-zelnodeindex", -1);
+
+        zelnodeOutPoint = COutPoint(hash, index);
+
+        if (zelnodeOutPoint.IsNull()) {
+            return InitError(_("Invalid zelnode outpoint data. assign zelnodeoutpoint and zelnodeindex."));
+        }
+
+        activeZelnode.deterministicOutPoint = zelnodeOutPoint;
+
         strZelnodePrivKey = GetArg("-zelnodeprivkey", "");
         if (!strZelnodePrivKey.empty()) {
             std::string errorMessage;
@@ -1945,8 +1973,19 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     threadGroup.create_thread(boost::bind(&ThreadCheckZelnodes));
 
-    if (GetBoolArg("-zelnode", false)) {
-        threadGroup.create_thread(boost::bind(&ThreadBenchmarkZelnode));
+    // TODO replace true with `fZelnode` before launch
+    if (fZelnode) {
+        SetupSysBench();
+
+        // Check if the benchmark application is running
+        if (!IsBenchmarkdRunning()) {
+            StartBenchmarkd();
+        }
+
+        // Make sure that benchmarkd is running and stop zelcash if it isn't
+        if (!IsBenchmarkdRunning()) {
+            return InitError("Failed to start benchmarkd application");
+        }
     }
 
     // ********************************************************* Step 12: start node

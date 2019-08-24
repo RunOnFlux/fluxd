@@ -6,6 +6,8 @@
 #include "zelnode/sporkdb.h"
 #include "zelnode/spork.h"
 
+static const char DB_ZELNODE_CACHE_DATA = 'd';
+
 CSporkDB::CSporkDB(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "sporks", nCacheSize, fMemory, fWipe) {}
 
 bool CSporkDB::WriteSpork(const int nSporkId, const CSporkMessage& spork)
@@ -24,3 +26,4 @@ bool CSporkDB::SporkExists(const int nSporkId)
 {
     return Exists(nSporkId);
 }
+

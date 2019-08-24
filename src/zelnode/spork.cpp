@@ -216,7 +216,6 @@ int CSporkManager::GetSporkIDByName(std::string strName)
 {
     if (strName == "SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT") return SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT;
     if (strName == "SPORK_2_ZELNODE_UPGRADE_VOTE_ENFORCEMENT") return SPORK_2_ZELNODE_UPGRADE_VOTE_ENFORCEMENT;
-
     return -1;
 }
 

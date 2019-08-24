@@ -229,6 +229,7 @@ BITCOIN_CORE_H = \
   zelnode/zelnodeconfig.h \
   zelnode/zelnodeman.h \
   zelnode/zelnodesync.h \
+  zelnode/zelnodecachedb.h \
   zmq/zmqabstractnotifier.h \
   zmq/zmqconfig.h\
   zmq/zmqnotificationinterface.h \
@@ -293,6 +294,7 @@ libbitcoin_server_a_SOURCES = \
   zelnode/zelnodeconfig.cpp \
   zelnode/zelnodeman.cpp \
   zelnode/zelnodesync.cpp \
+  zelnode/zelnodecachedb.cpp \
   $(BITCOIN_CORE_H) \
   $(LIBZELCASH_H)
 

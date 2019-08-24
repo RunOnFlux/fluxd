@@ -26,5 +26,7 @@ public:
 };
 
 
+
+
 #endif //ZELCASHNODES_SPORKDB_H
 

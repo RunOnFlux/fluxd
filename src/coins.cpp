@@ -10,6 +10,7 @@
 #include "policy/fees.h"
 
 #include <assert.h>
+#include <zelnode/zelnode.h>
 
 /**
  * calculate number of bytes for the bitmask, and its number of non-zero bytes
@@ -553,6 +554,9 @@ CAmount CCoinsViewCache::GetValueIn(const CTransaction& tx) const
     if (tx.IsCoinBase())
         return 0;
 
+    if (tx.IsZelnodeTx())
+        return 0;
+
     CAmount nResult = 0;
     for (unsigned int i = 0; i < tx.vin.size(); i++)
         nResult += GetOutputFor(tx.vin[i]).nValue;
@@ -618,6 +622,28 @@ bool CCoinsViewCache::HaveInputs(const CTransaction& tx) const
         }
     }
     return true;
+}
+
+bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, int& nTier) const
+{
+    if (!tx.IsZelnodeTx()) {
+        return false;
+    }
+
+    const COutPoint &prevout = tx.collatoralOut;
+    const CCoins* coins = AccessCoins(prevout.hash);
+    if (!coins || !coins->IsAvailable(prevout.n)) {
+        return false;
+    }
+
+    if (coins->vout[prevout.n].nValue == 10000 * COIN)
+        nTier = Zelnode::BASIC;
+    else if (coins->vout[prevout.n].nValue == 25000 * COIN)
+        nTier = Zelnode::SUPER;
+    else if (coins->vout[prevout.n].nValue == 100000 * COIN)
+        nTier = Zelnode::BAMF;
+
+    return nTier >= BASIC && nTier <= BAMF;
 }
 
 double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight) const

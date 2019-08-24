@@ -539,6 +539,9 @@ public:
     //! Check whether all prevouts of the transaction are present in the UTXO set represented by this view
     bool HaveInputs(const CTransaction& tx) const;
 
+    //! Check whether the prevout is present in the UTXO set represented by this view
+    bool CheckZelnodeTxInput(const CTransaction& tx, int& nTier) const;
+
     //! Check whether all joinsplit and sapling spend requirements (anchors/nullifiers) are satisfied
     bool HaveShieldedRequirements(const CTransaction& tx) const;
 

@@ -29,6 +29,8 @@ CObfuScationSigner obfuScationSigner;
 // Keep track of the active Zelnode
 ActiveZelnode activeZelnode;
 
+COutPoint zelnodeOutPoint;
+
 bool GetTestingCollateralScript(std::string strAddress, CScript& script)
 {
     if (!IsValidDestinationString(strAddress)) {
@@ -112,7 +114,7 @@ bool CObfuScationSigner::SignMessage(std::string strMessage, std::string& errorM
     return true;
 }
 
-bool CObfuScationSigner::VerifyMessage(CPubKey pubkey, vector<unsigned char>& vchSig, std::string strMessage, std::string& errorMessage)
+bool CObfuScationSigner::VerifyMessage(const CPubKey& pubkey, const vector<unsigned char>& vchSig, const std::string& strMessage, std::string& errorMessage)
 {
     CHashWriter ss(SER_GETHASH, 0);
     ss << strMessageMagic;
@@ -129,6 +131,8 @@ bool CObfuScationSigner::VerifyMessage(CPubKey pubkey, vector<unsigned char>& vc
 
     return (pubkey2.GetID() == pubkey.GetID());
 }
+
+
 
 
 //TODO: Rename/move to core

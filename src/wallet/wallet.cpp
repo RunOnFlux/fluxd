@@ -2973,8 +2973,8 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
             if (pcoin->IsCoinBase() && !fIncludeCoinBase)
                 continue;
 
-            if (pcoin->IsCoinBase() && pcoin->GetBlocksToMaturity() > 0)
-                continue;
+//            if (pcoin->IsCoinBase() && pcoin->GetBlocksToMaturity() > 0)
+//                continue;
 
             int nDepth = pcoin->GetDepthInMainChain();
             if (nDepth < 0)
@@ -3010,8 +3010,8 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                 if (mine == ISMINE_NO)
                     continue;
 
-                if (IsLockedCoin((*it).first, i) && nCoinType != ONLY_10000 && nCoinType != ONLY_25000 && nCoinType != ONLY_100000 && nCoinType != ALL_ZELNODE )
-                    continue;
+//                if (IsLockedCoin((*it).first, i) && nCoinType != ONLY_10000 && nCoinType != ONLY_25000 && nCoinType != ONLY_100000 && nCoinType != ALL_ZELNODE )
+//                    continue;
 
 
                 if (pcoin->vout[i].nValue <= 0 && !fIncludeZeroValue)
@@ -3655,7 +3655,8 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, boost::optional<CReserveKey&>
 
             // Add tx to wallet, because if it has change it's also ours,
             // otherwise just for transaction history.
-            AddToWallet(wtxNew, false, pwalletdb);
+            if (!wtxNew.IsZelnodeTx())
+                AddToWallet(wtxNew, false, pwalletdb);
 
             // Notify that old coins are spent
             set<CWalletTx*> setCoins;
@@ -4501,7 +4502,13 @@ int CMerkleTx::GetBlocksToMaturity() const
 bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectAbsurdFee)
 {
     CValidationState state;
-    return ::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, fRejectAbsurdFee);
+    bool ret = ::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, fRejectAbsurdFee);
+
+    if (!ret) {
+        LogPrintf("Failed to accept to mempool: %s\n", state.GetRejectReason());
+    }
+
+    return ret;
 }
 
 /**

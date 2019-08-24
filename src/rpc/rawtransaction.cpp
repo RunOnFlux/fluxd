@@ -20,6 +20,7 @@
 #include "script/sign.h"
 #include "script/standard.h"
 #include "uint256.h"
+#include "zelnode/zelnode.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif
@@ -151,27 +152,48 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry)
 {
     const uint256 txid = tx.GetHash();
     entry.push_back(Pair("txid", txid.GetHex()));
-    entry.push_back(Pair("overwintered", tx.fOverwintered));
     entry.push_back(Pair("version", tx.nVersion));
-    if (tx.fOverwintered) {
-        entry.push_back(Pair("versiongroupid", HexInt(tx.nVersionGroupId)));
-    }
-    entry.push_back(Pair("locktime", (int64_t)tx.nLockTime));
-    if (tx.fOverwintered) {
-        entry.push_back(Pair("expiryheight", (int64_t)tx.nExpiryHeight));
-    }
-    UniValue vin(UniValue::VARR);
-    BOOST_FOREACH(const CTxIn& txin, tx.vin) {
-        UniValue in(UniValue::VOBJ);
-        if (tx.IsCoinBase())
-            in.push_back(Pair("coinbase", HexStr(txin.scriptSig.begin(), txin.scriptSig.end())));
-        else {
-            in.push_back(Pair("txid", txin.prevout.hash.GetHex()));
-            in.push_back(Pair("vout", (int64_t)txin.prevout.n));
-            UniValue o(UniValue::VOBJ);
-            o.push_back(Pair("asm", ScriptToAsmStr(txin.scriptSig, true)));
-            o.push_back(Pair("hex", HexStr(txin.scriptSig.begin(), txin.scriptSig.end())));
-            in.push_back(Pair("scriptSig", o));
+
+    if (tx.IsZelnodeTx()) {
+        entry.push_back(Pair("type", tx.TypeToString()));
+        entry.push_back(Pair("collatoral_output", tx.collatoralOut.ToString()));
+        entry.push_back(Pair("sigtime", tx.sigTime));
+        entry.push_back(Pair("sig", EncodeBase64(&tx.sig[0], tx.sig.size())));
+
+        if (tx.nType & ZELNODE_START_TX_TYPE) {
+            entry.push_back(Pair("collatoral_pubkey", EncodeBase64(tx.collatoralPubkey.begin(), tx.collatoralPubkey.size())));
+            entry.push_back(Pair("zelnode_pubkey", EncodeBase64(tx.pubKey.begin(), tx.pubKey.size())));
+            entry.push_back(Pair("ip", tx.ip));
+        }
+
+        if (tx.nType & ZELNODE_CONFIRM_TX_TYPE) {
+            entry.push_back(Pair("update_type", tx.benchmarkSigTime));
+            entry.push_back(Pair("benchmark_tier", TierToString(tx.benchmarkTier)));
+            entry.push_back(Pair("benchmark_sigtime", tx.benchmarkSigTime));
+            entry.push_back(Pair("benchmark_sig", EncodeBase64(&tx.benchmarkSig[0], tx.benchmarkSig.size())));
+        }
+    } else {
+        entry.push_back(Pair("overwintered", tx.fOverwintered));
+
+        if (tx.fOverwintered) {
+            entry.push_back(Pair("versiongroupid", HexInt(tx.nVersionGroupId)));
+        }
+        entry.push_back(Pair("locktime", (int64_t) tx.nLockTime));
+        if (tx.fOverwintered) {
+            entry.push_back(Pair("expiryheight", (int64_t) tx.nExpiryHeight));
+        }
+        UniValue vin(UniValue::VARR);
+        BOOST_FOREACH(const CTxIn &txin, tx.vin) {
+                        UniValue in(UniValue::VOBJ);
+                        if (tx.IsCoinBase())
+                            in.push_back(Pair("coinbase", HexStr(txin.scriptSig.begin(), txin.scriptSig.end())));
+                        else {
+                            in.push_back(Pair("txid", txin.prevout.hash.GetHex()));
+                            in.push_back(Pair("vout", (int64_t) txin.prevout.n));
+                            UniValue o(UniValue::VOBJ);
+                            o.push_back(Pair("asm", ScriptToAsmStr(txin.scriptSig, true)));
+                            o.push_back(Pair("hex", HexStr(txin.scriptSig.begin(), txin.scriptSig.end())));
+                            in.push_back(Pair("scriptSig", o));
 
             // Add address and value info if spentindex enabled
             CSpentIndexValue spentInfo;

@@ -214,7 +214,7 @@ void ZelnodeSync::Process()
         return;
     }
 
-    LogPrintf("%s::Process -- Tick %d nCurrentAsset %d\n", __func__, tick, RequestedZelnodeAssets);
+//    LogPrintf("%s::Process -- Tick %d nCurrentAsset %d\n", __func__, tick, RequestedZelnodeAssets);
 
     if (RequestedZelnodeAssets == ZELNODE_SYNC_INITIAL) GetNextAsset();
 

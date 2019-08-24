@@ -544,10 +544,11 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     if (IsInitialBlockDownload(Params()))
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Zelcash is downloading blocks...");
 
-    // when enforcement is on we need information about a zelnode payee or otherwise our block is going to be orphaned by the network
-    if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)
-        && !zelnodeSync.IsZelnodeWinnersSynced())
-        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Zelcash is downloading zelnode winners...");
+    if (chainActive.Tip()->nHeight + 1 < Params().StartZelnodePayments()) {    // when enforcement is on we need information about a zelnode payee or otherwise our block is going to be orphaned by the network
+        if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)
+            && !zelnodeSync.IsZelnodeWinnersSynced())
+            throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Zelcash is downloading zelnode winners...");
+    }
 
     static unsigned int nTransactionsUpdatedLast;
 
@@ -596,8 +597,6 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
             throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Shutting down");
         // TODO: Maybe recheck connections/IBD and (if something wrong) send an expires-immediately template to stop miners?
     }
-
-
 
     // Update block
     static CBlockIndex* pindexPrev;

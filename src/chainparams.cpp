@@ -195,9 +195,14 @@ public:
         fTestnetToBeDeprecatedFieldRPC = false;
 
         strSporkKey = "04f5382d5868ae49aedfd67efce7c0f56a66a9405a2cc13f8ef236aabb3f0f1d00031f9b9ca67edc93044918a1cf265655108bab531e94c7d48918e40a94a34f77";
-        nStartZelnodePayments = 1550748576; //Thu, 21 Feb 2019 11:29:36 UTC // Not being used, but could be in the future
         networkID = CBaseChainParams::Network::MAIN;
         strZelnodeTestingDummyAddress= "t1Ub8iNuaoCAKTaiVyCh8d3iZ31QJFxnGzU";
+
+        // TODO update with deterministic start payout height
+        nStartZelnodePaymentsHeight = 5000000; // Start paying deterministic zelnodes on height
+
+        // TODO update with mainnet benchmarking public key
+        strBenchmarkingPublicKey = "044c09cb66c6bbb91e015aaff03707db7dc43b3dcd2fafeedb746a569e279cf63b28c6e2c01f6458c5e50bbefa3f3ebdafcc0ba02c77965ac1d5080becc42f35f1";
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
@@ -234,17 +239,17 @@ public:
         strCurrencyUnits = "TESTZEL";
         bip44CoinType = 1;
         consensus.fCoinbaseMustBeProtected = true;
-        consensus.nSubsidySlowStartInterval = 5000;
+        consensus.nSubsidySlowStartInterval = 1;
         consensus.nSubsidyHalvingInterval = 655350; // 2.5 years
         consensus.nMajorityEnforceBlockUpgrade = 51;
         consensus.nMajorityRejectBlockOutdated = 75;
         consensus.nMajorityWindow = 400;
-        consensus.powLimit = uint256S("07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        consensus.powLimit = uint256S("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nDigishieldAveragingWindow = 17;
-        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
+//        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
-        consensus.nPowAllowMinDifficultyBlocksAfterHeight = 299187;
+        consensus.nPowAllowMinDifficultyBlocksAfterHeight = 1;
         consensus.nPowTargetSpacing = 2 * 60;
 
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
@@ -271,8 +276,8 @@ public:
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 10;
 
-	    //eh_epoch_1 = eh96_5;
-    eh_epoch_1 = eh200_9;
+	    eh_epoch_1 = eh96_5;
+//        eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
         eh_epoch_3 = zelHash;
 
@@ -335,17 +340,15 @@ public:
         fMineBlocksOnDemand = false;
         fTestnetToBeDeprecatedFieldRPC = true;
         strSporkKey = "0408c6a3a6cacb673fc38f27c75d79c865e1550441ea8b5295abf21116972379a1b49416da07b7d9b40fb9daf8124f309c608dfc79756a5d3c2a957435642f7f1a";
-        nStartZelnodePayments = 1550748576; //Thu, 21 Feb 2019 11:29:36 UTC // Currently not being used.
         networkID = CBaseChainParams::Network::TESTNET;
         strZelnodeTestingDummyAddress= "tmXxZqbmvrxeSFQsXmm4N9CKyME767r47fS";
-
-
+        strBenchmarkingPublicKey = "04cf3c34f01486bbb34c1a7ca11c2ddb1b3d98698c3f37d54452ff91a8cd5e92a6910ce5fc2cc7ad63547454a965df53ff5be740d4ef4ac89848c2bafd1e40e6b7";
+        nStartZelnodePaymentsHeight = 20; // Start paying deterministic zelnodes on height 20
 
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
-            (0, consensus.hashGenesisBlock)
-            (3, uint256S("0x07e441f9f675fc69c5567f6470bdce27b9a9bcff3c25cea1f93a401157544660")),
+            (0, consensus.hashGenesisBlock),
             1560190235,  // * UNIX timestamp of last checkpoint block
             0,           // * total number of transactions between genesis and last checkpoint
                          //   (the tx=... number in the SetBestChain debug.log lines)
@@ -450,6 +453,7 @@ public:
         fTestnetToBeDeprecatedFieldRPC = false;
 
         networkID = CBaseChainParams::Network::REGTEST;
+        strBenchmarkingPublicKey = "04cf3c34f01486bbb34c1a7ca11c2ddb1b3d98698c3f37d54452ff91a8cd5e92a6910ce5fc2cc7ad63547454a965df53ff5be740d4ef4ac89848c2bafd1e40e6b7";
 
         checkpointData = (CCheckpointData){
             boost::assign::map_list_of

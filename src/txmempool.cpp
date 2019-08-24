@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
+#include <zelnode/zelnode.h>
 #include "txmempool.h"
 
 #include "clientversion.h"
@@ -295,6 +296,11 @@ void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction>& rem
         for (CTransaction tx : removed) {
             weightedTxTree->remove(tx.GetHash());
         }
+
+        if (origTx.IsZelnodeTx()) {
+            LogPrintf("%s: Remove zelnode tx from mempool %s\n", __func__, origTx.GetHash().GetHex());
+            mapZelnodeTxMempool.erase(origTx.collatoralOut);
+        }
     }
 }
 
@@ -433,23 +439,50 @@ void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx, unsigned i
 {
     LOCK(cs);
     std::vector<CTxMemPoolEntry> entries;
+    std::vector<CTransaction> trans;
     BOOST_FOREACH(const CTransaction& tx, vtx)
     {
         uint256 hash = tx.GetHash();
 
         indexed_transaction_set::iterator i = mapTx.find(hash);
-        if (i != mapTx.end())
-            entries.push_back(*i);
+
+        if (tx.IsZelnodeTx()) {
+            if (mapZelnodeTxMempool.count(tx.collatoralOut)){
+                i = mapTx.find(mapZelnodeTxMempool.at(tx.collatoralOut));
+
+                if (i != mapTx.end()) {
+                    entries.push_back(*i);
+                    trans.emplace_back(i->GetTx());
+                }
+            }
+        } else {
+            if (i != mapTx.end())
+                entries.push_back(*i);
+        }
     }
+
     BOOST_FOREACH(const CTransaction& tx, vtx)
     {
         std::list<CTransaction> dummy;
         remove(tx, dummy, false);
         removeConflicts(tx, conflicts);
+
         ClearPrioritisation(tx.GetHash());
     }
     // After the txs in the new block have been removed from the mempool, update policy estimates
     minerPolicyEstimator->processBlock(nBlockHeight, entries, fCurrentEstimate);
+
+    for (auto tx : trans)
+    {
+        indexed_transaction_set::iterator it = mapTx.find(tx.GetHash());
+        if (it != mapTx.end()) {
+            std::list<CTransaction> dummy;
+            remove(tx, dummy, false);
+        }
+        std::list<CTransaction> dummy;
+        removeConflicts(tx, dummy);
+        ClearPrioritisation(tx.GetHash());
+    }
 }
 
 /**
@@ -482,6 +515,8 @@ void CTxMemPool::clear()
     totalTxSize = 0;
     cachedInnerUsage = 0;
     ++nTransactionsUpdated;
+
+    mapZelnodeTxMempool.clear();
 }
 
 void CTxMemPool::check(const CCoinsViewCache *pcoins) const
