@@ -11,6 +11,9 @@ Miles Manley (3)
       Upstreamed and Zcash ported changes
       Versioning and release notes
 
+Jules "Coinblockers" (1)
+        Fix untar ownership fail in containerized environments
+
 Changlog - Zcash 2.0.6
 =========
 Daira Hopwood (3):
