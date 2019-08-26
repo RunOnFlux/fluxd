@@ -319,13 +319,12 @@ public:
 typedef std::map<JSOutPoint, SproutNoteData> mapSproutNoteData_t;
 typedef std::map<SaplingOutPoint, SaplingNoteData> mapSaplingNoteData_t;
 
-/** Sprout note, its location in a transaction, and number of confirmations. */
-struct SproutNoteEntry
+/** Decrypted note, its location in a transaction, and number of confirmations. */
+struct CSproutNotePlaintextEntry
 {
     JSOutPoint jsop;
     libzelcash::SproutPaymentAddress address;
-    libzelcash::SproutNote note;
-    std::array<unsigned char, ZC_MEMO_SIZE> memo;
+    libzelcash::SproutNotePlaintext plaintext;
     int confirmations;
 };
 
@@ -412,11 +411,11 @@ public:
     mapSaplingNoteData_t mapSaplingNoteData;
     std::vector<std::pair<std::string, std::string> > vOrderForm;
     unsigned int fTimeReceivedIsTxTime;
-    unsigned int nTimeReceived; //!< time received by this node
+    unsigned int nTimeReceived; //! time received by this node
     unsigned int nTimeSmart;
     char fFromMe;
     std::string strFromAccount;
-    int64_t nOrderPos; //!< position in ordered transaction list
+    int64_t nOrderPos; //! position in ordered transaction list
 
     // memory only
     mutable bool fDebitCached;
@@ -510,7 +509,7 @@ public:
         }
 
         READWRITE(*(CMerkleTx*)this);
-        std::vector<CMerkleTx> vUnused; //!< Used to be vtxPrev
+        std::vector<CMerkleTx> vUnused; //! Used to be vtxPrev
         READWRITE(vUnused);
         READWRITE(mapValue);
         READWRITE(mapSproutNoteData);
@@ -656,7 +655,7 @@ public:
     std::string strOtherAccount;
     std::string strComment;
     mapValue_t mapValue;
-    int64_t nOrderPos; //!< position in ordered transaction list
+    int64_t nOrderPos;  //! position in ordered transaction list
     uint64_t nEntryNo;
 
     CAccountingEntry()
@@ -1309,7 +1308,7 @@ public:
     bool LoadCryptedHDSeed(const uint256& seedFp, const std::vector<unsigned char>& seed);
 
     /* Find notes filtered by payment address, min depth, ability to spend */
-    void GetFilteredNotes(std::vector<SproutNoteEntry>& sproutEntries,
+    void GetFilteredNotes(std::vector<CSproutNotePlaintextEntry>& sproutEntries,
                           std::vector<SaplingNoteEntry>& saplingEntries,
                           std::string address,
                           int minDepth=1,
@@ -1318,7 +1317,7 @@ public:
 
     /* Find notes filtered by payment addresses, min depth, max depth, if they are spent,
        if a spending key is required, and if they are locked */
-    void GetFilteredNotes(std::vector<SproutNoteEntry>& sproutEntries,
+    void GetFilteredNotes(std::vector<CSproutNotePlaintextEntry>& sproutEntries,
                           std::vector<SaplingNoteEntry>& saplingEntries,
                           std::set<libzelcash::PaymentAddress>& filterAddresses,
                           int minDepth=1,

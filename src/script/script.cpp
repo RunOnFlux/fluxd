@@ -242,14 +242,14 @@ bool CScript::IsPushOnly() const
 }
 
 // insightexplorer
-CScript::ScriptType CScript::GetType() const
+int CScript::Type() const
 {
     if (this->IsPayToPublicKeyHash())
-        return CScript::P2PKH;
+        return 1;
     if (this->IsPayToScriptHash())
-        return CScript::P2SH;
+        return 2;
     // We don't know this script
-    return CScript::UNKNOWN;
+    return 0;
 }
 
 // insightexplorer

@@ -1031,7 +1031,7 @@ bool AsyncRPCOperation_sendmany::find_utxos(bool fAcceptCoinbase=false) {
 
 
 bool AsyncRPCOperation_sendmany::find_unspent_notes() {
-    std::vector<SproutNoteEntry> sproutEntries;
+    std::vector<CSproutNotePlaintextEntry> sproutEntries;
     std::vector<SaplingNoteEntry> saplingEntries;
     {
         LOCK2(cs_main, pwalletMain->cs_wallet);
@@ -1047,15 +1047,15 @@ bool AsyncRPCOperation_sendmany::find_unspent_notes() {
         saplingEntries.clear();
     }
 
-    for (SproutNoteEntry & entry : sproutEntries) {
-        z_sprout_inputs_.push_back(SendManyInputJSOP(entry.jsop, entry.note, CAmount(entry.note.value())));
-        std::string data(entry.memo.begin(), entry.memo.end());
+    for (CSproutNotePlaintextEntry & entry : sproutEntries) {
+        z_sprout_inputs_.push_back(SendManyInputJSOP(entry.jsop, entry.plaintext.note(boost::get<libzelcash::SproutPaymentAddress>(frompaymentaddress_)), CAmount(entry.plaintext.value())));
+        std::string data(entry.plaintext.memo().begin(), entry.plaintext.memo().end());
         LogPrint("zrpcunsafe", "%s: found unspent Sprout note (txid=%s, vjoinsplit=%d, jsoutindex=%d, amount=%s, memo=%s)\n",
             getId(),
             entry.jsop.hash.ToString().substr(0, 10),
             entry.jsop.js,
             int(entry.jsop.n),  // uint8_t
-            FormatMoney(entry.note.value()),
+            FormatMoney(entry.plaintext.value()),
             HexStr(data).substr(0, 10)
             );
     }

@@ -3,7 +3,6 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "chainparams.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "main.h"
@@ -215,7 +214,7 @@ static bool rest_block(HTTPRequest* req,
         if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
             return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not available (pruned data)");
 
-        if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+        if (!ReadBlockFromDisk(block, pblockindex))
             return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
     }
 
@@ -356,7 +355,7 @@ static bool rest_tx(HTTPRequest* req, const std::string& strURIPart)
 
     CTransaction tx;
     uint256 hashBlock = uint256();
-    if (!GetTransaction(hash, tx, Params().GetConsensus(), hashBlock, true))
+    if (!GetTransaction(hash, tx, hashBlock, true))
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
 
     CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);

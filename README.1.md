@@ -1,9 +1,6 @@
-# Zel 3.3.0 Kamiooka - ZelHash - Mandatory Upgrade to 3.3.0 [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
+Zel 3.2.0 Kamiooka - ZelHash
+===========
 <img align="right" height=112 width=562 src="doc/imgs/Kamiooka.png">
-
-## Mandatory Upgrade - Activation: 372,500 ≈ July 2nd 2019
-
-## Mandatory Upgrade to version 3.3.0 - Difficulty algorithm adjustment fix 
 
 What is Zel?
 --------------
@@ -17,10 +14,10 @@ For ZelNodes/Control Wallets you need to use this bootstrap with txindex enabled
 
 
 <p align="center">
-  <img src="doc/imgs/mandatory-kamiooka.png" height=500 >
+  <img src="doc/imgs/Kamiooka.png">
 </p>
 
-## :rocket: Getting Started
+## Getting Started
 
 Please see our [user guide](https://zel.gitbook.io/zeldocs/) for any and all info.
 
@@ -28,7 +25,7 @@ Please see our [user guide](https://zel.gitbook.io/zeldocs/) for any and all inf
 
 * :blue_book: See the documentation at the [Zel GitBook](https://zel.gitbook.io/zelcurrency/installing-zel-daemon)
   for help and more information.
-* :mag: Join us on [Discord.io/Zel](https://discord.io/zel) for support and to join the community conversation. 
+* :mag: Join us on [Discord.io/Zel](https://chat.zcashcommunity.com/channel/user-support) for support and to join the community conversation. 
 
 ### Building
 

@@ -206,7 +206,7 @@ UniValue generate(const UniValue& params, bool fHelp)
             unsigned int k = ehparams[0].k;
     while (nHeight < nHeightEnd)
     {
-        std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(Params(), coinbaseScript->reserveScript));
+        std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(coinbaseScript->reserveScript));
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         CBlock *pblock = &pblocktemplate->block;
@@ -254,7 +254,7 @@ UniValue generate(const UniValue& params, bool fHelp)
         }
 endloop:
         CValidationState state;
-        if (!ProcessNewBlock(state, Params(), NULL, pblock, true, NULL))
+        if (!ProcessNewBlock(state, NULL, pblock, true, NULL))
             throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
         ++nHeight;
         blockHashes.push_back(pblock->GetHash().GetHex());
@@ -530,7 +530,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
             if (block.hashPrevBlock != pindexPrev->GetBlockHash())
                 return "inconclusive-not-best-prevblk";
             CValidationState state;
-            TestBlockValidity(state, Params(), block, pindexPrev, false, true);
+            TestBlockValidity(state, block, pindexPrev, false, true);
             return BIP22ValidationResult(state);
         }
     }
@@ -541,7 +541,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     if (vNodes.empty())
         throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Zelcash is not connected!");
 
-    if (IsInitialBlockDownload(Params()))
+    if (IsInitialBlockDownload())
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Zelcash is downloading blocks...");
 
     // when enforcement is on we need information about a zelnode payee or otherwise our block is going to be orphaned by the network
@@ -634,7 +634,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         if (!coinbaseScript->reserveScript.size())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet or -mineraddress)");
 
-        pblocktemplate = CreateNewBlock(Params(), coinbaseScript->reserveScript, &mapZelnodePayouts);
+        pblocktemplate = CreateNewBlock(coinbaseScript->reserveScript, &mapZelnodePayouts);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -818,7 +818,7 @@ UniValue submitblock(const UniValue& params, bool fHelp)
     CValidationState state;
     submitblock_StateCatcher sc(block.GetHash());
     RegisterValidationInterface(&sc);
-    bool fAccepted = ProcessNewBlock(state, Params(), NULL, &block, true, NULL);
+    bool fAccepted = ProcessNewBlock(state, NULL, &block, true, NULL);
     UnregisterValidationInterface(&sc);
     if (fBlockPresent)
     {

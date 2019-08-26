@@ -216,7 +216,7 @@ unsigned int Lwma3CalculateNextWorkRequired(const CBlockIndex* pindexLast, const
     return nextTarget.GetCompact();
 }
 
-bool CheckEquihashSolution(const CBlockHeader *pblock, const Consensus::Params& params)
+bool CheckEquihashSolution(const CBlockHeader *pblock, const CChainParams& params)
 {
     //Set parameters N,K from solution size. Filtering of valid parameters
     //for the givenblock height will be carried out in main.cpp/ContextualCheckBlockHeader
