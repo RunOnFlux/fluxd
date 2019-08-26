@@ -1,14 +1,14 @@
-# Zel 3.3.0 Kamiooka - ZelHash - Mandatory Upgrade to 3.3.0 [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
+# Zel 3.3.1 Kamiooka [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
 <img align="right" height=112 width=562 src="doc/imgs/Kamiooka.png">
 
 ## Mandatory Upgrade - Activation: 372,500 ≈ July 2nd 2019
 
-## Mandatory Upgrade to version 3.3.0 - Difficulty algorithm adjustment fix 
+## Mandatory Upgrade to version 3.3.1 - Difficulty algorithm adjustment fix 
 
 What is Zel?
 --------------
 
-[Zel](https://zel.network/) is a fork of 2.0.5-2 Zcash aiming to provide a decentralized development platform via ZelNodes, ZelCore and more.
+[Zel](https://zel.network/) is a fork of 2.0.6 Zcash aiming to provide a decentralized development platform via ZelNodes, ZelCore and more.
 
 Zel is PoW asic resistant with ZelHash (Modified Equihash 125,4) with the personalisation string ZelProof and LWMA3 difficulty algorithm.
 
