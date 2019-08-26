@@ -221,7 +221,7 @@ double benchmark_verify_equihash()
     CBlockHeader genesis_header = genesis.GetBlockHeader();
     struct timeval tv_start;
     timer_start(tv_start);
-    CheckEquihashSolution(&genesis_header, params.GetConsensus());
+    CheckEquihashSolution(&genesis_header, params);
     return timer_stop(tv_start);
 }
 
@@ -555,7 +555,7 @@ double benchmark_connectblock_slow()
     CValidationState state;
     struct timeval tv_start;
     timer_start(tv_start);
-    assert(ConnectBlock(block, state, &index, view, Params(), true));
+    assert(ConnectBlock(block, state, &index, view, true));
     auto duration = timer_stop(tv_start);
 
     // Undo alterations to global state

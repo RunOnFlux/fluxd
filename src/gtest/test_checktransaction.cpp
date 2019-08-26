@@ -167,7 +167,7 @@ TEST(checktransaction_tests, BadTxnsOversize) {
 
         // ... but fails contextual ones!
         EXPECT_CALL(state, DoS(100, false, REJECT_INVALID, "bad-txns-oversize", false)).Times(1);
-        EXPECT_FALSE(ContextualCheckTransaction(tx, state, Params(), 1, 100));
+        EXPECT_FALSE(ContextualCheckTransaction(tx, state, 1, 100));
     }
 
     {
@@ -188,7 +188,7 @@ TEST(checktransaction_tests, BadTxnsOversize) {
 
         MockCValidationState state;
         EXPECT_TRUE(CheckTransactionWithoutProofVerification(tx, state));
-        EXPECT_TRUE(ContextualCheckTransaction(tx, state, Params(), 1, 100));
+        EXPECT_TRUE(ContextualCheckTransaction(tx, state, 1, 100));
 
         // Revert to default
         RegtestDeactivateAcadia();
@@ -496,7 +496,6 @@ TEST(checktransaction_tests, bad_txns_prevout_null) {
 
 TEST(checktransaction_tests, bad_txns_invalid_joinsplit_signature) {
     SelectParams(CBaseChainParams::REGTEST);
-    auto chainparams = Params();
 
     CMutableTransaction mtx = GetValidTransaction();
     mtx.joinSplitSig[0] += 1;
@@ -505,14 +504,13 @@ TEST(checktransaction_tests, bad_txns_invalid_joinsplit_signature) {
     MockCValidationState state;
     // during initial block download, DoS ban score should be zero, else 100
     EXPECT_CALL(state, DoS(0, false, REJECT_INVALID, "bad-txns-invalid-joinsplit-signature", false)).Times(1);
-    ContextualCheckTransaction(tx, state, chainparams, 0, 100, [](const CChainParams&) { return true; });
+    ContextualCheckTransaction(tx, state, 0, 100, []() { return true; });
     EXPECT_CALL(state, DoS(100, false, REJECT_INVALID, "bad-txns-invalid-joinsplit-signature", false)).Times(1);
-    ContextualCheckTransaction(tx, state, chainparams, 0, 100, [](const CChainParams&) { return false; });
+    ContextualCheckTransaction(tx, state, 0, 100, []() { return false; });
 }
 
 TEST(checktransaction_tests, non_canonical_ed25519_signature) {
     SelectParams(CBaseChainParams::REGTEST);
-    auto chainparams = Params();
 
     CMutableTransaction mtx = GetValidTransaction();
 
@@ -520,7 +518,7 @@ TEST(checktransaction_tests, non_canonical_ed25519_signature) {
     {
         CTransaction tx(mtx);
         MockCValidationState state;
-        EXPECT_TRUE(ContextualCheckTransaction(tx, state, chainparams, 0, 100));
+        EXPECT_TRUE(ContextualCheckTransaction(tx, state, 0, 100));
     }
 
     // Copied from libsodium/crypto_sign/ed25519/ref10/open.c
@@ -542,9 +540,9 @@ TEST(checktransaction_tests, non_canonical_ed25519_signature) {
     MockCValidationState state;
     // during initial block download, DoS ban score should be zero, else 100
     EXPECT_CALL(state, DoS(0, false, REJECT_INVALID, "bad-txns-invalid-joinsplit-signature", false)).Times(1);
-    ContextualCheckTransaction(tx, state, chainparams, 0, 100, [](const CChainParams&) { return true; });
+    ContextualCheckTransaction(tx, state, 0, 100, []() { return true; });
     EXPECT_CALL(state, DoS(100, false, REJECT_INVALID, "bad-txns-invalid-joinsplit-signature", false)).Times(1);
-    ContextualCheckTransaction(tx, state, chainparams, 0, 100, [](const CChainParams&) { return false; });
+    ContextualCheckTransaction(tx, state, 0, 100, []() { return false; });
 }
 
 TEST(checktransaction_tests, OverwinterConstructors) {
@@ -798,8 +796,8 @@ TEST(checktransaction_tests, OverwinterVersionNumberHigh) {
 
     UNSAFE_CTransaction tx(mtx);
     MockCValidationState state;
-    EXPECT_CALL(state, DoS(0, false, REJECT_INVALID, "bad-sapling-tx-version-group-id", false)).Times(1); // check this might need to be "bad-tx-overwinter-version-too-high"
-    ContextualCheckTransaction(tx, state, Params(), 1, 100);
+    EXPECT_CALL(state, DoS(0, false, REJECT_INVALID, "bad-sapling-tx-version-group-id", false)).Times(1);
+    ContextualCheckTransaction(tx, state, 1, 100);
 
     // Revert to default
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
@@ -824,7 +822,6 @@ TEST(checktransaction_tests, OverwinterBadVersionGroupId) {
 // This tests an Overwinter transaction checked against Sprout
 TEST(checktransaction_tests, OverwinterNotActive) {
     SelectParams(CBaseChainParams::TESTNET);
-    auto chainparams = Params();
 
     CMutableTransaction mtx = GetValidTransaction();
     mtx.fOverwintered = true;
@@ -836,9 +833,9 @@ TEST(checktransaction_tests, OverwinterNotActive) {
     MockCValidationState state;
     // during initial block download, DoS ban score should be zero, else 100
     EXPECT_CALL(state, DoS(0, false, REJECT_INVALID, "tx-overwinter-not-active", false)).Times(1);
-    ContextualCheckTransaction(tx, state, chainparams, 1, 100, [](const CChainParams&) { return true; });
+    ContextualCheckTransaction(tx, state, 1, 100, []() { return true; });
     EXPECT_CALL(state, DoS(100, false, REJECT_INVALID, "tx-overwinter-not-active", false)).Times(1);
-    ContextualCheckTransaction(tx, state, chainparams, 1, 100, [](const CChainParams&) { return false; });
+    ContextualCheckTransaction(tx, state, 1, 100, []() { return false; });
 }
 
 // This tests a transaction without the fOverwintered flag set, against the Overwinter consensus rule set.
@@ -855,7 +852,7 @@ TEST(checktransaction_tests, OverwinterFlagNotSet) {
     CTransaction tx(mtx);
     MockCValidationState state;
     EXPECT_CALL(state, DoS(100, false, REJECT_INVALID, "tx-overwintered-flag-not-set", false)).Times(1);
-    ContextualCheckTransaction(tx, state, Params(), 1, 100);
+    ContextualCheckTransaction(tx, state, 1, 100);
 
     // Revert to default
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);

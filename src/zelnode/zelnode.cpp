@@ -617,7 +617,7 @@ bool ZelnodeBroadcast::CheckInputsAndAdd(int& nDoS)
     // should be at least not earlier than block when 10000, 25000, 100000 ZEL tx got ZELNODE_MIN_CONFIRMATIONS
     uint256 hashBlock = uint256();
     CTransaction tx2;
-    GetTransaction(vin.prevout.hash, tx2, Params().GetConsensus(), hashBlock, true);
+    GetTransaction(vin.prevout.hash, tx2, hashBlock, true);
     BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
     if (mi != mapBlockIndex.end() && (*mi).second) {
         CBlockIndex* pZNIndex = (*mi).second;                                                        // block for 10000, 25000, 100000 ZEL tx -> 1 confirmation
