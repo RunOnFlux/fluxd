@@ -5,6 +5,7 @@ Tadeas Kmenta (9)
 Wilke Trei (7)
 Jeremy Anderson (7)
 Miles Manley (7)
+Jules 'Coinblockers' (1)
 
 Zcash Contributors
 ==================
