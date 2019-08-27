@@ -39,7 +39,7 @@ class SproutSaplingMigration(BitcoinTestFramework):
     def setup_nodes(self):
         # Activate overwinter/sapling on all nodes
         extra_args = [[
-            '-nuparams=5ba81b19:100',  # Overwinter
+            '-nuparams=76b809bb:100',  # Overwinter
             '-nuparams=76b809bb:100',  # Sapling
         ]] * 4
         # Add migration parameters to nodes[0]
@@ -105,13 +105,24 @@ class SproutSaplingMigration(BitcoinTestFramework):
         self.sync_all()
 
         # At 499 % 500 there will be a transaction in the mempool and the note will be locked
-        assert_equal(1, len(node.getrawmempool()), "mempool size at 499 % 500")
+        mempool = node.getrawmempool()
+        print("mempool: {}".format(mempool))
+        assert_equal(1, len(mempool), "mempool size at 499 % 500")
         assert_equal(node.z_getbalance(sproutAddr), Decimal('0'))
         assert_equal(node.z_getbalance(saplingAddr), Decimal('0'))
         assert_true(node.z_getbalance(saplingAddr, 0) > Decimal('0'), "Unconfirmed sapling balance at 499 % 500")
         # Check that unmigrated amount + unfinalized = starting balance - fee
         status = node.z_getmigrationstatus()
+        print("status: {}".format(status))
         assert_equal(Decimal('9.9999'), Decimal(status['unmigrated_amount']) + Decimal(status['unfinalized_migrated_amount']))
+
+        # The transaction in the mempool should be the one listed in migration_txids,
+        # and it should expire at the next 450 % 500.
+        assert_equal(1, len(status['migration_txids']))
+        txid = status['migration_txids'][0]
+        assert_equal(txid, mempool[0])
+        tx = node.getrawtransaction(txid, 1)
+        assert_equal(target_height + 450, tx['expiryheight'])
 
         node.generate(1)
         self.sync_all()
@@ -135,7 +146,7 @@ class SproutSaplingMigration(BitcoinTestFramework):
         assert_equal(sapling_balance, Decimal(status['finalized_migrated_amount']))
 
     def send_to_sprout_zaddr(self, tAddr, sproutAddr):
-        # Send some ZEL to a Sprout address
+        # Send some ZEC to a Sprout address
         opid = self.nodes[0].z_sendmany(tAddr, [{"address": sproutAddr, "amount": Decimal('10')}], 1, 0)
         wait_and_assert_operationid_status(self.nodes[0], opid)
         self.nodes[0].generate(1)
