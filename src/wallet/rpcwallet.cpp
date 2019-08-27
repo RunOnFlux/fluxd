@@ -3992,9 +3992,9 @@ UniValue z_getmigrationstatus(const UniValue& params, bool fHelp) {
         // * one or more Sprout JoinSplits with nonzero vpub_new field; and
         // * no Sapling Spends, and;
         // * one or more Sapling Outputs.
-        if (tx.vjoinsplit.size() > 0 && tx.vShieldedSpend.empty() && tx.vShieldedOutput.size() > 0) {
+        if (tx.vJoinSplit.size() > 0 && tx.vShieldedSpend.empty() && tx.vShieldedOutput.size() > 0) {
             bool nonZeroVPubNew = false;
-            for (const auto& js : tx.vjoinsplit) {
+            for (const auto& js : tx.vJoinSplit) {
                 if (js.vpub_new > 0) {
                     nonZeroVPubNew = true;
                     break;
