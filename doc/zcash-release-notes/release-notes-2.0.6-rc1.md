@@ -1,21 +1,6 @@
-Zel Changelog - Zel 3.3.1
-===============
-
-Blondfrogs (3):
-      Update zelnode sync parameters
-      Use params constraints where needed
-      Add RPC function to rescan blockchain
-
-Miles Manley (3)
-      Sprout to Sapling Migration tool
-      Upstreamed and Zcash ported changes
-      Versioning and release notes
-
-Jules "Coinblockers" (1)
-        Fix untar ownership fail in containerized environments
-
-Changlog - Zcash 2.0.6
+Changelog
 =========
+
 Daira Hopwood (3):
       Closes #3992. Remove obsolete warning message.
       make-release.py: Versioning changes for 2.0.6-rc1.
@@ -74,3 +59,4 @@ face (2):
 
 Benjamin Winston (1):
       Fixes #4013, added BitcoinABC as a disclosure partner
+

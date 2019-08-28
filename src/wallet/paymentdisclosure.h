@@ -75,7 +75,7 @@ struct PaymentDisclosurePayload {
     uint8_t version;        // 0 = experimental, 1 = first production version, etc.
     uint256 esk;            // zelcash/NoteEncryption.cpp
     uint256 txid;           // primitives/transaction.h
-    uint64_t js;            // Index into CTransaction.vjoinsplit
+    uint64_t js;            // Index into CTransaction.vJoinSplit
     uint8_t n;              // Index into JSDescription fields of length ZC_NUM_JS_OUTPUTS
 
     libzelcash::SproutPaymentAddress zaddr; // zelcash/Address.hpp

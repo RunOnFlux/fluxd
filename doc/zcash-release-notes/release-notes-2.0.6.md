@@ -1,28 +1,50 @@
-Zel Changelog - Zel 3.3.1
+Notable changes
 ===============
 
-Blondfrogs (3):
-      Update zelnode sync parameters
-      Use params constraints where needed
-      Add RPC function to rescan blockchain
+Debian Stretch is now a Supported Platform
+------------------------------------------
 
-Miles Manley (3)
-      Sprout to Sapling Migration tool
-      Upstreamed and Zcash ported changes
-      Versioning and release notes
+We now provide reproducible builds for Stretch as well as for Jessie.
 
-Jules "Coinblockers" (1)
-        Fix untar ownership fail in containerized environments
 
-Changlog - Zcash 2.0.6
+Fixed a bug in ``z_mergetoaddress``
+-----------------------------------
+
+We fixed a bug which prevented users sending from ``ANY_SPROUT`` or ``ANY_SAPLING``
+with ``z_mergetoaddress`` when a wallet contained both Sprout and Sapling notes.
+
+
+Insight Explorer
+----------------
+
+We have been incorporating changes to support the Insight explorer directly from
+``zcashd``. v2.0.6 includes the first change to an RPC method. If ``zcashd`` is
+run with the flag ``--insightexplorer``` (this requires an index rebuild), the
+RPC method ``getrawtransaction`` will now return additional information about
+spend indices.
+
+Changelog
 =========
-Daira Hopwood (3):
+
+Charlie O'Keefe (1):
+      Add stretch to list of suites in gitian linux descriptors
+
+Daira Hopwood (9):
       Closes #3992. Remove obsolete warning message.
       make-release.py: Versioning changes for 2.0.6-rc1.
       make-release.py: Updated manpages for 2.0.6-rc1.
+      make-release.py: Updated release notes and changelog for 2.0.6-rc1.
+      ld --version doesn't work on macOS.
+      Tweak author aliases.
+      Add coding declaration to zcutil/release-notes.py
+      make-release.py: Versioning changes for 2.0.6.
+      make-release.py: Updated manpages for 2.0.6.
 
 Daniel Kraft (1):
       Add some const declarations where they are appropriate.
+
+Eirik Ogilvie-Wigley (1):
+      Notable changes for 2.0.6
 
 Eirik Ogilvie-Wigley (7):
       Fix tree depth in comment
@@ -56,8 +78,11 @@ Jorge Timón (6):
 Larry Ruane (1):
       add spentindex to getrawtransaction RPC results
 
-MarcoFalke (1):
+Marco Falke (1):
       [doc] Fix doxygen comments for members
+
+Mary Moore-Simmons (1):
+      Fixes issue #3504: Changes to --version and adds a couple other useful commands.
 
 Peter Todd (1):
       Improve block validity/ConnectBlock() comments
@@ -74,3 +99,4 @@ face (2):
 
 Benjamin Winston (1):
       Fixes #4013, added BitcoinABC as a disclosure partner
+

@@ -585,7 +585,7 @@ void CWallet::ChainTip(const CBlockIndex *pindex,
         ChainTipAdded(pindex, pblock, sproutTree, saplingTree);
         // Prevent migration transactions from being created when node is syncing after launch,
         // and also when node wakes up from suspension/hibernation and incoming blocks are old.
-        if (!IsInitialBlockDownload() &&
+        if (!IsInitialBlockDownload(Params()) &&
             pblock->GetBlockTime() > GetAdjustedTime() - 3 * 60 * 60)
         {
             RunSaplingMigration(pindex->nHeight);
@@ -707,7 +707,7 @@ bool CWallet::IsNoteSproutChange(
     // - Notes created by consolidation transactions (e.g. using
     //   z_mergetoaddress).
     // - Notes sent from one address to itself.
-    for (const JSDescription & jsd : mapWallet[jsop.hash].vjoinsplit) {
+    for (const JSDescription & jsd : mapWallet[jsop.hash].vJoinSplit) {
         for (const uint256 & nullifier : jsd.nullifiers) {
             if (nullifierSet.count(std::make_pair(address, nullifier))) {
                 return true;
@@ -799,7 +799,7 @@ set<uint256> CWallet::GetConflicts(const uint256& txid) const
 
     std::pair<TxNullifiers::const_iterator, TxNullifiers::const_iterator> range_n;
 
-    for (const JSDescription& jsdesc : wtx.vjoinsplit) {
+    for (const JSDescription& jsdesc : wtx.vJoinSplit) {
         for (const uint256& nullifier : jsdesc.nullifiers) {
             if (mapTxSproutNullifiers.count(nullifier) <= 1) {
                 continue;  // No conflict if zero or one spends
@@ -1006,7 +1006,7 @@ void CWallet::AddToSpends(const uint256& wtxid)
     for (const CTxIn& txin : thisTx.vin) {
         AddToTransparentSpends(txin.prevout, wtxid);
     }
-    for (const JSDescription& jsdesc : thisTx.vjoinsplit) {
+    for (const JSDescription& jsdesc : thisTx.vJoinSplit) {
         for (const uint256& nullifier : jsdesc.nullifiers) {
             AddToSproutSpends(nullifier, wtxid);
         }
@@ -1136,7 +1136,7 @@ void CWallet::IncrementNoteWitnesses(const CBlockIndex* pindex,
     const CBlock* pblock {pblockIn};
     CBlock block;
     if (!pblock) {
-        ReadBlockFromDisk(block, pindex);
+        ReadBlockFromDisk(block, pindex, Params().GetConsensus());
         pblock = &block;
     }
 
@@ -1144,8 +1144,8 @@ void CWallet::IncrementNoteWitnesses(const CBlockIndex* pindex,
         auto hash = tx.GetHash();
         bool txIsOurs = mapWallet.count(hash);
         // Sprout
-        for (size_t i = 0; i < tx.vjoinsplit.size(); i++) {
-            const JSDescription& jsdesc = tx.vjoinsplit[i];
+        for (size_t i = 0; i < tx.vJoinSplit.size(); i++) {
+            const JSDescription& jsdesc = tx.vJoinSplit[i];
             for (uint8_t j = 0; j < jsdesc.commitments.size(); j++) {
                 const uint256& note_commitment = jsdesc.commitments[j];
                 sproutTree.append(note_commitment);
@@ -1402,10 +1402,10 @@ bool CWallet::UpdateNullifierNoteMap()
                 if (!item.second.nullifier) {
                     if (GetNoteDecryptor(item.second.address, dec)) {
                         auto i = item.first.js;
-                        auto hSig = wtxItem.second.vjoinsplit[i].h_sig(
+                        auto hSig = wtxItem.second.vJoinSplit[i].h_sig(
                             *pzelcashParams, wtxItem.second.joinSplitPubKey);
                         item.second.nullifier = GetSproutNoteNullifier(
-                            wtxItem.second.vjoinsplit[i],
+                            wtxItem.second.vJoinSplit[i],
                             item.second.address,
                             dec,
                             hSig,
@@ -1731,7 +1731,7 @@ void CWallet::MarkAffectedTransactionsDirty(const CTransaction& tx)
         if (mapWallet.count(txin.prevout.hash))
             mapWallet[txin.prevout.hash].MarkDirty();
     }
-    for (const JSDescription& jsdesc : tx.vjoinsplit) {
+    for (const JSDescription& jsdesc : tx.vJoinSplit) {
         for (const uint256& nullifier : jsdesc.nullifiers) {
             if (mapSproutNullifiersToNotes.count(nullifier) &&
                 mapWallet.count(mapSproutNullifiersToNotes[nullifier].hash)) {
@@ -1810,15 +1810,15 @@ mapSproutNoteData_t CWallet::FindMySproutNotes(const CTransaction &tx) const
     uint256 hash = tx.GetHash();
 
     mapSproutNoteData_t noteData;
-    for (size_t i = 0; i < tx.vjoinsplit.size(); i++) {
-        auto hSig = tx.vjoinsplit[i].h_sig(*pzelcashParams, tx.joinSplitPubKey);
-        for (uint8_t j = 0; j < tx.vjoinsplit[i].ciphertexts.size(); j++) {
+    for (size_t i = 0; i < tx.vJoinSplit.size(); i++) {
+        auto hSig = tx.vJoinSplit[i].h_sig(*pzelcashParams, tx.joinSplitPubKey);
+        for (uint8_t j = 0; j < tx.vJoinSplit[i].ciphertexts.size(); j++) {
             for (const NoteDecryptorMap::value_type& item : mapNoteDecryptors) {
                 try {
                     auto address = item.first;
                     JSOutPoint jsoutpt {hash, i, j};
                     auto nullifier = GetSproutNoteNullifier(
-                        tx.vjoinsplit[i],
+                        tx.vJoinSplit[i],
                         address,
                         item.second,
                         hSig, j);
@@ -2049,7 +2049,7 @@ bool CWallet::IsFromMe(const CTransaction& tx) const
     if (GetDebit(tx, ISMINE_ALL) > 0) {
         return true;
     }
-    for (const JSDescription& jsdesc : tx.vjoinsplit) {
+    for (const JSDescription& jsdesc : tx.vJoinSplit) {
         for (const uint256& nullifier : jsdesc.nullifiers) {
             if (IsSproutNullifierFromMe(nullifier)) {
                 return true;
@@ -2198,8 +2198,8 @@ void CWalletTx::SetSproutNoteData(mapSproutNoteData_t &noteData)
 {
     mapSproutNoteData.clear();
     for (const std::pair<JSOutPoint, SproutNoteData> nd : noteData) {
-        if (nd.first.js < vjoinsplit.size() &&
-                nd.first.n < vjoinsplit[nd.first.js].ciphertexts.size()) {
+        if (nd.first.js < vJoinSplit.size() &&
+                nd.first.n < vJoinSplit[nd.first.js].ciphertexts.size()) {
             // Store the address and nullifier for the Note
             mapSproutNoteData[nd.first] = nd.second;
         } else {
@@ -2291,7 +2291,7 @@ void CWalletTx::GetAmounts(list<COutputEntry>& listReceived,
     if (isFromMyTaddr) {
         CAmount myVpubOld = 0;
         CAmount myVpubNew = 0;
-        for (const JSDescription& js : vjoinsplit) {
+        for (const JSDescription& js : vJoinSplit) {
             bool fMyJSDesc = false;
 
             // Check input side
@@ -2305,7 +2305,7 @@ void CWalletTx::GetAmounts(list<COutputEntry>& listReceived,
             // Check output side
             if (!fMyJSDesc) {
                 for (const std::pair<JSOutPoint, SproutNoteData> nd : this->mapSproutNoteData) {
-                    if (nd.first.js < vjoinsplit.size() && nd.first.n < vjoinsplit[nd.first.js].ciphertexts.size()) {
+                    if (nd.first.js < vJoinSplit.size() && nd.first.n < vJoinSplit[nd.first.js].ciphertexts.size()) {
                         fMyJSDesc = true;
                         break;
                     }
@@ -2434,11 +2434,11 @@ void CWallet::WitnessNoteCommitment(std::vector<uint256> commitments,
 
     while (pindex) {
         CBlock block;
-        ReadBlockFromDisk(block, pindex);
+        ReadBlockFromDisk(block, pindex, Params().GetConsensus());
 
         BOOST_FOREACH(const CTransaction& tx, block.vtx)
         {
-            BOOST_FOREACH(const JSDescription& jsdesc, tx.vjoinsplit)
+            BOOST_FOREACH(const JSDescription& jsdesc, tx.vJoinSplit)
             {
                 BOOST_FOREACH(const uint256 &note_commitment, jsdesc.commitments)
                 {
@@ -2513,7 +2513,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
                 ShowProgress(_("Rescanning..."), std::max(1, std::min(99, (int)((Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex, false) - dProgressStart) / (dProgressTip - dProgressStart) * 100))));
 
             CBlock block;
-            ReadBlockFromDisk(block, pindex);
+            ReadBlockFromDisk(block, pindex, Params().GetConsensus());
             BOOST_FOREACH(CTransaction& tx, block.vtx)
             {
                 if (AddToWalletIfInvolvingMe(tx, &block, fUpdate)) {
@@ -4521,7 +4521,7 @@ bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectAbsurdFee)
  * These notes are decrypted and added to the output parameter vector, outEntries.
  */
 void CWallet::GetFilteredNotes(
-    std::vector<CSproutNotePlaintextEntry>& sproutEntries,
+    std::vector<SproutNoteEntry>& sproutEntries,
     std::vector<SaplingNoteEntry>& saplingEntries,
     std::string address,
     int minDepth,
@@ -4542,7 +4542,7 @@ void CWallet::GetFilteredNotes(
  * These notes are decrypted and added to the output parameter vector, outEntries.
  */
 void CWallet::GetFilteredNotes(
-    std::vector<CSproutNotePlaintextEntry>& sproutEntries,
+    std::vector<SproutNoteEntry>& sproutEntries,
     std::vector<SaplingNoteEntry>& saplingEntries,
     std::set<PaymentAddress>& filterAddresses,
     int minDepth,
@@ -4590,7 +4590,7 @@ void CWallet::GetFilteredNotes(
                 continue;
             }
 
-            int i = jsop.js; // Index into CTransaction.vjoinsplit
+            int i = jsop.js; // Index into CTransaction.vJoinSplit
             int j = jsop.n; // Index into JSDescription.ciphertexts
 
             // Get cached decryptor
@@ -4601,16 +4601,17 @@ void CWallet::GetFilteredNotes(
             }
 
             // determine amount of funds in the note
-            auto hSig = wtx.vjoinsplit[i].h_sig(*pzelcashParams, wtx.joinSplitPubKey);
+            auto hSig = wtx.vJoinSplit[i].h_sig(*pzelcashParams, wtx.joinSplitPubKey);
             try {
                 SproutNotePlaintext plaintext = SproutNotePlaintext::decrypt(
                         decryptor,
-                        wtx.vjoinsplit[i].ciphertexts[j],
-                        wtx.vjoinsplit[i].ephemeralKey,
+                        wtx.vJoinSplit[i].ciphertexts[j],
+                        wtx.vJoinSplit[i].ephemeralKey,
                         hSig,
                         (unsigned char) j);
 
-                sproutEntries.push_back(CSproutNotePlaintextEntry{jsop, pa, plaintext, wtx.GetDepthInMainChain()});
+                sproutEntries.push_back(SproutNoteEntry {
+                    jsop, pa, plaintext.note(pa), plaintext.memo(), wtx.GetDepthInMainChain() });
 
             } catch (const note_decryption_failed &err) {
                 // Couldn't decrypt with this spending key

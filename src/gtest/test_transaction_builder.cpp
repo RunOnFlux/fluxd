@@ -100,13 +100,13 @@ TEST(TransactionBuilder, TransparentToSapling)
 
     EXPECT_EQ(tx.vin.size(), 1);
     EXPECT_EQ(tx.vout.size(), 0);
-    EXPECT_EQ(tx.vjoinsplit.size(), 0);
+    EXPECT_EQ(tx.vJoinSplit.size(), 0);
     EXPECT_EQ(tx.vShieldedSpend.size(), 0);
     EXPECT_EQ(tx.vShieldedOutput.size(), 1);
     EXPECT_EQ(tx.valueBalance, -40000);
 
     CValidationState state;
-    EXPECT_TRUE(ContextualCheckTransaction(tx, state, 2, 0));
+    EXPECT_TRUE(ContextualCheckTransaction(tx, state, Params(), 2, 0));
     EXPECT_EQ(state.GetRejectReason(), "");
 
     // Revert to default
@@ -137,13 +137,13 @@ TEST(TransactionBuilder, SaplingToSapling) {
 
     EXPECT_EQ(tx.vin.size(), 0);
     EXPECT_EQ(tx.vout.size(), 0);
-    EXPECT_EQ(tx.vjoinsplit.size(), 0);
+    EXPECT_EQ(tx.vJoinSplit.size(), 0);
     EXPECT_EQ(tx.vShieldedSpend.size(), 1);
     EXPECT_EQ(tx.vShieldedOutput.size(), 2);
     EXPECT_EQ(tx.valueBalance, 10000);
 
     CValidationState state;
-    EXPECT_TRUE(ContextualCheckTransaction(tx, state, 3, 0));
+    EXPECT_TRUE(ContextualCheckTransaction(tx, state, Params(), 3, 0));
     EXPECT_EQ(state.GetRejectReason(), "");
 
     // Revert to default
@@ -173,15 +173,15 @@ TEST(TransactionBuilder, SaplingToSprout) {
 
     EXPECT_EQ(tx.vin.size(), 0);
     EXPECT_EQ(tx.vout.size(), 0);
-    EXPECT_EQ(tx.vjoinsplit.size(), 1);
-    EXPECT_EQ(tx.vjoinsplit[0].vpub_old, 25000);
-    EXPECT_EQ(tx.vjoinsplit[0].vpub_new, 0);
+    EXPECT_EQ(tx.vJoinSplit.size(), 1);
+    EXPECT_EQ(tx.vJoinSplit[0].vpub_old, 25000);
+    EXPECT_EQ(tx.vJoinSplit[0].vpub_new, 0);
     EXPECT_EQ(tx.vShieldedSpend.size(), 1);
     EXPECT_EQ(tx.vShieldedOutput.size(), 1);
     EXPECT_EQ(tx.valueBalance, 35000);
 
     CValidationState state;
-    EXPECT_TRUE(ContextualCheckTransaction(tx, state, 3, 0));
+    EXPECT_TRUE(ContextualCheckTransaction(tx, state, Params(), 3, 0));
     EXPECT_EQ(state.GetRejectReason(), "");
 
     // Revert to default
@@ -203,7 +203,7 @@ TEST(TransactionBuilder, SproutToSproutAndSapling) {
     
     SproutMerkleTree sproutTree;
     for (int i = 0; i < ZC_NUM_JS_OUTPUTS; i++) {
-        sproutTree.append(wtx.vjoinsplit[0].commitments[i]);
+        sproutTree.append(wtx.vJoinSplit[0].commitments[i]);
     }
     SproutWitness sproutWitness = sproutTree.witness();
     // Fake a view with the Sprout note in it
@@ -230,19 +230,19 @@ TEST(TransactionBuilder, SproutToSproutAndSapling) {
     EXPECT_EQ(tx.vout.size(), 0);
     // TODO: This should be doable in two JoinSplits.
     // There's an inefficiency in the implementation.
-    EXPECT_EQ(tx.vjoinsplit.size(), 3);
-    EXPECT_EQ(tx.vjoinsplit[0].vpub_old, 0);
-    EXPECT_EQ(tx.vjoinsplit[0].vpub_new, 0);
-    EXPECT_EQ(tx.vjoinsplit[1].vpub_old, 0);
-    EXPECT_EQ(tx.vjoinsplit[1].vpub_new, 0);
-    EXPECT_EQ(tx.vjoinsplit[2].vpub_old, 0);
-    EXPECT_EQ(tx.vjoinsplit[2].vpub_new, 10000);
+    EXPECT_EQ(tx.vJoinSplit.size(), 3);
+    EXPECT_EQ(tx.vJoinSplit[0].vpub_old, 0);
+    EXPECT_EQ(tx.vJoinSplit[0].vpub_new, 0);
+    EXPECT_EQ(tx.vJoinSplit[1].vpub_old, 0);
+    EXPECT_EQ(tx.vJoinSplit[1].vpub_new, 0);
+    EXPECT_EQ(tx.vJoinSplit[2].vpub_old, 0);
+    EXPECT_EQ(tx.vJoinSplit[2].vpub_new, 10000);
     EXPECT_EQ(tx.vShieldedSpend.size(), 0);
     EXPECT_EQ(tx.vShieldedOutput.size(), 1);
     EXPECT_EQ(tx.valueBalance, -5000);
 
     CValidationState state;
-    EXPECT_TRUE(ContextualCheckTransaction(tx, state, 4, 0));
+    EXPECT_TRUE(ContextualCheckTransaction(tx, state, Params(), 4, 0));
     EXPECT_EQ(state.GetRejectReason(), "");
 
     // Revert to default
@@ -373,7 +373,7 @@ TEST(TransactionBuilder, ChangeOutput)
 
         EXPECT_EQ(tx.vin.size(), 1);
         EXPECT_EQ(tx.vout.size(), 0);
-        EXPECT_EQ(tx.vjoinsplit.size(), 0);
+        EXPECT_EQ(tx.vJoinSplit.size(), 0);
         EXPECT_EQ(tx.vShieldedSpend.size(), 1);
         EXPECT_EQ(tx.vShieldedOutput.size(), 1);
         EXPECT_EQ(tx.valueBalance, -15000);
@@ -388,7 +388,7 @@ TEST(TransactionBuilder, ChangeOutput)
 
         EXPECT_EQ(tx.vin.size(), 1);
         EXPECT_EQ(tx.vout.size(), 0);
-        EXPECT_EQ(tx.vjoinsplit.size(), 0);
+        EXPECT_EQ(tx.vJoinSplit.size(), 0);
         EXPECT_EQ(tx.vShieldedSpend.size(), 0);
         EXPECT_EQ(tx.vShieldedOutput.size(), 1);
         EXPECT_EQ(tx.valueBalance, -15000);
@@ -403,7 +403,7 @@ TEST(TransactionBuilder, ChangeOutput)
 
         EXPECT_EQ(tx.vin.size(), 1);
         EXPECT_EQ(tx.vout.size(), 1);
-        EXPECT_EQ(tx.vjoinsplit.size(), 0);
+        EXPECT_EQ(tx.vJoinSplit.size(), 0);
         EXPECT_EQ(tx.vShieldedSpend.size(), 0);
         EXPECT_EQ(tx.vShieldedOutput.size(), 0);
         EXPECT_EQ(tx.valueBalance, 0);
@@ -435,7 +435,7 @@ TEST(TransactionBuilder, SetFee)
 
         EXPECT_EQ(tx.vin.size(), 0);
         EXPECT_EQ(tx.vout.size(), 0);
-        EXPECT_EQ(tx.vjoinsplit.size(), 0);
+        EXPECT_EQ(tx.vJoinSplit.size(), 0);
         EXPECT_EQ(tx.vShieldedSpend.size(), 1);
         EXPECT_EQ(tx.vShieldedOutput.size(), 2);
         EXPECT_EQ(tx.valueBalance, 10000);
@@ -451,7 +451,7 @@ TEST(TransactionBuilder, SetFee)
 
         EXPECT_EQ(tx.vin.size(), 0);
         EXPECT_EQ(tx.vout.size(), 0);
-        EXPECT_EQ(tx.vjoinsplit.size(), 0);
+        EXPECT_EQ(tx.vJoinSplit.size(), 0);
         EXPECT_EQ(tx.vShieldedSpend.size(), 1);
         EXPECT_EQ(tx.vShieldedOutput.size(), 2);
         EXPECT_EQ(tx.valueBalance, 20000);

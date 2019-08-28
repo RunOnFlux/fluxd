@@ -105,24 +105,27 @@ void ZelnodeSync::GetNextAsset()
 {
     switch (RequestedZelnodeAssets) {
         case (ZELNODE_SYNC_FAILED): // should never be used here actually, use Reset() instead
-            ClearFulfilledRequest();
             RequestedZelnodeAssets = ZELNODE_SYNC_INITIAL;
             LogPrintf("ZelnodeSync::GetNextAsset -- Starting %s\n", GetSyncStatus());
             break;
         case(ZELNODE_SYNC_INITIAL):
+            ClearFulfilledRequest();
             RequestedZelnodeAssets = ZELNODE_SYNC_SPORKS;
             LogPrintf("ZelnodeSync::GetNextAsset -- Starting %s\n", GetSyncStatus());
             break;
         case (ZELNODE_SYNC_SPORKS):
             RequestedZelnodeAssets = ZELNODE_SYNC_LIST;
+            RequestedZelnodeAttempt = 0;
             LogPrintf("ZelnodeSync::GetNextAsset -- Starting %s\n", GetSyncStatus());
             break;
         case (ZELNODE_SYNC_LIST):
             RequestedZelnodeAssets = ZELNODE_SYNC_MNW;
+            RequestedZelnodeAttempt = 0;
             LogPrintf("ZelnodeSync::GetNextAsset -- Starting %s\n", GetSyncStatus());
             break;
         case (ZELNODE_SYNC_MNW):
             RequestedZelnodeAssets = ZELNODE_SYNC_FINISHED;
+            RequestedZelnodeAttempt = 0;
             LogPrintf("ZelnodeSync - Sync has finished\n");
             break;
     }
@@ -296,8 +299,7 @@ void ZelnodeSync::Process()
                 pnode->FulfilledRequest("znwsync");
 
                 // timeout
-                if (lastZelnodeWinner == 0 &&
-                    (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 10)) {
+                if (lastZelnodeWinner == 0 && (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3 || GetTime() - nTimeAssetSyncStarted > ZELNODE_SYNC_TIMEOUT * 10)) {
                     if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)) {
                         LogPrintf("%s - ERROR - Syncing zelnode winners has failed, failed because %s, will try again\n", __func__, (RequestedZelnodeAttempt >= ZELNODE_SYNC_THRESHOLD * 3) ? "Requested zelnode attempt greater than threshold" : "nTimeAsset Sync timeout");
                         RequestedZelnodeAssets = ZELNODE_SYNC_FAILED;
