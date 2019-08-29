@@ -46,6 +46,12 @@ zelcash (2.0.0) stable; urgency=medium
 
  -- Zel Foundation <info@zel.cash>  Wed, 5 Dec 2018 12:00:00 +0100
 
+zcash (2.0.7+1) stable; urgency=medium
+
+  * 2.0.7-1 release.
+
+ -- Electric Coin Company <team@z.cash>  Thu, 29 Aug 2019 13:07:52 -0600
+
 zcash (2.0.7) stable; urgency=medium
 
   * 2.0.7 release.
