@@ -1825,7 +1825,7 @@ UniValue backupwallet(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_INTERNAL_ERROR, e.what());
     }
     if (exportdir.empty()) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "Cannot backup wallet until the 'exportdir=/path/do/dir/' option has been set in zelcash.conf and zelcashd restart.\n");
+        throw JSONRPCError(RPC_WALLET_ERROR, "Cannot backup wallet until the -exportdir option has been passed to zelcashd at runtime or the 'exportdir=/path/do/dir/' option has been set in zelcash.conf and zelcashd restarted.\n");
     }
     std::string unclean = params[0].get_str();
     std::string clean = SanitizeFilename(unclean);
