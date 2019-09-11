@@ -202,7 +202,7 @@ std::vector<std::string> split (std::string s, std::string delimiter) {
 
 bool IsBenchmarkdRunning()
 {
-    std::string strBenchmarkStatus = GetStdoutFromCommand("./src/benchmark-cli getstatus true", false, true);
+    std::string strBenchmarkStatus = GetStdoutFromCommand("./benchmark-cli getstatus true", false, true);
 
     UniValue response;
     response.read(strBenchmarkStatus);
@@ -219,7 +219,7 @@ bool IsBenchmarkdRunning()
 
 void StartBenchmarkd()
 {
-    RunCommand("./src/benchmarkd &");
+    RunCommand("./benchmarkd &");
     MilliSleep(4000);
     fZelStartedBench = true;
     LogPrintf("Benchmarkd Started\n");
@@ -228,13 +228,13 @@ void StartBenchmarkd()
 
 void StopBenchmarkd()
 {
-    int value = std::system("./src/benchmark-cli stop");
+    int value = std::system("./benchmark-cli stop");
 }
 
 std::string GetBenchmarks()
 {
     if (IsBenchmarkdRunning()) {
-        std::string strBenchmarkStatus = GetStdoutFromCommand("./src/benchmark-cli getbenchmarks");
+        std::string strBenchmarkStatus = GetStdoutFromCommand("./benchmark-cli getbenchmarks");
 
         return strBenchmarkStatus;
     }
@@ -245,7 +245,7 @@ std::string GetBenchmarks()
 std::string GetBenchmarkdStatus()
 {
     if (IsBenchmarkdRunning()) {
-        std::string strBenchmarkStatus = GetStdoutFromCommand("./src/benchmark-cli getstatus");
+        std::string strBenchmarkStatus = GetStdoutFromCommand("./benchmark-cli getstatus");
 
         return strBenchmarkStatus;
     }
@@ -259,7 +259,7 @@ bool GetSignedBroadcast(const ZelnodeBroadcast& znb, ZelnodeBroadcast& signedBro
         CDataStream ssZelnodeBroadcast(SER_NETWORK, PROTOCOL_VERSION);
         ssZelnodeBroadcast << znb;
         std::string znbHexStr = HexStr(ssZelnodeBroadcast.begin(), ssZelnodeBroadcast.end());
-        std::string response = GetStdoutFromCommand("./src/benchmark-cli signzelnodebroadcast " + znbHexStr, true);
+        std::string response = GetStdoutFromCommand("./benchmark-cli signzelnodebroadcast " + znbHexStr, true);
 
         UniValue signedresponse;
         signedresponse.read(response);
