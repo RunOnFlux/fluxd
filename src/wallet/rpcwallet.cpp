@@ -2683,8 +2683,7 @@ UniValue zc_sample_joinsplit(const UniValue& params, bool fHelp)
 
     uint256 joinSplitPubKey;
     uint256 anchor = SproutMerkleTree().root();
-    JSDescription samplejoinsplit(true,
-                                  *pzelcashParams,
+    JSDescription samplejoinsplit(*pzelcashParams,
                                   joinSplitPubKey,
                                   anchor,
                                   {JSInput(), JSInput()},
@@ -3050,8 +3049,7 @@ UniValue zc_raw_joinsplit(const UniValue& params, bool fHelp)
     mtx.nVersionGroupId = SAPLING_VERSION_GROUP_ID;
     mtx.joinSplitPubKey = joinSplitPubKey;
 
-    JSDescription jsdesc(true,
-                         *pzelcashParams,
+    JSDescription jsdesc(*pzelcashParams,
                          joinSplitPubKey,
                          anchor,
                          {vjsin[0], vjsin[1]},
@@ -3644,7 +3642,7 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
             "\nSend multiple times. Amounts are decimal numbers with at most 8 digits of precision."
             "\nChange generated from a taddr flows to a new taddr address, while change generated from a zaddr returns to itself."
             "\nWhen sending coinbase UTXOs to a zaddr, change is not allowed. The entire value of the UTXO(s) must be consumed."
-            + strprintf("\nBefore Sapling activates, the maximum number of zaddr outputs is %d due to transaction size limits.\n", Z_SENDMANY_MAX_ZADDR_OUTPUTS_BEFORE_SAPLING)
+            + strprintf("\nBefore Acadia (Sapling) activates, the maximum number of zaddr outputs is %d due to transaction size limits.\n", Z_SENDMANY_MAX_ZADDR_OUTPUTS_BEFORE_SAPLING)
             + HelpRequiringPassphrase() + "\n"
             "\nArguments:\n"
             "1. \"fromaddress\"         (string, required) The taddr or zaddr to send the funds from.\n"
@@ -3888,6 +3886,15 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
     o.push_back(Pair("fee", std::stod(FormatMoney(nFee))));
     UniValue contextInfo = o;
 
+    if (!fromTaddr || !zaddrRecipients.empty()) {
+        // We have shielded inputs or outputs, and therefore cannot create
+        // transactions before Acadia (Sapling) activates.
+        if (!Params().GetConsensus().NetworkUpgradeActive(nextBlockHeight, Consensus::UPGRADE_ACADIA)) {
+            throw JSONRPCError(
+                RPC_INVALID_PARAMETER, "Cannot create shielded transactions before Acadia (Sapling) has activated");
+        }
+    }
+
     // Builder (used if Sapling addresses are involved)
     boost::optional<TransactionBuilder> builder;
     if (noSproutAddrs) {
@@ -4125,26 +4132,17 @@ UniValue z_shieldcoinbase(const UniValue& params, bool fHelp)
     }
 
     int nextBlockHeight = chainActive.Height() + 1;
+    const bool saplingActive =  Params().GetConsensus().NetworkUpgradeActive(nextBlockHeight, Consensus::UPGRADE_ACADIA);
 
-    bool overwinterActive = NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA);
+    // We cannot create shielded transactions before Acadia (Sapling) activates.
+    if (!saplingActive) {
+        throw JSONRPCError(
+            RPC_INVALID_PARAMETER, "Cannot create shielded transactions before Acadia (Sapling) has activated");
+    }
+
+    bool overwinterActive = Params().GetConsensus().NetworkUpgradeActive(nextBlockHeight, Consensus::UPGRADE_ACADIA);
+    assert(overwinterActive);
     unsigned int max_tx_size = MAX_TX_SIZE_AFTER_SAPLING;
-    if (!NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
-        max_tx_size = MAX_TX_SIZE_BEFORE_SAPLING;
-    }
-
-    // If Sapling is not active, do not allow sending to a Sapling address.
-    if (!NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
-        auto res = DecodePaymentAddress(destaddress);
-        if (IsValidPaymentAddress(res)) {
-            bool toSapling = boost::get<libzelcash::SaplingPaymentAddress>(&res) != nullptr;
-            if (toSapling) {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, Acadia(Sapling) has not activated. ") + 
-                    string("Will be activated on block ") + to_string(Params().GetConsensus().vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight) + string("."));
-            }
-        } else {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, unknown address format: ") + destaddress );
-        }
-    }
 
     // Prepare to get coinbase utxos
     std::vector<ShieldCoinbaseUTXO> inputs;
@@ -4648,6 +4646,15 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
     contextInfo.push_back(Pair("fromaddresses", params[0]));
     contextInfo.push_back(Pair("toaddress", params[1]));
     contextInfo.push_back(Pair("fee", ValueFromAmount(nFee)));
+
+    if (!sproutNoteInputs.empty() || !saplingNoteInputs.empty() || !IsValidDestination(taddr)) {
+        // We have shielded inputs or the recipient is a shielded address, and
+        // therefore we cannot create transactions before Acadia (Sapling) activates.
+        if (!saplingActive) {
+            throw JSONRPCError(
+                RPC_INVALID_PARAMETER, "Cannot create shielded transactions before Acadia (Sapling) has activated");
+        }
+    }
 
     // Contextual transaction we will build on
     CMutableTransaction contextualTx = CreateNewContextualCMutableTransaction(

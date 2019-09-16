@@ -1046,7 +1046,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_internals)
     // Mutable tx containing contextual information we need to build tx
     // We removed the ability to create pre-Sapling Sprout proofs, so we can
     // only create Sapling-onwards transactions.
-    int nHeight = consensusParams.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight;
+    int nHeight = consensusParams.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight;
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(consensusParams, nHeight + 1);
     if (mtx.nVersion == 1) {
         mtx.nVersion = 2;
@@ -1600,7 +1600,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_shieldcoinbase_internals)
     // Mutable tx containing contextual information we need to build tx
     // We removed the ability to create pre-Sapling Sprout proofs, so we can
     // only create Sapling-onwards transactions.
-    int nHeight = consensusParams.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight;
+    int nHeight = consensusParams.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight;
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(consensusParams, nHeight + 1);
 
     // Test that option -mempooltxinputlimit is respected.
@@ -1829,7 +1829,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_internals)
     // Mutable tx containing contextual information we need to build tx
     // We removed the ability to create pre-Sapling Sprout proofs, so we can
     // only create Sapling-onwards transactions.
-    int nHeight = consensusParams.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight;
+    int nHeight = consensusParams.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight;
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(consensusParams, nHeight + 1);
 
     // Test that option -mempooltxinputlimit is respected.
