@@ -2073,7 +2073,7 @@ bool IsInitialBlockDownload(const CChainParams& chainParams)
         // where the node is being fed a fake alternate chain; shut down for safety.
         auto upgrade = chainParams.GetConsensus().vUpgrades[idx];
         if (upgrade.hashActivationBlock && (
-            !chainParams.GetConsensus().NetworkUpgradeActive(chainActive.Height(), Consensus::UpgradeIndex(idx))
+            !NetworkUpgradeActive(chainActive.Height(), chainParams.GetConsensus(), Consensus::UpgradeIndex(idx))
             || chainActive[upgrade.nActivationHeight]->GetBlockHash() != upgrade.hashActivationBlock.get()
         )) {
             AbortNode(
