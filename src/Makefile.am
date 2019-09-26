@@ -192,6 +192,7 @@ BITCOIN_CORE_H = \
   torcontrol.h \
   transaction_builder.h \
   txdb.h \
+  mempoollimit.h \
   txmempool.h \
   ui_interface.h \
   uint256.h \
@@ -278,6 +279,7 @@ libbitcoin_server_a_SOURCES = \
   timedata.cpp \
   torcontrol.cpp \
   txdb.cpp \
+  mempoollimit.cpp \
   txmempool.cpp \
   validationinterface.cpp \
   zelnode/activezelnode.cpp \
