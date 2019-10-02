@@ -20,7 +20,7 @@ Miles Manley (3)
 Jules "Coinblockers" (1)
         Fix untar ownership fail in containerized environments
 
-Changlog - Zcash 2.0.6
+Changlog - Zcash 2.0.7-3
 =========
 
 Jack Grigg  (1): 
