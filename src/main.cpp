@@ -1370,7 +1370,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
     }
 
-    if (pool.isRecentlyEvicted(tx.GetHash())) {
+    if (pool.IsRecentlyEvicted(tx.GetHash())) {
         return error("AcceptToMemoryPool: Transaction recently evicted");
     }
 
@@ -1612,7 +1612,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                 pool.addSpentIndex(entry, view);
             }
 
-            pool.ensureSizeLimit();
+            pool.EnsureSizeLimit();
         }
     }
 
