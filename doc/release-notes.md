@@ -1,3 +1,9 @@
+Zel Changelog - Zel 3.3.2
+===============
+
+Miles Manley (1): 
+      Versioning and release notes
+
 Zel Changelog - Zel 3.3.1
 ===============
 
@@ -13,6 +19,12 @@ Miles Manley (3)
 
 Jules "Coinblockers" (1)
         Fix untar ownership fail in containerized environments
+
+Changlog - Zcash 2.0.7-3
+=========
+
+Jack Grigg  (1): 
+      Ignore exceptions when deserializing note plaintexts
 
 Changlog - Zcash 2.0.6
 =========
