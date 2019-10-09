@@ -1371,7 +1371,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     }
 
     if (pool.IsRecentlyEvicted(tx.GetHash())) {
-        return error("AcceptToMemoryPool: Transaction recently evicted");
+        LogPrint("mempool", "Dropping txid %s : recently evicted", tx.GetHash().ToString());
+        return false;
     }
 
     auto verifier = libzelcash::ProofVerifier::Strict();
