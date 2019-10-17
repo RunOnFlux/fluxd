@@ -1,7 +1,7 @@
 // Copyright (c) 2019 The Zel developers
 // Copyright (c) 2019 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef ZELCASH_UTIL_TEST_H
 #define ZELCASH_UTIL_TEST_H
