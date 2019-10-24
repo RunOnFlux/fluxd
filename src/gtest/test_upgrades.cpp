@@ -60,9 +60,9 @@ TEST_F(UpgradesTest, CurrentEpoch) {
     auto nBranchId = NetworkUpgradeInfo[Consensus::UPGRADE_TESTDUMMY].nBranchId;
 
     // Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT
-    EXPECT_EQ(CurrentEpoch(0, params), Consensus::BASE);
+    EXPECT_EQ(CurrentEpoch(0, params), Consensus::BASE_SPROUT);
     EXPECT_EQ(CurrentEpochBranchId(0, params), 0);
-    EXPECT_EQ(CurrentEpoch(1000000, params), Consensus::BASE);
+    EXPECT_EQ(CurrentEpoch(1000000, params), Consensus::BASE_SPROUT);
     EXPECT_EQ(CurrentEpochBranchId(1000000, params), 0);
 
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_TESTDUMMY, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
@@ -75,9 +75,9 @@ TEST_F(UpgradesTest, CurrentEpoch) {
     int nActivationHeight = 100;
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_TESTDUMMY, nActivationHeight);
 
-    EXPECT_EQ(CurrentEpoch(0, params), Consensus::BASE);
+    EXPECT_EQ(CurrentEpoch(0, params), Consensus::BASE_SPROUT);
     EXPECT_EQ(CurrentEpochBranchId(0, params), 0);
-    EXPECT_EQ(CurrentEpoch(nActivationHeight - 1, params), Consensus::BASE);
+    EXPECT_EQ(CurrentEpoch(nActivationHeight - 1, params), Consensus::BASE_SPROUT);
     EXPECT_EQ(CurrentEpochBranchId(nActivationHeight - 1, params), 0);
     EXPECT_EQ(CurrentEpoch(nActivationHeight, params), Consensus::UPGRADE_TESTDUMMY);
     EXPECT_EQ(CurrentEpochBranchId(nActivationHeight, params), nBranchId);

@@ -169,13 +169,13 @@ BOOST_AUTO_TEST_CASE(RemoveWithoutBranchId) {
         tx.vout.resize(1);
         tx.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         tx.vout[0].nValue = i * COIN;
-        pool.addUnchecked(tx.GetHash(), entry.BranchId(NetworkUpgradeInfo[Consensus::BASE].nBranchId).FromTx(tx));
+        pool.addUnchecked(tx.GetHash(), entry.BranchId(NetworkUpgradeInfo[Consensus::BASE_SPROUT].nBranchId).FromTx(tx));
     }
     BOOST_CHECK_EQUAL(pool.size(), 10);
 
     // Check the pool only contains Base transactions
     for (CTxMemPool::indexed_transaction_set::const_iterator it = pool.mapTx.begin(); it != pool.mapTx.end(); it++) {
-        BOOST_CHECK_EQUAL(it->GetValidatedBranchId(), NetworkUpgradeInfo[Consensus::BASE].nBranchId);
+        BOOST_CHECK_EQUAL(it->GetValidatedBranchId(), NetworkUpgradeInfo[Consensus::BASE_SPROUT].nBranchId);
     }
 
     // Add some dummy transactions
@@ -208,7 +208,7 @@ BOOST_AUTO_TEST_CASE(RemoveWithoutBranchId) {
     }
 
     // Roll back to Sprout
-    pool.removeWithoutBranchId(NetworkUpgradeInfo[Consensus::BASE].nBranchId);
+    pool.removeWithoutBranchId(NetworkUpgradeInfo[Consensus::BASE_SPROUT].nBranchId);
     BOOST_CHECK_EQUAL(pool.size(), 0);
 }
 

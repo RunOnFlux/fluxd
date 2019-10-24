@@ -1148,7 +1148,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             }
             bool found = false;
             // Exclude Base from upgrades
-            for (auto i = Consensus::BASE + 1; i < Consensus::MAX_NETWORK_UPGRADES; ++i)
+            for (auto i = Consensus::BASE_SPROUT + 1; i < Consensus::MAX_NETWORK_UPGRADES; ++i)
             {
                 if (vDeploymentParams[0].compare(HexInt(NetworkUpgradeInfo[i].nBranchId)) == 0) {
                     UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex(i), nActivationHeight);

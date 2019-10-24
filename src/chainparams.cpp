@@ -101,8 +101,8 @@ public:
 	consensus.nPowAllowMinDifficultyBlocksAfterHeight = boost::none;
         consensus.nPowTargetSpacing = 2 * 60;
 
-        consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
-        consensus.vUpgrades[Consensus::BASE].nActivationHeight =
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
             Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
 
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nProtocolVersion = 170002;
@@ -242,8 +242,8 @@ public:
         consensus.nPowAllowMinDifficultyBlocksAfterHeight = 299187;
         consensus.nPowTargetSpacing = 2 * 60;
 
-        consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
-        consensus.vUpgrades[Consensus::BASE].nActivationHeight =
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
         Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
 
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nProtocolVersion = 170002;
@@ -384,8 +384,8 @@ public:
         consensus.nPowTargetSpacing = 2 * 60;
 	consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
 
-        consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
-        consensus.vUpgrades[Consensus::BASE].nActivationHeight =
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
             Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
@@ -472,7 +472,7 @@ public:
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)
     {
-        assert(idx > Consensus::BASE && idx < Consensus::MAX_NETWORK_UPGRADES);
+        assert(idx > Consensus::BASE_SPROUT && idx < Consensus::MAX_NETWORK_UPGRADES);
         consensus.vUpgrades[idx].nActivationHeight = nActivationHeight;
     }
 
