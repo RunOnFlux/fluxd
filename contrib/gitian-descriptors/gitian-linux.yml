@@ -1,9 +1,10 @@
 ---
-name: "zelcash-3.3.0"
+name: "zelcash-3.3.2"
 enable_cache: true
 distro: "debian"
 suites:
 - "jessie"
+- "stretch"
 architectures:
 - "amd64"
 packages:
