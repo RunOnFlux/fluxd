@@ -22,7 +22,7 @@ namespace Consensus {
  */
 enum UpgradeIndex {
     // BASE must be first
-    BASE,
+    BASE_SPROUT,
     UPGRADE_TESTDUMMY,
     // LWMA algo starts at this block 
     UPGRADE_LWMA,
