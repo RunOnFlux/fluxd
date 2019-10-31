@@ -408,7 +408,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
 
                     if (zn != NULL) {
                         if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
-                            zn->Status().find(strFilter) == string::npos &&
+                            zn->Status().find(strFilter) == string::npos && HexStr(zn->pubKeyZelnode).find(strFilter) &&
                             EncodeDestination(zn->pubKeyCollateralAddress.GetID()).find(strFilter) == string::npos) continue;
 
                         std::string strStatus = zn->Status();
@@ -448,7 +448,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
 
         if (zn != NULL) {
             if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
-                zn->Status().find(strFilter) == string::npos &&
+                zn->Status().find(strFilter) == string::npos && HexStr(zn->pubKeyZelnode).find(strFilter) &&
                     EncodeDestination(zn->pubKeyCollateralAddress.GetID()).find(strFilter) == string::npos) continue;
 
             std::string strStatus = zn->Status();
@@ -488,7 +488,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
 
         if (zn != NULL) {
             if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
-                zn->Status().find(strFilter) == string::npos &&
+                zn->Status().find(strFilter) == string::npos && HexStr(zn->pubKeyZelnode).find(strFilter) &&
                 EncodeDestination(zn->pubKeyCollateralAddress.GetID()).find(strFilter) == string::npos) continue;
 
             std::string strStatus = zn->Status();
