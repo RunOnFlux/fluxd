@@ -182,7 +182,7 @@ TEST(WalletTests, SproutNoteDataSerialisation) {
 
 
 TEST(WalletTests, FindUnspentSproutNotes) {
-    auto consensusParams = RegtestActivateSapling();
+    auto consensusParams = RegtestActivateAcadia();
 
     CWallet wallet;
     auto sk = libzelcash::SproutSpendingKey::random();
@@ -354,7 +354,7 @@ TEST(WalletTests, FindUnspentSproutNotes) {
     mapBlockIndex.erase(blockHash3);
 
     // Revert to default
-    RegtestDeactivateSapling();
+    RegtestDeactivateAcadia();
 }
 
 
