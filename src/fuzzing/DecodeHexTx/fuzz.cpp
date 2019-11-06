@@ -14,5 +14,4 @@ int fuzz_DecodeHexTx (int argc, char *argv[]) {
         else { fprintf(stderr, "Could not decode hex string") ; return -1; }
 }
 
-int main (int argc, char *argv[]) { return ZCASH_FUZZER_MAIN(argc, argv); }
-#warning BUILDING A FUZZER, NOT THE REAL MAIN
+int main (int argc, char *argv[]) { return fuzz_DecodeHexTx(argc, argv); }
