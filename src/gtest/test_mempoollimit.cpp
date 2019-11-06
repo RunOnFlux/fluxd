@@ -87,9 +87,9 @@ TEST(MempoolLimitTests, WeightedTxInfoFromTx)
 {
     // The transaction creation is based on the test:
     // test_transaction_builder.cpp/TEST(TransactionBuilder, SetFee)
-    auto consensusParams = RegtestActivateSapling();
+    auto consensusParams = RegtestActivateAcadia();
 
-    auto sk = libzcash::SaplingSpendingKey::random();
+    auto sk = libzelcash::SaplingSpendingKey::random();
     auto testNote = GetTestSaplingNote(sk.default_address(), 50000);
 
     // Default fee
@@ -133,5 +133,5 @@ TEST(MempoolLimitTests, WeightedTxInfoFromTx)
         EXPECT_EQ(5124, info.txWeight.evictionWeight);
     }
     
-    RegtestDeactivateSapling();
+    RegtestDeactivateAcadia();
 }

@@ -166,10 +166,10 @@ TEST(merkletree, emptyroots) {
     libzelcash::EmptyMerkleRoots<64, libzelcash::SHA256Compress> emptyroots;
     std::array<libzelcash::SHA256Compress, 65> computed;
 
-    computed.at(0) = libzcash::SHA256Compress::uncommitted();
+    computed.at(0) = libzelcash::SHA256Compress::uncommitted();
     ASSERT_TRUE(emptyroots.empty_root(0) == computed.at(0));
     for (size_t d = 1; d <= 64; d++) {
-        computed.at(d) = libzcash::SHA256Compress::combine(computed.at(d-1), computed.at(d-1), d-1);
+        computed.at(d) = libzelcash::SHA256Compress::combine(computed.at(d-1), computed.at(d-1), d-1);
         ASSERT_TRUE(emptyroots.empty_root(d) == computed.at(d));
     }
 
@@ -181,10 +181,10 @@ TEST(merkletree, EmptyrootsSapling) {
     libzelcash::EmptyMerkleRoots<62, libzelcash::PedersenHash> emptyroots;
     std::array<libzelcash::PedersenHash, 63> computed;
 
-    computed.at(0) = libzcash::PedersenHash::uncommitted();
+    computed.at(0) = libzelcash::PedersenHash::uncommitted();
     ASSERT_TRUE(emptyroots.empty_root(0) == computed.at(0));
     for (size_t d = 1; d <= 62; d++) {
-        computed.at(d) = libzcash::PedersenHash::combine(computed.at(d-1), computed.at(d-1), d-1);
+        computed.at(d) = libzelcash::PedersenHash::combine(computed.at(d-1), computed.at(d-1), d-1);
         ASSERT_TRUE(emptyroots.empty_root(d) == computed.at(d));
     }
 
