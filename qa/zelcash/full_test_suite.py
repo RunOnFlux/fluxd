@@ -139,7 +139,6 @@ STAGES = [
     'no-dot-so',
     'util-test',
     'secp256k1',
-    'libsnark',
     'univalue',
     'rpc',
 ]
@@ -151,7 +150,6 @@ STAGE_COMMANDS = {
     'no-dot-so': ensure_no_dot_so_in_depends,
     'util-test': util_test,
     'secp256k1': ['make', '-C', repofile('src/secp256k1'), 'check'],
-    'libsnark': ['make', '-C', repofile('src'), 'libsnark-tests'],
     'univalue': ['make', '-C', repofile('src/univalue'), 'check'],
     'rpc': [repofile('qa/pull-tester/rpc-tests.sh')],
 }

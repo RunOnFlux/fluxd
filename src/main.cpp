@@ -658,19 +658,12 @@ unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans) EXCLUSIVE_LOCKS_REQUIRE
 
 bool IsStandardTx(const CTransaction& tx, string& reason, const CChainParams& chainparams, const int nHeight)
 {
-    bool overwinterActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA);
     bool saplingActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA);
 
     if (saplingActive) {
         // Sapling standard rules apply
         if (tx.nVersion > CTransaction::SAPLING_MAX_CURRENT_VERSION || tx.nVersion < CTransaction::SAPLING_MIN_CURRENT_VERSION) {
             reason = "sapling-version";
-            return false;
-        }
-    } else if (overwinterActive) {
-        // Overwinter standard rules apply
-        if (tx.nVersion > CTransaction::OVERWINTER_MAX_CURRENT_VERSION || tx.nVersion < CTransaction::OVERWINTER_MIN_CURRENT_VERSION) {
-            reason = "overwinter-version";
             return false;
         }
     } else {
@@ -898,9 +891,8 @@ bool ContextualCheckTransaction(
         const int dosLevel,
         bool (*isInitBlockDownload)(const CChainParams&))
 {
-    bool overwinterActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA);
     bool saplingActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA);
-    bool isSprout = !overwinterActive;
+    bool isSprout = !saplingActive;
 
     // If Sprout rules apply, reject transactions which are intended for Overwinter and beyond
     if (isSprout && tx.fOverwintered) {
@@ -934,40 +926,21 @@ bool ContextualCheckTransaction(
             return state.DoS(100, error("CheckTransaction(): Sapling version too high"),
                 REJECT_INVALID, "bad-tx-sapling-version-too-high");
         }
-    } else if (overwinterActive) {
-        // Reject transactions with valid version but missing overwinter flag
-        if (tx.nVersion >= OVERWINTER_MIN_TX_VERSION && !tx.fOverwintered) {
-            return state.DoS(dosLevel, error("ContextualCheckTransaction(): overwinter flag must be set"),
-                            REJECT_INVALID, "tx-overwinter-flag-not-set");
-        }
-
-        // Reject transactions with non-Overwinter version group ID
-        if (tx.fOverwintered && tx.nVersionGroupId != OVERWINTER_VERSION_GROUP_ID) {
-            return state.DoS(isInitBlockDownload(chainparams) ? 0 : dosLevel,
-                    error("CheckTransaction(): invalid Overwinter tx version"),
-                    REJECT_INVALID, "bad-overwinter-tx-version-group-id");
-        }
-
-        // Reject transactions with invalid version
-        if (tx.fOverwintered && tx.nVersion > OVERWINTER_MAX_TX_VERSION ) {
-            return state.DoS(100, error("CheckTransaction(): overwinter version too high"),
-                REJECT_INVALID, "bad-tx-overwinter-version-too-high");
-        }
     }
 
     // Rules that apply to Overwinter or later:
-    if (overwinterActive) {
+    if (saplingActive) {
         // Reject transactions intended for Sprout
         if (!tx.fOverwintered) {
-            return state.DoS(dosLevel, error("ContextualCheckTransaction: overwinter is active"),
-                            REJECT_INVALID, "tx-overwinter-active");
+            return state.DoS(dosLevel, error("ContextualCheckTransaction: sapling is active not overwintered"),
+                            REJECT_INVALID, "tx-sapling-active");
         }
 
         // Check that all transactions are unexpired
         if (IsExpiredTx(tx, nHeight)) {
             // Don't increase banscore if the transaction only just expired
             int expiredDosLevel = IsExpiredTx(tx, nHeight - 1) ? dosLevel : 0;
-            return state.DoS(expiredDosLevel, error("ContextualCheckTransaction(): transaction is expired"), REJECT_INVALID, "tx-overwinter-expired");
+            return state.DoS(expiredDosLevel, error("ContextualCheckTransaction(): transaction is expired"), REJECT_INVALID, "tx-sapling-expired");
         }
     }
 
@@ -1833,10 +1806,15 @@ bool GetSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value)
 {
     AssertLockHeld(cs_main);
     if (!fSpentIndex)
-        return error("spent index not enabled");
+        return error("Spent index not enabled");
+
     if (mempool.getSpentIndex(key, value))
         return true;
-    return pblocktree->ReadSpentIndex(key, value);
+
+    if (!pblocktree->ReadSpentIndex(key, value))
+        return error("Unable to get spent index information");
+
+    return true;
 }
 
 bool GetAddressIndex(const uint160& addressHash, int type,
