@@ -3791,13 +3791,8 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
     mtx.nVersion = SAPLING_TX_VERSION;
     unsigned int max_tx_size = MAX_TX_SIZE_AFTER_SAPLING;
     if (!NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
-        if (NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
-            mtx.nVersionGroupId = OVERWINTER_VERSION_GROUP_ID;
-            mtx.nVersion = OVERWINTER_TX_VERSION;
-        } else {
-            mtx.fOverwintered = false;
-            mtx.nVersion = 2;
-        }
+        mtx.fOverwintered = false;
+        mtx.nVersion = 2;
 
         max_tx_size = MAX_TX_SIZE_BEFORE_SAPLING;
 
@@ -3889,7 +3884,7 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
     if (!fromTaddr || !zaddrRecipients.empty()) {
         // We have shielded inputs or outputs, and therefore cannot create
         // transactions before Acadia (Sapling) activates.
-        if (!Params().GetConsensus().NetworkUpgradeActive(nextBlockHeight, Consensus::UPGRADE_ACADIA)) {
+        if (!NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
             throw JSONRPCError(
                 RPC_INVALID_PARAMETER, "Cannot create shielded transactions before Acadia (Sapling) has activated");
         }
@@ -4132,7 +4127,7 @@ UniValue z_shieldcoinbase(const UniValue& params, bool fHelp)
     }
 
     int nextBlockHeight = chainActive.Height() + 1;
-    const bool saplingActive =  Params().GetConsensus().NetworkUpgradeActive(nextBlockHeight, Consensus::UPGRADE_ACADIA);
+    const bool saplingActive =  NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA);
 
     // We cannot create shielded transactions before Acadia (Sapling) activates.
     if (!saplingActive) {
@@ -4140,8 +4135,6 @@ UniValue z_shieldcoinbase(const UniValue& params, bool fHelp)
             RPC_INVALID_PARAMETER, "Cannot create shielded transactions before Acadia (Sapling) has activated");
     }
 
-    bool overwinterActive = Params().GetConsensus().NetworkUpgradeActive(nextBlockHeight, Consensus::UPGRADE_ACADIA);
-    assert(overwinterActive);
     unsigned int max_tx_size = MAX_TX_SIZE_AFTER_SAPLING;
 
     // Prepare to get coinbase utxos
@@ -4151,7 +4144,7 @@ UniValue z_shieldcoinbase(const UniValue& params, bool fHelp)
     size_t estimatedTxSize = 2000;  // 1802 joinsplit description + tx overhead + wiggle room
     size_t utxoCounter = 0;
     bool maxedOutFlag = false;
-    size_t mempoolLimit = (nLimit != 0) ? nLimit : (overwinterActive ? 0 : (size_t)GetArg("-mempooltxinputlimit", 0));
+    size_t mempoolLimit = (nLimit != 0) ? nLimit : (saplingActive ? 0 : (size_t)GetArg("-mempooltxinputlimit", 0));
 
     // Set of addresses to filter utxos by
     std::set<CTxDestination> destinations = {};
