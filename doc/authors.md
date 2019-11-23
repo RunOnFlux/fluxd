@@ -1,8 +1,8 @@
 Zel Contributors
 ==================
 
-Tadeas Kmenta (9)
-Miles Manley (8)
+Tadeas Kmenta (10)
+Miles Manley (10)
 Wilke Trei (7)
 Jeremy Anderson (7)
 Jules 'Coinblockers' (1)
@@ -12,7 +12,7 @@ Zcash Contributors
 
 Jack Grigg (874)
 Simon Liu (459)
-Sean Bowe (278)
+Sean Bowe (279)
 Eirik Ogilvie-Wigley (169)
 Daira Hopwood (136)
 Jay Graber (89)
