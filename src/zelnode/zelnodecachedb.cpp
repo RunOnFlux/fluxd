@@ -13,7 +13,7 @@ CDeterministicZelnodeDB::CDeterministicZelnodeDB(size_t nCacheSize, bool fMemory
 
 bool CDeterministicZelnodeDB::WriteZelnodeCacheData(const ZelnodeCacheData& data)
 {
-    LogPrintf("Wrote zelnodedata %s to database\n", data.collatoralIn.ToString());
+    LogPrint("dzelnode", "Wrote zelnodedata %s to database\n", data.collatoralIn.ToString());
     return Write(std::make_pair(DB_ZELNODE_CACHE_DATA, data.collatoralIn), data);
 }
 
@@ -58,9 +58,9 @@ bool CDeterministicZelnodeDB::LoadZelnodeCacheData()
         }
     }
 
-    LogPrintf("%s : Size of mapStartTxTracker: %s\n", __func__, g_zelnodeCache.mapStartTxTracker.size());
-    LogPrintf("%s : Size of mapStartTxDosTracker: %s\n", __func__, g_zelnodeCache.mapStartTxDosTracker.size());
-    LogPrintf("%s : Size of mapConfirmedZelnodeData: %s\n", __func__, g_zelnodeCache.mapConfirmedZelnodeData.size());
+    LogPrint("dzelnode","%s : Size of mapStartTxTracker: %s\n", __func__, g_zelnodeCache.mapStartTxTracker.size());
+    LogPrint("dzelnode", "%s : Size of mapStartTxDosTracker: %s\n", __func__, g_zelnodeCache.mapStartTxDosTracker.size());
+    LogPrint("dzelnode", "%s : Size of mapConfirmedZelnodeData: %s\n", __func__, g_zelnodeCache.mapConfirmedZelnodeData.size());
 
     return true;
 }

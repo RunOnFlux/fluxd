@@ -29,6 +29,7 @@
 #define ZELNODE_SUPER_COLLATERAL 25000
 #define ZELNODE_BAMF_COLLATERAL 100000
 
+#define ZELNODE_MIN_CONFIRMATION_DETERMINISTIC 100
 #define ZELNODE_START_TX_EXPIRATION_HEIGHT 5 // add to dos tracker after the amount
 #define ZELNODE_DOS_REMOVE_AMOUNT 10 // Remove from dos tracker after this amount
 #define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT 20 // Expire confirmed nodes if not see update confirm transaction within this number

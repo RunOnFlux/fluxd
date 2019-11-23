@@ -9,7 +9,7 @@
  * network protocol versioning
  */
 
-static const int PROTOCOL_VERSION = 170015;
+static const int PROTOCOL_VERSION = 170016;
 
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
@@ -36,7 +36,7 @@ static const int NO_BLOOM_VERSION = 170004;
 //! protocol version that requires zelnode payments
 static const int MIN_PEER_PROTO_VERSION_ZELNODE = 170009;
 
-//! protocol version that means zelnode broadcast will contain the benchmarkd data
-static const int BENCHMARKD_PROTO_VERSION = 170015;
+//! protocol version that means they support deterministic zelnodes
+static const int DETERMINISTIC_ZELNODES = 170016;
 
 #endif // BITCOIN_VERSION_H

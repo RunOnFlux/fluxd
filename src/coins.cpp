@@ -624,7 +624,7 @@ bool CCoinsViewCache::HaveInputs(const CTransaction& tx) const
     return true;
 }
 
-bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, int& nTier) const
+bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier) const
 {
     if (!tx.IsZelnodeTx()) {
         return false;
@@ -633,6 +633,11 @@ bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, int& nTier) co
     const COutPoint &prevout = tx.collatoralOut;
     const CCoins* coins = AccessCoins(prevout.hash);
     if (!coins || !coins->IsAvailable(prevout.n)) {
+        return false;
+    }
+
+    // Check for minimum height requirement
+    if (p_Height - coins->nHeight < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC) {
         return false;
     }
 

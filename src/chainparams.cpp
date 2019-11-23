@@ -125,6 +125,10 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].hashActivationBlock =
                 uint256S("00000052e2ac144c2872ff641c646e41dac166ac577bc9b0837f501aba19de4a");
 
+        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nProtocolVersion = 170016;
+        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nActivationHeight = 1000000;  // TODO, set approx data
+        // TODO, add the activation block hash after activation
+
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	consensus.eh_epoch_fade_length = 11;
@@ -246,7 +250,7 @@ public:
         consensus.nMajorityWindow = 400;
         consensus.powLimit = uint256S("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nDigishieldAveragingWindow = 17;
-//        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
+//        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow); // TODO revert this if we want to, it is testnet after all
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPowAllowMinDifficultyBlocksAfterHeight = 1;
@@ -272,11 +276,14 @@ public:
 	    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
         consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 720;
 
+        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nProtocolVersion = 170016;
+        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nActivationHeight = 800; // TODO, set activation height for testnet
+
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 10;
 
-	    eh_epoch_1 = eh96_5;
+	    eh_epoch_1 = eh96_5; // TODO, revert this for testnet if we don't want CPU minable until  EQUI144_5 goes live on block 100
 //        eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
         eh_epoch_3 = zelHash;
@@ -343,8 +350,7 @@ public:
         networkID = CBaseChainParams::Network::TESTNET;
         strZelnodeTestingDummyAddress= "tmXxZqbmvrxeSFQsXmm4N9CKyME767r47fS";
         strBenchmarkingPublicKey = "04cf3c34f01486bbb34c1a7ca11c2ddb1b3d98698c3f37d54452ff91a8cd5e92a6910ce5fc2cc7ad63547454a965df53ff5be740d4ef4ac89848c2bafd1e40e6b7";
-        nStartZelnodePaymentsHeight = 20; // Start paying deterministic zelnodes on height 20
-
+        nStartZelnodePaymentsHeight = 1600; // TODO, set this height. This is the height that will make zelnode payouts use the deterministic payouts into of the zelnode synced data
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
@@ -390,7 +396,7 @@ public:
         consensus.nDigishieldMaxAdjustUp = 0; // Turn off adjustment up
 
         consensus.nPowTargetSpacing = 2 * 60;
-	consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
+	    consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
 
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
@@ -399,30 +405,34 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight =
-	    Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight =
+        consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-    consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170006;
-    consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight =
-            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
-    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight =
-            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170006;
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nProtocolVersion = 170016;
+        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
 
-	consensus.nZawyLWMAAveragingWindow = 60;
-	consensus.eh_epoch_fade_length = 11;
+        consensus.nZawyLWMAAveragingWindow = 60;
+        consensus.eh_epoch_fade_length = 11;
 
-	eh_epoch_1 = eh48_5;
+	    eh_epoch_1 = eh48_5;
         eh_epoch_2 = eh48_5;
 
         pchMessageStart[0] = 0xaa;

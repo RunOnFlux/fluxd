@@ -32,6 +32,7 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
+#include <zelnode/zelnode.h>
 
 using namespace std;
 using namespace libzelcash;
@@ -2973,11 +2974,14 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
             if (pcoin->IsCoinBase() && !fIncludeCoinBase)
                 continue;
 
-//            if (pcoin->IsCoinBase() && pcoin->GetBlocksToMaturity() > 0)
-//                continue;
+            if (pcoin->IsCoinBase() && pcoin->GetBlocksToMaturity() > 0)
+                continue;
 
             int nDepth = pcoin->GetDepthInMainChain();
             if (nDepth < 0)
+                continue;
+
+            if (nDepth < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC)
                 continue;
 
             for (unsigned int i = 0; i < pcoin->vout.size(); i++) {
@@ -3010,9 +3014,8 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                 if (mine == ISMINE_NO)
                     continue;
 
-//                if (IsLockedCoin((*it).first, i) && nCoinType != ONLY_10000 && nCoinType != ONLY_25000 && nCoinType != ONLY_100000 && nCoinType != ALL_ZELNODE )
-//                    continue;
-
+                if (IsLockedCoin((*it).first, i) && nCoinType != ONLY_10000 && nCoinType != ONLY_25000 && nCoinType != ONLY_100000 && nCoinType != ALL_ZELNODE )
+                    continue;
 
                 if (pcoin->vout[i].nValue <= 0 && !fIncludeZeroValue)
                     continue;

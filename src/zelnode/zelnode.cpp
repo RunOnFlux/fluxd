@@ -928,11 +928,9 @@ void GetUndoDataForExpiredConfirmZelnodes(CZelnodeTxBlockUndo& p_zelnodeTxUndoDa
     }
 
     for (const auto& out : setSpentOuts) {
-        LogPrintf("%s : Expiring spent outputs: %s\n", __func__, out.ToString());
         if (g_zelnodeCache.mapConfirmedZelnodeData.count(out)) {
+            LogPrint("dzelnode","%s : expiring spent output: %s\n", __func__, out.ToString());
             p_zelnodeTxUndoData.vecExpiredConfirmedData.emplace_back(g_zelnodeCache.mapConfirmedZelnodeData.at(out));
-        } else {
-            LogPrintf("%s : Global cache didn't have outputs: %s\n", __func__, out.ToString());
         }
     }
 }
@@ -1000,7 +998,7 @@ bool ZelnodeCache::CheckIfStarted(const COutPoint& out)
         return true;
     }
 
-    LogPrintf("%s :  Initial Confirm tx, fail because outpoint %s is not in the mapStartTxTracker\n", __func__, out.ToString());
+    LogPrint("dzelnode", "%s :  Initial Confirm tx, fail because outpoint %s is not in the mapStartTxTracker\n", __func__, out.ToString());
     return false;
 }
 
@@ -1054,12 +1052,12 @@ bool ZelnodeCache::CheckNewStartTx(const COutPoint& out)
 {
     LOCK(cs);
     if (mapStartTxTracker.count(out)) {
-        LogPrintf("%s :  Failed because it is in the mapStartTxTracker: %s\n", __func__, out.ToString());
+        LogPrint("dzelnode", "%s :  Failed because it is in the mapStartTxTracker: %s\n", __func__, out.ToString());
         return false;
     }
 
     if (mapStartTxDosTracker.count(out)) {
-        LogPrintf("%s :  Failed because it is in the mapStartTxDosTracker: %s\n", __func__, out.ToString());
+        LogPrint("dzelnode", "%s :  Failed because it is in the mapStartTxDosTracker: %s\n", __func__, out.ToString());
         return false;
     }
 
@@ -1090,9 +1088,9 @@ void ZelnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
             mapStartTxDosHeights[removalHeight] = setNewDosHeights;
     }
 
-    LogPrintf("%s : Size of mapStartTxTracker: %s\n", __func__, g_zelnodeCache.mapStartTxTracker.size());
-    LogPrintf("%s : Size of mapStartTxDosTracker: %s\n", __func__, g_zelnodeCache.mapStartTxDosTracker.size());
-    LogPrintf("%s : Size of mapConfirmedZelnodeData: %s\n", __func__, g_zelnodeCache.mapConfirmedZelnodeData.size());
+    LogPrint("dzelnode", "%s : Size of mapStartTxTracker: %s\n", __func__, g_zelnodeCache.mapStartTxTracker.size());
+    LogPrint("dzelnode", "%s : Size of mapStartTxDosTracker: %s\n", __func__, g_zelnodeCache.mapStartTxDosTracker.size());
+    LogPrint("dzelnode", "%s : Size of mapConfirmedZelnodeData: %s\n", __func__, g_zelnodeCache.mapConfirmedZelnodeData.size());
 }
 
 void ZelnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
@@ -1355,9 +1353,9 @@ void FillBlockPayeeWithDeterministicPayouts(CMutableTransaction& txNew, CAmount 
 
     txNew.vout[0].nValue = nMinerReward;
 
-    LogPrint("zelnode","Zelnode Basic payment of %s to %s\n", FormatMoney(basic_amount).c_str(), EncodeDestination(basic_dest).c_str());
-    LogPrint("zelnode","Zelnode Super payment of %s to %s\n", FormatMoney(super_amount).c_str(), EncodeDestination(super_dest).c_str());
-    LogPrint("zelnode","Zelnode BAMF payment of %s to %s\n", FormatMoney(bamf_amount).c_str(), EncodeDestination(bamf_dest).c_str());
+    LogPrint("dzelnode","Zelnode Basic payment of %s to %s\n", FormatMoney(basic_amount).c_str(), EncodeDestination(basic_dest).c_str());
+    LogPrint("dzelnode","Zelnode Super payment of %s to %s\n", FormatMoney(super_amount).c_str(), EncodeDestination(super_dest).c_str());
+    LogPrint("dzelnode","Zelnode BAMF payment of %s to %s\n", FormatMoney(bamf_amount).c_str(), EncodeDestination(bamf_dest).c_str());
 }
 
 

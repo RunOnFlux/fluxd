@@ -148,8 +148,7 @@ UniValue TxShieldedOutputsToJSON(const CTransaction& tx) {
     return vdesc;
 }
 
-void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry)
-{
+void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) {
     const uint256 txid = tx.GetHash();
     entry.push_back(Pair("txid", txid.GetHex()));
     entry.push_back(Pair("version", tx.nVersion));
@@ -161,7 +160,8 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry)
         entry.push_back(Pair("sig", EncodeBase64(&tx.sig[0], tx.sig.size())));
 
         if (tx.nType & ZELNODE_START_TX_TYPE) {
-            entry.push_back(Pair("collatoral_pubkey", EncodeBase64(tx.collatoralPubkey.begin(), tx.collatoralPubkey.size())));
+            entry.push_back(
+                    Pair("collatoral_pubkey", EncodeBase64(tx.collatoralPubkey.begin(), tx.collatoralPubkey.size())));
             entry.push_back(Pair("zelnode_pubkey", EncodeBase64(tx.pubKey.begin(), tx.pubKey.size())));
             entry.push_back(Pair("ip", tx.ip));
         }
@@ -195,76 +195,77 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry)
                             o.push_back(Pair("hex", HexStr(txin.scriptSig.begin(), txin.scriptSig.end())));
                             in.push_back(Pair("scriptSig", o));
 
-            // Add address and value info if spentindex enabled
-            CSpentIndexValue spentInfo;
-            CSpentIndexKey spentKey(txin.prevout.hash, txin.prevout.n);
-            if (fSpentIndex && GetSpentIndex(spentKey, spentInfo)) {
-                in.push_back(Pair("value", ValueFromAmount(spentInfo.satoshis)));
-                in.push_back(Pair("valueSat", spentInfo.satoshis));
+                            // Add address and value info if spentindex enabled
+                            CSpentIndexValue spentInfo;
+                            CSpentIndexKey spentKey(txin.prevout.hash, txin.prevout.n);
+                            if (fSpentIndex && GetSpentIndex(spentKey, spentInfo)) {
+                                in.push_back(Pair("value", ValueFromAmount(spentInfo.satoshis)));
+                                in.push_back(Pair("valueSat", spentInfo.satoshis));
 
-                CTxDestination dest =
-                    DestFromAddressHash(spentInfo.addressType, spentInfo.addressHash);
-                if (IsValidDestination(dest)) {
-                    in.push_back(Pair("address", EncodeDestination(dest)));
-                }
+                                CTxDestination dest =
+                                        DestFromAddressHash(spentInfo.addressType, spentInfo.addressHash);
+                                if (IsValidDestination(dest)) {
+                                    in.push_back(Pair("address", EncodeDestination(dest)));
+                                }
+                            }
+                        }
+                        in.push_back(Pair("sequence", (int64_t) txin.nSequence));
+                        vin.push_back(in);
+                    }
+        entry.push_back(Pair("vin", vin));
+        UniValue vout(UniValue::VARR);
+        for (unsigned int i = 0; i < tx.vout.size(); i++) {
+            const CTxOut &txout = tx.vout[i];
+            UniValue out(UniValue::VOBJ);
+            out.push_back(Pair("value", ValueFromAmount(txout.nValue)));
+            out.push_back(Pair("valueZat", txout.nValue));
+            out.push_back(Pair("valueSat", txout.nValue));
+            out.push_back(Pair("n", (int64_t) i));
+            UniValue o(UniValue::VOBJ);
+            ScriptPubKeyToJSON(txout.scriptPubKey, o, true);
+            out.push_back(Pair("scriptPubKey", o));
+
+            // Add spent information if spentindex is enabled
+            CSpentIndexValue spentInfo;
+            CSpentIndexKey spentKey(txid, i);
+            if (fSpentIndex && GetSpentIndex(spentKey, spentInfo)) {
+                out.push_back(Pair("spentTxId", spentInfo.txid.GetHex()));
+                out.push_back(Pair("spentIndex", (int) spentInfo.inputIndex));
+                out.push_back(Pair("spentHeight", spentInfo.blockHeight));
+            }
+            vout.push_back(out);
+        }
+        entry.push_back(Pair("vout", vout));
+
+        UniValue vJoinSplit = TxJoinSplitToJSON(tx);
+        entry.push_back(Pair("vJoinSplit", vJoinSplit));
+
+        if (tx.fOverwintered && tx.nVersion >= SAPLING_TX_VERSION) {
+            entry.push_back(Pair("valueBalance", ValueFromAmount(tx.valueBalance)));
+            entry.push_back(Pair("valueBalanceZat", tx.valueBalance));
+            UniValue vspenddesc = TxShieldedSpendsToJSON(tx);
+            entry.push_back(Pair("vShieldedSpend", vspenddesc));
+            UniValue voutputdesc = TxShieldedOutputsToJSON(tx);
+            entry.push_back(Pair("vShieldedOutput", voutputdesc));
+            if (!(vspenddesc.empty() && voutputdesc.empty())) {
+                entry.push_back(Pair("bindingSig", HexStr(tx.bindingSig.begin(), tx.bindingSig.end())));
             }
         }
-        in.push_back(Pair("sequence", (int64_t)txin.nSequence));
-        vin.push_back(in);
-    }
-    entry.push_back(Pair("vin", vin));
-    UniValue vout(UniValue::VARR);
-    for (unsigned int i = 0; i < tx.vout.size(); i++) {
-        const CTxOut& txout = tx.vout[i];
-        UniValue out(UniValue::VOBJ);
-        out.push_back(Pair("value", ValueFromAmount(txout.nValue)));
-        out.push_back(Pair("valueZat", txout.nValue));
-        out.push_back(Pair("valueSat", txout.nValue));
-        out.push_back(Pair("n", (int64_t)i));
-        UniValue o(UniValue::VOBJ);
-        ScriptPubKeyToJSON(txout.scriptPubKey, o, true);
-        out.push_back(Pair("scriptPubKey", o));
 
-        // Add spent information if spentindex is enabled
-        CSpentIndexValue spentInfo;
-        CSpentIndexKey spentKey(txid, i);
-        if (fSpentIndex && GetSpentIndex(spentKey, spentInfo)) {
-            out.push_back(Pair("spentTxId", spentInfo.txid.GetHex()));
-            out.push_back(Pair("spentIndex", (int)spentInfo.inputIndex));
-            out.push_back(Pair("spentHeight", spentInfo.blockHeight));
-        }
-        vout.push_back(out);
-    }
-    entry.push_back(Pair("vout", vout));
-
-    UniValue vJoinSplit = TxJoinSplitToJSON(tx);
-    entry.push_back(Pair("vJoinSplit", vJoinSplit));
-
-    if (tx.fOverwintered && tx.nVersion >= SAPLING_TX_VERSION) {
-        entry.push_back(Pair("valueBalance", ValueFromAmount(tx.valueBalance)));
-        entry.push_back(Pair("valueBalanceZat", tx.valueBalance));
-        UniValue vspenddesc = TxShieldedSpendsToJSON(tx);
-        entry.push_back(Pair("vShieldedSpend", vspenddesc));
-        UniValue voutputdesc = TxShieldedOutputsToJSON(tx);
-        entry.push_back(Pair("vShieldedOutput", voutputdesc));
-        if (!(vspenddesc.empty() && voutputdesc.empty())) {
-            entry.push_back(Pair("bindingSig", HexStr(tx.bindingSig.begin(), tx.bindingSig.end())));
-        }
-    }
-
-    if (!hashBlock.IsNull()) {
-        entry.push_back(Pair("blockhash", hashBlock.GetHex()));
-        BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
-        if (mi != mapBlockIndex.end() && (*mi).second) {
-            CBlockIndex* pindex = (*mi).second;
-            if (chainActive.Contains(pindex)) {
-                entry.push_back(Pair("height", pindex->nHeight));
-                entry.push_back(Pair("confirmations", 1 + chainActive.Height() - pindex->nHeight));
-                entry.push_back(Pair("time", pindex->GetBlockTime()));
-                entry.push_back(Pair("blocktime", pindex->GetBlockTime()));
-            } else {
-                entry.push_back(Pair("height", -1));
-                entry.push_back(Pair("confirmations", 0));
+        if (!hashBlock.IsNull()) {
+            entry.push_back(Pair("blockhash", hashBlock.GetHex()));
+            BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
+            if (mi != mapBlockIndex.end() && (*mi).second) {
+                CBlockIndex *pindex = (*mi).second;
+                if (chainActive.Contains(pindex)) {
+                    entry.push_back(Pair("height", pindex->nHeight));
+                    entry.push_back(Pair("confirmations", 1 + chainActive.Height() - pindex->nHeight));
+                    entry.push_back(Pair("time", pindex->GetBlockTime()));
+                    entry.push_back(Pair("blocktime", pindex->GetBlockTime()));
+                } else {
+                    entry.push_back(Pair("height", -1));
+                    entry.push_back(Pair("confirmations", 0));
+                }
             }
         }
     }

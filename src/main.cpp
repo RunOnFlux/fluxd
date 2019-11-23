@@ -919,11 +919,20 @@ bool ContextualCheckTransaction(
     bool saplingActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA);
     bool isSprout = !saplingActive;
 
+    bool zelnodesActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ZELNODES);
+
     // If Sprout rules apply, reject transactions which are intended for Overwinter and beyond
     if (isSprout && tx.fOverwintered) {
         return state.DoS(isInitBlockDownload(chainparams) ? 0 : dosLevel,
                          error("ContextualCheckTransaction(): overwinter is not active yet"),
                          REJECT_INVALID, "tx-overwinter-not-active");
+    }
+
+    if (tx.IsZelnodeTx()) {
+        if (!zelnodesActive) {
+            return state.DoS(dosLevel, error("ContextualCheckTransaction(): zelnodes tx seen before active"),
+                             REJECT_INVALID, "tx-zelnodes-not-active");
+        }
     }
 
     if (!tx.IsZelnodeTx()) {
@@ -1186,7 +1195,7 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
         return state.DoS(10, error("CheckTransaction(): vout empty"),
                          REJECT_INVALID, "bad-txns-vout-empty");
 
-    if (tx.IsZelnodeTx() && !tx.vout.empty() && !tx.vjoinsplit.empty() && !tx.vShieldedOutput.empty()
+    if (tx.IsZelnodeTx() && !tx.vout.empty() && !tx.vJoinSplit.empty() && !tx.vShieldedOutput.empty()
         && !tx.vin.empty() && !tx.vShieldedSpend.empty()) {
         return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, with none empty vectors"),
                          REJECT_INVALID, "bad-txns-zelnode-tx-not-empty");
@@ -1554,12 +1563,12 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             if (tx.nType == ZELNODE_START_TX_TYPE) {
                 // Check to make sure the input is not spent and meets the criteria of a zelnode input
                 int nTier;
-                if (!view.CheckZelnodeTxInput(tx, nTier)) {
+                if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier)) {
                     return state.DoS(10, error("bad-txns-zelnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-zelnode-inputs-invalid-spent-or-bad-value");
                 }
             } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
                 int nTier;
-                if (!view.CheckZelnodeTxInput(tx, nTier)) {
+                if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier)) {
                     return state.DoS(10, error("bad-txns-zelnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-zelnode-inputs-invalid-spent-or-bad-value");
                 }
             }
@@ -3088,7 +3097,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
             if (tx.IsZelnodeTx()) {
                 int nTier = 0;
-                if (!view.CheckZelnodeTxInput(tx, nTier))
+                if (!view.CheckZelnodeTxInput(tx, pindex->nHeight, nTier))
                     return state.DoS(100, error("ConnectBlock(): zelnode tx inputs missing/spent"),
                                      REJECT_INVALID, "bad-txns-zelnode-tx-inputs-missingorspent");
 
