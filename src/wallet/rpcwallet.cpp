@@ -3931,6 +3931,12 @@ UniValue z_setmigration(const UniValue& params, bool fHelp) {
             "1. enabled  (boolean, required) 'true' or 'false' to enable or disable respectively.\n"
         );
     LOCK(pwalletMain->cs_wallet);
+    bool setTo = params[0].get_bool();
+    if (setTo) {
+        if (GetArg("-migrationdestaddress", "").empty())
+            return "Must set -migrationdestaddress with valid sapling address";
+    }
+
     pwalletMain->fSaplingMigrationEnabled = params[0].get_bool();
     return NullUniValue;
 }
@@ -3963,8 +3969,12 @@ UniValue z_getmigrationstatus(const UniValue& params, bool fHelp) {
     //  The "destination_address" field MAY be omitted if the "-migrationdestaddress"
     // parameter is not set and no default address has yet been generated.
     // Note: The following function may return the default address even if it has not been added to the wallet
-    auto destinationAddress = AsyncRPCOperation_saplingmigration::getMigrationDestAddress(pwalletMain->GetHDSeedForRPC());
-    migrationStatus.push_back(Pair("destination_address", EncodePaymentAddress(destinationAddress)));
+    bool fFailed = false;
+    auto destinationAddress = AsyncRPCOperation_saplingmigration::getMigrationDestAddress(pwalletMain->GetHDSeedForRPC(), fFailed);
+
+    if (!fFailed)
+        migrationStatus.push_back(Pair("destination_address", EncodePaymentAddress(destinationAddress)));
+
     //  The values of "unmigrated_amount" and "migrated_amount" MUST take into
     // account failed transactions, that were not mined within their expiration
     // height.

@@ -1723,6 +1723,11 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         // Set sapling migration status
         pwalletMain->fSaplingMigrationEnabled = GetBoolArg("-migration", false);
+        if (pwalletMain->fSaplingMigrationEnabled) {
+            if (GetArg("-migrationdestaddress", "").empty()) {
+                strErrors << _("Error if -migration is set, -migrationdestaddress must also be set to a valid sapling address") << "\n";
+            }
+        }
 
         if (fFirstRun)
         {

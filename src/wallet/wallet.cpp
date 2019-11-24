@@ -4701,9 +4701,14 @@ bool HaveSpendingKeyForPaymentAddress::operator()(const libzelcash::SaplingPayme
     libzelcash::SaplingIncomingViewingKey ivk;
     libzelcash::SaplingFullViewingKey fvk;
 
-    return m_wallet->GetSaplingIncomingViewingKey(zaddr, ivk) &&
-        m_wallet->GetSaplingFullViewingKey(ivk, fvk) &&
-        m_wallet->HaveSaplingSpendingKey(fvk);
+    if (!m_wallet->GetSaplingIncomingViewingKey(zaddr, ivk))
+        return false;
+    if (!m_wallet->GetSaplingFullViewingKey(ivk, fvk))
+        return false;
+    if (!m_wallet->HaveSaplingSpendingKey(fvk))
+        return false;
+
+    return true;
 }
 
 bool HaveSpendingKeyForPaymentAddress::operator()(const libzelcash::InvalidEncoding& no) const
