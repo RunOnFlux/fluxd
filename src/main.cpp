@@ -1512,9 +1512,13 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             return state.DoS(0, false, REJECT_DUPLICATE, "zelnode-tx-outpoint-already-in-mempool");
         }
 
-        if (tx.nType == ZELNODE_START_TX_TYPE) {
-            if (GetAdjustedTime() - tx.sigTime > ZELNODE_MAX_SIG_TIME) {
-                return state.DoS(0, false, REJECT_DUPLICATE, "zelnode-tx-sig-to-old");
+        if (GetAdjustedTime() - tx.sigTime > ZELNODE_MAX_SIG_TIME) {
+            return state.DoS(0, false, REJECT_DUPLICATE, "zelnode-tx-sig-to-old");
+        }
+
+        if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
+            if (GetAdjustedTime() - tx.benchmarkSigTime > ZELNODE_MAX_SIG_TIME) {
+                return state.DoS(0, false, REJECT_DUPLICATE, "zelnode-tx-bench-sig-to-old");
             }
         }
     }
@@ -3640,8 +3644,8 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
         assert(zelnodeCache.Flush());
 
-        LogPrintf("%s : Size of global zelnodeCache mapStartTxTracker : %u\n", __func__, g_zelnodeCache.mapStartTxTracker.size());
-        LogPrintf("%s : Size of global zelnodeCache mapStartTxDosTrackerTxTracker : %u\n", __func__, g_zelnodeCache.mapStartTxDosTracker.size());
+        LogPrint("dzelnode", "%s : Size of global zelnodeCache mapStartTxTracker : %u\n", __func__, g_zelnodeCache.mapStartTxTracker.size());
+        LogPrint("dzelnode", "%s : Size of global zelnodeCache mapStartTxDosTrackerTxTracker : %u\n", __func__, g_zelnodeCache.mapStartTxDosTracker.size());
     }
     int64_t nTime4 = GetTimeMicros(); nTimeFlush += nTime4 - nTime3;
     LogPrint("bench", "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
@@ -5986,7 +5990,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         CAddress addrFrom;
         uint64_t nNonce = 1;
         vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
-        if (pfrom->nVersion < MIN_PEER_PROTO_VERSION)
+        if ((Params().NetworkID() == CBaseChainParams::MAIN && pfrom->nVersion < MIN_PEER_PROTO_VERSION)
+         || (Params().NetworkID() == CBaseChainParams::TESTNET && pfrom->nVersion < MIN_PEER_PROTO_VERSION_TESTNET))
         {
             // disconnect from peers older than this proto version
             LogPrintf("peer=%d using obsolete version %i; disconnecting\n", pfrom->id, pfrom->nVersion);
@@ -5995,8 +6000,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             pfrom->fDisconnect = true;
             return false;
         }
-
-        // TODO update to only connect to peers after a certain block height / fork has occured
 
         // Reject incoming connections from nodes that don't know about the current epoch
         const Consensus::Params& consensusParams = chainparams.GetConsensus();

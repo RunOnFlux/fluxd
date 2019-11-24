@@ -25,19 +25,30 @@
 #define ZELNODE_MIN_BENCHMARK_SECONDS (60 * 60) // Benchmark required new zelnode broadcast
 
 
+/// Deterministic Zelnode consensus
 #define ZELNODE_BASIC_COLLATERAL 10000
 #define ZELNODE_SUPER_COLLATERAL 25000
 #define ZELNODE_BAMF_COLLATERAL 100000
 
+// How old the output must be for zelnodes collatoral to be considered valid
 #define ZELNODE_MIN_CONFIRMATION_DETERMINISTIC 100
-#define ZELNODE_START_TX_EXPIRATION_HEIGHT 5 // add to dos tracker after the amount
-#define ZELNODE_DOS_REMOVE_AMOUNT 10 // Remove from dos tracker after this amount
-#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT 20 // Expire confirmed nodes if not see update confirm transaction within this number
+
+// If the zelnode isn't confirmed within this amount of blocks, the zelnode is moved to a DoS list
+#define ZELNODE_START_TX_EXPIRATION_HEIGHT 60
+
+// How long the zelnode will stay in the DoS list. Is the calculated from that height the start transaction was added to the chain
+#define ZELNODE_DOS_REMOVE_AMOUNT 180
+
+// How often a new confirmation transaction needs to be seen on chain to keep a node up and running
+#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT 60
+
+// Nodes are allowed to send a update confirm notification only after this many blocks past there last confirm
+#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT 40
 
 
-#define ZELNODE_MAX_SIG_TIME 3600 // Max signature time that we accept into the mempool // TODO look at this more
-
-#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT 5 // Nodes should send an update confirm transaction after this amount
+/// Mempool only
+// Max signature time that we accept into the mempool
+#define ZELNODE_MAX_SIG_TIME 3600
 
 class Zelnode;
 class ZelnodeBroadcast;

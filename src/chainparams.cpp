@@ -265,29 +265,28 @@ public:
         Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
-	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 70;
+	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 500;
 
 	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
-	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 100;
+	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 1000;
 
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 120;
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 1100;
 
 	    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
-        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 720;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 1200;
 
         consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nProtocolVersion = 170016;
-        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nActivationHeight = 800; // TODO, set activation height for testnet
+        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nActivationHeight = 1300;
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 10;
 
-	    eh_epoch_1 = eh96_5; // TODO, revert this for testnet if we don't want CPU minable until  EQUI144_5 goes live on block 100
+	    eh_epoch_1 = eh96_5; // TODO, revert this for testnet if we don't want CPU minable until  EQUI144_5 goes live on block 1000
 //        eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
         eh_epoch_3 = zelHash;
-
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -311,12 +310,12 @@ public:
 
         vFixedSeeds.clear();
         vSeeds.clear();
+        vSeeds.push_back(CDNSSeedData("zel-testnet-seed.asoftwaresolution.com", "zel-testnet-seed.asoftwaresolution.com")); // Blondfrogs
         vSeeds.push_back(CDNSSeedData("test.vps.zel.network", "test.singapore.zel.network")); // MilesManley
         vSeeds.push_back(CDNSSeedData("test.vpsone.zel.network", "test.bangalore.zel.network")); // MilesManley
         vSeeds.push_back(CDNSSeedData("test.vpstwo.zel.network", "test.frankfurt.zel.network")); // MilesManley
         vSeeds.push_back(CDNSSeedData("test.vpsthree.zel.network", "test.newyork.zel.network")); // MilesManley
-        //vSeeds.push_back(CDNSSeedData("vps.testnet.zelcash.online", "dnsseedtestnet.zelcash.online")); // TheTrunk
-
+//        vSeeds.push_back(CDNSSeedData("vps.testnet.zelcash.online", "dnsseedtestnet.zelcash.online")); // TheTrunk
 
         // guarantees the first 2 characters, when base58 encoded, are "tm"
         base58Prefixes[PUBKEY_ADDRESS]     = {0x1D,0x25};
@@ -350,7 +349,7 @@ public:
         networkID = CBaseChainParams::Network::TESTNET;
         strZelnodeTestingDummyAddress= "tmXxZqbmvrxeSFQsXmm4N9CKyME767r47fS";
         strBenchmarkingPublicKey = "04cf3c34f01486bbb34c1a7ca11c2ddb1b3d98698c3f37d54452ff91a8cd5e92a6910ce5fc2cc7ad63547454a965df53ff5be740d4ef4ac89848c2bafd1e40e6b7";
-        nStartZelnodePaymentsHeight = 1600; // TODO, set this height. This is the height that will make zelnode payouts use the deterministic payouts into of the zelnode synced data
+        nStartZelnodePaymentsHeight = 1300;
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
