@@ -327,9 +327,11 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             if (!view.HaveInputs(tx))
                 continue;
 
-            int nTier;
-            if (!view.CheckZelnodeTxInput(tx, pindexPrev->nHeight + 1, nTier))
-                continue;
+            if (tx.IsZelnodeTx()) {
+                int nTier;
+                if (!view.CheckZelnodeTxInput(tx, pindexPrev->nHeight + 1, nTier))
+                    continue;
+            }
 
             CAmount nTxFees = view.GetValueIn(tx)-tx.GetValueOut();
 
