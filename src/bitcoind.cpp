@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2013 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "clientversion.h"
 #include "rpc/server.h"
@@ -194,7 +194,10 @@ bool AppInit(int argc, char* argv[])
 
     return fRet;
 }
-
+#include "fuzz.h"
+#ifdef ZCASH_FUZZ
+#include "fuzz.cpp"
+#else
 int main(int argc, char* argv[])
 {
     SetupEnvironment();
@@ -204,3 +207,4 @@ int main(int argc, char* argv[])
 
     return (AppInit(argc, argv) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
+#endif

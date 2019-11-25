@@ -1,8 +1,8 @@
 // Copyright (c) 2014-2016 The Dash developers
 // Copyright (c) 2015-2019 The PIVX developers
 // Copyright (c) 2019 The Zel developers
-// Distributed under the MIT/X11 software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "activezelnode.h"
 #include "addrman.h"
@@ -24,18 +24,6 @@ void ActiveZelnode::ManageStatus()
 
     if (!fZelnode) return;
 
-    if (fBenchmarkFailed) {
-        notCapableReason = strprintf("Benchmarking tests failed, please restart the node to try again");
-        LogPrintf("%s - %s\n", __func__, notCapableReason);
-        return;
-    }
-
-    if (!fBenchmarkComplete) {
-        notCapableReason = strprintf("Benchmarking isn't complete yet, please try again in a minute");
-        LogPrintf("%s - %s\n", __func__, notCapableReason);
-        return;
-    }
-
     if (fDebug) LogPrintf("%s - Begin\n", __func__);
 
     //need correct blocks to send ping
@@ -51,14 +39,17 @@ void ActiveZelnode::ManageStatus()
         Zelnode* pzn;
         pzn = zelnodeman.Find(pubKeyZelnode);
         if (pzn != NULL) {
-            if (!CheckBenchmarks(pzn->tier)) {
-                status = ACTIVE_ZELNODE_NOT_CAPABLE;
-                notCapableReason = strprintf("Failed benchmarks test for %s", pzn->Tier());
-                LogPrintf("%s - %s\n", __func__, notCapableReason);
-                return;
-            }
             pzn->Check();
             if (pzn->IsEnabled() && pzn->protocolVersion == PROTOCOL_VERSION) EnableHotColdZelnode(pzn->vin, pzn->addr);
+        }
+    }
+
+    if (status == ACTIVE_ZELNODE_STARTED) {
+        Zelnode* pzn;
+        pzn = zelnodeman.Find(pubKeyZelnode);
+        if (pzn != NULL) {
+            if (!BuildZelnodeBroadcast(errorMessage))
+                return;
         }
     }
 
@@ -129,7 +120,8 @@ void ActiveZelnode::ManageStatus()
             }
 
             ZelnodeBroadcast znb;
-            if (!CreateBroadcast(vin, service, keyCollateralAddress, pubKeyCollateralAddress, keyZelnode, pubKeyZelnode, errorMessage, znb)) {
+            CMutableTransaction mut;
+            if (!CreateBroadcast(vin, service, keyCollateralAddress, pubKeyCollateralAddress, keyZelnode, pubKeyZelnode, errorMessage, znb, mut)) {
                 notCapableReason = "Error on Register: " + errorMessage;
                 LogPrintf("%s - %s\n", __func__, notCapableReason);
                 return;
@@ -153,6 +145,65 @@ void ActiveZelnode::ManageStatus()
     //send to all peers
     if (!SendZelnodePing(errorMessage)) {
         LogPrintf("%s - Error on Ping: %s\n", __func__, errorMessage);
+    }
+}
+
+
+void ActiveZelnode::ManageDeterministricZelnode()
+{
+    // We only want to run this command on the VPS that has zelnode=1 and is running benchmarkd
+    if (!fZelnode)
+        return;
+
+    std::string errorMessage;
+
+    // Start confirm transaction
+    CMutableTransaction mutTx;
+    mutTx.nVersion = ZELNODE_TX_VERSION;
+
+    // Get the current height
+    int nHeight = chainActive.Height();
+
+    // Check if zelnode is currently in the start list, if so we will be building the Initial Confirm Transaction
+    // If the zelnode is already confirmed check to see if it needs to be re confirmed, if so, Create the Update Transaction
+    if (g_zelnodeCache.InStartTracker(activeZelnode.deterministicOutPoint)) {
+        // Check if we currently have a tx with the same vin in our mempool
+        // If we do, Resend the wallet transactions to our peers
+        if (mempool.mapZelnodeTxMempool.count(activeZelnode.deterministicOutPoint)) {
+            if (pwalletMain)
+                pwalletMain->ResendWalletTransactions(GetAdjustedTime());
+            LogPrintf("Zelnode found in start tracker. Skipping confirm transaction creation, because tranasaction already in mempool %s\n", activeZelnode.deterministicOutPoint.ToString());
+            return;
+        }
+
+        // If we don't have one in our mempool. That means it is time to confirm the zelnode
+        if (nHeight - nLastTriedToConfirm > 3) { // Only try this every couple blocks
+            activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::INITIAL_CONFIRM);
+        } else {
+            return;
+        }
+    } else if (g_zelnodeCache.CheckIfNeedsNextConfirm(activeZelnode.deterministicOutPoint)) {
+        activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::UPDATE_CONFIRM);
+    } else {
+        LogPrintf("Zelnode found nothing to do: %s\n", activeZelnode.deterministicOutPoint.ToString());
+        return;
+    }
+
+    if (activeZelnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
+        CReserveKey reservekey(pwalletMain);
+        CTransaction tx(mutTx);
+        CTransaction signedTx;
+        if (GetBenchmarkSignedTransaction(tx, signedTx, errorMessage)) {
+            CWalletTx walletTx(pwalletMain, signedTx);
+            pwalletMain->CommitTransaction(walletTx, reservekey);
+            nLastTriedToConfirm = nHeight;
+        } else {
+            error("Failed to sign benchmarking for zelnode confirm transaction for outpoint %s, Error message: %s", activeZelnode.deterministicOutPoint.ToString(), errorMessage);
+            return;
+        }
+    } else {
+        error("Failed to sign zelnode for confirm transaction for outpoint %s, Error message: %s", activeZelnode.deterministicOutPoint.ToString(), errorMessage);
+        return;
     }
 }
 
@@ -225,7 +276,7 @@ bool ActiveZelnode::SendZelnodePing(std::string& errorMessage)
     }
 }
 
-bool ActiveZelnode::CreateBroadcast(std::string strService, std::string strKeyZelnode, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, ZelnodeBroadcast &znb, bool fOffline)
+bool ActiveZelnode::CreateBroadcast(std::string strService, std::string strKeyZelnode, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, ZelnodeBroadcast &znb, CMutableTransaction& mutTransaction, bool fOffline)
 {
     CTxIn vin;
     CPubKey pubKeyCollateralAddress;
@@ -254,19 +305,17 @@ bool ActiveZelnode::CreateBroadcast(std::string strService, std::string strKeyZe
     }
 
     CService service = CService(strService);
-
     // The service needs the correct default port to work properly
     if (!ZelnodeBroadcast::CheckDefaultPort(strService, errorMessage, "ActiveZelnode::CreateBroadcast()"))
         return false;
 
     addrman.Add(CAddress(service), CNetAddr("127.0.0.1"), 2 * 60 * 60);
-
     return CreateBroadcast(vin, CService(strService), keyCollateralAddress, pubKeyCollateralAddress, keyZelnode,
-                           pubKeyZelnode, errorMessage, znb);
+                           pubKeyZelnode, errorMessage, znb, mutTransaction);
 }
 
 bool ActiveZelnode::CreateBroadcast(CTxIn vin, CService service, CKey key, CPubKey pubKey, CKey keyZelnode,
-                                    CPubKey pubKeyZelnode, std::string& errorMessage, ZelnodeBroadcast& znb)
+                                    CPubKey pubKeyZelnode, std::string& errorMessage, ZelnodeBroadcast& znb, CMutableTransaction& mutTransaction)
 {
     // wait for reindex and/or import to finish
     if (fImporting || fReindex) return false;
@@ -279,8 +328,21 @@ bool ActiveZelnode::CreateBroadcast(CTxIn vin, CService service, CKey key, CPubK
         return false;
     }
 
+    // Create zelnode transaction
+    if (mutTransaction.nType == ZELNODE_START_TX_TYPE) {
+        mutTransaction.ip = service.ToStringIP();
+        mutTransaction.collatoralIn = vin.prevout;
+        mutTransaction.collatoralPubkey = pubKey;
+        mutTransaction.pubKey = pubKeyZelnode;
+    } else if (mutTransaction.nType == ZELNODE_CONFIRM_TX_TYPE) {
+        mutTransaction.collatoralIn = vin.prevout;
+        if (mutTransaction.nUpdateType != ZelnodeUpdateType::UPDATE_CONFIRM)
+            mutTransaction.nUpdateType = ZelnodeUpdateType::INITIAL_CONFIRM;
+    }
+
     znb = ZelnodeBroadcast(service, vin, pubKey, pubKeyZelnode, PROTOCOL_VERSION);
     znb.lastPing = znp;
+
     if (!znb.Sign(key)) {
         errorMessage = strprintf("Failed to sign broadcast, vin: %s", vin.ToString());
         LogPrintf("%s -  %s\n", __func__, errorMessage);
@@ -341,7 +403,6 @@ bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, 
             return false;
         }
     }
-
     // At this point we have a selected output, retrieve the associated info
     return GetVinFromOutput(*selectedOutput, vin, pubkey, secretKey);
 }
@@ -353,7 +414,6 @@ bool ActiveZelnode::GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, C
     if (fImporting || fReindex) return false;
 
     CScript pubScript;
-
     vin = CTxIn(out.tx->GetHash(), out.i);
     pubScript = out.tx->vout[out.i].scriptPubKey; // the inputs PubKey
 
@@ -374,6 +434,7 @@ bool ActiveZelnode::GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, C
     }
 
     pubkey = secretKey.GetPubKey();
+
     return true;
 }
 
@@ -401,7 +462,7 @@ vector<std::pair<COutput, CAmount>> ActiveZelnode::SelectCoinsZelnode()
     }
 
     // Retrieve all possible outputs
-    pwalletMain->AvailableCoins(vCoins);
+    pwalletMain->AvailableCoins(vCoins, false);
 
     // Lock ZN coins from zelnode.conf back if they where temporary unlocked
     if (!confLockedCoins.empty()) {
@@ -438,6 +499,200 @@ bool ActiveZelnode::EnableHotColdZelnode(CTxIn& newVin, CService& newService)
     service = newService;
 
     LogPrintf("%s - Enabled! You may shut down the cold daemon.\n", __func__);
+
+    return true;
+}
+
+bool ActiveZelnode::BuildZelnodeBroadcast(std::string& errorMessage) {
+    // Choose coins to use
+    CPubKey pubKeyCollateralAddress;
+    CKey keyCollateralAddress;
+
+    if (GetZelNodeVin(vin, pubKeyCollateralAddress, keyCollateralAddress)) {
+        LOCK(pwalletMain->cs_wallet);
+        pwalletMain->LockCoin(vin.prevout);
+
+        // send to all nodes
+        CPubKey pubKeyZelnode;
+        CKey keyZelnode;
+
+        if (!obfuScationSigner.SetKey(strZelnodePrivKey, errorMessage, keyZelnode, pubKeyZelnode)) {
+            notCapableReason = "Error upon calling SetKey: " + errorMessage;
+            LogPrintf("Register::ManageStatus() - %s\n", notCapableReason);
+            return false;
+        }
+
+        ZelnodeBroadcast znb;
+        CMutableTransaction mut;
+        if (!CreateBroadcast(vin, service, keyCollateralAddress, pubKeyCollateralAddress, keyZelnode,
+                             pubKeyZelnode, errorMessage, znb, mut)) {
+            notCapableReason = "Error on Register: " + errorMessage;
+            LogPrintf("%s - %s\n", __func__, notCapableReason);
+            return false;
+        }
+
+        //send to all peers
+        LogPrintf("%s - Relay broadcast vin = %s\n", __func__, vin.ToString());
+        znb.Relay();
+
+        return true;
+    }
+}
+
+bool ActiveZelnode::SignDeterministicStartTx(CMutableTransaction& mutableTransaction, std::string& errorMessage)
+{
+    if (mutableTransaction.nType != ZELNODE_START_TX_TYPE) {
+        errorMessage = "invalid-tx-type";
+        return error("%s : %s", __func__, errorMessage);
+    }
+
+    CTxIn txin;
+    CPubKey pubKeyAddressNew;
+    CKey keyAddressNew;
+    if (!pwalletMain->GetZelnodeVinAndKeys(txin, pubKeyAddressNew, keyAddressNew, mutableTransaction.collatoralIn.hash.GetHex(), std::to_string(mutableTransaction.collatoralIn.n))) {
+        errorMessage = strprintf("Could not allocate txin %s:%s for zelnode %s", mutableTransaction.collatoralIn.hash.GetHex(), std::to_string(mutableTransaction.collatoralIn.n), mutableTransaction.ip);
+        LogPrintf("zelnode","%s -- %s\n", __func__, errorMessage);
+        return false;
+    }
+
+    // Set the public key for the zelnode collatoral
+    mutableTransaction.collatoralPubkey = pubKeyAddressNew;
+
+    if (mutableTransaction.nType == ZELNODE_START_TX_TYPE) {
+        std::string errorMessage;
+        mutableTransaction.sigTime = GetAdjustedTime();
+
+        std::string strMessage = mutableTransaction.GetHash().GetHex();
+
+        if (!obfuScationSigner.SignMessage(strMessage, errorMessage, mutableTransaction.sig, keyAddressNew))
+            return error("%s - Error: Sign Zelnode for start transaction %s", __func__, errorMessage);
+
+        if (!obfuScationSigner.VerifyMessage(mutableTransaction.collatoralPubkey, mutableTransaction.sig, strMessage, errorMessage))
+            return error("%s - Error: Verify Zelnode for start transaction: %s", __func__, errorMessage);
+
+        return true;
+    }
+
+    return false;
+}
+
+bool ActiveZelnode::SignDeterministicConfirmTx(CMutableTransaction& mutableTransaction, std::string& errorMessage)
+{
+    std::string strErrorRet;
+
+    if (mutableTransaction.nType != ZELNODE_CONFIRM_TX_TYPE) {
+        errorMessage = "invalid-tx-type";
+        return error("%s : %s", __func__, errorMessage);
+    }
+
+    auto data = g_zelnodeCache.GetZelnodeData(mutableTransaction.collatoralIn);
+
+    if (data.IsNull()) {
+        errorMessage = "zelnode-data-is-null";
+        return error("%s : %s", __func__, errorMessage);
+    }
+
+    // We need to sign the mutable transaction
+    mutableTransaction.sigTime = GetAdjustedTime();
+
+    std::string strMessage = mutableTransaction.collatoralIn.ToString() + std::to_string(mutableTransaction.collatoralIn.n) + std::to_string(mutableTransaction.nUpdateType) + std::to_string(mutableTransaction.sigTime);
+
+    // send to all nodes
+    CPubKey pubKeyZelnode;
+    CKey keyZelnode;
+
+    if (!obfuScationSigner.SetKey(strZelnodePrivKey, errorMessage, keyZelnode, pubKeyZelnode)) {
+        notCapableReason = "Error upon calling SetKey: " + errorMessage;
+        errorMessage = "unable-set-key";
+        return error("%s : %s", __func__, errorMessage);
+    }
+
+    if (data.pubKey != pubKeyZelnode) {
+        return error("%s - PubKey miss match", __func__);
+    }
+
+    if (!obfuScationSigner.SignMessage(strMessage, errorMessage, mutableTransaction.sig, keyZelnode))
+        return error("%s - Error: Signing Zelnode %s", __func__, errorMessage);
+
+    if (!obfuScationSigner.VerifyMessage(pubKeyZelnode, mutableTransaction.sig, strMessage, errorMessage))
+        return error("%s - Error: Verify Zelnode sig %s", __func__, errorMessage);
+
+    return true;
+}
+
+bool ActiveZelnode::BuildDeterministicStartTx(std::string strService, std::string strKeyZelnode, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, CMutableTransaction& mutTransaction)
+{
+    // wait for reindex and/or import to finish
+    if (IsInitialBlockDownload(Params())) {
+        errorMessage = "block chain is downloading";
+        return false;
+    }
+
+    CTxIn vin;
+    CPubKey pubKeyCollateralAddress;
+    CKey keyCollateralAddress;
+    CPubKey pubKeyZelnode;
+    CKey keyZelnode;
+
+    if (!obfuScationSigner.SetKey(strKeyZelnode, errorMessage, keyZelnode, pubKeyZelnode)) {
+        errorMessage = strprintf("Can't find keys for zelnode %s - %s", strService, errorMessage);
+        LogPrintf("%s - %s\n", __func__, errorMessage);
+        return false;
+    }
+
+    if (!GetZelNodeVin(vin, pubKeyCollateralAddress, keyCollateralAddress, strTxHash, strOutputIndex)) {
+        errorMessage = strprintf("Could not allocate vin %s:%s for zelnode %s", strTxHash, strOutputIndex,
+                                 strService);
+        LogPrintf("%s - %s\n", __func__, errorMessage);
+        return false;
+    }
+
+    mutTransaction.nType = ZELNODE_START_TX_TYPE;
+
+    CService service = CService(strService);
+    // The service needs the correct default port to work properly
+    if (!CheckDefaultPort(strService, errorMessage, "ActiveZelnode::GetDeterministicTx"))
+        return false;
+
+    // TODO , what is this doing?
+    addrman.Add(CAddress(service), CNetAddr("127.0.0.1"), 2 * 60 * 60);
+
+    // Create zelnode transaction
+    if (mutTransaction.nType == ZELNODE_START_TX_TYPE) {
+        mutTransaction.ip = service.ToStringIP();
+        mutTransaction.collatoralIn = vin.prevout;
+        mutTransaction.collatoralPubkey = pubKeyCollateralAddress;
+        mutTransaction.pubKey = pubKeyZelnode;
+    } else if (mutTransaction.nType == ZELNODE_CONFIRM_TX_TYPE) {
+        mutTransaction.collatoralIn = vin.prevout;
+        if (mutTransaction.nUpdateType != ZelnodeUpdateType::UPDATE_CONFIRM)
+            mutTransaction.nUpdateType = ZelnodeUpdateType::INITIAL_CONFIRM;
+    }
+
+    return true;
+}
+
+void ActiveZelnode::BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType)
+{
+    CKey keyCollateralAddress;
+    CKey keyZelnode;
+
+    mutTransaction.nType = ZELNODE_CONFIRM_TX_TYPE;
+    mutTransaction.collatoralIn = deterministicOutPoint;
+    mutTransaction.nUpdateType = nUpdateType;
+}
+
+bool ActiveZelnode::CheckDefaultPort(std::string strService, std::string& strErrorRet, std::string strContext)
+{
+    CService service = CService(strService);
+    int nDefaultPort = Params().GetDefaultPort();
+
+    if (service.GetPort() != nDefaultPort) {
+        strErrorRet = strprintf("Invalid port %u for zelnode %s, only %d is supported on %s-net.",
+                                service.GetPort(), strService, nDefaultPort, Params().NetworkIDString());
+        LogPrint("zelnode", "%s -- %s - %s\n", __func__, strContext, strErrorRet);
+        return false;
+    }
 
     return true;
 }

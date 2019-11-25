@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef BITCOIN_CHAINPARAMS_H
 #define BITCOIN_CHAINPARAMS_H
@@ -128,8 +128,9 @@ public:
     /** Zelnode Handling **/
     std::string SporkKey() const { return strSporkKey; }
     std::string ZelnodeTestingDummyAddress() const { return strZelnodeTestingDummyAddress; }
-    int64_t StartZelnodePayments() const { return nStartZelnodePayments; }
+    int64_t StartZelnodePayments() const { return nStartZelnodePaymentsHeight; }
     CBaseChainParams::Network NetworkID() const { return networkID; }
+    std::string BenchmarkingPublicKey() const { return strBenchmarkingPublicKey; }
 
 
 protected:
@@ -170,8 +171,9 @@ protected:
     /** Zelnode params **/
     std::string strSporkKey;
     std::string strZelnodeTestingDummyAddress;
-    int64_t nStartZelnodePayments;
+    int64_t nStartZelnodePaymentsHeight;
     CBaseChainParams::Network networkID;
+    std::string strBenchmarkingPublicKey;
 };
 
 /**

@@ -1,8 +1,8 @@
 // Copyright (c) 2014-2015 The Dash developers
 // Copyright (c) 2015-2017 The PIVX developers
 // Copyright (c) 2019 The Zel developers
-// Distributed under the MIT/X11 software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef OBFUSCATION_H
 #define OBFUSCATION_H
@@ -21,6 +21,7 @@ class ActiveZelnode;
 
 extern CObfuScationSigner obfuScationSigner;
 extern std::string strZelnodePrivKey;
+extern COutPoint zelnodeOutPoint;
 extern ActiveZelnode activeZelnode;
 
 bool GetTestingCollateralScript(std::string strAddress, CScript& script);
@@ -39,7 +40,7 @@ public:
     /// Sign the message, returns true if successful
     bool SignMessage(std::string strMessage, std::string& errorMessage, std::vector<unsigned char>& vchSig, CKey key);
     /// Verify the message, returns true if succcessful
-    bool VerifyMessage(CPubKey pubkey, std::vector<unsigned char>& vchSig, std::string strMessage, std::string& errorMessage);
+    bool VerifyMessage(const CPubKey& pubkey, const std::vector<unsigned char>& vchSig, const std::string& strMessage, std::string& errorMessage);
 };
 
 void ThreadCheckZelnodes();

@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "main.h"
 
@@ -21,7 +21,6 @@
 #include "metrics.h"
 #include "net.h"
 #include "pow.h"
-#include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
 #include "undo.h"
@@ -34,6 +33,8 @@
 #include <algorithm>
 #include <atomic>
 #include "zelnode/sporkdb.h"
+
+#include "zelnode/zelnodecachedb.h"
 
 #include <sstream>
 
@@ -115,6 +116,24 @@ const string strMessageMagic = "Zelcash Signed Message:\n";
 
 // Internal stuff
 namespace {
+
+    /** Abort with a message */
+    bool AbortNode(const std::string& strMessage, const std::string& userMessage="")
+    {
+        strMiscWarning = strMessage;
+        LogPrintf("*** %s\n", strMessage);
+        uiInterface.ThreadSafeMessageBox(
+            userMessage.empty() ? _("Error: A fatal internal error occurred, see debug.log for details") : userMessage,
+            "", CClientUIInterface::MSG_ERROR);
+        StartShutdown();
+        return false;
+    }
+
+    bool AbortNode(CValidationState& state, const std::string& strMessage, const std::string& userMessage="")
+    {
+        AbortNode(strMessage, userMessage);
+        return state.Error(strMessage);
+    }
 
     struct CBlockIndexWorkComparator
     {
@@ -570,6 +589,7 @@ CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& loc
 CCoinsViewCache *pcoinsTip = NULL;
 CBlockTreeDB *pblocktree = NULL;
 CSporkDB* pSporkDB = NULL;
+CDeterministicZelnodeDB* pZelnodeDB = NULL;
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -659,26 +679,23 @@ unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans) EXCLUSIVE_LOCKS_REQUIRE
 
 bool IsStandardTx(const CTransaction& tx, string& reason, const CChainParams& chainparams, const int nHeight)
 {
-    bool overwinterActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA);
     bool saplingActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA);
 
-    if (saplingActive) {
-        // Sapling standard rules apply
-        if (tx.nVersion > CTransaction::SAPLING_MAX_CURRENT_VERSION || tx.nVersion < CTransaction::SAPLING_MIN_CURRENT_VERSION) {
-            reason = "sapling-version";
-            return false;
-        }
-    } else if (overwinterActive) {
-        // Overwinter standard rules apply
-        if (tx.nVersion > CTransaction::OVERWINTER_MAX_CURRENT_VERSION || tx.nVersion < CTransaction::OVERWINTER_MIN_CURRENT_VERSION) {
-            reason = "overwinter-version";
-            return false;
-        }
-    } else {
-        // Sprout standard rules apply
-        if (tx.nVersion > CTransaction::SPROUT_MAX_CURRENT_VERSION || tx.nVersion < CTransaction::SPROUT_MIN_CURRENT_VERSION) {
-            reason = "version";
-            return false;
+    if (!tx.IsZelnodeTx()) {
+        if (saplingActive) {
+            // Sapling standard rules apply
+            if (tx.nVersion > CTransaction::SAPLING_MAX_CURRENT_VERSION ||
+                tx.nVersion < CTransaction::SAPLING_MIN_CURRENT_VERSION) {
+                reason = "sapling-version";
+                return false;
+            }
+        } else {
+            // Sprout standard rules apply
+            if (tx.nVersion > CTransaction::SPROUT_MAX_CURRENT_VERSION ||
+                tx.nVersion < CTransaction::SPROUT_MIN_CURRENT_VERSION) {
+                reason = "version";
+                return false;
+            }
         }
     }
 
@@ -899,9 +916,10 @@ bool ContextualCheckTransaction(
         const int dosLevel,
         bool (*isInitBlockDownload)(const CChainParams&))
 {
-    bool overwinterActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA);
     bool saplingActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA);
-    bool isSprout = !overwinterActive;
+    bool isSprout = !saplingActive;
+
+    bool zelnodesActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ZELNODES);
 
     // If Sprout rules apply, reject transactions which are intended for Overwinter and beyond
     if (isSprout && tx.fOverwintered) {
@@ -910,75 +928,66 @@ bool ContextualCheckTransaction(
                          REJECT_INVALID, "tx-overwinter-not-active");
     }
 
-    if (saplingActive) {
-        // Reject transactions with valid version but missing overwintered flag
-        if (tx.nVersion >= SAPLING_MIN_TX_VERSION && !tx.fOverwintered) {
-            return state.DoS(dosLevel, error("ContextualCheckTransaction(): overwintered flag must be set"),
-                            REJECT_INVALID, "tx-overwintered-flag-not-set");
-        }
-
-        // Reject transactions with non-Sapling version group ID
-        if (tx.fOverwintered && tx.nVersionGroupId != SAPLING_VERSION_GROUP_ID) {
-            return state.DoS(isInitBlockDownload(chainparams) ? 0 : dosLevel,
-                    error("CheckTransaction(): invalid Sapling tx version"),
-                    REJECT_INVALID, "bad-sapling-tx-version-group-id");
-        }
-
-        // Reject transactions with invalid version
-        if (tx.fOverwintered && tx.nVersion < SAPLING_MIN_TX_VERSION ) {
-            return state.DoS(100, error("CheckTransaction(): Sapling version too low"),
-                REJECT_INVALID, "bad-tx-sapling-version-too-low");
-        }
-
-        // Reject transactions with invalid version
-        if (tx.fOverwintered && tx.nVersion > SAPLING_MAX_TX_VERSION ) {
-            return state.DoS(100, error("CheckTransaction(): Sapling version too high"),
-                REJECT_INVALID, "bad-tx-sapling-version-too-high");
-        }
-    } else if (overwinterActive) {
-        // Reject transactions with valid version but missing overwinter flag
-        if (tx.nVersion >= OVERWINTER_MIN_TX_VERSION && !tx.fOverwintered) {
-            return state.DoS(dosLevel, error("ContextualCheckTransaction(): overwinter flag must be set"),
-                            REJECT_INVALID, "tx-overwinter-flag-not-set");
-        }
-
-        // Reject transactions with non-Overwinter version group ID
-        if (tx.fOverwintered && tx.nVersionGroupId != OVERWINTER_VERSION_GROUP_ID) {
-            return state.DoS(isInitBlockDownload(chainparams) ? 0 : dosLevel,
-                    error("CheckTransaction(): invalid Overwinter tx version"),
-                    REJECT_INVALID, "bad-overwinter-tx-version-group-id");
-        }
-
-        // Reject transactions with invalid version
-        if (tx.fOverwintered && tx.nVersion > OVERWINTER_MAX_TX_VERSION ) {
-            return state.DoS(100, error("CheckTransaction(): overwinter version too high"),
-                REJECT_INVALID, "bad-tx-overwinter-version-too-high");
+    if (tx.IsZelnodeTx()) {
+        if (!zelnodesActive) {
+            return state.DoS(dosLevel, error("ContextualCheckTransaction(): zelnodes tx seen before active"),
+                             REJECT_INVALID, "tx-zelnodes-not-active");
         }
     }
 
-    // Rules that apply to Overwinter or later:
-    if (overwinterActive) {
-        // Reject transactions intended for Sprout
-        if (!tx.fOverwintered) {
-            return state.DoS(dosLevel, error("ContextualCheckTransaction: overwinter is active"),
-                            REJECT_INVALID, "tx-overwinter-active");
+    if (!tx.IsZelnodeTx()) {
+        if (saplingActive) {
+            // Reject transactions with valid version but missing overwintered flag
+            if (tx.nVersion >= SAPLING_MIN_TX_VERSION && !tx.fOverwintered) {
+                return state.DoS(dosLevel, error("ContextualCheckTransaction(): overwintered flag must be set"),
+                                 REJECT_INVALID, "tx-overwintered-flag-not-set");
+            }
+
+            // Reject transactions with non-Sapling version group ID
+            if (tx.fOverwintered && tx.nVersionGroupId != SAPLING_VERSION_GROUP_ID) {
+                return state.DoS(isInitBlockDownload(chainparams) ? 0 : dosLevel,
+                                 error("CheckTransaction(): invalid Sapling tx version"),
+                                 REJECT_INVALID, "bad-sapling-tx-version-group-id");
+            }
+
+            // Reject transactions with invalid version
+            if (tx.fOverwintered && tx.nVersion < SAPLING_MIN_TX_VERSION) {
+                return state.DoS(100, error("CheckTransaction(): Sapling version too low"),
+                                 REJECT_INVALID, "bad-tx-sapling-version-too-low");
+            }
+
+            // Reject transactions with invalid version
+            if (tx.fOverwintered && tx.nVersion > SAPLING_MAX_TX_VERSION) {
+                return state.DoS(100, error("CheckTransaction(): Sapling version too high"),
+                                 REJECT_INVALID, "bad-tx-sapling-version-too-high");
+            }
         }
 
-        // Check that all transactions are unexpired
-        if (IsExpiredTx(tx, nHeight)) {
-            // Don't increase banscore if the transaction only just expired
-            int expiredDosLevel = IsExpiredTx(tx, nHeight - 1) ? dosLevel : 0;
-            return state.DoS(expiredDosLevel, error("ContextualCheckTransaction(): transaction is expired"), REJECT_INVALID, "tx-overwinter-expired");
-        }
-    }
+        // Rules that apply to Overwinter or later:
+        if (saplingActive) {
+            // Reject transactions intended for Sprout
+            if (!tx.fOverwintered) {
+                return state.DoS(dosLevel, error("ContextualCheckTransaction: sapling is active not overwintered"),
+                                 REJECT_INVALID, "tx-sapling-active");
+            }
 
-    // Rules that apply before Sapling:
-    if (!saplingActive) {
-        // Size limits
-        BOOST_STATIC_ASSERT(MAX_BLOCK_SIZE > MAX_TX_SIZE_BEFORE_SAPLING); // sanity
-        if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_TX_SIZE_BEFORE_SAPLING)
-            return state.DoS(100, error("ContextualCheckTransaction(): size limits failed"),
-                            REJECT_INVALID, "bad-txns-oversize");
+            // Check that all transactions are unexpired
+            if (IsExpiredTx(tx, nHeight)) {
+                // Don't increase banscore if the transaction only just expired
+                int expiredDosLevel = IsExpiredTx(tx, nHeight - 1) ? dosLevel : 0;
+                return state.DoS(expiredDosLevel, error("ContextualCheckTransaction(): transaction is expired"),
+                                 REJECT_INVALID, "tx-sapling-expired");
+            }
+        }
+
+        // Rules that apply before Sapling:
+        if (!saplingActive) {
+            // Size limits
+            BOOST_STATIC_ASSERT(MAX_BLOCK_SIZE > MAX_TX_SIZE_BEFORE_SAPLING); // sanity
+            if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_TX_SIZE_BEFORE_SAPLING)
+                return state.DoS(100, error("ContextualCheckTransaction(): size limits failed"),
+                                 REJECT_INVALID, "bad-txns-oversize");
+        }
     }
 
     uint256 dataToBeSigned;
@@ -1066,6 +1075,43 @@ bool ContextualCheckTransaction(
 
         librustzcash_sapling_verification_ctx_free(ctx);
     }
+
+    if (tx.IsZelnodeTx()) {
+        if (tx.nType == ZELNODE_START_TX_TYPE) {
+            if (!g_zelnodeCache.CheckNewStartTx(tx.collatoralOut)) {
+                return state.DoS(dosLevel, error("zelnode-tx-already-in-chain-or-waiting-for-dos-unban"), REJECT_INVALID, "zelnode-tx-already-in-chain-or-waiting-for-dos-unban");
+            }
+
+            if (g_zelnodeCache.CheckIfConfirmed(tx.collatoralOut)) {
+                return state.DoS(dosLevel, error("zelnode-tx-already-in-confirm-chain"), REJECT_INVALID, "zelnode-tx-already-in-confirm-chain");
+            }
+        } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
+
+            if (g_zelnodeCache.GetZelnodeData(tx.collatoralOut).nTier > tx.benchmarkTier) {
+                return state.DoS(dosLevel, error("zelnode-tx-benchmark-tier-to-low-for-collatoral"), REJECT_INVALID, "zelnode-tx-benchmark-tier-to-low-for-collatoral");
+            }
+            if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
+                if (!g_zelnodeCache.CheckIfStarted(tx.collatoralOut))
+                    return state.DoS(dosLevel, error("zelnode-tx-invalid-confirm-outpoint-not-started"), REJECT_INVALID, "zelnode-tx-invalid-confirm-outpoint-not-started");
+            } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
+                if (!g_zelnodeCache.CheckIfConfirmed(tx.collatoralOut)) {
+                    return state.DoS(dosLevel, error("zelnode-tx-invalid-update-confirm-outpoint-not-confirmed"), REJECT_INVALID, "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed");
+                }
+
+                if (!g_zelnodeCache.CheckUpdateHeight(tx)) {
+                    return state.DoS(dosLevel, error("zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon"), REJECT_INVALID, "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon");
+                }
+
+                if (g_zelnodeCache.GetZelnodeData(tx.collatoralOut).nTier > tx.benchmarkTier) {
+                    return state.DoS(dosLevel, error("zelnode-tx-benchmark-tier-to-low-for-collatoral"), REJECT_INVALID, "zelnode-tx-benchmark-tier-to-low-for-collatoral");
+                }
+            } else {
+                return state.DoS(100, error("zelnode-tx-malicious-update-type"), REJECT_INVALID, "zelnode-tx-malicious-update-type");
+            }
+        } else {
+            return state.DoS(100, error("zelnode-tx-malicious-type"), REJECT_INVALID, "zelnode-tx-malicious-type");
+        }
+    }
     return true;
 }
 
@@ -1149,6 +1195,42 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
         return state.DoS(10, error("CheckTransaction(): vout empty"),
                          REJECT_INVALID, "bad-txns-vout-empty");
 
+    if (tx.IsZelnodeTx() && !tx.vout.empty() && !tx.vJoinSplit.empty() && !tx.vShieldedOutput.empty()
+        && !tx.vin.empty() && !tx.vShieldedSpend.empty()) {
+        return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, with none empty vectors"),
+                         REJECT_INVALID, "bad-txns-zelnode-tx-not-empty");
+    }
+
+    if (tx.IsZelnodeTx()) {
+        // Check type of zelnode tx
+        if (tx.nType != ZELNODE_START_TX_TYPE && tx.nType != ZELNODE_CONFIRM_TX_TYPE)
+            return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, bad type"),
+                             REJECT_INVALID, "bad-txns-zelnode-tx-invalid-type");
+
+        // Check Input is not null
+        if (tx.collatoralOut.IsNull()) {
+            return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, with null collatoralOut prevout"),
+                             REJECT_INVALID, "bad-txns-zelnode-tx-null-prevout");
+        }
+
+        if (!CheckZelnodeTxSignatures(tx)) {
+            return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, invalid signatures"),
+                             REJECT_INVALID, "bad-txns-zelnode-tx-invalid-signature");
+        }
+
+        if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
+            if (tx.benchmarkTier < BASIC || tx.benchmarkTier > BAMF) {
+                return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, invalid benchmarking tier"),
+                                 REJECT_INVALID, "bad-txns-zelnode-tx-invalid-benchmark-tier");
+            }
+
+            if (tx.nUpdateType != ZelnodeUpdateType::INITIAL_CONFIRM && tx.nUpdateType != ZelnodeUpdateType::UPDATE_CONFIRM) {
+                return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, invalid update type"),
+                                 REJECT_INVALID, "bad-txns-zelnode-tx-invalid-update-type");
+            }
+        }
+    }
+
     // Size limits
     BOOST_STATIC_ASSERT(MAX_BLOCK_SIZE >= MAX_TX_SIZE_AFTER_SAPLING); // sanity
     BOOST_STATIC_ASSERT(MAX_TX_SIZE_AFTER_SAPLING > MAX_TX_SIZE_BEFORE_SAPLING); // sanity
@@ -1173,7 +1255,7 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
     }
 
     // Check for non-zero valueBalance when there are no Sapling inputs or outputs
-    if (tx.vShieldedSpend.empty() && tx.vShieldedOutput.empty() && tx.valueBalance != 0) {
+    if (tx.vShieldedSpend.empty() && tx.vShieldedOutput.empty() && tx.valueBalance != 0 && !tx.IsZelnodeTx()) {
         return state.DoS(100, error("CheckTransaction(): tx.valueBalance has no sources or sinks"),
                             REJECT_INVALID, "bad-txns-valuebalance-nonzero");
     }
@@ -1380,6 +1462,11 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
     }
 
+    if (pool.IsRecentlyEvicted(tx.GetHash())) {
+        LogPrint("mempool", "Dropping txid %s : recently evicted", tx.GetHash().ToString());
+        return false;
+    }
+
     auto verifier = libzelcash::ProofVerifier::Strict();
     if (!CheckTransaction(tx, state, verifier))
         return error("AcceptToMemoryPool: CheckTransaction failed");
@@ -1419,6 +1506,22 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     uint256 hash = tx.GetHash();
     if (pool.exists(hash))
         return false;
+
+    if (tx.IsZelnodeTx()) {
+        if (pool.mapZelnodeTxMempool.count(tx.collatoralOut)) {
+            return state.DoS(0, false, REJECT_DUPLICATE, "zelnode-tx-outpoint-already-in-mempool");
+        }
+
+        if (GetAdjustedTime() - tx.sigTime > ZELNODE_MAX_SIG_TIME) {
+            return state.DoS(0, false, REJECT_DUPLICATE, "zelnode-tx-sig-to-old");
+        }
+
+        if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
+            if (GetAdjustedTime() - tx.benchmarkSigTime > ZELNODE_MAX_SIG_TIME) {
+                return state.DoS(0, false, REJECT_DUPLICATE, "zelnode-tx-bench-sig-to-old");
+            }
+        }
+    }
 
     // Check for conflicts with in-memory transactions
     {
@@ -1460,6 +1563,21 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         if (view.HaveCoins(hash))
             return false;
 
+        if (tx.IsZelnodeTx()) {
+            if (tx.nType == ZELNODE_START_TX_TYPE) {
+                // Check to make sure the input is not spent and meets the criteria of a zelnode input
+                int nTier;
+                if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier)) {
+                    return state.DoS(10, error("bad-txns-zelnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-zelnode-inputs-invalid-spent-or-bad-value");
+                }
+            } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
+                int nTier;
+                if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier)) {
+                    return state.DoS(10, error("bad-txns-zelnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-zelnode-inputs-invalid-spent-or-bad-value");
+                }
+            }
+        }
+
         // do all inputs exist?
         // Note that this does not check for the presence of actual outputs (see the next check for that),
         // and only helps with filling in pfMissingInputs (to determine missing vs spent).
@@ -1478,8 +1596,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
         // are the joinsplits' and sapling spends' requirements met in tx(valid anchors/nullifiers)?
         if (!view.HaveShieldedRequirements(tx))
-            return state.Invalid(error("AcceptToMemoryPool: joinsplit requirements not met"),
-                                 REJECT_DUPLICATE, "bad-txns-joinsplit-requirements-not-met");
+            return state.Invalid(error("AcceptToMemoryPool: shielded requirements not met"),
+                                 REJECT_DUPLICATE, "bad-txns-shielded-requirements-not-met");
 
         // Bring the best block into scope
         view.GetBestBlock();
@@ -1601,11 +1719,31 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             return error("AcceptToMemoryPool: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s", hash.ToString());
         }
 
-        // Store transaction in memory
-        pool.addUnchecked(hash, entry, !IsInitialBlockDownload(Params()));
-    }
+        {
+            // We lock to prevent other threads from accessing the mempool between adding and evicting
+            LOCK(pool.cs);
 
-    SyncWithWallets(tx, NULL);
+            // Store transaction in memory
+            pool.addUnchecked(hash, entry, !IsInitialBlockDownload(Params()));
+
+            // Add memory address index
+            if (fAddressIndex) {
+                pool.addAddressIndex(entry, view);
+            }
+
+            if (tx.IsZelnodeTx()) {
+                LogPrintf("%s: Adding zelnode transaction to mempool: %s hash: %s\n", __func__, tx.collatoralOut.ToString(), tx.GetHash().GetHex());
+                pool.mapZelnodeTxMempool.insert(std::make_pair(tx.collatoralOut, tx.GetHash()));
+            }
+
+            // insightexplorer: Add memory spent index
+            if (fSpentIndex) {
+                pool.addSpentIndex(entry, view);
+            }
+
+            pool.EnsureSizeLimit();
+        }
+    }
 
     return true;
 }
@@ -1806,6 +1944,16 @@ bool AcceptableInputs(CTxMemPool& pool, CValidationState& state, const CTransact
     }
 
     // SyncWithWallets(tx, NULL);
+    return true;
+}
+
+bool GetTimestampIndex(unsigned int high, unsigned int low, bool fActiveOnly,
+    std::vector<std::pair<uint256, unsigned int> > &hashes)
+{
+    if (!fTimestampIndex)
+        return error("Timestamp index not enabled");
+    if (!pblocktree->ReadTimestampIndex(high, low, fActiveOnly, hashes))
+        return error("Unable to get hashes for timestamps");
 
     return true;
 }
@@ -1814,8 +1962,40 @@ bool GetSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value)
 {
     AssertLockHeld(cs_main);
     if (!fSpentIndex)
-        return false;
-    return pblocktree->ReadSpentIndex(key, value);
+        return error("Spent index not enabled");
+
+    if (mempool.getSpentIndex(key, value))
+        return true;
+
+    if (!pblocktree->ReadSpentIndex(key, value))
+        return error("Unable to get spent index information");
+
+    return true;
+}
+
+bool GetAddressIndex(const uint160& addressHash, int type,
+                     std::vector<CAddressIndexDbEntry>& addressIndex,
+                     int start, int end)
+{
+    if (!fAddressIndex)
+        return error("address index not enabled");
+
+    if (!pblocktree->ReadAddressIndex(addressHash, type, addressIndex, start, end))
+        return error("unable to get txids for address");
+
+    return true;
+}
+
+bool GetAddressUnspent(const uint160& addressHash, int type,
+                       std::vector<CAddressUnspentDbEntry>& unspentOutputs)
+{
+    if (!fAddressIndex)
+        return error("address index not enabled");
+
+    if (!pblocktree->ReadAddressUnspentIndex(addressHash, type, unspentOutputs))
+        return error("unable to get txids for address");
+
+    return true;
 }
 
 /** Return transaction in tx, and if it was found inside a block, its hash is placed in hashBlock */
@@ -2022,6 +2202,29 @@ bool IsInitialBlockDownload(const CChainParams& chainParams)
         return true;
     if (chainActive.Tip()->nChainWork < UintToArith256(chainParams.GetConsensus().nMinimumChainWork))
         return true;
+    // Don't bother checking Sprout, it is always active.
+    for (int idx = Consensus::BASE_SPROUT + 1; idx < Consensus::MAX_NETWORK_UPGRADES; idx++) {
+        // If we expect a particular activation block hash, and either the upgrade is not
+        // active or it doesn't match the block at that height on the current chain, then
+        // we are not on the correct chain. As we have already checked that the current
+        // chain satisfies the minimum chain work, this is likely an adversarial situation
+        // where the node is being fed a fake alternate chain; shut down for safety.
+        auto upgrade = chainParams.GetConsensus().vUpgrades[idx];
+        if (upgrade.hashActivationBlock && (
+            !NetworkUpgradeActive(chainActive.Height(), chainParams.GetConsensus(), Consensus::UpgradeIndex(idx))
+            || chainActive[upgrade.nActivationHeight]->GetBlockHash() != upgrade.hashActivationBlock.get()
+        )) {
+            AbortNode(
+                strprintf(
+                    "%s: Activation block hash mismatch for the %s network upgrade (expected %s, found %s). Likely adversarial condition; shutting down for safety.",
+                    __func__,
+                    NetworkUpgradeInfo[idx].strName,
+                    upgrade.hashActivationBlock.get().GetHex(),
+                    chainActive[upgrade.nActivationHeight]->GetBlockHash().GetHex()),
+                _("We are on a chain with sufficient work, but the network upgrade checkpoints do not match. Your node may be under attack! Shutting down for safety."));
+            return true;
+        }
+    }
     if (chainActive.Tip()->GetBlockTime() < (GetTime() - nMaxTipAge))
         return true;
     LogPrintf("Leaving InitialBlockDownload (latching to false)\n");
@@ -2411,24 +2614,6 @@ bool UndoReadFromDisk(CBlockUndo& blockundo, const CDiskBlockPos& pos, const uin
     return true;
 }
 
-/** Abort with a message */
-bool AbortNode(const std::string& strMessage, const std::string& userMessage="")
-{
-    strMiscWarning = strMessage;
-    LogPrintf("*** %s\n", strMessage);
-    uiInterface.ThreadSafeMessageBox(
-        userMessage.empty() ? _("Error: A fatal internal error occurred, see debug.log for details") : userMessage,
-        "", CClientUIInterface::MSG_ERROR);
-    StartShutdown();
-    return false;
-}
-
-bool AbortNode(CValidationState& state, const std::string& strMessage, const std::string& userMessage="")
-{
-    AbortNode(strMessage, userMessage);
-    return state.Error(strMessage);
-}
-
 } // anon namespace
 
 /**
@@ -2476,7 +2661,7 @@ enum DisconnectResult
  *  The addressIndex and spentIndex will be updated if requested.
  */
 static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& state,
-    const CBlockIndex* pindex, CCoinsViewCache& view, const CChainParams& chainparams,
+    const CBlockIndex* pindex, CCoinsViewCache& view, ZelnodeCache* p_zelnodeCache, const CChainParams& chainparams,
     const bool updateIndices)
 {
     assert(pindex->GetBlockHash() == view.GetBestBlock());
@@ -2498,6 +2683,21 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
         error("DisconnectBlock(): block and undo data inconsistent");
         return DISCONNECT_FAILED;
     }
+
+    CZelnodeTxBlockUndo zelnodeBlockUndo;
+    if (!pZelnodeDB->ReadBlockUndoZelnodeData(block.GetHash(), zelnodeBlockUndo)) {
+        error("DisconnectBlock(): block zelnodetx undo data inconsistent");
+        return DISCONNECT_FAILED;
+    }
+
+
+    if (!p_zelnodeCache) {
+        error("DisconnectBlock(): p_zelnodeCache is null");
+        return DISCONNECT_FAILED;
+    }
+
+    p_zelnodeCache->AddBackUndoData(zelnodeBlockUndo);
+
     std::vector<CAddressIndexDbEntry> addressIndex;
     std::vector<CAddressUnspentDbEntry> addressUnspentIndex;
     std::vector<CSpentIndexDbEntry> spentIndex;
@@ -2525,6 +2725,21 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
                     addressUnspentIndex.push_back(make_pair(
                         CAddressUnspentKey(scriptType, addrHash, hash, k),
                         CAddressUnspentValue()));
+                }
+            }
+        }
+
+        p_zelnodeCache->CheckForUndoExpiredStartTx(pindex->nHeight);
+
+        if (tx.IsZelnodeTx()) {
+            if (tx.nType == ZELNODE_START_TX_TYPE) {
+                // Undo the start from the list
+                p_zelnodeCache->UndoNewStart(tx, pindex->nHeight);
+            } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
+                if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
+                    p_zelnodeCache->UndoNewConfirm(tx);
+                } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
+                    // TODO
                 }
             }
         }
@@ -2735,7 +2950,7 @@ static int64_t nTimeCallbacks = 0;
 static int64_t nTimeTotal = 0;
 
 bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,
-                  CCoinsViewCache& view, const CChainParams& chainparams, bool fJustCheck)
+                  CCoinsViewCache& view, const CChainParams& chainparams, bool fJustCheck, ZelnodeCache* p_zelnodeCache)
 {
     AssertLockHeld(cs_main);
 
@@ -2811,11 +3026,20 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                              REJECT_INVALID, "bad-txns-BIP30");
     }
 
+    // Check the deterministric zelnode payouts
+    if (pindex->nHeight >= chainparams.StartZelnodePayments()) {
+        if (!g_zelnodeCache.CheckZelnodePayout(block.vtx[0], pindex->nHeight, p_zelnodeCache))
+            LogPrint("zelnode", "%s : Couldn't find deterministic zelnode payment", __func__);
+    }
+
     unsigned int flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
 
     // DERSIG (BIP66) is also always enforced, but does not have a flag.
 
     CBlockUndo blockundo;
+    CZelnodeTxBlockUndo zelnodeTxBlockUndo;
+
+    std::set<COutPoint> setSpentOutPoints;
 
     CCheckQueueControl<CScriptCheck> control(fExpensiveChecks && nScriptCheckThreads ? &scriptcheckqueue : NULL);
 
@@ -2857,6 +3081,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     std::vector<PrecomputedTransactionData> txdata;
     txdata.reserve(block.vtx.size()); // Required so that pointers to individual PrecomputedTransactionData don't get invalidated
+
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
         const CTransaction &tx = block.vtx[i];
@@ -2873,6 +3098,44 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             if (!view.HaveInputs(tx))
                 return state.DoS(100, error("ConnectBlock(): inputs missing/spent"),
                                  REJECT_INVALID, "bad-txns-inputs-missingorspent");
+
+            if (tx.IsZelnodeTx()) {
+                int nTier = 0;
+                if (!view.CheckZelnodeTxInput(tx, pindex->nHeight, nTier))
+                    return state.DoS(100, error("ConnectBlock(): zelnode tx inputs missing/spent"),
+                                     REJECT_INVALID, "bad-txns-zelnode-tx-inputs-missingorspent");
+
+                if (tx.nType == ZELNODE_START_TX_TYPE) {
+                    if (p_zelnodeCache) {
+                        if (!g_zelnodeCache.CheckNewStartTx(tx.collatoralOut)) {
+                            return state.DoS(100, error("ConnectBlock(): zelnode tx, failed CheckNewStartTx call"),
+                                             REJECT_INVALID, "bad-txns-zelnode-tx-check-new-start");
+                        }
+
+                        // Add new Zelnode Start Tx into local cache
+                        p_zelnodeCache->AddNewStart(tx, pindex->nHeight, nTier);
+                    }
+                } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
+                    if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
+                        if (p_zelnodeCache) {
+                            p_zelnodeCache->AddNewConfirm(tx, pindex->nHeight);
+                        }
+                    } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
+                        if (p_zelnodeCache) {
+                            p_zelnodeCache->AddUpdateConfirm(tx, pindex->nHeight);
+                            auto global_data = g_zelnodeCache.GetZelnodeData(tx.collatoralOut);
+                            if (global_data.IsNull())
+                                return state.DoS(100, error("ConnectBlock(): zelnode tx, failed finding data to creating undo data"),
+                                                 REJECT_INVALID, "bad-txns-zelnode-global-data-not-found");
+                            zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.insert(std::make_pair(tx.collatoralOut, global_data.nLastConfirmedBlockHeight));
+                        }
+                    }
+                }
+            } else {
+                for (const auto& input : tx.vin) {
+                    setSpentOutPoints.insert(input.prevout);
+                }
+            }
 
             // are the JoinSplit's requirements met?
             if (!view.HaveShieldedRequirements(tx))
@@ -2977,6 +3240,20 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }
 
+    // Update the temp cache with the set of started outpoints that have now expired from the dos list
+    GetUndoDataForExpiredZelnodeDosScores(zelnodeTxBlockUndo, pindex->nHeight);
+    p_zelnodeCache->AddExpiredDosTx(zelnodeTxBlockUndo, pindex->nHeight);
+
+    // Update the temp cache with the set of confirmed outpoints that have now expired
+    GetUndoDataForExpiredConfirmZelnodes(zelnodeTxBlockUndo, pindex->nHeight, setSpentOutPoints);
+    p_zelnodeCache->AddExpiredConfirmTx(zelnodeTxBlockUndo);
+
+    // Update the block undo, with the paid nodes last paid height.
+    GetUndoDataForPaidZelnodes(zelnodeTxBlockUndo, *p_zelnodeCache);
+
+    // Check for Start tx that are going to expire
+    p_zelnodeCache->CheckForExpiredStartTx(pindex->nHeight);
+
     view.PushAnchor(sprout_tree);
     view.PushAnchor(sapling_tree);
     if (!fJustCheck) {
@@ -3025,6 +3302,15 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             // update nUndoPos in block index
             pindex->nUndoPos = pos.nPos;
             pindex->nStatus |= BLOCK_HAVE_UNDO;
+        }
+
+        if (zelnodeTxBlockUndo.vecExpiredDosData.size() ||
+            zelnodeTxBlockUndo.vecExpiredConfirmedData.size() ||
+            zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.size() ||
+            zelnodeTxBlockUndo.mapLastPaidHeights.size())
+        {
+            if (!pZelnodeDB->WriteBlockUndoZelnodeData(block.GetHash(), zelnodeTxBlockUndo))
+                return AbortNode(state, "Failed to write zelnodetx undo data");
         }
 
         // Now that all consensus rules have been validated, set nCachedBranchId.
@@ -3161,6 +3447,10 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
             return state.Error("out of disk space");
         // First make sure all block and undo data is flushed to disk.
         FlushBlockFile();
+
+        // Dump Zelnode cache to database
+        g_zelnodeCache.DumpZelnodeCache();
+
         // Then update all block file information (which may refer to block and undo files).
         {
             std::vector<std::pair<int, const CBlockFileInfo*> > vFiles;
@@ -3254,10 +3544,12 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
     int64_t nStart = GetTimeMicros();
     {
         CCoinsViewCache view(pcoinsTip);
+        ZelnodeCache zelnodeCache;
         // insightexplorer: update indices (true)
-        if (DisconnectBlock(block, state, pindexDelete, view, chainparams, true) != DISCONNECT_OK)
+        if (DisconnectBlock(block, state, pindexDelete, view, &zelnodeCache, chainparams, true) != DISCONNECT_OK)
             return error("DisconnectTip(): DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString());
         assert(view.Flush());
+        assert(zelnodeCache.Flush());
     }
     LogPrint("bench", "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
     uint256 sproutAnchorAfterDisconnect = pcoinsTip->GetBestAnchor(SPROUT);
@@ -3337,7 +3629,8 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     LogPrint("bench", "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
     {
         CCoinsViewCache view(pcoinsTip);
-        bool rv = ConnectBlock(*pblock, state, pindexNew, view, chainparams);
+        ZelnodeCache zelnodeCache;
+        bool rv = ConnectBlock(*pblock, state, pindexNew, view, chainparams, false, &zelnodeCache);
         GetMainSignals().BlockChecked(*pblock, state);
         if (!rv) {
             if (state.IsInvalid())
@@ -3348,6 +3641,11 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
         nTime3 = GetTimeMicros(); nTimeConnectTotal += nTime3 - nTime2;
         LogPrint("bench", "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
         assert(view.Flush());
+
+        assert(zelnodeCache.Flush());
+
+        LogPrint("dzelnode", "%s : Size of global zelnodeCache mapStartTxTracker : %u\n", __func__, g_zelnodeCache.mapStartTxTracker.size());
+        LogPrint("dzelnode", "%s : Size of global zelnodeCache mapStartTxDosTrackerTxTracker : %u\n", __func__, g_zelnodeCache.mapStartTxDosTracker.size());
     }
     int64_t nTime4 = GetTimeMicros(); nTimeFlush += nTime4 - nTime3;
     LogPrint("bench", "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
@@ -3359,6 +3657,19 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     // Remove conflicting transactions from the mempool.
     list<CTransaction> txConflicted;
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload(chainparams));
+
+
+    if (g_zelnodeCache.mapZelnodeList.at(BASIC).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(BASIC).listConfirmedZelnodes.size()) {
+        error("Basic set map, doesn't have the same size as the listconfirmed zelnodes");
+    }
+
+    if (g_zelnodeCache.mapZelnodeList.at(SUPER).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(SUPER).listConfirmedZelnodes.size()) {
+        error("Super set map, doesn't have the same size as the listconfirmed zelnodes");
+    }
+
+    if (g_zelnodeCache.mapZelnodeList.at(BAMF).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(BAMF).listConfirmedZelnodes.size()) {
+        error("BAMF set map, doesn't have the same size as the listconfirmed zelnodes");
+    }
 
     // Remove transactions that expire at new block height from mempool
     mempool.removeExpired(pindexNew->nHeight);
@@ -3378,6 +3689,10 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     GetMainSignals().ChainTip(pindexNew, pblock, oldSproutTree, oldSaplingTree, true);
 
     EnforceNodeDeprecation(pindexNew->nHeight);
+
+    if (fZelnode && pindexNew->nHeight % 2) {
+        activeZelnode.ManageDeterministricZelnode();
+    }
 
     int64_t nTime6 = GetTimeMicros(); nTimePostConnect += nTime6 - nTime5; nTimeTotal += nTime6 - nTime1;
     LogPrint("bench", "  - Connect postprocess: %.2fms [%.2fs]\n", (nTime6 - nTime5) * 0.001, nTimePostConnect * 0.000001);
@@ -4019,10 +4334,21 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
     if (block.vtx.empty() || !block.vtx[0].IsCoinBase())
         return state.DoS(100, error("CheckBlock(): first tx is not coinbase"),
                          REJECT_INVALID, "bad-cb-missing");
-    for (unsigned int i = 1; i < block.vtx.size(); i++)
+
+    std::set<COutPoint> setZelnodeTxOuts;
+    for (unsigned int i = 1; i < block.vtx.size(); i++) {
         if (block.vtx[i].IsCoinBase())
             return state.DoS(100, error("CheckBlock(): more than one coinbase"),
                              REJECT_INVALID, "bad-cb-multiple");
+
+        if (block.vtx[i].IsZelnodeTx()) {
+            if (setZelnodeTxOuts.count(block.vtx[i].collatoralOut))
+                return state.DoS(100, error("CheckBlock(): more than one zelnodetx with same outpoint"),
+                                 REJECT_INVALID, "bad-zelnode-tx-multiple");
+            setZelnodeTxOuts.insert(block.vtx[i].collatoralOut);
+        }
+    }
+
 
     // Check the zelnode payouts
     CBlockIndex* pindexPrev = chainActive.Tip();
@@ -4038,14 +4364,16 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
 
         // Because some peers could not have enough data to see that this block is invalid, don't ban them
         // Because we might not have enough data to tell if the block is indeed valid, Issue an initial reject message
-        if (nHeight != 0 && !IsInitialBlockDownload(chainparams)) {
-            if (!IsBlockPayeeValid(block, nHeight)) {
-                LogPrint("zelnode", "%s : Couldn't find zelnode payment", __func__);
-                return state.DoS(0, false, REJECT_INVALID, "bad-cb-payee");
+        if (nHeight < chainparams.StartZelnodePayments()) {
+            if (nHeight != 0 && !IsInitialBlockDownload(chainparams)) {
+                if (!IsBlockPayeeValid(block, nHeight)) {
+                    LogPrint("zelnode", "%s : Couldn't find zelnode payment", __func__);
+                    return state.DoS(0, false, REJECT_INVALID, "bad-cb-payee");
+                }
+            } else {
+                if (fDebug)
+                    LogPrintf("%s : Zelnode payment check skipped on sync - skipping IsBlockPayeeValid()\n", __func__);
             }
-        } else {
-            if (fDebug)
-                LogPrintf("%s : Zelnode payment check skipped on sync - skipping IsBlockPayeeValid()\n", __func__);
         }
     }
 
@@ -4341,6 +4669,7 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
 
     CCoinsViewCache viewNew(pcoinsTip);
     CBlockIndex indexDummy(block);
+    ZelnodeCache cache;
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev->nHeight + 1;
     // JoinSplit proofs are verified in ConnectBlock
@@ -4353,7 +4682,7 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
         return false;
     if (!ContextualCheckBlock(block, state, chainparams, pindexPrev))
         return false;
-    if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true))
+    if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true, &cache))
         return false;
     assert(state.IsValid());
 
@@ -4667,9 +4996,10 @@ bool static LoadBlockIndexDB()
     // insightexplorer
     // Check whether block explorer features are enabled
     pblocktree->ReadFlag("insightexplorer", fInsightExplorer);
-    LogPrintf("%s: insight explorer %s\n", __func__, fAddressIndex ? "enabled" : "disabled");
+    LogPrintf("%s: insight explorer %s\n", __func__, fInsightExplorer ? "enabled" : "disabled");
     fAddressIndex = fInsightExplorer;
     fSpentIndex = fInsightExplorer;
+    fTimestampIndex = fInsightExplorer;
 
     // Fill in-memory data
     BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
@@ -4729,6 +5059,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
     nCheckLevel = std::max(0, std::min(4, nCheckLevel));
     LogPrintf("Verifying last %i blocks at level %i\n", nCheckDepth, nCheckLevel);
     CCoinsViewCache coins(coinsview);
+    ZelnodeCache zelnodeCache;
     CBlockIndex* pindexState = chainActive.Tip();
     CBlockIndex* pindexFailure = NULL;
     int nGoodTransactions = 0;
@@ -4760,7 +5091,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
         // check level 3: check for inconsistencies during memory-only disconnect of tip blocks
         if (nCheckLevel >= 3 && pindex == pindexState && (coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheUsage) {
             // insightexplorer: do not update indices (false)
-            DisconnectResult res = DisconnectBlock(block, state, pindex, coins, chainparams, false);
+            DisconnectResult res = DisconnectBlock(block, state, pindex, coins, &zelnodeCache, chainparams, false);
             if (res == DISCONNECT_FAILED) {
                 return error("VerifyDB(): *** irrecoverable inconsistency in block data at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
             }
@@ -5659,7 +5990,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         CAddress addrFrom;
         uint64_t nNonce = 1;
         vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
-        if (pfrom->nVersion < MIN_PEER_PROTO_VERSION)
+        if ((Params().NetworkID() == CBaseChainParams::MAIN && pfrom->nVersion < MIN_PEER_PROTO_VERSION)
+         || (Params().NetworkID() == CBaseChainParams::TESTNET && pfrom->nVersion < MIN_PEER_PROTO_VERSION_TESTNET))
         {
             // disconnect from peers older than this proto version
             LogPrintf("peer=%d using obsolete version %i; disconnecting\n", pfrom->id, pfrom->nVersion);
@@ -6186,7 +6518,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 Misbehaving(pfrom->GetId(), nDoS);
         }
     }
-
 
     else if (strCommand == "headers" && !fImporting && !fReindex) // Ignore headers received while importing
     {

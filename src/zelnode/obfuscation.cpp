@@ -1,8 +1,8 @@
 // Copyright (c) 2014-2015 The Dash developers
 // Copyright (c) 2015-2017 The PIVX developers
 // Copyright (c) 2019 The Zel developers
-// Distributed under the MIT/X11 software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "zelnode/obfuscation.h"
 #include "coincontrol.h"
@@ -28,6 +28,8 @@ using namespace boost;
 CObfuScationSigner obfuScationSigner;
 // Keep track of the active Zelnode
 ActiveZelnode activeZelnode;
+
+COutPoint zelnodeOutPoint;
 
 bool GetTestingCollateralScript(std::string strAddress, CScript& script)
 {
@@ -112,7 +114,7 @@ bool CObfuScationSigner::SignMessage(std::string strMessage, std::string& errorM
     return true;
 }
 
-bool CObfuScationSigner::VerifyMessage(CPubKey pubkey, vector<unsigned char>& vchSig, std::string strMessage, std::string& errorMessage)
+bool CObfuScationSigner::VerifyMessage(const CPubKey& pubkey, const vector<unsigned char>& vchSig, const std::string& strMessage, std::string& errorMessage)
 {
     CHashWriter ss(SER_GETHASH, 0);
     ss << strMessageMagic;
@@ -129,6 +131,8 @@ bool CObfuScationSigner::VerifyMessage(CPubKey pubkey, vector<unsigned char>& vc
 
     return (pubkey2.GetID() == pubkey.GetID());
 }
+
+
 
 
 //TODO: Rename/move to core

@@ -83,7 +83,7 @@ TEST(Validation, ContextualCheckInputsPassesWithCoinbase) {
     FakeCoinsViewDB fakeDB;
     CCoinsViewCache view(&fakeDB);
 
-    for (int idx = Consensus::BASE; idx < Consensus::MAX_NETWORK_UPGRADES; idx++) {
+    for (int idx = Consensus::BASE_SPROUT; idx < Consensus::MAX_NETWORK_UPGRADES; idx++) {
         auto consensusBranchId = NetworkUpgradeInfo[idx].nBranchId;
         CValidationState state;
         PrecomputedTransactionData txdata(tx);

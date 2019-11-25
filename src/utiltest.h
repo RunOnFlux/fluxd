@@ -1,7 +1,7 @@
 // Copyright (c) 2019 The Zel developers
 // Copyright (c) 2019 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef ZELCASH_UTIL_TEST_H
 #define ZELCASH_UTIL_TEST_H
@@ -18,12 +18,14 @@ CWalletTx GetValidSproutReceive(ZCJoinSplit& params,
                                 const libzelcash::SproutSpendingKey& sk,
                                 CAmount value,
                                 bool randomInputs,
-                                int32_t version = 2);
+                                uint32_t versionGroupId = SAPLING_VERSION_GROUP_ID,
+                                int32_t version = SAPLING_TX_VERSION);
 CWalletTx GetInvalidCommitmentSproutReceive(ZCJoinSplit& params,
                                 const libzelcash::SproutSpendingKey& sk,
                                 CAmount value,
                                 bool randomInputs,
-                                int32_t version = 2);
+                                uint32_t versionGroupId = SAPLING_VERSION_GROUP_ID,
+                                int32_t version = SAPLING_TX_VERSION);
 libzelcash::SproutNote GetSproutNote(ZCJoinSplit& params,
                                    const libzelcash::SproutSpendingKey& sk,
                                    const CTransaction& tx, size_t js, size_t n);
