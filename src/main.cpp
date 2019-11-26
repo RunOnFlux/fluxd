@@ -1467,6 +1467,13 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         return false;
     }
 
+    if (tx.IsZelnodeTx()) {
+        if (pool.mapSeenZelnodeTx.count(tx.GetHash())) {
+            LogPrint("mempool", "Dropping txid %s : recently seen", tx.GetHash().ToString());
+            return false;
+        }
+    }
+
     auto verifier = libzelcash::ProofVerifier::Strict();
     if (!CheckTransaction(tx, state, verifier))
         return error("AcceptToMemoryPool: CheckTransaction failed");
@@ -1734,6 +1741,19 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             if (tx.IsZelnodeTx()) {
                 LogPrintf("%s: Adding zelnode transaction to mempool: %s hash: %s\n", __func__, tx.collatoralOut.ToString(), tx.GetHash().GetHex());
                 pool.mapZelnodeTxMempool.insert(std::make_pair(tx.collatoralOut, tx.GetHash()));
+                pool.mapSeenZelnodeTx.insert(std::make_pair(tx.GetHash(), GetTime()));
+
+                std::set<uint256> toRemove;
+                auto time = GetTime();
+                for (const auto& item : pool.mapSeenZelnodeTx) {
+                    if (time - item.second > 1800) {
+                        toRemove.insert(item.first);
+                    }
+                }
+
+                for (const auto& item : toRemove) {
+                    pool.mapSeenZelnodeTx.erase(item);
+                }
             }
 
             // insightexplorer: Add memory spent index

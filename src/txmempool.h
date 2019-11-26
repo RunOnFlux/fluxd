@@ -174,6 +174,7 @@ public:
     std::map<uint256, std::pair<double, CAmount> > mapDeltas;
 
     std::map<COutPoint, uint256> mapZelnodeTxMempool;
+    std::map<uint256, uint32_t> mapSeenZelnodeTx;
 
     CTxMemPool(const CFeeRate& _minRelayFee);
     ~CTxMemPool();
