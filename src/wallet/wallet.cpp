@@ -2962,6 +2962,7 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
         LOCK2(cs_main, cs_wallet);
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
+
             const uint256& wtxid = it->first;
             const CWalletTx* pcoin = &(*it).second;
 
@@ -2994,12 +2995,15 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                 } else if (nCoinType == ONLY_100000) {
                     found = pcoin->vout[i].nValue == 100000 * COIN;
                 } else if (nCoinType == ALL_ZELNODE) {
-                    if (pcoin->vout[i].nValue == 10000 * COIN)
+                    if (pcoin->vout[i].nValue == 10000 * COIN) {
                         found = true;
-                    else if (pcoin->vout[i].nValue == 25000 * COIN)
+                    }
+                    else if (pcoin->vout[i].nValue == 25000 * COIN) {
                         found = true;
-                    else if (pcoin->vout[i].nValue == 100000 * COIN)
+                    }
+                    else if (pcoin->vout[i].nValue == 100000 * COIN) {
                         found = true;
+                    }
                 } else {
                     found = true;
                 }
@@ -4807,7 +4811,7 @@ bool CWallet::GetZelnodeVinAndKeys(CTxIn& txinRet, CPubKey& pubKeyRet, CKey& key
 
     // Find possible candidates
     std::vector<COutput> vPossibleCoins;
-    AvailableCoins(vPossibleCoins, true, NULL, false, ONLY_10000);
+    AvailableCoins(vPossibleCoins, true, NULL, false, false,ALL_ZELNODE);
     if (vPossibleCoins.empty()) {
         LogPrintf("CWallet::GetZelnodeVinAndKeys -- Could not locate any valid zelnode vin\n");
         return false;
