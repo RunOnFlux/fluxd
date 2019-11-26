@@ -919,7 +919,7 @@ bool ContextualCheckTransaction(
     bool saplingActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA);
     bool isSprout = !saplingActive;
 
-    bool zelnodesActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ZELNODES);
+    bool kamataActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_KAMATA);
 
     // If Sprout rules apply, reject transactions which are intended for Overwinter and beyond
     if (isSprout && tx.fOverwintered) {
@@ -929,7 +929,7 @@ bool ContextualCheckTransaction(
     }
 
     if (tx.IsZelnodeTx()) {
-        if (!zelnodesActive) {
+        if (!kamataActive) {
             return state.DoS(dosLevel, error("ContextualCheckTransaction(): zelnodes tx seen before active"),
                              REJECT_INVALID, "tx-zelnodes-not-active");
         }

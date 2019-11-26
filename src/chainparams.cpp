@@ -125,8 +125,8 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].hashActivationBlock =
                 uint256S("00000052e2ac144c2872ff641c646e41dac166ac577bc9b0837f501aba19de4a");
 
-        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nProtocolVersion = 170016;
-        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nActivationHeight = 1000000;  // TODO, set approx data
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 500000;  // 26th December
         // TODO, add the activation block hash after activation
 
 
@@ -276,8 +276,8 @@ public:
 	    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
         consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 1200;
 
-        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nProtocolVersion = 170016;
-        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nActivationHeight = 1300;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 1300;
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
@@ -420,8 +420,8 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight =
                 Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nProtocolVersion = 170016;
-        consensus.vUpgrades[Consensus::UPGRADE_ZELNODES].nActivationHeight =
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight =
                 Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 

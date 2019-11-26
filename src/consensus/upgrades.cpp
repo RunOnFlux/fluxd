@@ -41,8 +41,8 @@ const struct NUInfo NetworkUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
     },
     {
             /*.nBranchId =*/ 0x76b809bb,
-            /*.strName =*/ "Zelnodes",
-            /*.strInfo =*/ "Zel Zelnodes Upgrade, Deterministic zelnodes",
+            /*.strName =*/ "Kamata",
+            /*.strInfo =*/ "Zel Kamata Upgrade, Deterministic ZelNodes and ZelFlux",
     }
 };
 
