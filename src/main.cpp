@@ -3028,8 +3028,12 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     // Check the deterministric zelnode payouts
     if (pindex->nHeight >= chainparams.StartZelnodePayments()) {
-        if (!g_zelnodeCache.CheckZelnodePayout(block.vtx[0], pindex->nHeight, p_zelnodeCache))
+        if (!g_zelnodeCache.CheckZelnodePayout(block.vtx[0], pindex->nHeight, p_zelnodeCache)) {
             LogPrint("zelnode", "%s : Couldn't find deterministic zelnode payment", __func__);
+            // TODO, up the DoS score when ready for mainnet launch
+            return state.DoS(1, error("ConnectBlock(): not paying deterministic zelnodes"),
+                             REJECT_INVALID, "bad-txns-not-paying-correct-zelnodes");
+        }
     }
 
     unsigned int flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
