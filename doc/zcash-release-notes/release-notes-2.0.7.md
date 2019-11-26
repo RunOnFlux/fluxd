@@ -1,11 +1,11 @@
 Notable changes
 ===============
 
-Shorter Block Times - not activated in Zel ゼル
+Shorter Block Times
 -------------------
 Shorter block times are coming to Zcash! In the v2.0.7 release we have implemented [ZIP208](https://github.com/zcash/zips/blob/master/zip-0208.rst) which will take effect when Blossom activates. Upon activation, the block times for Zcash will decrease from 150 seconds to 75 seconds, and the block reward will decrease accordingly. This affects at what block height halving events will occur, but should not affect the overall rate at which Zcash is mined. The total founders' reward stays the same, and the total supply of Zcash is decreased only microscopically due to rounding.
 
-Blossom Activation on Testnet - no activated in Zel ゼル
+Blossom Activation on Testnet
 -----------------------------
 The v2.0.7 release includes Blossom activation on testnet, bringing shorter block times. The testnet Blossom activation height is 584000.
 
@@ -16,7 +16,7 @@ Changes needed for the Insight explorer have been incorporated into Zcash. *This
 Changelog
 =========
 
-Daira Hopwood (10):
+Daira Hopwood (11):
       Add MIT license to Makefiles
       Add MIT license to build-aux/m4/bitcoin_* scripts, and a permissive license to build-aux/m4/l_atomic.m4 .
       Update copyright information for Zcash, leveldb, and libsnark.
@@ -27,6 +27,7 @@ Daira Hopwood (10):
       Link to ticket #2827 using URL
       Release process doc: add step to set the gpg key id.
       Release process doc: mention the commit message.
+      Add RPC test and test framework constants for Sapling->Blossom activation.
 
 Dimitris Apostolou (5):
       Rename vjoinsplit to vJoinSplit
@@ -35,7 +36,7 @@ Dimitris Apostolou (5):
       Rename FindWalletTx to FindWalletTxToZap
       Fix RPC undefined behavior.
 
-Eirik Ogilvie-Wigley (47):
+Eirik Ogilvie-Wigley (56):
       Make nextHeight required in CalculateNextWorkRequired
       Fix nondeterministic failure in sapling migration test
       Clean up and fix typo
@@ -83,6 +84,15 @@ Eirik Ogilvie-Wigley (47):
       Rename method and use int64_t
       make-release.py: Versioning changes for 2.0.7-rc1.
       make-release.py: Updated manpages for 2.0.7-rc1.
+      make-release.py: Updated release notes and changelog for 2.0.7-rc1.
+      Update download path
+      Set testnet Blossom activation height
+      Notable changes for v2.0.7
+      Enable shorter block times rpc test
+      Grammatical fixes and improvements
+      Remove constant
+      make-release.py: Versioning changes for 2.0.7.
+      make-release.py: Updated manpages for 2.0.7.
 
 Eirik Ogilvie-Wigley (8):
       Use CommitTransaction() rather than sendrawtransaction()
@@ -94,11 +104,12 @@ Eirik Ogilvie-Wigley (8):
       Use reserve key for transparent change when sending to Sapling
       Fix comment in mergetoaddress RPC test
 
-Jack Grigg (4):
+Jack Grigg (5):
       test: Check for change t-addr reuse in z_sendmany
       Use reserve key for transparent change when sending to Sprout
       test: Fix permissions on wallet_changeaddresses RPC test
       test: Fix pyflakes warnings
+      test: Fix AuthServiceProxy closed conn detection
 
 Larry Ruane (6):
       add addressindex related RPCs
@@ -130,4 +141,9 @@ codetriage-readme-bot (1):
 
 Jack Grigg (1):
       Update README.md
+
+Benjamin Winston (3):
+      Updated location to new download server
+      Fixes 4097, improves caching on parameter downloads
+      Updated location to new download server, fixing #4100
 

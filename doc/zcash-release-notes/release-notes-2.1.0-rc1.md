@@ -1,37 +1,5 @@
-Zel Changelog - Zel 4.0.0
+Notable changes
 ===============
-
-Jeremy "Blondfrogs" Anderson (8):
-      Fix wallet finding ZelNode vin
-      Fix gbt transactions
-      Fix migration tool not finding default address private key
-      Zcash Merge Fixes
-      Add ZelNode fork code
-      Benchmarking - Benchmarkd
-      Deterministic ZelNodes
-      Fix Broken gtests
-
-Miles Manley (3):
-      Kamata naming
-      Versioning and release notes
-      Set Kamata network upgrade activation height
-      Zcash Upstream and Merge
-
-Tadeas Kmenta(1):
-      Benchmarking - Benchmarkd
-
-Changlog - Zcash 2.1.0-1
-=========
-
-Jack Grigg (2):
-      make-release.py: Versioning changes for 2.1.0-1.
-      make-release.py: Updated manpages for 2.1.0-1.
-
-Sean Bowe (1):
-      Fix of CVE-2017-18350
-
-Changlog - Zcash 2.1.0
-=========
 
 DoS Mitigation: Mempool Size Limit and Random Drop
 --------------------------------------------------
@@ -52,16 +20,6 @@ minutes, but this can be configured with the parameter
 `mempoolevictionmemoryminutes`.
 
 For full details see ZIP 401.
-
-Asynchronous Operations Incorrectly Reporting Success
------------------------------------------------------
-We fixed an issue where asynchronous operations were sometimes reporting sucess
-when they had actually failed. One way this could occur was when trying to use
-`z_sendmany` to create a transaction spending coinbase funds in a way where
-change would be generated (not a valid use of `z_sendmany`). In this case the
-operation would erroneously report success, and the only way to see that the 
-transaction had actually failed was to look in the `debug.log` file. Such
-operations will now correctly report that they have failed.
 
 Fake chain detection during initial block download
 --------------------------------------------------
@@ -126,10 +84,7 @@ Daira Hopwood (4):
       Test setting an expiry height of 0.
       Fix setting an expiry height of 0. fixes #4132
 
-Dimitris Apostolou (1):
-      depends macOS: point --sysroot to SDK
-
-Eirik Ogilvie-Wigley (41):
+Eirik Ogilvie-Wigley (33):
       Wrap metrics message in strprintf
       DoS protection: Weighted random drop of txs if mempool full
       Rebuild weighted list on removal and fix size calculation
@@ -163,14 +118,6 @@ Eirik Ogilvie-Wigley (41):
       Use same type when calling max
       make-release.py: Versioning changes for 2.1.0-rc1.
       make-release.py: Updated manpages for 2.1.0-rc1.
-      make-release.py: Updated release notes and changelog for 2.1.0-rc1.
-      Release notes for bug fix
-      Better wording in release notes
-      Fix wording
-      Fix getblocksubsidy tests
-      fix comment
-      make-release.py: Versioning changes for 2.1.0.
-      make-release.py: Updated manpages for 2.1.0.
 
 Gareth Davies (1):
       Updating IPFS link for chunking
@@ -216,18 +163,15 @@ Jack Grigg (39):
       Add block hashes for Overwinter, Sapling, and testnet Blossom
       Update release notes with node abort behaviour
 
-Larry Ruane (5):
+Larry Ruane (4):
       insightexplorer: formatting, pyflakes cleanups
       precompute empty merkle roots
       update unit tests to compute empty roots
       access array element using at()
-      #4175 z_sendmany coinbase to zaddr with change: report error status
-
-Sean Bowe (1):
-      Set mainnet activation of Blossom
 
 jeff-liang (1):
       Display which network the node is running on.
 
 Benjamin Winston (1):
       Removed stale seeder, fixing #4153
+

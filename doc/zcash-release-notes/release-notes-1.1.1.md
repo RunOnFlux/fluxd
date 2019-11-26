@@ -279,7 +279,7 @@ Sean Bowe (49):
       Fix miner tests
       Update sapling-crypto and librustzcash
       Swap bit endianness of test vectors
-      Remove unnecessary IsCoinbase() check. Coinbases are guaranteed to have empty vJoinSplit.
+      Remove unnecessary IsCoinbase() check. Coinbases are guaranteed to have empty vjoinsplit.
       Refactor so that dataToBeSigned can be used later in the function for other purposes.
       Update to latest librustzcash
       Check Sapling Spend/Output proofs and signatures.

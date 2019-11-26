@@ -234,7 +234,7 @@ public:
 static CMainParams mainParams;
 
 /**
- * testnet-kamiooka
+ * testnet-kamata
  */
 class CTestNetParams : public CChainParams {
 public:

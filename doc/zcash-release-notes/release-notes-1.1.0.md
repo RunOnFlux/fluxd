@@ -81,7 +81,7 @@ Jack Grigg (47):
       depends: Explicitly download and vendor Rust dependencies
       Make Rust compilation mandatory
       Optimise serialization of MerklePath, avoiding ambiguity of std::vector<bool>
-      Use uint64_t instead of size_t for serialized indices into tx.vJoinSplit
+      Use uint64_t instead of size_t for serialized indices into tx.vjoinsplit
       Move explicit instantiation of IncrementalMerkleTree::emptyroots into header
       libsnark: Don't set -static on Darwin
       Set PLATFORM flag when compiling libsnark

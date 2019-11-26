@@ -1,37 +1,18 @@
-Zel Changelog - Zel 4.0.0
+Notable changes
 ===============
 
-Jeremy "Blondfrogs" Anderson (8):
-      Fix wallet finding ZelNode vin
-      Fix gbt transactions
-      Fix migration tool not finding default address private key
-      Zcash Merge Fixes
-      Add ZelNode fork code
-      Benchmarking - Benchmarkd
-      Deterministic ZelNodes
-      Fix Broken gtests
+Blossom network upgrade
+-----------------------
 
-Miles Manley (3):
-      Kamata naming
-      Versioning and release notes
-      Set Kamata network upgrade activation height
-      Zcash Upstream and Merge
+The mainnet activation of the Blossom network upgrade is supported by this
+release, with an activation height of 653600, which should occur in early
+December — roughly one day following the targeted EOS halt of our 2.0.7-3
+release. Please upgrade to this release, or any subsequent release, in order to
+follow the Blossom network upgrade.
 
-Tadeas Kmenta(1):
-      Benchmarking - Benchmarkd
-
-Changlog - Zcash 2.1.0-1
-=========
-
-Jack Grigg (2):
-      make-release.py: Versioning changes for 2.1.0-1.
-      make-release.py: Updated manpages for 2.1.0-1.
-
-Sean Bowe (1):
-      Fix of CVE-2017-18350
-
-Changlog - Zcash 2.1.0
-=========
+The Blossom network upgrade implements
+[ZIP208](https://github.com/zcash/zips/blob/master/zip-0208.rst) which shortens
+block times from 150s to 75s.
 
 DoS Mitigation: Mempool Size Limit and Random Drop
 --------------------------------------------------
@@ -231,3 +212,4 @@ jeff-liang (1):
 
 Benjamin Winston (1):
       Removed stale seeder, fixing #4153
+
