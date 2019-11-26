@@ -1138,8 +1138,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state,
     }
 }
 
-bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidationState &state)
-{
+bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidationState &state) {
     // Basic checks that don't depend on any context
 
     /**
@@ -1164,36 +1163,37 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
      *        0 <= tx.nVersion < OVERWINTER_MIN_TX_VERSION
      *        OVERWINTER_MAX_TX_VERSION < tx.nVersion <= INT32_MAX
      */
-    if (!tx.fOverwintered && tx.nVersion < SPROUT_MIN_TX_VERSION) {
-        return state.DoS(100, error("CheckTransaction(): version too low"),
-                         REJECT_INVALID, "bad-txns-version-too-low");
-    }
-    else if (tx.fOverwintered) {
-        if (tx.nVersion < OVERWINTER_MIN_TX_VERSION) {
-            return state.DoS(100, error("CheckTransaction(): overwinter version too low"),
-                REJECT_INVALID, "bad-tx-overwinter-version-too-low");
-        }
-        if (tx.nVersionGroupId != OVERWINTER_VERSION_GROUP_ID &&
+    if (!tx.IsZelnodeTx()) {
+        if (!tx.fOverwintered && tx.nVersion < SPROUT_MIN_TX_VERSION) {
+            return state.DoS(100, error("CheckTransaction(): version too low"),
+                             REJECT_INVALID, "bad-txns-version-too-low");
+        } else if (tx.fOverwintered) {
+            if (tx.nVersion < OVERWINTER_MIN_TX_VERSION) {
+                return state.DoS(100, error("CheckTransaction(): overwinter version too low"),
+                                 REJECT_INVALID, "bad-tx-overwinter-version-too-low");
+            }
+            if (tx.nVersionGroupId != OVERWINTER_VERSION_GROUP_ID &&
                 tx.nVersionGroupId != SAPLING_VERSION_GROUP_ID) {
-            return state.DoS(100, error("CheckTransaction(): unknown tx version group id"),
-                    REJECT_INVALID, "bad-tx-version-group-id");
+                return state.DoS(100, error("CheckTransaction(): unknown tx version group id"),
+                                 REJECT_INVALID, "bad-tx-version-group-id");
+            }
+            if (tx.nExpiryHeight >= TX_EXPIRY_HEIGHT_THRESHOLD) {
+                return state.DoS(100, error("CheckTransaction(): expiry height is too high"),
+                                 REJECT_INVALID, "bad-tx-expiry-height-too-high");
+            }
         }
-        if (tx.nExpiryHeight >= TX_EXPIRY_HEIGHT_THRESHOLD) {
-            return state.DoS(100, error("CheckTransaction(): expiry height is too high"),
-                            REJECT_INVALID, "bad-tx-expiry-height-too-high");
-        }
-    }
 
-    // Transactions containing empty `vin` must have either non-empty
-    // `vJoinSplit` or non-empty `vShieldedSpend`.
-    if (tx.vin.empty() && tx.vJoinSplit.empty() && tx.vShieldedSpend.empty())
-        return state.DoS(10, error("CheckTransaction(): vin empty"),
-                         REJECT_INVALID, "bad-txns-vin-empty");
-    // Transactions containing empty `vout` must have either non-empty
-    // `vJoinSplit` or non-empty `vShieldedOutput`.
-    if (tx.vout.empty() && tx.vJoinSplit.empty() && tx.vShieldedOutput.empty())
-        return state.DoS(10, error("CheckTransaction(): vout empty"),
-                         REJECT_INVALID, "bad-txns-vout-empty");
+        // Transactions containing empty `vin` must have either non-empty
+        // `vJoinSplit` or non-empty `vShieldedSpend`.
+        if (tx.vin.empty() && tx.vJoinSplit.empty() && tx.vShieldedSpend.empty())
+            return state.DoS(10, error("CheckTransaction(): vin empty"),
+                             REJECT_INVALID, "bad-txns-vin-empty");
+        // Transactions containing empty `vout` must have either non-empty
+        // `vJoinSplit` or non-empty `vShieldedOutput`.
+        if (tx.vout.empty() && tx.vJoinSplit.empty() && tx.vShieldedOutput.empty())
+            return state.DoS(10, error("CheckTransaction(): vout empty"),
+                             REJECT_INVALID, "bad-txns-vout-empty");
+    }
 
     if (tx.IsZelnodeTx() && !tx.vout.empty() && !tx.vJoinSplit.empty() && !tx.vShieldedOutput.empty()
         && !tx.vin.empty() && !tx.vShieldedSpend.empty()) {

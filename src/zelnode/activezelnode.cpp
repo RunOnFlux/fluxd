@@ -462,7 +462,7 @@ vector<std::pair<COutput, CAmount>> ActiveZelnode::SelectCoinsZelnode()
     }
 
     // Retrieve all possible outputs
-    pwalletMain->AvailableCoins(vCoins, false);
+    pwalletMain->AvailableCoins(vCoins, true, NULL, false, false, ALL_ZELNODE);
 
     // Lock ZN coins from zelnode.conf back if they where temporary unlocked
     if (!confLockedCoins.empty()) {
