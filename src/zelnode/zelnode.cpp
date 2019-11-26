@@ -1210,12 +1210,12 @@ bool ZelnodeCache::CheckZelnodePayout(const CTransaction& coinbase, const int p_
     }
 
     // Get the addresses the should be paid
-    if (GetNextPayment(basic_dest, SUPER, super_out)) {
+    if (GetNextPayment(super_dest, SUPER, super_out)) {
         fSuperFound = true;
     }
 
     // Get the addresses the should be paid
-    if (GetNextPayment(basic_dest, BAMF, bamf_out)) {
+    if (GetNextPayment(bamf_dest, BAMF, bamf_out)) {
         fBAMFFound = true;
     }
 
