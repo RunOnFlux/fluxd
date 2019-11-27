@@ -864,7 +864,7 @@ bool CheckZelnodeTxSignatures(const CTransaction& transaction)
         std::string strMessage = transaction.GetHash().GetHex();
 
         if (!obfuScationSigner.VerifyMessage(transaction.collatoralPubkey, transaction.sig, strMessage, errorMessage))
-            return error("%s - Error: %s", __func__, errorMessage);
+            return error("%s - START Error: %s", __func__, errorMessage);
 
         return true;
     } else if (transaction.nType & ZELNODE_CONFIRM_TX_TYPE) {
@@ -874,8 +874,11 @@ bool CheckZelnodeTxSignatures(const CTransaction& transaction)
 
         std::string strMessage = transaction.collatoralOut.ToString() + std::to_string(transaction.collatoralOut.n) + std::to_string(transaction.nUpdateType) + std::to_string(transaction.sigTime);
 
-        if (!obfuScationSigner.VerifyMessage(data.pubKey, transaction.sig, strMessage, errorMessage))
-            return error("%s - Error: %s", __func__, errorMessage);
+        // Someone a node can be kicked on the list. So when we are verifying from the db transaction. we dont have the data.pubKey
+        if (!data.IsNull()) {
+            if (!obfuScationSigner.VerifyMessage(data.pubKey, transaction.sig, strMessage, errorMessage))
+                return error("%s - CONFIRM Error: %s", __func__, errorMessage);
+        }
 
         if (!CheckBenchmarkSignature(transaction)) {
             return error("%s - Error: invalid benchmarking signatures %s,", __func__, errorMessage);

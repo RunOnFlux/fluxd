@@ -1090,6 +1090,16 @@ bool ContextualCheckTransaction(
             if (g_zelnodeCache.GetZelnodeData(tx.collatoralOut).nTier > tx.benchmarkTier) {
                 return state.DoS(dosLevel, error("zelnode-tx-benchmark-tier-to-low-for-collatoral"), REJECT_INVALID, "zelnode-tx-benchmark-tier-to-low-for-collatoral");
             }
+
+            // Check the signatures. This is a contextual check as it requires the zelnode pubkey
+            auto data = g_zelnodeCache.GetZelnodeData(tx.collatoralOut);
+            std::string errorMessage;
+
+            std::string strMessage = tx.collatoralOut.ToString() + std::to_string(tx.collatoralOut.n) + std::to_string(tx.nUpdateType) + std::to_string(tx.sigTime);
+
+            if (!obfuScationSigner.VerifyMessage(data.pubKey, tx.sig, strMessage, errorMessage))
+                return error("%s - CONFIRM Error: %s", __func__, errorMessage);
+
             if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
                 if (!g_zelnodeCache.CheckIfStarted(tx.collatoralOut))
                     return state.DoS(dosLevel, error("zelnode-tx-invalid-confirm-outpoint-not-started"), REJECT_INVALID, "zelnode-tx-invalid-confirm-outpoint-not-started");
