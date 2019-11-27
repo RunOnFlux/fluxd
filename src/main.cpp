@@ -1079,17 +1079,34 @@ bool ContextualCheckTransaction(
 
     if (tx.IsZelnodeTx()) {
         if (tx.nType == ZELNODE_START_TX_TYPE) {
+
+            // TODO move all the accept block checks to make sure the block is from the future. 
+            bool fFailure = false;
+            std::string strFailMessage;
             if (!g_zelnodeCache.CheckNewStartTx(tx.collatoralOut)) {
+                fFailure = true;
+                strFailMessage = "zelnode-tx-already-in-chain-or-waiting-for-dos-unban";
                 return state.DoS(dosLevel, error("zelnode-tx-already-in-chain-or-waiting-for-dos-unban"), REJECT_INVALID, "zelnode-tx-already-in-chain-or-waiting-for-dos-unban");
             }
 
-            if (g_zelnodeCache.CheckIfConfirmed(tx.collatoralOut)) {
-                return state.DoS(dosLevel, error("zelnode-tx-already-in-confirm-chain"), REJECT_INVALID, "zelnode-tx-already-in-confirm-chain");
+            if (!fFailure && g_zelnodeCache.CheckIfConfirmed(tx.collatoralOut)) {
+                fFailure = true;
+                strFailMessage = "zelnode-tx-already-in-confirm-chain";
+            }
+
+            if (fFailure && !fFromAccept) {
+                return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage);
             }
         } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
-
+            bool fFailure = false;
+            std::string strFailMessage;
             if (g_zelnodeCache.GetZelnodeData(tx.collatoralOut).nTier > tx.benchmarkTier) {
-                return state.DoS(dosLevel, error("zelnode-tx-benchmark-tier-to-low-for-collatoral"), REJECT_INVALID, "zelnode-tx-benchmark-tier-to-low-for-collatoral");
+                fFailure = true;
+                strFailMessage = "zelnode-tx-benchmark-tier-to-low-for-collatoral";
+            }
+
+            if (fFailure && !fFromAccept) {
+                return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage);
             }
 
             // Check the signatures. This is a contextual check as it requires the zelnode pubkey
@@ -1120,7 +1137,6 @@ bool ContextualCheckTransaction(
                     return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage);
                 }
             } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
-
                 bool fFailure = false;
                 std::string strFailMessage;
                 if (!g_zelnodeCache.CheckIfConfirmed(tx.collatoralOut)) {
