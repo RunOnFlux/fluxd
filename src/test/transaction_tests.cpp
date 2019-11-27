@@ -493,7 +493,7 @@ void test_simple_joinsplit_invalidity(uint32_t consensusBranchId, CMutableTransa
         jsdesc->nullifiers[1] = GetRandHash();
 
         BOOST_CHECK(CheckTransactionWithoutProofVerification(newTx, state));
-        BOOST_CHECK(!ContextualCheckTransaction(newTx, state, Params(), 0, 100));
+        BOOST_CHECK(!ContextualCheckTransaction(newTx, state, Params(), 0, 100, false));
         BOOST_CHECK(state.GetRejectReason() == "bad-txns-invalid-joinsplit-signature");
 
         // Empty output script.
@@ -507,7 +507,7 @@ void test_simple_joinsplit_invalidity(uint32_t consensusBranchId, CMutableTransa
                                     ) == 0);
 
         BOOST_CHECK(CheckTransactionWithoutProofVerification(newTx, state));
-        BOOST_CHECK(ContextualCheckTransaction(newTx, state, Params(), 0, 100));
+        BOOST_CHECK(ContextualCheckTransaction(newTx, state, Params(), 0, 100, false));
     }
     {
         // Ensure that values within the joinsplit are well-formed.

@@ -351,7 +351,7 @@ bool ContextualCheckInputs(const CTransaction& tx, CValidationState &state, cons
 
 /** Check a transaction contextually against a set of consensus rules */
 bool ContextualCheckTransaction(const CTransaction& tx, CValidationState &state,
-                                const CChainParams& chainparams, int nHeight, int dosLevel,
+                                const CChainParams& chainparams, int nHeight, int dosLevel, bool fFromAccept,
                                 bool (*isInitBlockDownload)(const CChainParams&) = IsInitialBlockDownload);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
@@ -477,7 +477,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
 bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state,
                                 const CChainParams& chainparams, CBlockIndex *pindexPrev);
 bool ContextualCheckBlock(const CBlock& block, CValidationState& state,
-                          const CChainParams& chainparams, CBlockIndex *pindexPrev);
+                          const CChainParams& chainparams, CBlockIndex *pindexPrev, bool fComeFromAccept);
 
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins.
  *  Validity checks that depend on the UTXO set are also done; ConnectBlock()

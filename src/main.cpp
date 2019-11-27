@@ -914,6 +914,7 @@ bool ContextualCheckTransaction(
         const CChainParams& chainparams,
         const int nHeight,
         const int dosLevel,
+        bool fFromAccept,
         bool (*isInitBlockDownload)(const CChainParams&))
 {
     bool saplingActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA);
@@ -1095,25 +1096,50 @@ bool ContextualCheckTransaction(
             auto data = g_zelnodeCache.GetZelnodeData(tx.collatoralOut);
             std::string errorMessage;
 
-            std::string strMessage = tx.collatoralOut.ToString() + std::to_string(tx.collatoralOut.n) + std::to_string(tx.nUpdateType) + std::to_string(tx.sigTime);
+            if (!data.IsNull()) {
+                std::string strMessage = tx.collatoralOut.ToString() + std::to_string(tx.collatoralOut.n) +
+                                         std::to_string(tx.nUpdateType) + std::to_string(tx.sigTime);
 
-            if (!obfuScationSigner.VerifyMessage(data.pubKey, tx.sig, strMessage, errorMessage))
-                return error("%s - CONFIRM Error: %s", __func__, errorMessage);
+                if (!obfuScationSigner.VerifyMessage(data.pubKey, tx.sig, strMessage, errorMessage))
+                    return error("%s - CONFIRM Error: %s", __func__, errorMessage);
+            } else {
+                if (!fFromAccept) {
+                    return error("%s - Zelnode data not found. Not from accept", __func__);
+                }
+            }
 
             if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
-                if (!g_zelnodeCache.CheckIfStarted(tx.collatoralOut))
-                    return state.DoS(dosLevel, error("zelnode-tx-invalid-confirm-outpoint-not-started"), REJECT_INVALID, "zelnode-tx-invalid-confirm-outpoint-not-started");
+                bool fFailure = false;
+                std::string strFailMessage;
+                if (!g_zelnodeCache.CheckIfStarted(tx.collatoralOut)) {
+                    fFailure = true;
+                    strFailMessage = "zelnode-tx-invalid-confirm-outpoint-not-started";
+                }
+
+                if (fFailure && !fFromAccept) {
+                    return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage);
+                }
             } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
+
+                bool fFailure = false;
+                std::string strFailMessage;
                 if (!g_zelnodeCache.CheckIfConfirmed(tx.collatoralOut)) {
-                    return state.DoS(dosLevel, error("zelnode-tx-invalid-update-confirm-outpoint-not-confirmed"), REJECT_INVALID, "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed");
+                    fFailure = true;
+                    strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed";
                 }
 
-                if (!g_zelnodeCache.CheckUpdateHeight(tx)) {
-                    return state.DoS(dosLevel, error("zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon"), REJECT_INVALID, "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon");
+                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx)) {
+                    fFailure = true;
+                    strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon";
                 }
 
-                if (g_zelnodeCache.GetZelnodeData(tx.collatoralOut).nTier > tx.benchmarkTier) {
-                    return state.DoS(dosLevel, error("zelnode-tx-benchmark-tier-to-low-for-collatoral"), REJECT_INVALID, "zelnode-tx-benchmark-tier-to-low-for-collatoral");
+                if (!fFailure && g_zelnodeCache.GetZelnodeData(tx.collatoralOut).nTier > tx.benchmarkTier) {
+                    fFailure = true;
+                    strFailMessage = "zelnode-tx-benchmark-tier-to-low-for-collatoral";
+                }
+
+                if (fFailure && !fFromAccept) {
+                    return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage);
                 }
             } else {
                 return state.DoS(100, error("zelnode-tx-malicious-update-type"), REJECT_INVALID, "zelnode-tx-malicious-update-type");
@@ -1490,7 +1516,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
     // DoS level set to 10 to be more forgiving.
     // Check transaction contextually against the set of consensus rules which apply in the next block to be mined.
-    if (!ContextualCheckTransaction(tx, state, Params(), nextBlockHeight, 10)) {
+    if (!ContextualCheckTransaction(tx, state, Params(), nextBlockHeight, 10, false)) {
         return error("AcceptToMemoryPool: ContextualCheckTransaction failed");
     }
 
@@ -4490,7 +4516,7 @@ bool ContextualCheckBlockHeader(
 
 bool ContextualCheckBlock(
     const CBlock& block, CValidationState& state,
-    const CChainParams& chainparams, CBlockIndex * const pindexPrev)
+    const CChainParams& chainparams, CBlockIndex * const pindexPrev, bool fFromAccept)
 {
     const int nHeight = pindexPrev == NULL ? 0 : pindexPrev->nHeight + 1;
     const Consensus::Params& consensusParams = chainparams.GetConsensus();
@@ -4499,7 +4525,7 @@ bool ContextualCheckBlock(
     BOOST_FOREACH(const CTransaction& tx, block.vtx) {
 
         // Check transaction contextually against consensus rules at block height
-        if (!ContextualCheckTransaction(tx, state, chainparams, nHeight, 100)) {
+        if (!ContextualCheckTransaction(tx, state, chainparams, nHeight,100, fFromAccept)) {
             return false; // Failure reason has been set in validation state object
         }
 
@@ -4611,7 +4637,7 @@ static bool AcceptBlock(const CBlock& block, CValidationState& state, const CCha
 
     // See method docstring for why this is always disabled
     auto verifier = libzelcash::ProofVerifier::Disabled();
-    if ((!CheckBlock(block, state, chainparams, verifier)) || !ContextualCheckBlock(block, state, chainparams, pindex->pprev)) {
+    if ((!CheckBlock(block, state, chainparams, verifier)) || !ContextualCheckBlock(block, state, chainparams, pindex->pprev, true)) {
         if (state.IsInvalid() && !state.CorruptionPossible()) {
             pindex->nStatus |= BLOCK_FAILED_VALID;
             setDirtyBlockIndex.insert(pindex);
@@ -4714,7 +4740,7 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
         return false;
     if (!CheckBlock(block, state, chainparams, verifier, fCheckPOW, fCheckMerkleRoot))
         return false;
-    if (!ContextualCheckBlock(block, state, chainparams, pindexPrev))
+    if (!ContextualCheckBlock(block, state, chainparams, pindexPrev, false))
         return false;
     if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true, &cache))
         return false;
