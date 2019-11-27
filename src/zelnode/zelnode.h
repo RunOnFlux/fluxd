@@ -548,9 +548,9 @@ public:
         if (a.nLastPaidHeight && b.nLastPaidHeight) {
             return (aComparatorHeight < bComparatorHeight || (aComparatorHeight == bComparatorHeight && a.out < b.out));
         } else if (a.nLastPaidHeight) {
-            return aComparatorHeight < bComparatorHeight || aComparatorHeight == bComparatorHeight;
+            return aComparatorHeight < bComparatorHeight;
         } else if (b.nLastPaidHeight) {
-            return aComparatorHeight < bComparatorHeight || aComparatorHeight != bComparatorHeight;
+            return aComparatorHeight < bComparatorHeight || aComparatorHeight == bComparatorHeight;
         } else {
             return (aComparatorHeight < bComparatorHeight || (aComparatorHeight == bComparatorHeight && a.out < b.out));
         }

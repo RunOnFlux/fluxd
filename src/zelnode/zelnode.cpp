@@ -1778,15 +1778,15 @@ void ZelnodeCache::InsertIntoList(const ZelnodeCacheData& p_zelnodeData)
     ZelnodeListData listData(p_zelnodeData);
     if (p_zelnodeData.nTier == Zelnode::BASIC) {
         mapZelnodeList.at(Zelnode::BASIC).setConfirmedTxInList.insert(p_zelnodeData.collatoralIn);
-        mapZelnodeList.at(Zelnode::BASIC).listConfirmedZelnodes.emplace_back(listData);
+        mapZelnodeList.at(Zelnode::BASIC).listConfirmedZelnodes.emplace_front(listData);
     }
     else if (p_zelnodeData.nTier == Zelnode::SUPER) {
         mapZelnodeList.at(Zelnode::SUPER).setConfirmedTxInList.insert(p_zelnodeData.collatoralIn);
-        mapZelnodeList.at(Zelnode::SUPER).listConfirmedZelnodes.emplace_back(listData);
+        mapZelnodeList.at(Zelnode::SUPER).listConfirmedZelnodes.emplace_front(listData);
     }
     else if (p_zelnodeData.nTier == Zelnode::BAMF) {
         mapZelnodeList.at(Zelnode::BAMF).setConfirmedTxInList.insert(p_zelnodeData.collatoralIn);
-        mapZelnodeList.at(Zelnode::BAMF).listConfirmedZelnodes.emplace_back(listData);
+        mapZelnodeList.at(Zelnode::BAMF).listConfirmedZelnodes.emplace_front(listData);
     }
 }
 
