@@ -5,6 +5,8 @@
 #include "zelnode/zelnodecachedb.h"
 #include "zelnode.h"
 #include "undo.h"
+#include <boost/filesystem.hpp>
+#include <boost/thread.hpp>
 
 static const char DB_ZELNODE_CACHE_DATA = 'd';
 static const char BLOCK_ZELNODE_UNDO_DATA = 'u';
