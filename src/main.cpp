@@ -1080,7 +1080,7 @@ bool ContextualCheckTransaction(
     if (tx.IsZelnodeTx()) {
         if (tx.nType == ZELNODE_START_TX_TYPE) {
 
-            // TODO move all the accept block checks to make sure the block is from the future. 
+            // TODO move all the accept block checks to make sure the block is from the future.
             bool fFailure = false;
             std::string strFailMessage;
             if (!g_zelnodeCache.CheckNewStartTx(tx.collatoralOut)) {
@@ -3524,9 +3524,6 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
         // First make sure all block and undo data is flushed to disk.
         FlushBlockFile();
 
-        // Dump Zelnode cache to database
-        g_zelnodeCache.DumpZelnodeCache();
-
         // Then update all block file information (which may refer to block and undo files).
         {
             std::vector<std::pair<int, const CBlockFileInfo*> > vFiles;
@@ -3562,6 +3559,9 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
         // Flush the chainstate (which may refer to block index entries).
         if (!pcoinsTip->Flush())
             return AbortNode(state, "Failed to write to coin database");
+
+        // Dump Zelnode cache to database
+        g_zelnodeCache.DumpZelnodeCache();
         nLastFlush = nNow;
     }
     if ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) && nNow > nLastSetChain + (int64_t)DATABASE_WRITE_INTERVAL * 1000000) {
