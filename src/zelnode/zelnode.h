@@ -398,6 +398,7 @@ std::string TierToString(int tier);
 bool CheckZelnodeTxSignatures(const CTransaction& transaction);
 bool CheckBenchmarkSignature(const CTransaction& transaction);
 
+// Locations
 enum {
     ZELNODE_TX_ERROR = 0,
     ZELNODE_TX_STARTED = 1,
@@ -418,6 +419,8 @@ enum Tier {
     SUPER = 2,
     BAMF = 3
 };
+
+std::string ZelnodeLocationToString(int nLocation);
 
 void GetUndoDataForExpiredZelnodeDosScores(CZelnodeTxBlockUndo& p_zelnodeTxUudoData, const int& p_nHeight);
 void GetUndoDataForExpiredConfirmZelnodes(CZelnodeTxBlockUndo& p_zelnodeTxUudoData, const int& p_nHeight, const std::set<COutPoint> setSpentOuts);
@@ -702,7 +705,7 @@ public:
 
     //! Helper functions
     ZelnodeCacheData GetZelnodeData(const CTransaction& tx);
-    ZelnodeCacheData GetZelnodeData(const COutPoint& out);
+    ZelnodeCacheData GetZelnodeData(const COutPoint& out, int* fNeedLocation = nullptr);
 
     bool Flush();
     bool LoadData(ZelnodeCacheData& data);
@@ -716,6 +719,8 @@ public:
 
     void DumpZelnodeCache();
 };
+
+bool IsDZelnodeActive();
 
 
 #endif //ZELCASHNODES_ZELNODE_H

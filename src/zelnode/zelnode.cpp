@@ -1149,14 +1149,17 @@ ZelnodeCacheData ZelnodeCache::GetZelnodeData(const CTransaction& tx)
     return GetZelnodeData(tx.collatoralOut);
 }
 
-ZelnodeCacheData ZelnodeCache::GetZelnodeData(const COutPoint& out)
+ZelnodeCacheData ZelnodeCache::GetZelnodeData(const COutPoint& out, int* nNeedLocation)
 {
     LOCK(cs);
     if (mapStartTxTracker.count(out)) {
+        if (nNeedLocation) *nNeedLocation = ZELNODE_TX_STARTED;
         return mapStartTxTracker.at(out);
     } else if (mapStartTxDosTracker.count(out)) {
+        if (nNeedLocation) *nNeedLocation = ZELNODE_TX_DOS_PROTECTION;
         return mapStartTxDosTracker.at(out);
     } else if (mapConfirmedZelnodeData.count(out)) {
+        if (nNeedLocation) *nNeedLocation = ZELNODE_TX_CONFIRMED;
         return mapConfirmedZelnodeData.at(out);
     }
 
@@ -1841,6 +1844,25 @@ void ZelnodeCache::DumpZelnodeCache()
         if (!found) {
             pZelnodeDB->EraseZelnodeCacheData(item);
         }
+    }
+}
+
+bool IsDZelnodeActive()
+{
+    return chainActive.Height() >= Params().GetConsensus().vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight;
+}
+
+std::string ZelnodeLocationToString(int nLocation) {
+    if (nLocation == ZELNODE_TX_ERROR) {
+        return "No location";
+    } else if (nLocation == ZELNODE_TX_STARTED) {
+        return "Start list";
+    } else if (nLocation == ZELNODE_TX_DOS_PROTECTION) {
+        return "DoS list";
+    } else if (nLocation == ZELNODE_TX_CONFIRMED) {
+        return "Confirmed list";
+    } else {
+        return "No location";
     }
 }
 
