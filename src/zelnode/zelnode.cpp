@@ -1171,8 +1171,9 @@ bool ZelnodeCache::GetNextPayment(CTxDestination& dest, int nTier, COutPoint& p_
 {
     if (nTier == BASIC || nTier == SUPER || nTier == BAMF) {
         LOCK(cs);
-        if (mapZelnodeList.at(nTier).setConfirmedTxInList.size()) {
-            for (int i = 0; i < mapZelnodeList.at(nTier).setConfirmedTxInList.size(); i++) {
+        int setSize = mapZelnodeList.at(nTier).setConfirmedTxInList.size();
+        if (setSize) {
+            for (int i = 0; i < setSize; i++) {
                 if (mapZelnodeList.at(nTier).listConfirmedZelnodes.size()) {
                     p_zelnodeOut = mapZelnodeList.at(nTier).listConfirmedZelnodes.front().out;
                     if (mapConfirmedZelnodeData.count(p_zelnodeOut)) {
@@ -1241,7 +1242,7 @@ bool ZelnodeCache::CheckZelnodePayout(const CTransaction& coinbase, const int p_
 
     // Loop through Tx to make sure they all got paid
     for (const auto& out : coinbase.vout) {
-        if (fBasicFound && !fBasicApproved)
+        if (fBasicFound)
             if (out.scriptPubKey == basic_script)
                 if (out.nValue == basic_amount)
                     fBasicApproved = true;

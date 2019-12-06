@@ -1194,7 +1194,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
 
         CTxDestination dest_bamf;
         COutPoint outpoint_bamf;
-        if (g_zelnodeCache.GetNextPayment(dest_bamf, SUPER, outpoint_bamf)) {
+        if (g_zelnodeCache.GetNextPayment(dest_bamf, BAMF, outpoint_bamf)) {
             UniValue obj(UniValue::VOBJ);
             auto data = g_zelnodeCache.GetZelnodeData(outpoint_bamf);
             obj.push_back(std::make_pair("collatoral", data.collatoralIn.ToString()));
