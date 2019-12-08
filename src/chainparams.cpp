@@ -126,7 +126,7 @@ public:
                 uint256S("00000052e2ac144c2872ff641c646e41dac166ac577bc9b0837f501aba19de4a");
 
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
-        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 500000;  // 26th December
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 1000000;  // 26th December
         // TODO, add the activation block hash after activation
 
 
@@ -137,8 +137,8 @@ public:
         eh_epoch_2 = eh144_5;
         eh_epoch_3 = zelHash;
 
-        // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0x00");
+        // The best chain should have at least this much work. Updated to match the chainwork associated with upgrade_kamiooka
+        consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000000000021f5d5da5d73");
 
         /**
          * The message start string should be awesome! ⓩ❤
