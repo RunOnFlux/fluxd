@@ -100,6 +100,7 @@ UniValue getzelnodeoutputs(const UniValue& params, bool fHelp)
         obj.push_back(Pair("txhash", out.tx->GetHash().ToString()));
         obj.push_back(Pair("outputidx", out.i));
         obj.push_back(Pair("ZEL Amount", pair.second / COIN));
+        obj.push_back(Pair("Confirmations", pair.first.nDepth));
         ret.push_back(obj);
     }
 

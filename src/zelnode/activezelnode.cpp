@@ -403,6 +403,12 @@ bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, 
             return false;
         }
     }
+
+    if (selectedOutput->nDepth < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC) {
+        LogPrintf("%s - zelnode hasn't met confirmation requirement (remaining confirmations required: %d)\n", __func__, ZELNODE_MIN_CONFIRMATION_DETERMINISTIC - selectedOutput->nDepth);
+        return false;
+    }
+
     // At this point we have a selected output, retrieve the associated info
     return GetVinFromOutput(*selectedOutput, vin, pubkey, secretKey);
 }
