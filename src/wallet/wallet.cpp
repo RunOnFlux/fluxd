@@ -2982,8 +2982,10 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
             if (nDepth < 0)
                 continue;
 
-            if (nDepth < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC)
-                continue;
+            if (nCoinType != ALL_COINS) {
+                if (nDepth < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC)
+                    continue;
+            }
 
             for (unsigned int i = 0; i < pcoin->vout.size(); i++) {
                 bool found = false;
