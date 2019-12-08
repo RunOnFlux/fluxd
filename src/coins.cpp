@@ -630,7 +630,7 @@ bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_H
         return false;
     }
 
-    const COutPoint &prevout = tx.collatoralOut;
+    const COutPoint &prevout = tx.collateralOut;
     const CCoins* coins = AccessCoins(prevout.hash);
     if (!coins || !coins->IsAvailable(prevout.n)) {
         return false;

@@ -15,13 +15,13 @@ CDeterministicZelnodeDB::CDeterministicZelnodeDB(size_t nCacheSize, bool fMemory
 
 bool CDeterministicZelnodeDB::WriteZelnodeCacheData(const ZelnodeCacheData& data)
 {
-    LogPrint("dzelnode", "Wrote zelnodedata %s to database\n", data.collatoralIn.ToString());
-    return Write(std::make_pair(DB_ZELNODE_CACHE_DATA, data.collatoralIn), data);
+    LogPrint("dzelnode", "Wrote zelnodedata %s to database\n", data.collateralIn.ToString());
+    return Write(std::make_pair(DB_ZELNODE_CACHE_DATA, data.collateralIn), data);
 }
 
 bool CDeterministicZelnodeDB::ReadZelnodeCacheData(const COutPoint& outpoint, ZelnodeCacheData& data)
 {
-    return Read(std::make_pair(DB_ZELNODE_CACHE_DATA, data.collatoralIn), data);
+    return Read(std::make_pair(DB_ZELNODE_CACHE_DATA, data.collateralIn), data);
 }
 
 bool CDeterministicZelnodeDB::EraseZelnodeCacheData(const COutPoint& outpoint)

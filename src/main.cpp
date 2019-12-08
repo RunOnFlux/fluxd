@@ -1083,13 +1083,13 @@ bool ContextualCheckTransaction(
             // TODO move all the accept block checks to make sure the block is from the future.
             bool fFailure = false;
             std::string strFailMessage;
-            if (!g_zelnodeCache.CheckNewStartTx(tx.collatoralOut)) {
+            if (!g_zelnodeCache.CheckNewStartTx(tx.collateralOut)) {
                 fFailure = true;
                 strFailMessage = "zelnode-tx-already-in-chain-or-waiting-for-dos-unban";
                 return state.DoS(dosLevel, error("zelnode-tx-already-in-chain-or-waiting-for-dos-unban"), REJECT_INVALID, "zelnode-tx-already-in-chain-or-waiting-for-dos-unban");
             }
 
-            if (!fFailure && g_zelnodeCache.CheckIfConfirmed(tx.collatoralOut)) {
+            if (!fFailure && g_zelnodeCache.CheckIfConfirmed(tx.collateralOut)) {
                 fFailure = true;
                 strFailMessage = "zelnode-tx-already-in-confirm-chain";
             }
@@ -1100,9 +1100,9 @@ bool ContextualCheckTransaction(
         } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
             bool fFailure = false;
             std::string strFailMessage;
-            if (g_zelnodeCache.GetZelnodeData(tx.collatoralOut).nTier > tx.benchmarkTier) {
+            if (g_zelnodeCache.GetZelnodeData(tx.collateralOut).nTier > tx.benchmarkTier) {
                 fFailure = true;
-                strFailMessage = "zelnode-tx-benchmark-tier-to-low-for-collatoral";
+                strFailMessage = "zelnode-tx-benchmark-tier-to-low-for-collateral";
             }
 
             if (fFailure && !fFromAccept) {
@@ -1110,11 +1110,11 @@ bool ContextualCheckTransaction(
             }
 
             // Check the signatures. This is a contextual check as it requires the zelnode pubkey
-            auto data = g_zelnodeCache.GetZelnodeData(tx.collatoralOut);
+            auto data = g_zelnodeCache.GetZelnodeData(tx.collateralOut);
             std::string errorMessage;
 
             if (!data.IsNull()) {
-                std::string strMessage = tx.collatoralOut.ToString() + std::to_string(tx.collatoralOut.n) +
+                std::string strMessage = tx.collateralOut.ToString() + std::to_string(tx.collateralOut.n) +
                                          std::to_string(tx.nUpdateType) + std::to_string(tx.sigTime);
 
                 if (!obfuScationSigner.VerifyMessage(data.pubKey, tx.sig, strMessage, errorMessage))
@@ -1128,7 +1128,7 @@ bool ContextualCheckTransaction(
             if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
                 bool fFailure = false;
                 std::string strFailMessage;
-                if (!g_zelnodeCache.CheckIfStarted(tx.collatoralOut)) {
+                if (!g_zelnodeCache.CheckIfStarted(tx.collateralOut)) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-invalid-confirm-outpoint-not-started";
                 }
@@ -1139,7 +1139,7 @@ bool ContextualCheckTransaction(
             } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
                 bool fFailure = false;
                 std::string strFailMessage;
-                if (!g_zelnodeCache.CheckIfConfirmed(tx.collatoralOut)) {
+                if (!g_zelnodeCache.CheckIfConfirmed(tx.collateralOut)) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed";
                 }
@@ -1149,9 +1149,9 @@ bool ContextualCheckTransaction(
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon";
                 }
 
-                if (!fFailure && g_zelnodeCache.GetZelnodeData(tx.collatoralOut).nTier > tx.benchmarkTier) {
+                if (!fFailure && g_zelnodeCache.GetZelnodeData(tx.collateralOut).nTier > tx.benchmarkTier) {
                     fFailure = true;
-                    strFailMessage = "zelnode-tx-benchmark-tier-to-low-for-collatoral";
+                    strFailMessage = "zelnode-tx-benchmark-tier-to-low-for-collateral";
                 }
 
                 if (fFailure && !fFromAccept) {
@@ -1260,8 +1260,8 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
                              REJECT_INVALID, "bad-txns-zelnode-tx-invalid-type");
 
         // Check Input is not null
-        if (tx.collatoralOut.IsNull()) {
-            return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, with null collatoralOut prevout"),
+        if (tx.collateralOut.IsNull()) {
+            return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, with null collateralOut prevout"),
                              REJECT_INVALID, "bad-txns-zelnode-tx-null-prevout");
         }
 
@@ -1567,7 +1567,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         return false;
 
     if (tx.IsZelnodeTx()) {
-        if (pool.mapZelnodeTxMempool.count(tx.collatoralOut)) {
+        if (pool.mapZelnodeTxMempool.count(tx.collateralOut)) {
             return state.DoS(0, false, REJECT_DUPLICATE, "zelnode-tx-outpoint-already-in-mempool");
         }
 
@@ -1791,8 +1791,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             }
 
             if (tx.IsZelnodeTx()) {
-                LogPrintf("%s: Adding zelnode transaction to mempool: %s hash: %s\n", __func__, tx.collatoralOut.ToString(), tx.GetHash().GetHex());
-                pool.mapZelnodeTxMempool.insert(std::make_pair(tx.collatoralOut, tx.GetHash()));
+                LogPrintf("%s: Adding zelnode transaction to mempool: %s hash: %s\n", __func__, tx.collateralOut.ToString(), tx.GetHash().GetHex());
+                pool.mapZelnodeTxMempool.insert(std::make_pair(tx.collateralOut, tx.GetHash()));
                 pool.mapSeenZelnodeTx.insert(std::make_pair(tx.GetHash(), GetTime()));
 
                 std::set<uint256> toRemove;
@@ -3183,7 +3183,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
                 if (tx.nType == ZELNODE_START_TX_TYPE) {
                     if (p_zelnodeCache) {
-                        if (!g_zelnodeCache.CheckNewStartTx(tx.collatoralOut)) {
+                        if (!g_zelnodeCache.CheckNewStartTx(tx.collateralOut)) {
                             return state.DoS(100, error("ConnectBlock(): zelnode tx, failed CheckNewStartTx call"),
                                              REJECT_INVALID, "bad-txns-zelnode-tx-check-new-start");
                         }
@@ -3199,11 +3199,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                     } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
                         if (p_zelnodeCache) {
                             p_zelnodeCache->AddUpdateConfirm(tx, pindex->nHeight);
-                            auto global_data = g_zelnodeCache.GetZelnodeData(tx.collatoralOut);
+                            auto global_data = g_zelnodeCache.GetZelnodeData(tx.collateralOut);
                             if (global_data.IsNull())
                                 return state.DoS(100, error("ConnectBlock(): zelnode tx, failed finding data to creating undo data"),
                                                  REJECT_INVALID, "bad-txns-zelnode-global-data-not-found");
-                            zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.insert(std::make_pair(tx.collatoralOut, global_data.nLastConfirmedBlockHeight));
+                            zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.insert(std::make_pair(tx.collateralOut, global_data.nLastConfirmedBlockHeight));
                         }
                     }
                 }
@@ -4418,10 +4418,10 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
                              REJECT_INVALID, "bad-cb-multiple");
 
         if (block.vtx[i].IsZelnodeTx()) {
-            if (setZelnodeTxOuts.count(block.vtx[i].collatoralOut))
+            if (setZelnodeTxOuts.count(block.vtx[i].collateralOut))
                 return state.DoS(100, error("CheckBlock(): more than one zelnodetx with same outpoint"),
                                  REJECT_INVALID, "bad-zelnode-tx-multiple");
-            setZelnodeTxOuts.insert(block.vtx[i].collatoralOut);
+            setZelnodeTxOuts.insert(block.vtx[i].collateralOut);
         }
     }
 

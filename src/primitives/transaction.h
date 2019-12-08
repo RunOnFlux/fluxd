@@ -360,6 +360,7 @@ public:
     COutPoint() : BaseOutPoint() {};
     COutPoint(uint256 hashIn, uint32_t nIn) : BaseOutPoint(hashIn, nIn) {};
     std::string ToString() const;
+    std::string ToFullString() const;
 };
 
 /** An outpoint - a combination of a transaction hash and an index n into its sapling
@@ -581,8 +582,8 @@ public:
 
     // Zelnode Tx data
     const int8_t nType;
-    const COutPoint collatoralOut; // Collatoral out
-    const CPubKey collatoralPubkey;
+    const COutPoint collateralOut; // collateral out
+    const CPubKey collateralPubkey;
     const CPubKey pubKey; // Pubkey used for VPS signature verification
     const int64_t sigTime; // Timestamp to be used for hash verification
     const std::string ip;
@@ -634,8 +635,8 @@ public:
         if (nVersion == ZELNODE_TX_VERSION) {
             READWRITE(*const_cast<int8_t*>(&nType));
             if (nType & ZELNODE_START_TX_TYPE) {
-                READWRITE(*const_cast<COutPoint*>(&collatoralOut));
-                READWRITE(*const_cast<CPubKey*>(&collatoralPubkey));
+                READWRITE(*const_cast<COutPoint*>(&collateralOut));
+                READWRITE(*const_cast<CPubKey*>(&collateralPubkey));
                 READWRITE(*const_cast<CPubKey*>(&pubKey));
                 READWRITE(*const_cast<int64_t*>(&sigTime));
                 READWRITE(*const_cast<std::string*>(&ip));
@@ -644,7 +645,7 @@ public:
                     READWRITE(*const_cast<std::vector<unsigned char>*>(&sig));
 
             } else if (nType & ZELNODE_CONFIRM_TX_TYPE) {
-                READWRITE(*const_cast<COutPoint*>(&collatoralOut));
+                READWRITE(*const_cast<COutPoint*>(&collateralOut));
                 READWRITE(*const_cast<int64_t*>(&sigTime));
                 READWRITE(*const_cast<int8_t*>(&benchmarkTier));
                 READWRITE(*const_cast<int64_t*>(&benchmarkSigTime));
@@ -693,7 +694,7 @@ public:
     }
 
     bool IsNull() const {
-        return vin.empty() && vout.empty() && !IsZelnodeTx() || (IsZelnodeTx() && collatoralOut.IsNull());
+        return vin.empty() && vout.empty() && !IsZelnodeTx() || (IsZelnodeTx() && collateralOut.IsNull());
     }
 
     std::string TypeToString() const {
@@ -782,8 +783,8 @@ struct CMutableTransaction
     CTransaction::binding_sig_t bindingSig = {{0}};
 
     int8_t nType;
-    COutPoint collatoralIn; // Collatoral in
-    CPubKey collatoralPubkey;
+    COutPoint collateralIn; // collateral in
+    CPubKey collateralPubkey;
     CPubKey pubKey; // Pubkey used for VPS signature verification
     int64_t sigTime; // Timestamp to be used for hash verification
     std::string ip;
@@ -834,8 +835,8 @@ struct CMutableTransaction
         if (nVersion == ZELNODE_TX_VERSION) {
             READWRITE(nType);
             if (nType & ZELNODE_START_TX_TYPE) {
-                READWRITE(collatoralIn);
-                READWRITE(collatoralPubkey);
+                READWRITE(collateralIn);
+                READWRITE(collateralPubkey);
                 READWRITE(pubKey);
                 READWRITE(sigTime);
                 READWRITE(ip);
@@ -843,7 +844,7 @@ struct CMutableTransaction
                     READWRITE(sig);
 
             } else if (nType & ZELNODE_CONFIRM_TX_TYPE) {
-                READWRITE(collatoralIn);
+                READWRITE(collateralIn);
                 READWRITE(sigTime);
                 READWRITE(benchmarkTier);
                 READWRITE(benchmarkSigTime);

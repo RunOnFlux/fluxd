@@ -222,7 +222,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             }
 
             if (tx.IsZelnodeTx()) {
-                const CCoins* coins = view.AccessCoins(tx.collatoralOut.hash);
+                const CCoins* coins = view.AccessCoins(tx.collateralOut.hash);
                 assert(coins);
 
                 int nConf = nHeight - coins->nHeight;

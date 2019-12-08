@@ -863,16 +863,16 @@ bool CheckZelnodeTxSignatures(const CTransaction& transaction)
 
         std::string strMessage = transaction.GetHash().GetHex();
 
-        if (!obfuScationSigner.VerifyMessage(transaction.collatoralPubkey, transaction.sig, strMessage, errorMessage))
+        if (!obfuScationSigner.VerifyMessage(transaction.collateralPubkey, transaction.sig, strMessage, errorMessage))
             return error("%s - START Error: %s", __func__, errorMessage);
 
         return true;
     } else if (transaction.nType & ZELNODE_CONFIRM_TX_TYPE) {
 
-        auto data = g_zelnodeCache.GetZelnodeData(transaction.collatoralOut);
+        auto data = g_zelnodeCache.GetZelnodeData(transaction.collateralOut);
         std::string errorMessage;
 
-        std::string strMessage = transaction.collatoralOut.ToString() + std::to_string(transaction.collatoralOut.n) + std::to_string(transaction.nUpdateType) + std::to_string(transaction.sigTime);
+        std::string strMessage = transaction.collateralOut.ToString() + std::to_string(transaction.collateralOut.n) + std::to_string(transaction.nUpdateType) + std::to_string(transaction.sigTime);
 
         // Someone a node can be kicked on the list. So when we are verifying from the db transaction. we dont have the data.pubKey
         if (!data.IsNull()) {
@@ -954,8 +954,8 @@ void ZelnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_nH
     ZelnodeCacheData data;
     data.nStatus = ZELNODE_TX_STARTED;
     data.nType = ZELNODE_START_TX_TYPE;
-    data.collatoralIn = p_transaction.collatoralOut;
-    data.collatoralPubkey = p_transaction.collatoralPubkey;
+    data.collateralIn = p_transaction.collateralOut;
+    data.collateralPubkey = p_transaction.collateralPubkey;
     data.pubKey = p_transaction.pubKey;
     data.ip = p_transaction.ip;
     data.nLastPaidHeight = 0;
@@ -963,34 +963,34 @@ void ZelnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_nH
     data.nTier = nTier;
 
     LOCK(cs);
-    mapStartTxTracker.insert(std::make_pair(p_transaction.collatoralOut, data));
-    setDirtyOutPoint.insert(p_transaction.collatoralOut);
+    mapStartTxTracker.insert(std::make_pair(p_transaction.collateralOut, data));
+    setDirtyOutPoint.insert(p_transaction.collateralOut);
 }
 
 void ZelnodeCache::UndoNewStart(const CTransaction& p_transaction, const int p_nHeight)
 {
     LOCK(cs);
-    setUndoStartTx.insert(p_transaction.collatoralOut);
+    setUndoStartTx.insert(p_transaction.collateralOut);
     setUndoStartTxHeight = p_nHeight;
 }
 
 void ZelnodeCache::AddNewConfirm(const CTransaction& p_transaction, const int p_nHeight)
 {
     LOCK(cs);
-    setAddToConfirm.insert(p_transaction.collatoralOut);
+    setAddToConfirm.insert(p_transaction.collateralOut);
     setAddToConfirmHeight = p_nHeight;
 }
 
 void ZelnodeCache::UndoNewConfirm(const CTransaction& p_transaction)
 {
     LOCK(cs);
-    setUndoAddToConfirm.insert(p_transaction.collatoralOut);
+    setUndoAddToConfirm.insert(p_transaction.collateralOut);
 }
 
 void ZelnodeCache::AddUpdateConfirm(const CTransaction& p_transaction, const int p_nHeight)
 {
     LOCK(cs);
-    setAddToUpdateConfirm.insert(p_transaction.collatoralOut);
+    setAddToUpdateConfirm.insert(p_transaction.collateralOut);
     setAddToUpdateConfirmHeight = p_nHeight;
 }
 
@@ -1024,7 +1024,7 @@ bool ZelnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const in
     else
         nCurrentHeight = chainActive.Height();
 
-    COutPoint out = p_transaction.collatoralOut;
+    COutPoint out = p_transaction.collateralOut;
     if (!p_transaction.IsZelnodeTx())
         return false;
 
@@ -1146,7 +1146,7 @@ bool ZelnodeCache::CheckIfNeedsNextConfirm(const COutPoint& out)
 
 ZelnodeCacheData ZelnodeCache::GetZelnodeData(const CTransaction& tx)
 {
-    return GetZelnodeData(tx.collatoralOut);
+    return GetZelnodeData(tx.collateralOut);
 }
 
 ZelnodeCacheData ZelnodeCache::GetZelnodeData(const COutPoint& out, int* nNeedLocation)
@@ -1177,7 +1177,7 @@ bool ZelnodeCache::GetNextPayment(CTxDestination& dest, int nTier, COutPoint& p_
                 if (mapZelnodeList.at(nTier).listConfirmedZelnodes.size()) {
                     p_zelnodeOut = mapZelnodeList.at(nTier).listConfirmedZelnodes.front().out;
                     if (mapConfirmedZelnodeData.count(p_zelnodeOut)) {
-                        dest = mapConfirmedZelnodeData.at(p_zelnodeOut).collatoralPubkey.GetID();
+                        dest = mapConfirmedZelnodeData.at(p_zelnodeOut).collateralPubkey.GetID();
                         return true;
                     } else {
                         // The front of the list, wasn't in the confirmed zelnode data. These means it expired
@@ -1371,7 +1371,7 @@ void ZelnodeCache::AddExpiredDosTx(const CZelnodeTxBlockUndo& p_undoData, const 
     LOCK(cs);
     std::set<COutPoint> setOutPoint;
     for (const auto& item : p_undoData.vecExpiredDosData) {
-        setOutPoint.insert(item.collatoralIn);
+        setOutPoint.insert(item.collateralIn);
     }
     mapDosExpiredToRemove[p_nHeight] = setOutPoint;
 }
@@ -1380,7 +1380,7 @@ void ZelnodeCache::AddExpiredConfirmTx(const CZelnodeTxBlockUndo& p_undoData)
 {
     LOCK(cs);
     for (const auto& item : p_undoData.vecExpiredConfirmedData) {
-        setExpireConfirmOutPoints.insert(item.collatoralIn);
+        setExpireConfirmOutPoints.insert(item.collateralIn);
     }
 }
 
@@ -1404,8 +1404,8 @@ void ZelnodeCache::AddBackUndoData(const CZelnodeTxBlockUndo& p_undoData)
     // Undo the expired dos outpoints
     for (const auto& item : p_undoData.vecExpiredDosData) {
         nHeight = item.nAddedBlockHeight;
-        mapStartTxDosTracker.insert(std::make_pair(item.collatoralIn, item));
-        setOutPoint.insert(item.collatoralIn);
+        mapStartTxDosTracker.insert(std::make_pair(item.collateralIn, item));
+        setOutPoint.insert(item.collateralIn);
     }
 
     if (setOutPoint.size()) {
@@ -1496,8 +1496,8 @@ bool ZelnodeCache::Flush()
     bool fUndoExpiredAddedToListSuper = false;
     bool fUndoExpiredAddedToListBAMF = false;
     for (const auto& item : setUndoExpireConfirm) {
-        g_zelnodeCache.mapConfirmedZelnodeData.insert(std::make_pair(item.collatoralIn, item));
-        g_zelnodeCache.setDirtyOutPoint.insert(item.collatoralIn);
+        g_zelnodeCache.mapConfirmedZelnodeData.insert(std::make_pair(item.collateralIn, item));
+        g_zelnodeCache.setDirtyOutPoint.insert(item.collateralIn);
 
         if (g_zelnodeCache.CheckListHas(item)) {
             // already in set, and therefor list. Skip it
@@ -1537,13 +1537,13 @@ bool ZelnodeCache::Flush()
             data.nLastPaidHeight = 0;
 
             // Add the data to the confirm trackers
-            g_zelnodeCache.mapConfirmedZelnodeData.insert(std::make_pair(data.collatoralIn, data));
+            g_zelnodeCache.mapConfirmedZelnodeData.insert(std::make_pair(data.collateralIn, data));
 
             // Because we don't automatically remove nodes that have expired from the list, to help not sort it as often
             // If this node is already in the list. We wont add it let. We need to wait for the node to be removed from the list.
             // Then we can add it to the list
-            if (g_zelnodeCache.mapZelnodeList.at(data.nTier).setConfirmedTxInList.count(data.collatoralIn)) {
-                setRemoveFromList.insert(data.collatoralIn);
+            if (g_zelnodeCache.mapZelnodeList.at(data.nTier).setConfirmedTxInList.count(data.collateralIn)) {
+                setRemoveFromList.insert(data.collateralIn);
             }
 
             // TODO, once we are running smoothly. We should be able to place into a list, sort the list. Add add the nodes in order that is is sorted.
@@ -1571,7 +1571,7 @@ bool ZelnodeCache::Flush()
             g_zelnodeCache.mapConfirmedZelnodeData.erase(item);
 
             // adding it to this set, means that it will go and remove the outpoint from the list, and the set if it is in there
-            setRemoveFromList.insert(data.collatoralIn);
+            setRemoveFromList.insert(data.collateralIn);
 
             if (data.nTier == Zelnode::BASIC) fRemoveBasic = true;
             else if (data.nTier == Zelnode::BASIC) fRemoveSuper = true;
@@ -1725,19 +1725,19 @@ bool ZelnodeCache::Flush()
 bool ZelnodeCache::LoadData(ZelnodeCacheData& data)
 {
     if (data.nStatus == ZELNODE_TX_STARTED) {
-        mapStartTxTracker.insert(std::make_pair(data.collatoralIn, data));
+        mapStartTxTracker.insert(std::make_pair(data.collateralIn, data));
         if (!mapStartTxHeights.count(data.nAddedBlockHeight))
             mapStartTxHeights[data.nAddedBlockHeight] = std::set<COutPoint>();
 
-        mapStartTxHeights.at(data.nAddedBlockHeight).insert(data.collatoralIn);
+        mapStartTxHeights.at(data.nAddedBlockHeight).insert(data.collateralIn);
     } else if (data.nStatus == ZELNODE_TX_DOS_PROTECTION) {
-        mapStartTxDosTracker.insert(std::make_pair(data.collatoralIn, data));
+        mapStartTxDosTracker.insert(std::make_pair(data.collateralIn, data));
         if (!mapStartTxDosHeights.count(data.nAddedBlockHeight))
             mapStartTxDosHeights[data.nAddedBlockHeight] = std::set<COutPoint>();
 
-        mapStartTxDosHeights.at(data.nAddedBlockHeight).insert(data.collatoralIn);
+        mapStartTxDosHeights.at(data.nAddedBlockHeight).insert(data.collateralIn);
     } else if (data.nStatus == ZELNODE_TX_CONFIRMED) {
-        mapConfirmedZelnodeData.insert(std::make_pair(data.collatoralIn, data));
+        mapConfirmedZelnodeData.insert(std::make_pair(data.collateralIn, data));
         InsertIntoList(data);
     }
 
@@ -1759,11 +1759,11 @@ void ZelnodeCache::SortList(const int& nTier)
 bool ZelnodeCache::CheckListHas(const ZelnodeCacheData& p_zelnodeData)
 {
     if (p_zelnodeData.nTier == Zelnode::BASIC)
-        return mapZelnodeList.at(Zelnode::BASIC).setConfirmedTxInList.count(p_zelnodeData.collatoralIn);
+        return mapZelnodeList.at(Zelnode::BASIC).setConfirmedTxInList.count(p_zelnodeData.collateralIn);
     else if (p_zelnodeData.nTier == Zelnode::SUPER)
-        return mapZelnodeList.at(Zelnode::SUPER).setConfirmedTxInList.count(p_zelnodeData.collatoralIn);
+        return mapZelnodeList.at(Zelnode::SUPER).setConfirmedTxInList.count(p_zelnodeData.collateralIn);
     else if (p_zelnodeData.nTier == Zelnode::BAMF)
-        return mapZelnodeList.at(Zelnode::BAMF).setConfirmedTxInList.count(p_zelnodeData.collatoralIn);
+        return mapZelnodeList.at(Zelnode::BAMF).setConfirmedTxInList.count(p_zelnodeData.collateralIn);
 }
 
 // Needs to be protected by locking cs before calling
@@ -1784,15 +1784,15 @@ void ZelnodeCache::InsertIntoList(const ZelnodeCacheData& p_zelnodeData)
 {
     ZelnodeListData listData(p_zelnodeData);
     if (p_zelnodeData.nTier == Zelnode::BASIC) {
-        mapZelnodeList.at(Zelnode::BASIC).setConfirmedTxInList.insert(p_zelnodeData.collatoralIn);
+        mapZelnodeList.at(Zelnode::BASIC).setConfirmedTxInList.insert(p_zelnodeData.collateralIn);
         mapZelnodeList.at(Zelnode::BASIC).listConfirmedZelnodes.emplace_front(listData);
     }
     else if (p_zelnodeData.nTier == Zelnode::SUPER) {
-        mapZelnodeList.at(Zelnode::SUPER).setConfirmedTxInList.insert(p_zelnodeData.collatoralIn);
+        mapZelnodeList.at(Zelnode::SUPER).setConfirmedTxInList.insert(p_zelnodeData.collateralIn);
         mapZelnodeList.at(Zelnode::SUPER).listConfirmedZelnodes.emplace_front(listData);
     }
     else if (p_zelnodeData.nTier == Zelnode::BAMF) {
-        mapZelnodeList.at(Zelnode::BAMF).setConfirmedTxInList.insert(p_zelnodeData.collatoralIn);
+        mapZelnodeList.at(Zelnode::BAMF).setConfirmedTxInList.insert(p_zelnodeData.collateralIn);
         mapZelnodeList.at(Zelnode::BAMF).listConfirmedZelnodes.emplace_front(listData);
     }
 }
@@ -1855,15 +1855,15 @@ bool IsDZelnodeActive()
 
 std::string ZelnodeLocationToString(int nLocation) {
     if (nLocation == ZELNODE_TX_ERROR) {
-        return "No location";
+        return "OFFLINE";
     } else if (nLocation == ZELNODE_TX_STARTED) {
-        return "Start list";
+        return "STARTED";
     } else if (nLocation == ZELNODE_TX_DOS_PROTECTION) {
-        return "DoS list";
+        return "DOS";
     } else if (nLocation == ZELNODE_TX_CONFIRMED) {
-        return "Confirmed list";
+        return "CONFIRMED";
     } else {
-        return "No location";
+        return "OFFLINE";
     }
 }
 

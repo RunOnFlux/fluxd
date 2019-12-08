@@ -30,7 +30,7 @@
 #define ZELNODE_SUPER_COLLATERAL 25000
 #define ZELNODE_BAMF_COLLATERAL 100000
 
-// How old the output must be for zelnodes collatoral to be considered valid
+// How old the output must be for zelnodes collateral to be considered valid
 #define ZELNODE_MIN_CONFIRMATION_DETERMINISTIC 100
 
 // If the zelnode isn't confirmed within this amount of blocks, the zelnode is moved to a DoS list
@@ -431,8 +431,8 @@ class ZelnodeCacheData {
 public:
     // Zelnode Tx data
     int8_t nType;
-    COutPoint collatoralIn; // Collatoral in
-    CPubKey collatoralPubkey;
+    COutPoint collateralIn; // collateral in
+    CPubKey collateralPubkey;
     CPubKey pubKey; // Pubkey used for VPS signature verification
     int nAddedBlockHeight;
     int nConfirmedBlockHeight;
@@ -493,7 +493,7 @@ public:
         int aComparatorHeight = a.nLastPaidHeight > 0 ? a.nLastPaidHeight : a.nConfirmedBlockHeight;
         int bComparatorHeight = b.nLastPaidHeight > 0 ? b.nLastPaidHeight : b.nConfirmedBlockHeight;
 
-        return (aComparatorHeight < bComparatorHeight || (aComparatorHeight == bComparatorHeight && a.collatoralIn < b.collatoralIn));
+        return (aComparatorHeight < bComparatorHeight || (aComparatorHeight == bComparatorHeight && a.collateralIn < b.collateralIn));
     }
 
     ADD_SERIALIZE_METHODS;
@@ -502,8 +502,8 @@ public:
     inline void SerializationOp(Stream& s, Operation ser_action)
     {
         READWRITE(nType);
-        READWRITE(collatoralIn);
-        READWRITE(collatoralPubkey);
+        READWRITE(collateralIn);
+        READWRITE(collateralPubkey);
         READWRITE(pubKey);
         READWRITE(nAddedBlockHeight);
         READWRITE(nConfirmedBlockHeight);
@@ -539,7 +539,7 @@ public:
     {
         nConfirmedBlockHeight = p_zelnodeData.nConfirmedBlockHeight;
         nLastPaidHeight = p_zelnodeData.nLastPaidHeight;
-        out = p_zelnodeData.collatoralIn;
+        out = p_zelnodeData.collateralIn;
     }
 
     friend bool operator<(const ZelnodeListData& a, const ZelnodeListData& b)

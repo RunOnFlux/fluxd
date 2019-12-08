@@ -331,11 +331,11 @@ bool ActiveZelnode::CreateBroadcast(CTxIn vin, CService service, CKey key, CPubK
     // Create zelnode transaction
     if (mutTransaction.nType == ZELNODE_START_TX_TYPE) {
         mutTransaction.ip = service.ToStringIP();
-        mutTransaction.collatoralIn = vin.prevout;
-        mutTransaction.collatoralPubkey = pubKey;
+        mutTransaction.collateralIn = vin.prevout;
+        mutTransaction.collateralPubkey = pubKey;
         mutTransaction.pubKey = pubKeyZelnode;
     } else if (mutTransaction.nType == ZELNODE_CONFIRM_TX_TYPE) {
-        mutTransaction.collatoralIn = vin.prevout;
+        mutTransaction.collateralIn = vin.prevout;
         if (mutTransaction.nUpdateType != ZelnodeUpdateType::UPDATE_CONFIRM)
             mutTransaction.nUpdateType = ZelnodeUpdateType::INITIAL_CONFIRM;
     }
@@ -549,14 +549,14 @@ bool ActiveZelnode::SignDeterministicStartTx(CMutableTransaction& mutableTransac
     CTxIn txin;
     CPubKey pubKeyAddressNew;
     CKey keyAddressNew;
-    if (!pwalletMain->GetZelnodeVinAndKeys(txin, pubKeyAddressNew, keyAddressNew, mutableTransaction.collatoralIn.hash.GetHex(), std::to_string(mutableTransaction.collatoralIn.n))) {
-        errorMessage = strprintf("Could not allocate txin %s:%s for zelnode %s", mutableTransaction.collatoralIn.hash.GetHex(), std::to_string(mutableTransaction.collatoralIn.n), mutableTransaction.ip);
+    if (!pwalletMain->GetZelnodeVinAndKeys(txin, pubKeyAddressNew, keyAddressNew, mutableTransaction.collateralIn.hash.GetHex(), std::to_string(mutableTransaction.collateralIn.n))) {
+        errorMessage = strprintf("Could not allocate txin %s:%s for zelnode %s", mutableTransaction.collateralIn.hash.GetHex(), std::to_string(mutableTransaction.collateralIn.n), mutableTransaction.ip);
         LogPrintf("zelnode","%s -- %s\n", __func__, errorMessage);
         return false;
     }
 
-    // Set the public key for the zelnode collatoral
-    mutableTransaction.collatoralPubkey = pubKeyAddressNew;
+    // Set the public key for the zelnode collateral
+    mutableTransaction.collateralPubkey = pubKeyAddressNew;
 
     if (mutableTransaction.nType == ZELNODE_START_TX_TYPE) {
         std::string errorMessage;
@@ -567,7 +567,7 @@ bool ActiveZelnode::SignDeterministicStartTx(CMutableTransaction& mutableTransac
         if (!obfuScationSigner.SignMessage(strMessage, errorMessage, mutableTransaction.sig, keyAddressNew))
             return error("%s - Error: Sign Zelnode for start transaction %s", __func__, errorMessage);
 
-        if (!obfuScationSigner.VerifyMessage(mutableTransaction.collatoralPubkey, mutableTransaction.sig, strMessage, errorMessage))
+        if (!obfuScationSigner.VerifyMessage(mutableTransaction.collateralPubkey, mutableTransaction.sig, strMessage, errorMessage))
             return error("%s - Error: Verify Zelnode for start transaction: %s", __func__, errorMessage);
 
         return true;
@@ -585,7 +585,7 @@ bool ActiveZelnode::SignDeterministicConfirmTx(CMutableTransaction& mutableTrans
         return error("%s : %s", __func__, errorMessage);
     }
 
-    auto data = g_zelnodeCache.GetZelnodeData(mutableTransaction.collatoralIn);
+    auto data = g_zelnodeCache.GetZelnodeData(mutableTransaction.collateralIn);
 
     if (data.IsNull()) {
         errorMessage = "zelnode-data-is-null";
@@ -595,7 +595,7 @@ bool ActiveZelnode::SignDeterministicConfirmTx(CMutableTransaction& mutableTrans
     // We need to sign the mutable transaction
     mutableTransaction.sigTime = GetAdjustedTime();
 
-    std::string strMessage = mutableTransaction.collatoralIn.ToString() + std::to_string(mutableTransaction.collatoralIn.n) + std::to_string(mutableTransaction.nUpdateType) + std::to_string(mutableTransaction.sigTime);
+    std::string strMessage = mutableTransaction.collateralIn.ToString() + std::to_string(mutableTransaction.collateralIn.n) + std::to_string(mutableTransaction.nUpdateType) + std::to_string(mutableTransaction.sigTime);
 
     // send to all nodes
     CPubKey pubKeyZelnode;
@@ -660,11 +660,11 @@ bool ActiveZelnode::BuildDeterministicStartTx(std::string strService, std::strin
     // Create zelnode transaction
     if (mutTransaction.nType == ZELNODE_START_TX_TYPE) {
         mutTransaction.ip = service.ToStringIP();
-        mutTransaction.collatoralIn = vin.prevout;
-        mutTransaction.collatoralPubkey = pubKeyCollateralAddress;
+        mutTransaction.collateralIn = vin.prevout;
+        mutTransaction.collateralPubkey = pubKeyCollateralAddress;
         mutTransaction.pubKey = pubKeyZelnode;
     } else if (mutTransaction.nType == ZELNODE_CONFIRM_TX_TYPE) {
-        mutTransaction.collatoralIn = vin.prevout;
+        mutTransaction.collateralIn = vin.prevout;
         if (mutTransaction.nUpdateType != ZelnodeUpdateType::UPDATE_CONFIRM)
             mutTransaction.nUpdateType = ZelnodeUpdateType::INITIAL_CONFIRM;
     }
@@ -678,7 +678,7 @@ void ActiveZelnode::BuildDeterministicConfirmTx(CMutableTransaction& mutTransact
     CKey keyZelnode;
 
     mutTransaction.nType = ZELNODE_CONFIRM_TX_TYPE;
-    mutTransaction.collatoralIn = deterministicOutPoint;
+    mutTransaction.collateralIn = deterministicOutPoint;
     mutTransaction.nUpdateType = nUpdateType;
 }
 

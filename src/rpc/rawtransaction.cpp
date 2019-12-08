@@ -155,13 +155,13 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
 
     if (tx.IsZelnodeTx()) {
         entry.push_back(Pair("type", tx.TypeToString()));
-        entry.push_back(Pair("collatoral_output", tx.collatoralOut.ToString()));
+        entry.push_back(Pair("collateral_output", tx.collateralOut.ToString()));
         entry.push_back(Pair("sigtime", tx.sigTime));
         entry.push_back(Pair("sig", EncodeBase64(&tx.sig[0], tx.sig.size())));
 
         if (tx.nType & ZELNODE_START_TX_TYPE) {
             entry.push_back(
-                    Pair("collatoral_pubkey", EncodeBase64(tx.collatoralPubkey.begin(), tx.collatoralPubkey.size())));
+                    Pair("collateral_pubkey", EncodeBase64(tx.collateralPubkey.begin(), tx.collateralPubkey.size())));
             entry.push_back(Pair("zelnode_pubkey", EncodeBase64(tx.pubKey.begin(), tx.pubKey.size())));
             entry.push_back(Pair("ip", tx.ip));
         }

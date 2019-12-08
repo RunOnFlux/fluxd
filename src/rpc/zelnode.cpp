@@ -605,18 +605,29 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
         UniValue info(UniValue::VOBJ);
 
         if (data.IsNull()) {
-            info.push_back(std::make_pair("collatoral", item.out.ToString()));
+            info.push_back(std::make_pair("collateral", item.out.ToString()));
             info.push_back(std::make_pair("status", "expired"));
             info.push_back(std::make_pair("last_paid_height", item.nLastPaidHeight));
             info.push_back(std::make_pair("confirmed_height", item.nConfirmedBlockHeight));
+            info.push_back(std::make_pair("activesince", 0));
+            info.push_back(std::make_pair("lastpaid", 0));
         } else {
-            info.push_back(std::make_pair("collatoral", data.collatoralIn.ToString()));
+            info.push_back(std::make_pair("collateral", data.collateralIn.ToString()));
             info.push_back(std::make_pair("ip", data.ip));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
             info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
             info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
             info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+            info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+            if (chainActive.Height() >= data.nAddedBlockHeight)
+                info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("activesince", 0));
+            if (chainActive.Height() >= data.nLastPaidHeight)
+                info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("lastpaid", 0));
         }
 
         responseBasic.push_back(std::make_pair(std::to_string(count++), info));
@@ -632,13 +643,31 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
 
         UniValue info(UniValue::VOBJ);
 
-        info.push_back(std::make_pair("collatoral", data.collatoralIn.ToString()));
-        info.push_back(std::make_pair("ip", data.ip));
-        info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
-        info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
-        info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
-        info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
-        info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+        if (data.IsNull()) {
+            info.push_back(std::make_pair("collateral", item.out.ToString()));
+            info.push_back(std::make_pair("status", "expired"));
+            info.push_back(std::make_pair("last_paid_height", item.nLastPaidHeight));
+            info.push_back(std::make_pair("confirmed_height", item.nConfirmedBlockHeight));
+            info.push_back(std::make_pair("activesince", 0));
+            info.push_back(std::make_pair("lastpaid", 0));
+        } else {
+            info.push_back(std::make_pair("collateral", data.collateralIn.ToString()));
+            info.push_back(std::make_pair("ip", data.ip));
+            info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+            info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+            info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+            info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+            info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+            info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+            if (chainActive.Height() >= data.nAddedBlockHeight)
+                info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("activesince", 0));
+            if (chainActive.Height() >= data.nLastPaidHeight)
+                info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("lastpaid", 0));
+        }
 
         responseSuper.push_back(std::make_pair(std::to_string(count++), info));
     }
@@ -653,13 +682,31 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
 
         UniValue info(UniValue::VOBJ);
 
-        info.push_back(std::make_pair("collatoral", data.collatoralIn.ToString()));
-        info.push_back(std::make_pair("ip", data.ip));
-        info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
-        info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
-        info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
-        info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
-        info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+        if (data.IsNull()) {
+            info.push_back(std::make_pair("collateral", item.out.ToString()));
+            info.push_back(std::make_pair("status", "expired"));
+            info.push_back(std::make_pair("last_paid_height", item.nLastPaidHeight));
+            info.push_back(std::make_pair("confirmed_height", item.nConfirmedBlockHeight));
+            info.push_back(std::make_pair("activesince", 0));
+            info.push_back(std::make_pair("lastpaid", 0));
+        } else {
+            info.push_back(std::make_pair("collateral", data.collateralIn.ToString()));
+            info.push_back(std::make_pair("ip", data.ip));
+            info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+            info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+            info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+            info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+            info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+            info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+            if (chainActive.Height() >= data.nAddedBlockHeight)
+                info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("activesince", 0));
+            if (chainActive.Height() >= data.nLastPaidHeight)
+                info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("lastpaid", 0));
+        }
 
         responseBAMF.push_back(std::make_pair(std::to_string(count++), info));
     }
@@ -779,18 +826,29 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
             UniValue info(UniValue::VOBJ);
 
             if (data.IsNull()) {
-                info.push_back(std::make_pair("collatoral", item.out.ToString()));
+                info.push_back(std::make_pair("collateral", item.out.ToString()));
                 info.push_back(std::make_pair("status", "expired"));
                 info.push_back(std::make_pair("last_paid_height", item.nLastPaidHeight));
                 info.push_back(std::make_pair("confirmed_height", item.nConfirmedBlockHeight));
+                info.push_back(std::make_pair("activesince", 0));
+                info.push_back(std::make_pair("lastpaid", 0));
             } else {
-                info.push_back(std::make_pair("collatoral", data.collatoralIn.ToString()));
+                info.push_back(std::make_pair("collateral", data.collateralIn.ToString()));
                 info.push_back(std::make_pair("ip", data.ip));
                 info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
                 info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
                 info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
                 info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
                 info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+                info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+                if (chainActive.Height() >= data.nAddedBlockHeight)
+                    info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("activesince", 0));
+                if (chainActive.Height() >= data.nLastPaidHeight)
+                    info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("lastpaid", 0));
             }
 
             responseBasic.push_back(std::make_pair(std::to_string(count++), info));
@@ -805,14 +863,31 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
             auto data = g_zelnodeCache.GetZelnodeData(item.out);
 
             UniValue info(UniValue::VOBJ);
-
-            info.push_back(std::make_pair("collatoral", data.collatoralIn.ToString()));
-            info.push_back(std::make_pair("ip", data.ip));
-            info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
-            info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
-            info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
-            info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
-            info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+            if (data.IsNull()) {
+                info.push_back(std::make_pair("collateral", item.out.ToString()));
+                info.push_back(std::make_pair("status", "expired"));
+                info.push_back(std::make_pair("last_paid_height", item.nLastPaidHeight));
+                info.push_back(std::make_pair("confirmed_height", item.nConfirmedBlockHeight));
+                info.push_back(std::make_pair("activesince", 0));
+                info.push_back(std::make_pair("lastpaid", 0));
+            } else {
+                info.push_back(std::make_pair("collateral", data.collateralIn.ToString()));
+                info.push_back(std::make_pair("ip", data.ip));
+                info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+                info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+                info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+                info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+                if (chainActive.Height() >= data.nAddedBlockHeight)
+                    info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("activesince", 0));
+                if (chainActive.Height() >= data.nLastPaidHeight)
+                    info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("lastpaid", 0));
+            }
 
             responseSuper.push_back(std::make_pair(std::to_string(count++), info));
         }
@@ -827,13 +902,31 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
 
             UniValue info(UniValue::VOBJ);
 
-            info.push_back(std::make_pair("collatoral", data.collatoralIn.ToString()));
-            info.push_back(std::make_pair("ip", data.ip));
-            info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
-            info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
-            info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
-            info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
-            info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+            if (data.IsNull()) {
+                info.push_back(std::make_pair("collateral", item.out.ToString()));
+                info.push_back(std::make_pair("status", "expired"));
+                info.push_back(std::make_pair("last_paid_height", item.nLastPaidHeight));
+                info.push_back(std::make_pair("confirmed_height", item.nConfirmedBlockHeight));
+                info.push_back(std::make_pair("activesince", 0));
+                info.push_back(std::make_pair("lastpaid", 0));
+            } else {
+                info.push_back(std::make_pair("collateral", data.collateralIn.ToString()));
+                info.push_back(std::make_pair("ip", data.ip));
+                info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+                info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+                info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+                info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+                if (chainActive.Height() >= data.nAddedBlockHeight)
+                    info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("activesince", 0));
+                if (chainActive.Height() >= data.nLastPaidHeight)
+                    info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("lastpaid", 0));
+            }
 
             responseBAMF.push_back(std::make_pair(std::to_string(count++), info));
         }
@@ -1012,11 +1105,11 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
         UniValue info(UniValue::VOBJ);
 
         if (data.IsNull()) {
-            info.push_back(std::make_pair("collatoral", activeZelnode.deterministicOutPoint.ToString()));
+            info.push_back(std::make_pair("collateral", activeZelnode.deterministicOutPoint.ToFullString()));
             info.push_back(std::make_pair("status", "expired"));
         } else {
             info.push_back(std::make_pair("location", ZelnodeLocationToString(nLocation)));
-            info.push_back(std::make_pair("collatoral", data.collatoralIn.ToString()));
+            info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             info.push_back(std::make_pair("ip", data.ip));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
@@ -1165,7 +1258,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
         if (g_zelnodeCache.GetNextPayment(dest_basic, BASIC, outpoint_basic)) {
             UniValue obj(UniValue::VOBJ);
             auto data = g_zelnodeCache.GetZelnodeData(outpoint_basic);
-            obj.push_back(std::make_pair("collatoral", data.collatoralIn.ToString()));
+            obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             obj.push_back(std::make_pair("ip", data.ip));
             obj.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             obj.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
@@ -1181,7 +1274,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
         if (g_zelnodeCache.GetNextPayment(dest_super, SUPER, outpoint_super)) {
             UniValue obj(UniValue::VOBJ);
             auto data = g_zelnodeCache.GetZelnodeData(outpoint_super);
-            obj.push_back(std::make_pair("collatoral", data.collatoralIn.ToString()));
+            obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             obj.push_back(std::make_pair("ip", data.ip));
             obj.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             obj.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
@@ -1197,7 +1290,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
         if (g_zelnodeCache.GetNextPayment(dest_bamf, BAMF, outpoint_bamf)) {
             UniValue obj(UniValue::VOBJ);
             auto data = g_zelnodeCache.GetZelnodeData(outpoint_bamf);
-            obj.push_back(std::make_pair("collatoral", data.collatoralIn.ToString()));
+            obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             obj.push_back(std::make_pair("ip", data.ip));
             obj.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             obj.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
@@ -1525,6 +1618,28 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
     UniValue ret(UniValue::VARR);
 
     for (ZelnodeConfig::ZelnodeEntry zelnode : zelnodeEntries) {
+
+
+        if (IsDZelnodeActive()) {
+            int nIndex;
+            if(!zelnode.castOutputIndex(nIndex))
+                continue;
+            COutPoint out = COutPoint(uint256S(zelnode.getTxHash()), uint32_t(nIndex));
+
+            int nLocation = ZELNODE_TX_ERROR;
+            auto data = g_zelnodeCache.GetZelnodeData(out, &nLocation);
+
+            UniValue object(UniValue::VOBJ);
+            object.push_back(Pair("alias", zelnode.getAlias()));
+            object.push_back(Pair("address", zelnode.getIp()));
+            object.push_back(Pair("privateKey", zelnode.getPrivKey()));
+            object.push_back(Pair("txHash", zelnode.getTxHash()));
+            object.push_back(Pair("outputIndex", zelnode.getOutputIndex()));
+            object.push_back(Pair("status", ZelnodeLocationToString(nLocation)));
+            ret.push_back(object);
+            continue;
+        }
+
         int nIndex;
         if(!zelnode.castOutputIndex(nIndex))
             continue;
