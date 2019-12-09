@@ -1850,6 +1850,11 @@ void ZelnodeCache::DumpZelnodeCache()
 
 bool IsDZelnodeActive()
 {
+    return chainActive.Height() >= Params().StartZelnodePayments();
+}
+
+bool IsZelnodeTransactionsActive()
+{
     return chainActive.Height() >= Params().GetConsensus().vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight;
 }
 
@@ -1864,6 +1869,25 @@ std::string ZelnodeLocationToString(int nLocation) {
         return "CONFIRMED";
     } else {
         return "OFFLINE";
+    }
+}
+
+void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion) {
+    for (auto &entry : mapConfirmedZelnodeData) {
+        std::string strHost = entry.second.ip;
+        CNetAddr node = CNetAddr(strHost, false);
+        int nNetwork = node.GetNetwork();
+        switch (nNetwork) {
+            case 1 :
+                ipv4++;
+                break;
+            case 2 :
+                ipv6++;
+                break;
+            case 3 :
+                onion++;
+                break;
+        }
     }
 }
 

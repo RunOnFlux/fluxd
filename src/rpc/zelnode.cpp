@@ -115,7 +115,7 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
         strCommand = params[0].get_str();
 
 
-    if (IsDZelnodeActive()) {
+    if (IsZelnodeTransactionsActive()) {
         if (fHelp || params.size() < 2 || params.size() > 3 ||
             (params.size() == 2 && (strCommand != "all")) ||
             (params.size() == 3 && strCommand != "alias"))
@@ -436,8 +436,8 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
 
 UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
 {
-    if (!IsDZelnodeActive()) {
-        throw runtime_error("deterministic zelnodes is not active yet");
+    if (!IsZelnodeTransactionsActive()) {
+        throw runtime_error("deterministic zelnodes transactions is not active yet");
     }
 
     std::string strCommand;
@@ -564,10 +564,6 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
 
 UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
 {
-    if (!IsDZelnodeActive()) {
-        throw runtime_error("deterministic zelnodes is not active yet");
-    }
-
     if (fHelp || params.size())
         throw runtime_error(
                 "viewdeterministiczelnodelist\n"
@@ -1366,6 +1362,31 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
                 HelpExampleCli("getzelnodecount", "") + HelpExampleRpc("getzelnodecount", ""));
 
     UniValue obj(UniValue::VOBJ);
+
+    if (IsDZelnodeActive())
+    {
+        int nBasic = g_zelnodeCache.mapZelnodeList.at(BASIC).listConfirmedZelnodes.size();
+        int nSuper = g_zelnodeCache.mapZelnodeList.at(SUPER).listConfirmedZelnodes.size();
+        int nBAMF = g_zelnodeCache.mapZelnodeList.at(BAMF).listConfirmedZelnodes.size();
+
+        int nTotal = g_zelnodeCache.mapConfirmedZelnodeData.size();
+
+        obj.push_back(Pair("total", nTotal));
+        obj.push_back(Pair("stable", nTotal));
+        obj.push_back(Pair("basic-enabled", nBasic));
+        obj.push_back(Pair("super-enabled", nSuper));
+        obj.push_back(Pair("bamf-enabled", nBAMF));
+
+        int ipv4 = 0, ipv6 = 0, onion = 0;
+        g_zelnodeCache.CountNetworks(ipv4, ipv6, onion);
+
+        obj.push_back(Pair("ipv4", ipv4));
+        obj.push_back(Pair("ipv6", ipv6));
+        obj.push_back(Pair("onion", onion));
+
+        return obj;
+    }
+
     int nBasicCount = 0;
     int nSuperCount = 0;
     int nBAMFCount = 0;

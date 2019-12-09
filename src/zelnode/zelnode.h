@@ -718,9 +718,14 @@ public:
     void EraseFromList(const std::set<COutPoint>& setToRemove, const int nTier);
 
     void DumpZelnodeCache();
+
+    void CountNetworks(int& ipv4, int& ipv6, int& onion);
 };
 
 bool IsDZelnodeActive();
+bool IsZelnodeTransactionsActive();
+
+
 
 
 #endif //ZELCASHNODES_ZELNODE_H
