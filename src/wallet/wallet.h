@@ -394,7 +394,7 @@ public:
     int GetDepthInMainChain() const { const CBlockIndex *pindexRet; return GetDepthInMainChain(pindexRet); }
     bool IsInMainChain() const { const CBlockIndex *pindexRet; return GetDepthInMainChainINTERNAL(pindexRet) > 0; }
     int GetBlocksToMaturity() const;
-    bool AcceptToMemoryPool(bool fLimitFree=true, bool fRejectAbsurdFee=true);
+    bool AcceptToMemoryPool(bool fLimitFree=true, bool fRejectAbsurdFee=true, CValidationState* state = nullptr);
 };
 
 /** 
@@ -1145,7 +1145,7 @@ public:
     bool FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, int& nChangePosRet, std::string& strFailReason);
     bool CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosRet,
                            std::string& strFailReason, const CCoinControl *coinControl = NULL, bool sign = true);
-    bool CommitTransaction(CWalletTx& wtxNew, boost::optional<CReserveKey&> reservekey);
+    bool CommitTransaction(CWalletTx& wtxNew, boost::optional<CReserveKey&> reservekey, CValidationState* state = nullptr);
 
     static CFeeRate minTxFee;
     static CAmount GetMinimumFee(unsigned int nTxBytes, unsigned int nConfirmTarget, const CTxMemPool& pool);

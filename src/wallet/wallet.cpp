@@ -3646,7 +3646,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 /**
  * Call after CreateTransaction unless you want to abort
  */
-bool CWallet::CommitTransaction(CWalletTx& wtxNew, boost::optional<CReserveKey&> reservekey)
+bool CWallet::CommitTransaction(CWalletTx& wtxNew, boost::optional<CReserveKey&> reservekey, CValidationState* state)
 {
     {
         LOCK2(cs_main, cs_wallet);
@@ -3686,6 +3686,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, boost::optional<CReserveKey&>
         if (fBroadcastTransactions)
         {
             // Broadcast
+
             if (!wtxNew.AcceptToMemoryPool(false))
             {
                 // This must not fail. The transaction has already been signed and recorded.
@@ -4508,10 +4509,10 @@ int CMerkleTx::GetBlocksToMaturity() const
 }
 
 
-bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectAbsurdFee)
+bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectAbsurdFee, CValidationState* p_state)
 {
     CValidationState state;
-    bool ret = ::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, fRejectAbsurdFee);
+    bool ret = ::AcceptToMemoryPool(mempool, p_state == nullptr ? state : *p_state, *this, fLimitFree, NULL, fRejectAbsurdFee);
 
     if (!ret) {
         LogPrintf("Failed to accept to mempool: %s\n", state.GetRejectReason());

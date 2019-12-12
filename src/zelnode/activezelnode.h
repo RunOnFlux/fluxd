@@ -37,7 +37,7 @@ private:
     bool CreateBroadcast(CTxIn vin, CService service, CKey key, CPubKey pubKey, CKey keyZelnode, CPubKey pubKeyZelnode, std::string& errorMessage, ZelnodeBroadcast &znb, CMutableTransaction& mutTransaction);
 
     /// Get 10000 ZEL input that can be used for the Zelnode
-    bool GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex);
+    bool GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage);
     bool GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
 
 public:

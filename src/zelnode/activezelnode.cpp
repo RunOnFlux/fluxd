@@ -297,7 +297,8 @@ bool ActiveZelnode::CreateBroadcast(std::string strService, std::string strKeyZe
         return false;
     }
 
-    if (!GetZelNodeVin(vin, pubKeyCollateralAddress, keyCollateralAddress, strTxHash, strOutputIndex)) {
+    std::string strErrorMessage;
+    if (!GetZelNodeVin(vin, pubKeyCollateralAddress, keyCollateralAddress, strTxHash, strOutputIndex, strErrorMessage)) {
         errorMessage = strprintf("Could not allocate vin %s:%s for zelnode %s", strTxHash, strOutputIndex,
                                  strService);
         LogPrintf("%s - %s\n", __func__, errorMessage);
@@ -355,10 +356,11 @@ bool ActiveZelnode::CreateBroadcast(CTxIn vin, CService service, CKey key, CPubK
 
 bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey)
 {
-    return GetZelNodeVin(vin, pubkey, secretKey, "", "");
+    std::string strErrorMessage;
+    return GetZelNodeVin(vin, pubkey, secretKey, "", "", strErrorMessage);
 }
 
-bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex)
+bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage)
 {
     // wait for reindex and/or import to finish
     if (fImporting || fReindex) return false;
@@ -378,6 +380,7 @@ bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, 
         try {
             outputIndex = std::stoi(strOutputIndex.c_str());
         } catch (const std::exception& e) {
+            errorMessage = "Failed to convert index to an integer";
             LogPrintf("%s: %s on strOutputIndex\n", __func__, e.what());
             return false;
         }
@@ -391,6 +394,7 @@ bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, 
             }
         }
         if (!found) {
+            errorMessage = "Could not find collateral in wallet";
             LogPrintf("%s - Could not locate valid vin\n", __func__);
             return false;
         }
@@ -399,12 +403,14 @@ bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, 
         if (possibleCoins.size() > 0) {
             selectedOutput = &possibleCoins[0].first;
         } else {
+            errorMessage = "No possible coins found for zelnodes";
             LogPrintf("%s - Could not locate specified vin from possible list\n", __func__);
             return false;
         }
     }
 
     if (selectedOutput->nDepth < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC) {
+        errorMessage = strprintf("Zelnode hasn't met confirmation requirement (remaining confirmations required: %d)\n", ZELNODE_MIN_CONFIRMATION_DETERMINISTIC - selectedOutput->nDepth);
         LogPrintf("%s - zelnode hasn't met confirmation requirement (remaining confirmations required: %d)\n", __func__, ZELNODE_MIN_CONFIRMATION_DETERMINISTIC - selectedOutput->nDepth);
         return false;
     }
@@ -646,8 +652,9 @@ bool ActiveZelnode::BuildDeterministicStartTx(std::string strService, std::strin
         return false;
     }
 
-    if (!GetZelNodeVin(vin, pubKeyCollateralAddress, keyCollateralAddress, strTxHash, strOutputIndex)) {
-        errorMessage = strprintf("Could not allocate vin %s:%s for zelnode %s", strTxHash, strOutputIndex,
+    if (!GetZelNodeVin(vin, pubKeyCollateralAddress, keyCollateralAddress, strTxHash, strOutputIndex, errorMessage)) {
+        if (errorMessage.empty())
+            errorMessage = strprintf("Could not allocate vin %s:%s for zelnode %s", strTxHash, strOutputIndex,
                                  strService);
         LogPrintf("%s - %s\n", __func__, errorMessage);
         return false;

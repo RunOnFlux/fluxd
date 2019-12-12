@@ -22,6 +22,7 @@
 
 #include <boost/tokenizer.hpp>
 #include <fstream>
+#include <consensus/validation.h>
 
 UniValue createzelnodekey(const UniValue& params, bool fHelp)
 {
@@ -230,11 +231,13 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
                     fSigned = true;
 
                     CWalletTx walletTx(pwalletMain, tx);
-                    bool fCommited = pwalletMain->CommitTransaction(walletTx, reservekey);
+                    CValidationState state;
+                    bool fCommited = pwalletMain->CommitTransaction(walletTx, reservekey, &state);
                     zelnodeEntry.push_back(Pair("transaction_commited", fCommited ? "successful" : "failed"));
                     if (fCommited) {
                         successful++;
                     } else {
+                        errorMessage = state.GetRejectReason();
                         failed++;
                     }
                 } else {
