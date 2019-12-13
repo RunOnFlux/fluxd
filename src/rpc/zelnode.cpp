@@ -595,21 +595,14 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
                 HelpExampleCli("viewdeterministiczelnodelist", ""));
 
     UniValue wholelist(UniValue::VARR);
-    int count = 1;
+    int count = 0;
     for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::BASIC).listConfirmedZelnodes) {
 
         auto data = g_zelnodeCache.GetZelnodeData(item.out);
 
         UniValue info(UniValue::VOBJ);
 
-        if (data.IsNull()) {
-            info.push_back(std::make_pair("collateral", item.out.ToString()));
-            info.push_back(std::make_pair("status", "expired"));
-            info.push_back(std::make_pair("last_paid_height", item.nLastPaidHeight));
-            info.push_back(std::make_pair("confirmed_height", item.nConfirmedBlockHeight));
-            info.push_back(std::make_pair("activesince", 0));
-            info.push_back(std::make_pair("lastpaid", 0));
-        } else {
+        if (!data.IsNull()) {
             info.push_back(std::make_pair("collateral", data.collateralIn.ToString()));
             info.push_back(std::make_pair("ip", data.ip));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
@@ -628,9 +621,11 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
                 info.push_back(std::make_pair("lastpaid", 0));
 
             info.push_back(std::make_pair("rank", count++));
+
+            wholelist.push_back(info);
         }
 
-        wholelist.push_back(info);
+
     }
 
     count = 0;
@@ -640,14 +635,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
 
         UniValue info(UniValue::VOBJ);
 
-        if (data.IsNull()) {
-            info.push_back(std::make_pair("collateral", item.out.ToString()));
-            info.push_back(std::make_pair("status", "expired"));
-            info.push_back(std::make_pair("last_paid_height", item.nLastPaidHeight));
-            info.push_back(std::make_pair("confirmed_height", item.nConfirmedBlockHeight));
-            info.push_back(std::make_pair("activesince", 0));
-            info.push_back(std::make_pair("lastpaid", 0));
-        } else {
+        if (!data.IsNull())  {
             info.push_back(std::make_pair("collateral", data.collateralIn.ToString()));
             info.push_back(std::make_pair("ip", data.ip));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
@@ -665,9 +653,11 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
             else
                 info.push_back(std::make_pair("lastpaid", 0));
             info.push_back(std::make_pair("rank", count++));
+
+            wholelist.push_back(info);
         }
 
-        wholelist.push_back(info);
+
     }
 
     count = 0;
@@ -677,14 +667,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
 
         UniValue info(UniValue::VOBJ);
 
-        if (data.IsNull()) {
-            info.push_back(std::make_pair("collateral", item.out.ToString()));
-            info.push_back(std::make_pair("status", "expired"));
-            info.push_back(std::make_pair("last_paid_height", item.nLastPaidHeight));
-            info.push_back(std::make_pair("confirmed_height", item.nConfirmedBlockHeight));
-            info.push_back(std::make_pair("activesince", 0));
-            info.push_back(std::make_pair("lastpaid", 0));
-        } else {
+        if (!data.IsNull()) {
             info.push_back(std::make_pair("collateral", data.collateralIn.ToString()));
             info.push_back(std::make_pair("ip", data.ip));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
@@ -702,9 +685,9 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
             else
                 info.push_back(std::make_pair("lastpaid", 0));
             info.push_back(std::make_pair("rank", count++));
-        }
 
-        wholelist.push_back(info);
+            wholelist.push_back(info);
+        }
     }
 
     return wholelist;
