@@ -3393,8 +3393,8 @@ UniValue z_listreceivedbyaddress(const UniValue& params, bool fHelp)
             obj.push_back(Pair("txid", entry.op.hash.ToString()));
             obj.push_back(Pair("amount", ValueFromAmount(CAmount(entry.note.value()))));
             obj.push_back(Pair("confirmations", entry.confirmations));
-            if (pwalletMain->mapWallet.count(entry.jsop.hash)) {
-                const CWalletTx& wtx = pwalletMain->mapWallet[entry.jsop.hash];
+            if (pwalletMain->mapWallet.count(entry.op.hash)) {
+                const CWalletTx& wtx = pwalletMain->mapWallet[entry.op.hash];
                 obj.push_back(Pair("time", wtx.GetTxTime()));
             }
             obj.push_back(Pair("memo", HexStr(entry.memo)));
