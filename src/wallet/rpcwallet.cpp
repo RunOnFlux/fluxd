@@ -3321,6 +3321,8 @@ UniValue z_listreceivedbyaddress(const UniValue& params, bool fHelp)
             "{\n"
             "  \"txid\": \"txid\",           (string) the transaction id\n"
             "  \"amount\": xxxxx,         (numeric) the amount of value in the note\n"
+            "  \"confirmations\" : n,     (numeric) The number of confirmations\n"
+            "  \"time\" : ttt,            (numeric) The transaction time in seconds since epoch (1 Jan 1970 GMT)\n"
             "  \"memo\": xxxxx,           (string) hexadecimal string representation of memo field\n"
             "  \"jsindex\" (sprout) : n,     (numeric) the joinsplit index\n"
             "  \"jsoutindex\" (sprout) : n,     (numeric) the output index of the joinsplit\n"
@@ -3371,6 +3373,11 @@ UniValue z_listreceivedbyaddress(const UniValue& params, bool fHelp)
             UniValue obj(UniValue::VOBJ);
             obj.push_back(Pair("txid", entry.jsop.hash.ToString()));
             obj.push_back(Pair("amount", ValueFromAmount(CAmount(entry.note.value()))));
+            obj.push_back(Pair("confirmations", entry.confirmations));
+            if (pwalletMain->mapWallet.count(entry.jsop.hash)) {
+                const CWalletTx& wtx = pwalletMain->mapWallet[entry.jsop.hash];
+                obj.push_back(Pair("time", wtx.GetTxTime()));
+            }
             std::string data(entry.memo.begin(), entry.memo.end());
             obj.push_back(Pair("memo", HexStr(data)));
             obj.push_back(Pair("jsindex", entry.jsop.js));
@@ -3385,6 +3392,11 @@ UniValue z_listreceivedbyaddress(const UniValue& params, bool fHelp)
             UniValue obj(UniValue::VOBJ);
             obj.push_back(Pair("txid", entry.op.hash.ToString()));
             obj.push_back(Pair("amount", ValueFromAmount(CAmount(entry.note.value()))));
+            obj.push_back(Pair("confirmations", entry.confirmations));
+            if (pwalletMain->mapWallet.count(entry.op.hash)) {
+                const CWalletTx& wtx = pwalletMain->mapWallet[entry.op.hash];
+                obj.push_back(Pair("time", wtx.GetTxTime()));
+            }
             obj.push_back(Pair("memo", HexStr(entry.memo)));
             obj.push_back(Pair("outindex", (int)entry.op.n));
             if (hasSpendingKey) {
