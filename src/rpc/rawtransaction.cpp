@@ -167,7 +167,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
         }
 
         if (tx.nType & ZELNODE_CONFIRM_TX_TYPE) {
-            entry.push_back(Pair("update_type", tx.benchmarkSigTime));
+            entry.push_back(Pair("update_type", tx.nUpdateType));
             entry.push_back(Pair("benchmark_tier", TierToString(tx.benchmarkTier)));
             entry.push_back(Pair("benchmark_sigtime", tx.benchmarkSigTime));
             entry.push_back(Pair("benchmark_sig", EncodeBase64(&tx.benchmarkSig[0], tx.benchmarkSig.size())));
