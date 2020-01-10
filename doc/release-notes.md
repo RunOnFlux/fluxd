@@ -11,14 +11,11 @@ Jeremy "Blondfrogs" Anderson (8):
       Deterministic ZelNodes
       Fix Broken gtests
 
-Miles Manley (3):
-      Kamata naming
-      Versioning and release notes
-      Set Kamata network upgrade activation height
-      Zcash Upstream and Merge
+Miles Manley (1):
+      Zcash Upstream port
 
 Tadeas Kmenta(1):
-      Benchmarking - Benchmarkd
+      Extend RPC
 
 Changlog - Zcash 2.1.0-1
 =========

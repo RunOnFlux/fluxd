@@ -137,7 +137,9 @@ public:
         eh_epoch_2 = eh144_5;
         eh_epoch_3 = zelHash;
 
-        // The best chain should have at least this much work. Updated to match the chainwork associated with upgrade_kamiooka
+        // The best chain should have at least this much work. 
+        // nMinimumChainWork MUST be set to at least the chain work of hashActivationBlock, otherwise the detection of fake alternate chain will have false positives.
+        // Updated to match the chainwork associated with upgrade_kamiooka
         consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000000000021f5d5da5d73");
 
         /**

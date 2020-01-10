@@ -98,7 +98,7 @@ void ThreadSendAlert()
     //  4000 or higher will put the RPC into safe mode
     alert.nPriority     = 5000;
     alert.strComment    = "";
-    alert.strStatusBar  = "Your client is outdated. ZelFlux is live. Please update to the most recent version of Zel (4.0.0 or later).";
+    alert.strStatusBar  = "Your client is outdated. Please update to the most recent version of ZelCash (4.0.0 or later).";
     alert.strRPCError   = alert.strStatusBar;
 
     // Set specific client version/versions here. If setSubVer is empty, no filtering on subver is done:
