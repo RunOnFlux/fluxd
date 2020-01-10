@@ -251,24 +251,24 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
                 entry.push_back(Pair("bindingSig", HexStr(tx.bindingSig.begin(), tx.bindingSig.end())));
             }
         }
-
-        if (!hashBlock.IsNull()) {
-            entry.push_back(Pair("blockhash", hashBlock.GetHex()));
-            BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
-            if (mi != mapBlockIndex.end() && (*mi).second) {
-                CBlockIndex *pindex = (*mi).second;
-                if (chainActive.Contains(pindex)) {
-                    entry.push_back(Pair("height", pindex->nHeight));
-                    entry.push_back(Pair("confirmations", 1 + chainActive.Height() - pindex->nHeight));
-                    entry.push_back(Pair("time", pindex->GetBlockTime()));
-                    entry.push_back(Pair("blocktime", pindex->GetBlockTime()));
-                } else {
-                    entry.push_back(Pair("height", -1));
-                    entry.push_back(Pair("confirmations", 0));
-                }
+    }
+    if (!hashBlock.IsNull()) {
+        entry.push_back(Pair("blockhash", hashBlock.GetHex()));
+        BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
+        if (mi != mapBlockIndex.end() && (*mi).second) {
+            CBlockIndex *pindex = (*mi).second;
+            if (chainActive.Contains(pindex)) {
+                entry.push_back(Pair("height", pindex->nHeight));
+                entry.push_back(Pair("confirmations", 1 + chainActive.Height() - pindex->nHeight));
+                entry.push_back(Pair("time", pindex->GetBlockTime()));
+                entry.push_back(Pair("blocktime", pindex->GetBlockTime()));
+            } else {
+                entry.push_back(Pair("height", -1));
+                entry.push_back(Pair("confirmations", 0));
             }
         }
     }
+
 }
 
 UniValue getrawtransaction(const UniValue& params, bool fHelp)
