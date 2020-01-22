@@ -579,6 +579,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
                 "    \"txhash\": \"hash\",                    (string) Collateral transaction hash\n"
                 "    \"outidx\": n,                           (numeric) Collateral transaction output index\n"
                 "    \"ip\": \"address\"                      (string) IP address\n"
+                "    \"network\": \"network\"                 (string) Network type (IPv4, IPv6, onion)\n"
                 "    \"added_height\": \"height\"             (string) Block height when zelnode was added\n"
                 "    \"confirmed_height\": \"height\"         (string) Block height when zelnode was confirmed\n"
                 "    \"last_confirmed_height\": \"height\"    (string) Last block height when zelnode was confirmed\n"
@@ -614,10 +615,15 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
                 EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
                 continue;
 
+            std::string strHost = data.ip;
+            CNetAddr node = CNetAddr(strHost, false);
+            std::string strNetwork = GetNetworkName(node.GetNetwork());
+
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             info.push_back(std::make_pair("txhash", strTxHash));
             info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
             info.push_back(std::make_pair("ip", data.ip));
+            info.push_back(std::make_pair("network", strNetwork));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
             info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
@@ -655,10 +661,15 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
                 EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
                 continue;
 
+            std::string strHost = data.ip;
+            CNetAddr node = CNetAddr(strHost, false);
+            std::string strNetwork = GetNetworkName(node.GetNetwork());
+
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             info.push_back(std::make_pair("txhash", data.collateralIn.GetTxHash()));
             info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
             info.push_back(std::make_pair("ip", data.ip));
+            info.push_back(std::make_pair("network", strNetwork));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
             info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
@@ -695,10 +706,15 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
                 EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
                 continue;
 
+            std::string strHost = data.ip;
+            CNetAddr node = CNetAddr(strHost, false);
+            std::string strNetwork = GetNetworkName(node.GetNetwork());
+
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             info.push_back(std::make_pair("txhash", data.collateralIn.GetTxHash()));
             info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
             info.push_back(std::make_pair("ip", data.ip));
+            info.push_back(std::make_pair("network", strNetwork));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
             info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
