@@ -140,6 +140,16 @@ std::string COutPoint::ToFullString() const
     return strprintf("COutPoint(%s, %u)", hash.ToString(), n);
 }
 
+std::string COutPoint::GetTxHash() const
+{
+    return strprintf("%s", hash.ToString());
+}
+
+std::string COutPoint::GetTxIndex() const
+{
+    return strprintf("%u", n);
+}
+
 
 std::string SaplingOutPoint::ToString() const
 {

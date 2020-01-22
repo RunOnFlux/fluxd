@@ -567,32 +567,37 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
 
 UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
 {
-    if (fHelp || params.size())
+    if (fHelp || params.size() > 1)
         throw runtime_error(
-                "viewdeterministiczelnodelist\n"
+                "viewdeterministiczelnodelist ( \"filter\" )\n"
                 "\nView the list in deterministric zelnode(s)\n"
 
-                "\nResult: :\n"
-                "{\n"
-                "  \"index\": n,                 (number) index in the list\n"
-                "      {\n"
-                         "\"node\": \"xxxx\",    (string) Node name or alias\n"
-                         "\"result\": \"xxxx\",  (string) 'success' or 'failed'\n"
-                         "\"error\": \"xxxx\"    (string) Error message, if failed\n"
-                       "}\n"
-                " \"xxxx\",     (string) Overall status message\n"
-                "  \"detail\": [\n"
-                "    {\n"
-                "      \"node\": \"xxxx\",    (string) Node name or alias\n"
-                "      \"result\": \"xxxx\",  (string) 'success' or 'failed'\n"
-                "      \"error\": \"xxxx\"    (string) Error message, if failed\n"
-                "    }\n"
-                "    ,...\n"
-                "  ]\n"
-                "}\n"
+                "\nResult:\n"
+                "[\n"
+                "  {\n"
+                "    \"collateral\": n,                       (string) Collateral transaction\n"
+                "    \"txhash\": \"hash\",                    (string) Collateral transaction hash\n"
+                "    \"outidx\": n,                           (numeric) Collateral transaction output index\n"
+                "    \"ip\": \"address\"                      (string) IP address\n"
+                "    \"added_height\": \"height\"             (string) Block height when zelnode was added\n"
+                "    \"confirmed_height\": \"height\"         (string) Block height when zelnode was confirmed\n"
+                "    \"last_confirmed_height\": \"height\"    (string) Last block height when zelnode was confirmed\n"
+                "    \"last_paid_height\": \"height\"         (string) Last block height when zelnode was paid\n"
+                "    \"tier\": \"type\",                      (string) Tier (BASIC/SUPER/BAMF)\n"
+                "    \"payment_address\": \"addr\",           (string) Zelnode ZEL address\n"
+                "    \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
+                "    \"lastpaid\": ttt,                       (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode was last paid\n"
+                "    \"rank\": n                              (numberic) rank\n"
+                "  }\n"
+                "  ,...\n"
+                "]\n"
 
                 "\nExamples:\n" +
                 HelpExampleCli("viewdeterministiczelnodelist", ""));
+
+    std::string strFilter = "";
+
+    if (params.size() == 1) strFilter = params[0].get_str();
 
     UniValue wholelist(UniValue::VARR);
     int count = 0;
@@ -603,7 +608,15 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
         UniValue info(UniValue::VOBJ);
 
         if (!data.IsNull()) {
+            std::string strTxHash = data.collateralIn.GetTxHash();
+
+            if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
+                EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
+                continue;
+
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+            info.push_back(std::make_pair("txhash", strTxHash));
+            info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
             info.push_back(std::make_pair("ip", data.ip));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
@@ -636,7 +649,15 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
         UniValue info(UniValue::VOBJ);
 
         if (!data.IsNull())  {
+            std::string strTxHash = data.collateralIn.GetTxHash();
+
+            if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
+                EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
+                continue;
+
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+            info.push_back(std::make_pair("txhash", data.collateralIn.GetTxHash()));
+            info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
             info.push_back(std::make_pair("ip", data.ip));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
@@ -668,7 +689,15 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
         UniValue info(UniValue::VOBJ);
 
         if (!data.IsNull()) {
+            std::string strTxHash = data.collateralIn.GetTxHash();
+
+            if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
+                EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
+                continue;
+
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+            info.push_back(std::make_pair("txhash", data.collateralIn.GetTxHash()));
+            info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
             info.push_back(std::make_pair("ip", data.ip));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
@@ -793,7 +822,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
     if (IsDZelnodeActive()) {
         UniValue wholelist(UniValue::VARR);
 
-        int count = 1;
+        int count = 0;
         for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::BASIC).listConfirmedZelnodes) {
 
             auto data = g_zelnodeCache.GetZelnodeData(item.out);

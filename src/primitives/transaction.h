@@ -361,6 +361,8 @@ public:
     COutPoint(uint256 hashIn, uint32_t nIn) : BaseOutPoint(hashIn, nIn) {};
     std::string ToString() const;
     std::string ToFullString() const;
+    std::string GetTxHash() const;
+    std::string GetTxIndex() const;
 };
 
 /** An outpoint - a combination of a transaction hash and an index n into its sapling
