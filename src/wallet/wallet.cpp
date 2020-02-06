@@ -1171,6 +1171,7 @@ int CWallet::VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessO
   int nWitnessTxIncrement = 0;
   int nWitnessTotalTxCount = mapWallet.size();
   int nMinimumHeight = pindex->nHeight;
+  bool walletHasNotes = false; //Use to enable z_sendmany when no notes are present
 
   for (std::pair<const uint256, CWalletTx>& wtxItem : mapWallet) {
     nWitnessTxIncrement += 1;
@@ -1179,6 +1180,7 @@ int CWallet::VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessO
       continue;
 
     if (wtxItem.second.GetDepthInMainChain() > 0) {
+      walletHasNotes = true;
       auto wtxHash = wtxItem.second.GetHash();
       int wtxHeight = mapBlockIndex[wtxItem.second.hashBlock]->nHeight;
 
@@ -1360,6 +1362,9 @@ int CWallet::VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessO
       }
     }
   }
+  //enable z_sendmany when the wallet has no Notes
+  if (!walletHasNotes)
+    initWitnessesBuilt = true;
 
   return nMinimumHeight;
 }
@@ -1460,6 +1465,8 @@ void CWallet::BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly)
 
   }
 
+  //Set witnessBuilt to true to allow zsendmany to run
+  initWitnessesBuilt = true;
 }
 
 bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
