@@ -504,7 +504,7 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-regtest", "Enter regression test mode, which uses a special chain in which blocks can be solved instantly. "
             "This is intended for regression testing tools and app development.");
     }
-    // strUsage += HelpMessageOpt("-shrinkdebugfile", _("Shrink debug.log file on client startup (default: 1 when no -debug)"));
+    strUsage += HelpMessageOpt("-shrinkdebugfile", _("Shrink debug.log file on client startup (default: 1 when no -debug)"));
     strUsage += HelpMessageOpt("-testnet", _("Use the test network"));
 
     strUsage += HelpMessageGroup(_("Node relay options:"));
@@ -967,6 +967,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // ********************************************************* Step 3: parameter-to-internal-flags
 
+
     fDebug = !mapMultiArgs["-debug"].empty();
     // Special-case: if -debug=0/-nodebug is set, turn off debugging messages
     const vector<string>& categories = mapMultiArgs["-debug"];
@@ -1244,12 +1245,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             threadGroup.create_thread(&ThreadScriptCheck);
     }
 
-    if (mapArgs.count("-sporkkey")) // spork priv key
-    {
-        if (!sporkManager.SetPrivKey(GetArg("-sporkkey", "")))
-            return InitError(_("Unable to sign spork message, wrong key?"));
-    }
-
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
     threadGroup.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
@@ -1265,9 +1260,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         threadGroup.create_thread(&ThreadShowMetricsScreen);
     }
 
-    // Initialize Zelcash circuit parameters
-    ZC_LoadParams(chainparams);
-
     /* Start the RPC server already.  It will be started in "warmup" mode
      * and not really process calls already (but it will signify connections
      * that the server is there and will be ready later).  Warmup mode will
@@ -1278,6 +1270,16 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
         if (!AppInitServers(threadGroup))
             return InitError(_("Unable to start HTTP server. See debug log for details."));
+    }
+    uiInterface.InitMessage(_("Initializing..."));
+
+    // Initialize Zelcash circuit parameters
+    ZC_LoadParams(chainparams);
+
+    if (mapArgs.count("-sporkkey")) // spork priv key
+    {
+        if (!sporkManager.SetPrivKey(GetArg("-sporkkey", "")))
+            return InitError(_("Unable to sign spork message, wrong key?"));
     }
 
     int64_t nStart;
@@ -1873,7 +1875,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             return InitError(_("-mineraddress is not in the local wallet. Either use a local address, or set -minetolocalwallet=0"));
         }
  #endif // ENABLE_WALLET
- 
+
         // This is leveraging the fact that boost::signals2 executes connected
         // handlers in-order. Further up, the wallet is connected to this signal
         // if the wallet is enabled. The wallet's ScriptForMining handler does
@@ -2030,10 +2032,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     if (fZelnode) {
-        
+
         strPath = GetSelfPath();
         LogPrintf("Path: %s\n",strPath);
-       
+
          if (FindBenchmarkPath("fluxbenchd",strPath)) {
 
             LogPrintf("Found fluxbenchd in %s\n",strPath);
@@ -2058,7 +2060,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                  return InitError("Failed to find benchmark cli application");
              }
         }
-        
+
     }
 
     if (fZelnode) {
