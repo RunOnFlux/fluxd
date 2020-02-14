@@ -1247,8 +1247,8 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
                              REJECT_INVALID, "bad-txns-vout-empty");
     }
 
-    if (tx.IsZelnodeTx() && !tx.vout.empty() && !tx.vJoinSplit.empty() && !tx.vShieldedOutput.empty()
-        && !tx.vin.empty() && !tx.vShieldedSpend.empty()) {
+    if (tx.IsZelnodeTx() && (!tx.vout.empty() || !tx.vJoinSplit.empty() || !tx.vShieldedOutput.empty()
+        || !tx.vin.empty() || !tx.vShieldedSpend.empty())) {
         return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, with none empty vectors"),
                          REJECT_INVALID, "bad-txns-zelnode-tx-not-empty");
     }
