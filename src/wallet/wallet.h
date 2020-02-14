@@ -1110,7 +1110,7 @@ public:
       * Sapling ZKeys
       */
     //! Generates new Sapling key
-    libzelcash::SaplingPaymentAddress GenerateNewSaplingZKey();
+    libzelcash::SaplingPaymentAddress GenerateNewSaplingZKey(bool resetCounter = false);
     //! Adds Sapling spending key to the store, and saves it to disk
     bool AddSaplingZKey(
         const libzelcash::SaplingExtendedSpendingKey &key,

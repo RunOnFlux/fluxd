@@ -195,8 +195,20 @@ libzelcash::SaplingPaymentAddress AsyncRPCOperation_saplingmigration::getMigrati
         return *saplingAddress;
     }
 
-    fFailed = true;
-    libzelcash::SaplingPaymentAddress toAddress;
+    // Derive m/32'/coin_type'/0'
+    libzelcash::SaplingExtendedSpendingKey xsk = m_32h_cth.Derive(0 | ZIP32_HARDENED_KEY_LIMIT);
+
+    libzelcash::SaplingPaymentAddress toAddress = xsk.DefaultAddress();
+
+    // Refactor: this is similar logic as in the visitor HaveSpendingKeyForPaymentAddress and is used elsewhere
+    libzelcash::SaplingIncomingViewingKey ivk;
+    libzelcash::SaplingFullViewingKey fvk;
+    if (!(pwalletMain->GetSaplingIncomingViewingKey(toAddress, ivk) &&
+        pwalletMain->GetSaplingFullViewingKey(ivk, fvk) &&
+        pwalletMain->HaveSaplingSpendingKey(fvk))) {
+        // Sapling account 0 must be the first address returned by GenerateNewSaplingZKey
+        assert(pwalletMain->GenerateNewSaplingZKey(true) == toAddress);
+    }
 
     return toAddress;
 

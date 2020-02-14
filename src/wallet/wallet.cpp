@@ -114,7 +114,7 @@ libzelcash::SproutPaymentAddress CWallet::GenerateNewSproutZKey()
 }
 
 // Generate a new Sapling spending key and return its public payment address
-SaplingPaymentAddress CWallet::GenerateNewSaplingZKey()
+SaplingPaymentAddress CWallet::GenerateNewSaplingZKey(bool resetCounter)
 {
     AssertLockHeld(cs_wallet); // mapSaplingZKeyMetadata
 
@@ -138,6 +138,11 @@ SaplingPaymentAddress CWallet::GenerateNewSaplingZKey()
 
     // Derive account key at next index, skip keys already known to the wallet
     libzelcash::SaplingExtendedSpendingKey xsk;
+
+    //reset saplingAccountCounter
+    if (resetCounter)
+      hdChain.saplingAccountCounter = 0;
+
     do
     {
         xsk = m_32h_cth.Derive(hdChain.saplingAccountCounter | ZIP32_HARDENED_KEY_LIMIT);
