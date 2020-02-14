@@ -895,7 +895,7 @@ bool CheckBenchmarkSignature(const CTransaction& transaction)
     std::string public_key = Params().BenchmarkingPublicKey();
     CPubKey pubkey(ParseHex(public_key));
     std::string errorMessage = "";
-    std::string strMessage = std::string(transaction.sig.begin(), transaction.sig.end()) + std::to_string(transaction.benchmarkTier) + std::to_string(transaction.benchmarkSigTime);
+    std::string strMessage = std::string(transaction.sig.begin(), transaction.sig.end()) + std::to_string(transaction.benchmarkTier) + std::to_string(transaction.benchmarkSigTime) + transaction.ip;
 
     if (!obfuScationSigner.VerifyMessage(pubkey, transaction.benchmarkSig, strMessage, errorMessage))
         return error("%s - Error: %s", __func__, errorMessage);

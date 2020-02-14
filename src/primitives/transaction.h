@@ -642,7 +642,6 @@ public:
                 READWRITE(*const_cast<CPubKey*>(&pubKey));
                 READWRITE(*const_cast<uint32_t*>(&sigTime));
                 READWRITE(*const_cast<std::string*>(&ip));
-
                 if (!(s.GetType() & SER_GETHASH))
                     READWRITE(*const_cast<std::vector<unsigned char>*>(&sig));
 
@@ -652,6 +651,7 @@ public:
                 READWRITE(*const_cast<int8_t*>(&benchmarkTier));
                 READWRITE(*const_cast<uint32_t*>(&benchmarkSigTime));
                 READWRITE(*const_cast<int8_t*>(&nUpdateType));
+                READWRITE(*const_cast<std::string*>(&ip));
                 if (!(s.GetType() & SER_GETHASH)) {
                     READWRITE(*const_cast<std::vector<unsigned char>*>(&sig));
                     READWRITE(*const_cast<std::vector<unsigned char>*>(&benchmarkSig));
@@ -851,6 +851,7 @@ struct CMutableTransaction
                 READWRITE(benchmarkTier);
                 READWRITE(benchmarkSigTime);
                 READWRITE(nUpdateType);
+                READWRITE(ip);
                 if (!(s.GetType() & SER_GETHASH)) {
                     READWRITE(sig);
                     READWRITE(benchmarkSig);
