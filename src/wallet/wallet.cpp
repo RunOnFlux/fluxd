@@ -1166,7 +1166,7 @@ int CWallet::SaplingWitnessMinimumHeight(const uint256& nullifier, int nWitnessH
 
 int CWallet::VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessOnly)
 {
-  LOCK2(cs_wallet,cs_main);
+  LOCK2(cs_main, cs_wallet);
 
   int nWitnessTxIncrement = 0;
   int nWitnessTotalTxCount = mapWallet.size();
@@ -1372,7 +1372,7 @@ int CWallet::VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessO
 void CWallet::BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly)
 {
 
-  LOCK2(cs_wallet,cs_main);
+  LOCK2(cs_main, cs_wallet);
 
   int startHeight = VerifyAndSetInitialWitness(pindex, witnessOnly) + 1;
 
@@ -2759,7 +2759,7 @@ void CWallet::WitnessNoteCommitment(std::vector<uint256> commitments,
  */
 
 void CWallet::ReorderWalletTransactions(std::map<std::pair<int,int>, CWalletTx> &mapSorted, int64_t &maxOrderPos) {
-    LOCK2(cs_wallet,cs_main);
+    LOCK2(cs_main, cs_wallet);
 
     int maxSortNumber = chainActive.Tip()->nHeight + 1;
 
@@ -2785,7 +2785,7 @@ void CWallet::ReorderWalletTransactions(std::map<std::pair<int,int>, CWalletTx> 
  */
 
 void CWallet::UpdateWalletTransactionOrder(std::map<std::pair<int,int>, CWalletTx> &mapSorted, bool resetOrder) {
-  LOCK2(cs_wallet,cs_main);
+  LOCK2(cs_main, cs_wallet);
 
   int64_t previousPosition = 0;
   std::map<const uint256, CWalletTx> mapUpdatedTxs;
@@ -2842,7 +2842,7 @@ void CWallet::DeleteTransactions(std::vector<uint256> &removeTxs) {
 
 void CWallet::DeleteWalletTransactions(const CBlockIndex* pindex) {
 
-      LOCK2(cs_wallet,cs_main);
+      LOCK2(cs_main, cs_wallet);
 
       int nDeleteAfter = (int)fDeleteTransactionsAfterNBlocks;
       bool runCompact = false;
