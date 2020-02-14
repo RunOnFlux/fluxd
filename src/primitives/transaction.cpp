@@ -295,12 +295,12 @@ CTransaction& CTransaction::operator=(const CTransaction &tx) {
     *const_cast<COutPoint*>(&collateralOut) = tx.collateralOut;
     *const_cast<CPubKey*>(&collateralPubkey) = tx.collateralPubkey;
     *const_cast<CPubKey*>(&pubKey) = tx.pubKey;
-    *const_cast<int64_t*>(&sigTime) = tx.sigTime;
+    *const_cast<uint32_t*>(&sigTime) = tx.sigTime;
     *const_cast<std::string*>(&ip) = tx.ip;
     *const_cast<std::vector<unsigned char>*>(&sig) = tx.sig;
     *const_cast<int8_t*>(&benchmarkTier) = tx.benchmarkTier;
     *const_cast<std::vector<unsigned char>*>(&benchmarkSig) = tx.benchmarkSig;
-    *const_cast<int64_t*>(&benchmarkSigTime) = tx.benchmarkSigTime;
+    *const_cast<uint32_t*>(&benchmarkSigTime) = tx.benchmarkSigTime;
     *const_cast<int8_t*>(&nUpdateType) = tx.nUpdateType;
 
 

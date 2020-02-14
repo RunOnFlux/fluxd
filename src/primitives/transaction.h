@@ -587,12 +587,12 @@ public:
     const COutPoint collateralOut; // collateral out
     const CPubKey collateralPubkey;
     const CPubKey pubKey; // Pubkey used for VPS signature verification
-    const int64_t sigTime; // Timestamp to be used for hash verification
+    const uint32_t sigTime; // Timestamp to be used for hash verification
     const std::string ip;
     const std::vector<unsigned char> sig;
     const int8_t benchmarkTier;
     const std::vector<unsigned char> benchmarkSig;
-    const int64_t benchmarkSigTime;
+    const uint32_t benchmarkSigTime;
     const int8_t nUpdateType;
 
     /** Construct a CTransaction that qualifies as IsNull() */
@@ -640,7 +640,7 @@ public:
                 READWRITE(*const_cast<COutPoint*>(&collateralOut));
                 READWRITE(*const_cast<CPubKey*>(&collateralPubkey));
                 READWRITE(*const_cast<CPubKey*>(&pubKey));
-                READWRITE(*const_cast<int64_t*>(&sigTime));
+                READWRITE(*const_cast<uint32_t*>(&sigTime));
                 READWRITE(*const_cast<std::string*>(&ip));
 
                 if (!(s.GetType() & SER_GETHASH))
@@ -648,9 +648,9 @@ public:
 
             } else if (nType & ZELNODE_CONFIRM_TX_TYPE) {
                 READWRITE(*const_cast<COutPoint*>(&collateralOut));
-                READWRITE(*const_cast<int64_t*>(&sigTime));
+                READWRITE(*const_cast<uint32_t*>(&sigTime));
                 READWRITE(*const_cast<int8_t*>(&benchmarkTier));
-                READWRITE(*const_cast<int64_t*>(&benchmarkSigTime));
+                READWRITE(*const_cast<uint32_t*>(&benchmarkSigTime));
                 READWRITE(*const_cast<int8_t*>(&nUpdateType));
                 if (!(s.GetType() & SER_GETHASH)) {
                     READWRITE(*const_cast<std::vector<unsigned char>*>(&sig));
@@ -788,12 +788,12 @@ struct CMutableTransaction
     COutPoint collateralIn; // collateral in
     CPubKey collateralPubkey;
     CPubKey pubKey; // Pubkey used for VPS signature verification
-    int64_t sigTime; // Timestamp to be used for hash verification
+    uint32_t sigTime; // Timestamp to be used for hash verification
     std::string ip;
     std::vector<unsigned char> sig;
     int8_t benchmarkTier;
     std::vector<unsigned char> benchmarkSig;
-    int64_t benchmarkSigTime;
+    uint32_t benchmarkSigTime;
     int8_t nUpdateType;
 
     CMutableTransaction();
