@@ -189,6 +189,8 @@ void ActiveZelnode::ManageDeterministricZelnode()
         return;
     }
 
+    mutTx.ip = g_zelnodeCache.GetZelnodeData(activeZelnode.deterministicOutPoint).ip;
+
     if (activeZelnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
         CReserveKey reservekey(pwalletMain);
         CTransaction tx(mutTx);

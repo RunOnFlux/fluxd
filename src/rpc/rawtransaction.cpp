@@ -158,12 +158,12 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
         entry.push_back(Pair("collateral_output", tx.collateralOut.ToString()));
         entry.push_back(Pair("sigtime", tx.sigTime));
         entry.push_back(Pair("sig", EncodeBase64(&tx.sig[0], tx.sig.size())));
+        entry.push_back(Pair("ip", tx.ip));
 
         if (tx.nType & ZELNODE_START_TX_TYPE) {
             entry.push_back(
                     Pair("collateral_pubkey", EncodeBase64(tx.collateralPubkey.begin(), tx.collateralPubkey.size())));
             entry.push_back(Pair("zelnode_pubkey", EncodeBase64(tx.pubKey.begin(), tx.pubKey.size())));
-            entry.push_back(Pair("ip", tx.ip));
         }
 
         if (tx.nType & ZELNODE_CONFIRM_TX_TYPE) {
@@ -171,6 +171,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
             entry.push_back(Pair("benchmark_tier", TierToString(tx.benchmarkTier)));
             entry.push_back(Pair("benchmark_sigtime", tx.benchmarkSigTime));
             entry.push_back(Pair("benchmark_sig", EncodeBase64(&tx.benchmarkSig[0], tx.benchmarkSig.size())));
+
         }
     } else {
         entry.push_back(Pair("overwintered", tx.fOverwintered));
