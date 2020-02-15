@@ -6939,9 +6939,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
     else {
         // Check commands against the zelnode and spork messages
-        zelnodeman.ProcessMessage(pfrom, strCommand, vRecv);
-        zelnodePayments.ProcessMessageZelnodePayments(pfrom, strCommand, vRecv);
-        ProcessSpork(pfrom, strCommand, vRecv);
+        // TODO remove this after the DZelnode upgrade is stable
+        if (chainActive.Tip()->nHeight + 1 < Params().StartZelnodePayments()) {
+            zelnodeman.ProcessMessage(pfrom, strCommand, vRecv);
+            zelnodePayments.ProcessMessageZelnodePayments(pfrom, strCommand, vRecv);
+            zelnodeSync.ProcessMessage(pfrom, strCommand, vRecv);
+        }
         zelnodeSync.ProcessMessage(pfrom, strCommand, vRecv);
     }
 
