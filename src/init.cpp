@@ -1978,7 +1978,20 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     threadGroup.create_thread(boost::bind(&ThreadCheckZelnodes));
 
-    // TODO replace true with `fZelnode` before launch
+    if (fZelnode) {
+        if (!FindBenchmarkPath(strBenchmarkPathing, "zelbenchd")) {
+            return InitError("Failed to find daemon application");
+        } else {
+            LogPrintf("Found zelbenchd in: %s\n", strBenchmarkPathing);
+        }
+
+        if (!FindBenchmarkPath(strBenchmarkCliPathing, "zelbench-cli")) {
+            return InitError("Failed to find cli application");
+        } else {
+            LogPrintf("Found zelbench-cli in: %s\n", strBenchmarkCliPathing);
+        }
+    }
+
     if (fZelnode) {
         SetupSysBench();
 
@@ -1989,7 +2002,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         // Make sure that benchmarkd is running and stop zelcash if it isn't
         if (!IsBenchmarkdRunning()) {
-            return InitError("Failed to start benchmarkd application");
+            return InitError("Failed to start zelbenchd application");
         }
     }
 
