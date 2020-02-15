@@ -11,6 +11,8 @@ class Benchmarks;
 class CTransaction;
 extern Benchmarks benchmarks;
 extern bool fZelStartedBench;
+extern std::string strBenchmarkPathing;
+extern std::string strBenchmarkCliPathing;
 
 class Benchmarks {
 public:
@@ -19,6 +21,10 @@ public:
     int nPatchVersion;
     bool fVersionValid;
 };
+
+bool FindBenchmarkPath(std::string& path, const std::string filename);
+std::string GetBenchCliPath();
+std::string GetBenchDaemonPath();
 
 bool IsBenchmarkdRunning();
 void StartBenchmarkd();

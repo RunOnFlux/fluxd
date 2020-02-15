@@ -11,6 +11,10 @@
 #include <core_io.h>
 #include "zelnode/zelnode.h"
 
+#include <boost/filesystem.hpp>
+
+namespace filesys = boost::filesystem;
+
 
 #define SYSTEM_BENCH_MIN_MAJOR_VERSION 0
 #define SYSTEM_BENCH_MIN_MINOR_VERSION 4
@@ -18,6 +22,9 @@
 
 Benchmarks benchmarks;
 bool fZelStartedBench = false;
+std::string strBenchmarkPathing = "/usr/local/bin"; // Default path
+std::string strBenchmarkCliPathing = "/usr/local/bin"; // Default path
+
 std::regex re_version("sysbench ([0-9.]+)");
 
 std::string sysbenchversion = "sysbench --version";
@@ -29,6 +36,41 @@ std::string sysbenchinstall_2 = "sudo apt install sysbench";
 std::string sysbenchfetch = "curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/script.deb.sh | sudo bash";
 
 std::string strTestnetSring = "-testnet ";
+
+bool FindBenchmarkPath(std::string& path, const std::string filename)
+{
+    filesys::path pathObj(path + "/" + filename);
+    if (filesys::exists(pathObj) && filesys::is_regular_file(pathObj)) {
+        return true;
+    }
+
+    char const* home = getenv("HOME");
+    path = strprintf("%s", home);
+    filesys::path pathObj2(path + "/" + filename);
+    if (filesys::exists(pathObj2) && filesys::is_regular_file(pathObj2)) {
+        return true;
+    }
+
+    path = "./src";
+    filesys::path pathObj3(path + "/" + filename);
+    if (filesys::exists(pathObj3) && filesys::is_regular_file(pathObj3)) {
+        return true;
+    }
+
+    return false;
+}
+
+std::string GetBenchCliPath()
+{
+    // The space at the end is so parameters can be added easily
+    return strBenchmarkCliPathing + "/zelbench-cli ";
+}
+
+std::string GetBenchDaemonPath()
+{
+    // The space at the end is so parameters can be added easily
+    return strBenchmarkCliPathing + "/zelbenchd ";
+}
 
 
 std::string GetStdoutFromCommand(std::string cmd,bool redirect_stdout, bool redirect_devnull) {
@@ -209,7 +251,7 @@ bool IsBenchmarkdRunning()
     if (GetBoolArg("-testnet", false))
         testnet = strTestnetSring;
 
-    std::string strBenchmarkStatus = GetStdoutFromCommand("./src/benchmark-cli " + testnet + "getstatus true", false, true);
+    std::string strBenchmarkStatus = GetStdoutFromCommand(GetBenchCliPath() + testnet + "getstatus true", false, true);
 
     UniValue response;
     response.read(strBenchmarkStatus);
@@ -229,7 +271,7 @@ void StartBenchmarkd()
     std::string testnet = "";
     if (GetBoolArg("-testnet", false))
         testnet = strTestnetSring;
-    RunCommand("./src/benchmarkd " + testnet + "&");
+    RunCommand(GetBenchDaemonPath() + testnet + "&");
     MilliSleep(4000);
     fZelStartedBench = true;
     LogPrintf("Benchmarkd Started\n");
@@ -241,7 +283,7 @@ void StopBenchmarkd()
     std::string testnet = "";
     if (GetBoolArg("-testnet", false))
         testnet = strTestnetSring;
-    int value = std::system(std::string("./src/benchmark-cli " + testnet + "stop").c_str());
+    int value = std::system(std::string(GetBenchCliPath() + testnet + "stop").c_str());
 }
 
 std::string GetBenchmarks()
@@ -251,7 +293,7 @@ std::string GetBenchmarks()
         testnet = strTestnetSring;
 
     if (IsBenchmarkdRunning()) {
-        std::string strBenchmarkStatus = GetStdoutFromCommand("./src/benchmark-cli " + testnet + "getbenchmarks");
+        std::string strBenchmarkStatus = GetStdoutFromCommand(GetBenchCliPath() + testnet + "getbenchmarks");
 
         return strBenchmarkStatus;
     }
@@ -266,7 +308,7 @@ std::string GetBenchmarkdStatus()
         testnet = strTestnetSring;
 
     if (IsBenchmarkdRunning()) {
-        std::string strBenchmarkStatus = GetStdoutFromCommand("./src/benchmark-cli " + testnet + "getstatus");
+        std::string strBenchmarkStatus = GetStdoutFromCommand(GetBenchCliPath() + testnet + "getstatus");
 
         return strBenchmarkStatus;
     }
@@ -284,7 +326,7 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         ss << tx;
         std::string txHexStr = HexStr(ss.begin(), ss.end());
-        std::string response = GetStdoutFromCommand("./src/benchmark-cli " + testnet + "signzelnodetransaction " + txHexStr, true);
+        std::string response = GetStdoutFromCommand(GetBenchCliPath() + testnet + "signzelnodetransaction " + txHexStr, true);
 
         UniValue signedresponse;
         signedresponse.read(response);
