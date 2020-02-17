@@ -35,6 +35,8 @@
 #include <boost/thread.hpp>
 #include <zelnode/zelnode.h>
 
+#include <malloc.h>
+
 using namespace std;
 using namespace libzelcash;
 
@@ -2843,6 +2845,9 @@ void CWallet::DeleteTransactions(std::vector<uint256> &removeTxs) {
             return;
         }
     }
+    
+    // Miodrag: release memory back to the OS
+    malloc_trim(0);
 }
 
 void CWallet::DeleteWalletTransactions(const CBlockIndex* pindex) {
