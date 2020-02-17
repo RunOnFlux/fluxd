@@ -81,7 +81,7 @@ public:
     //Manage my active deterministic zelnode
     void ManageDeterministricZelnode();
 
-    bool BuildDeterministicStartTx(std::string strService, std::string strKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, CMutableTransaction& mutTransaction);
+    bool BuildDeterministicStartTx(std::string strKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, CMutableTransaction& mutTransaction);
     void BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType);
     bool SignDeterministicStartTx(CMutableTransaction& mutableTransaction, std::string& errorMessage);
     bool SignDeterministicConfirmTx(CMutableTransaction& mutableTransaction, std::string& errorMessage);

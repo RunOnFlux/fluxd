@@ -641,7 +641,6 @@ public:
                 READWRITE(*const_cast<CPubKey*>(&collateralPubkey));
                 READWRITE(*const_cast<CPubKey*>(&pubKey));
                 READWRITE(*const_cast<uint32_t*>(&sigTime));
-                READWRITE(*const_cast<std::string*>(&ip));
                 if (!(s.GetType() & SER_GETHASH))
                     READWRITE(*const_cast<std::vector<unsigned char>*>(&sig));
 
@@ -841,7 +840,6 @@ struct CMutableTransaction
                 READWRITE(collateralPubkey);
                 READWRITE(pubKey);
                 READWRITE(sigTime);
-                READWRITE(ip);
                 if (!(s.GetType() & SER_GETHASH))
                     READWRITE(sig);
 

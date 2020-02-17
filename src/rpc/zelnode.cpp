@@ -217,7 +217,7 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
 
             mutTransaction.nVersion = ZELNODE_TX_VERSION;
 
-            bool result = activeZelnode.BuildDeterministicStartTx(zne.getIp(), zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
+            bool result = activeZelnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
 
             zelnodeEntry.push_back(Pair("transaction_built", result ? "successful" : "failed"));
 
@@ -521,7 +521,7 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
 
             mutTransaction.nVersion = ZELNODE_TX_VERSION;
 
-            bool result = activeZelnode.BuildDeterministicStartTx(zne.getIp(), zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
+            bool result = activeZelnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
 
             statusObj.push_back(Pair("result", result ? "successful" : "failed"));
 

@@ -1276,6 +1276,11 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
                                  REJECT_INVALID, "bad-txns-zelnode-tx-invalid-benchmark-tier");
             }
 
+            if (tx.ip.size() > 40) {
+                return state.DoS(100,error("CheckTransaction(): Is Zelnode Tx, ip address to large"),
+                        REJECT_INVALID, "bad-txns-zelnode-tx-ip-address-to-large");
+            }
+
             if (tx.nUpdateType != ZelnodeUpdateType::INITIAL_CONFIRM && tx.nUpdateType != ZelnodeUpdateType::UPDATE_CONFIRM) {
                 return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, invalid update type"),
                                  REJECT_INVALID, "bad-txns-zelnode-tx-invalid-update-type");

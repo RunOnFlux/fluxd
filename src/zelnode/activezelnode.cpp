@@ -189,8 +189,6 @@ void ActiveZelnode::ManageDeterministricZelnode()
         return;
     }
 
-    mutTx.ip = g_zelnodeCache.GetZelnodeData(activeZelnode.deterministicOutPoint).ip;
-
     if (activeZelnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
         CReserveKey reservekey(pwalletMain);
         CTransaction tx(mutTx);
@@ -634,7 +632,7 @@ bool ActiveZelnode::SignDeterministicConfirmTx(CMutableTransaction& mutableTrans
     return true;
 }
 
-bool ActiveZelnode::BuildDeterministicStartTx(std::string strService, std::string strKeyZelnode, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, CMutableTransaction& mutTransaction)
+bool ActiveZelnode::BuildDeterministicStartTx(std::string strKeyZelnode, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, CMutableTransaction& mutTransaction)
 {
     // wait for reindex and/or import to finish
     if (IsInitialBlockDownload(Params())) {
@@ -649,32 +647,22 @@ bool ActiveZelnode::BuildDeterministicStartTx(std::string strService, std::strin
     CKey keyZelnode;
 
     if (!obfuScationSigner.SetKey(strKeyZelnode, errorMessage, keyZelnode, pubKeyZelnode)) {
-        errorMessage = strprintf("Can't find keys for zelnode %s - %s", strService, errorMessage);
+        errorMessage = strprintf("Can't find keys for zelnode - %s", errorMessage);
         LogPrintf("%s - %s\n", __func__, errorMessage);
         return false;
     }
 
     if (!GetZelNodeVin(vin, pubKeyCollateralAddress, keyCollateralAddress, strTxHash, strOutputIndex, errorMessage)) {
         if (errorMessage.empty())
-            errorMessage = strprintf("Could not allocate vin %s:%s for zelnode %s", strTxHash, strOutputIndex,
-                                 strService);
+            errorMessage = strprintf("Could not allocate vin %s:%s for zelnode", strTxHash, strOutputIndex);
         LogPrintf("%s - %s\n", __func__, errorMessage);
         return false;
     }
 
     mutTransaction.nType = ZELNODE_START_TX_TYPE;
 
-    CService service = CService(strService);
-    // The service needs the correct default port to work properly
-    if (!CheckDefaultPort(strService, errorMessage, "ActiveZelnode::GetDeterministicTx"))
-        return false;
-
-    // TODO , what is this doing?
-    addrman.Add(CAddress(service), CNetAddr("127.0.0.1"), 2 * 60 * 60);
-
     // Create zelnode transaction
     if (mutTransaction.nType == ZELNODE_START_TX_TYPE) {
-        mutTransaction.ip = service.ToStringIP();
         mutTransaction.collateralIn = vin.prevout;
         mutTransaction.collateralPubkey = pubKeyCollateralAddress;
         mutTransaction.pubKey = pubKeyZelnode;
