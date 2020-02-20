@@ -39,7 +39,7 @@ static const int NO_BLOOM_VERSION = 170004;
 //! protocol version that requires zelnode payments
 static const int MIN_PEER_PROTO_VERSION_ZELNODE = 170009;
 
-//! protocol version that means they support deterministic zelnodes
+//! protocol version that means they support deterministic zelnodes, not used as of now, usage of UPGRADE_KAMATA
 static const int DETERMINISTIC_ZELNODES = 170016;
 
 #endif // BITCOIN_VERSION_H

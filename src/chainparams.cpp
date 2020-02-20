@@ -126,7 +126,7 @@ public:
                 uint256S("00000052e2ac144c2872ff641c646e41dac166ac577bc9b0837f501aba19de4a");
 
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
-        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 1000000;  // 26th December
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 556000;  // 15th March
         // TODO, add the activation block hash after activation
 
 
@@ -204,8 +204,7 @@ public:
         networkID = CBaseChainParams::Network::MAIN;
         strZelnodeTestingDummyAddress= "t1Ub8iNuaoCAKTaiVyCh8d3iZ31QJFxnGzU";
 
-        // TODO update with deterministic start payout height
-        nStartZelnodePaymentsHeight = 5000000; // Start paying deterministic zelnodes on height
+        nStartZelnodePaymentsHeight = 556000; // Start paying deterministic zelnodes on height
 
         // TODO update with mainnet benchmarking public key
         strBenchmarkingPublicKey = "044c09cb66c6bbb91e015aaff03707db7dc43b3dcd2fafeedb746a569e279cf63b28c6e2c01f6458c5e50bbefa3f3ebdafcc0ba02c77965ac1d5080becc42f35f1";
@@ -217,11 +216,12 @@ public:
             (35000, uint256S("0x000000004646dd797644b9c67aff320961e95c311b4f26985424b720d09fcaa5"))
             (70000, uint256S("0x00000001edcf7768ed39fac55414e53a78d077b1b41fccdaf9307d7bc219626a"))
             (94071, uint256S("0x00000005ec83876bc5288badf0971ae83ac7c6a286851f7b22a75a03e73b401a")), //Halep won French Open 2018
-            1528556469,     // * UNIX timestamp of last checkpoint block
-            248945,              // * total number of transactions between genesis and last checkpoint
+            (530000, uint256S("0x0000004b4459ec6904e8116d178c357b0f25a7d45c5c5836ce3714791f1ed124")),
+            1581212778,     // * UNIX timestamp of last checkpoint block
+            1429455,              // * total number of transactions between genesis and last checkpoint
                             //   (the tx=... number in the SetBestChain debug.log lines)
-            1525            // * estimated number of transactions per day
-                            //   total number of tx / (checkpoint block height / (24 * 24))
+            1941            // * estimated number of transactions per day
+                            //   total number of tx / (checkpoint block height / (24 * 30))
         };
 
         // Hardcoded fallback value for the Sprout shielded value pool balance
@@ -245,14 +245,14 @@ public:
         strCurrencyUnits = "TESTZEL";
         bip44CoinType = 1;
         consensus.fCoinbaseMustBeProtected = true;
-        consensus.nSubsidySlowStartInterval = 1;
+        consensus.nSubsidySlowStartInterval = 5000;
         consensus.nSubsidyHalvingInterval = 655350; // 2.5 years
         consensus.nMajorityEnforceBlockUpgrade = 51;
         consensus.nMajorityRejectBlockOutdated = 75;
         consensus.nMajorityWindow = 400;
-        consensus.powLimit = uint256S("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        consensus.powLimit = uint256S("0effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // to be slightly above 17
         consensus.nDigishieldAveragingWindow = 17;
-//        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow); // TODO revert this if we want to, it is testnet after all
+        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPowAllowMinDifficultyBlocksAfterHeight = 1;
@@ -285,8 +285,7 @@ public:
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 10;
 
-	    eh_epoch_1 = eh96_5; // TODO, revert this for testnet if we don't want CPU minable until  EQUI144_5 goes live on block 1000
-//        eh_epoch_1 = eh200_9;
+        eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
         eh_epoch_3 = zelHash;
 
@@ -317,7 +316,7 @@ public:
         vSeeds.push_back(CDNSSeedData("test.vpsone.zel.network", "test.bangalore.zel.network")); // MilesManley
         vSeeds.push_back(CDNSSeedData("test.vpstwo.zel.network", "test.frankfurt.zel.network")); // MilesManley
         vSeeds.push_back(CDNSSeedData("test.vpsthree.zel.network", "test.newyork.zel.network")); // MilesManley
-//        vSeeds.push_back(CDNSSeedData("vps.testnet.zelcash.online", "dnsseedtestnet.zelcash.online")); // TheTrunk
+        vSeeds.push_back(CDNSSeedData("vps.testnet.zelcash.online", "dnsseedtestnet.zelcash.online")); // TheTrunk
 
         // guarantees the first 2 characters, when base58 encoded, are "tm"
         base58Prefixes[PUBKEY_ADDRESS]     = {0x1D,0x25};

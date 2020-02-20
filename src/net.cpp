@@ -1901,7 +1901,7 @@ void RelayZelnodeTx(const CInv& inv)
                 {
                     if((pnode->nServices==NODE_BLOOM_WITHOUT_ZN) && inv.IsZelnodeType())continue;
 
-                    if (pnode->nVersion >= MIN_PEER_PROTO_VERSION)
+                    if ((Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION) || (Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION_TESTNET))
                         pnode->PushInventory(inv);
                 }
 }
@@ -1913,7 +1913,7 @@ void RelayInv(const CInv& inv)
     {
         if((pnode->nServices==NODE_BLOOM_WITHOUT_ZN) && inv.IsZelnodeType())continue;
 
-        if (pnode->nVersion >= MIN_PEER_PROTO_VERSION)
+        if ((Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION) || (Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION_TESTNET))
             pnode->PushInventory(inv);
     }
 }
