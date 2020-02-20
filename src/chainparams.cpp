@@ -215,7 +215,7 @@ public:
             (5500, uint256S("0x0000000e7724f8bace09dd762657169c10622af4a6a8e959152cd00b9119848e"))
             (35000, uint256S("0x000000004646dd797644b9c67aff320961e95c311b4f26985424b720d09fcaa5"))
             (70000, uint256S("0x00000001edcf7768ed39fac55414e53a78d077b1b41fccdaf9307d7bc219626a"))
-            (94071, uint256S("0x00000005ec83876bc5288badf0971ae83ac7c6a286851f7b22a75a03e73b401a")), //Halep won French Open 2018
+            (94071, uint256S("0x00000005ec83876bc5288badf0971ae83ac7c6a286851f7b22a75a03e73b401a")) //Halep won French Open 2018
             (530000, uint256S("0x0000004b4459ec6904e8116d178c357b0f25a7d45c5c5836ce3714791f1ed124")),
             1581212778,     // * UNIX timestamp of last checkpoint block
             1429455,              // * total number of transactions between genesis and last checkpoint
