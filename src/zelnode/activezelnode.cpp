@@ -151,7 +151,7 @@ void ActiveZelnode::ManageStatus()
 
 void ActiveZelnode::ManageDeterministricZelnode()
 {
-    // We only want to run this command on the VPS that has zelnode=1 and is running benchmarkd
+    // We only want to run this command on the VPS that has zelnode=1 and is running zelbenchd
     if (!fZelnode)
         return;
 

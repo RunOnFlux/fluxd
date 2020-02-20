@@ -245,7 +245,7 @@ std::vector<std::string> split (std::string s, std::string delimiter) {
     return res;
 }
 
-bool IsBenchmarkdRunning()
+bool IsZelBenchdRunning()
 {
     std::string testnet = "";
     if (GetBoolArg("-testnet", false))
@@ -266,7 +266,7 @@ bool IsBenchmarkdRunning()
     return false;
 }
 
-void StartBenchmarkd()
+void StartZelBenchd()
 {
     std::string testnet = "";
     if (GetBoolArg("-testnet", false))
@@ -274,11 +274,11 @@ void StartBenchmarkd()
     RunCommand(GetBenchDaemonPath() + testnet + "&");
     MilliSleep(4000);
     fZelStartedBench = true;
-    LogPrintf("Benchmarkd Started\n");
+    LogPrintf("ZelBenchd Started\n");
 }
 
 
-void StopBenchmarkd()
+void StopZelBenchd()
 {
     std::string testnet = "";
     if (GetBoolArg("-testnet", false))
@@ -292,28 +292,28 @@ std::string GetBenchmarks()
     if (GetBoolArg("-testnet", false))
         testnet = strTestnetSring;
 
-    if (IsBenchmarkdRunning()) {
+    if (IsZelBenchdRunning()) {
         std::string strBenchmarkStatus = GetStdoutFromCommand(GetBenchCliPath() + testnet + "getbenchmarks");
 
         return strBenchmarkStatus;
     }
 
-    return "Benchmarkd not running";
+    return "ZelBenchd not running";
 }
 
-std::string GetBenchmarkdStatus()
+std::string GetZelBenchdStatus()
 {
     std::string testnet = "";
     if (GetBoolArg("-testnet", false))
         testnet = strTestnetSring;
 
-    if (IsBenchmarkdRunning()) {
+    if (IsZelBenchdRunning()) {
         std::string strBenchmarkStatus = GetStdoutFromCommand(GetBenchCliPath() + testnet + "getstatus");
 
         return strBenchmarkStatus;
     }
 
-    return "Benchmarkd not running";
+    return "ZelBenchd not running";
 }
 
 bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedTx, std::string& error)
@@ -322,7 +322,7 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
     if (GetBoolArg("-testnet", false))
         testnet = strTestnetSring;
 
-    if (IsBenchmarkdRunning()) {
+    if (IsZelBenchdRunning()) {
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         ss << tx;
         std::string txHexStr = HexStr(ss.begin(), ss.end());
@@ -361,7 +361,7 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
         return true;
     }
 
-    error = "Benchmarkd isn't running";
+    error = "ZelBenchd isn't running";
     return false;
 }
 

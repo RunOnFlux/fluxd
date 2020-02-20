@@ -7,7 +7,7 @@ Jeremy "Blondfrogs" Anderson (8):
       Fix migration tool not finding default address private key
       Zcash Merge Fixes
       Add ZelNode fork code
-      Benchmarking - Benchmarkd
+      Benchmarking - ZelBenchd
       Deterministic ZelNodes
       Fix Broken gtests
 

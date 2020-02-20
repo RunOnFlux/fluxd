@@ -1996,12 +1996,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         SetupSysBench();
 
         // Check if the benchmark application is running
-        if (!IsBenchmarkdRunning()) {
-            StartBenchmarkd();
+        if (!IsZelBenchdRunning()) {
+            StartZelBenchd();
         }
 
-        // Make sure that benchmarkd is running and stop zelcash if it isn't
-        if (!IsBenchmarkdRunning()) {
+        // Make sure that zelbenchd is running and stop zelcash if it isn't
+        if (!IsZelBenchdRunning()) {
             return InitError("Failed to start zelbenchd application");
         }
     }

@@ -2010,45 +2010,45 @@ UniValue getbenchstatus(const UniValue& params, bool fHelp)
     if (fHelp || params.size() != 0)
         throw runtime_error(
                 "getbenchstatus\n"
-                "\nCommand to get status of benchmarkd\n"
+                "\nCommand to get status of zelbenchd\n"
 
                 "\nExamples:\n" +
                 HelpExampleCli("getbenchstatus", "") + HelpExampleRpc("getbenchstatus", ""));
 
-    return GetBenchmarkdStatus();
+    return GetZelBenchdStatus();
 }
 
 
-UniValue stopbenchmarkd(const UniValue& params, bool fHelp)
+UniValue stopzelbenchd(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
-                "stopbenchmarkd\n"
-                "\nStop benchmarkd\n"
+                "stopzelbenchd\n"
+                "\nStop zelbenchd\n"
 
                 "\nExamples:\n" +
-                HelpExampleCli("stopbenchmarkd", "") + HelpExampleRpc("stopbenchmarkd", ""));
+                HelpExampleCli("stopzelbenchd", "") + HelpExampleRpc("stopzelbenchd", ""));
 
-    if (IsBenchmarkdRunning()) {
-        StopBenchmarkd();
+    if (IsZelBenchdRunning()) {
+        StopZelBenchd();
         return "Stopping process";
     }
 
     return "Not running";
 }
 
-UniValue startbenchmarkd(const UniValue& params, bool fHelp)
+UniValue startzelbenchd(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
-                "startbenchmarkd\n"
-                "\nStart benchmarkd\n"
+                "startzelbenchd\n"
+                "\nStart zelbenchd\n"
 
                 "\nExamples:\n" +
-                HelpExampleCli("startbenchmarkd", "") + HelpExampleRpc("startbenchmarkd", ""));
+                HelpExampleCli("startzelbenchd", "") + HelpExampleRpc("startzelbenchd", ""));
 
-    if (!IsBenchmarkdRunning()) {
-        StartBenchmarkd();
+    if (!IsZelBenchdRunning()) {
+        StartZelBenchd();
         return "Starting process";
     }
 
@@ -2083,8 +2083,8 @@ static const CRPCCommand commands[] =
 
                 { "benchmarks", "getbenchmarks",         &getbenchmarks,           false  },
                 { "benchmarks", "getbenchstatus",        &getbenchstatus,          false  },
-                { "benchmarks", "stopbenchmarkd",        &stopbenchmarkd,          false  },
-                { "benchmarks", "startbenchmarkd",       &startbenchmarkd,         false  },
+                { "benchmarks", "stopzelbenchd",        &stopzelbenchd,          false  },
+                { "benchmarks", "startzelbenchd",       &startzelbenchd,         false  },
 
                 /** Not shown in help menu */
                 { "hidden",    "createsporkkeys",        &createsporkkeys,         false  }

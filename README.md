@@ -9,7 +9,7 @@ What is Zel?
 [Zel](https://zel.network/) is a fork of 2.1.0-1 Zcash aiming to provide a decentralized development platform via ZelFlux, ZelNodes, ZelCore and more.
 
 Zel is PoW and "ASIC resistant" with ZelHash (Modified Equihash 125,4) with the personalisation string ZelProof and utilises the LWMA3 difficulty algorithm.
-The Kamata network upgrade which activates in December 2019 brings ZelFlux, Benchmarkd and Determenistic ZelNodes.
+The Kamata network upgrade which activates in December 2019 brings ZelFlux, ZelBenchd and Determenistic ZelNodes.
 
 To speed up synchronisation you can download the Zel blockchain (state 18. 12. 2018) here https://zelcore.io/Zelcash.zip
 For ZelNodes/Control Wallets you need to use this bootstrap with txindex enabled (state 18. 02. 2019) https://zelcore.io/zelcashbootstraptxindex.zip

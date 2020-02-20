@@ -26,11 +26,11 @@ bool FindBenchmarkPath(std::string& path, const std::string filename);
 std::string GetBenchCliPath();
 std::string GetBenchDaemonPath();
 
-bool IsBenchmarkdRunning();
-void StartBenchmarkd();
-void StopBenchmarkd();
+bool IsZelBenchdRunning();
+void StartZelBenchd();
+void StopZelBenchd();
 std::string GetBenchmarks();
-std::string GetBenchmarkdStatus();
+std::string GetZelBenchdStatus();
 bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedTx, std::string& error);
 
 // Sysbench stuff
