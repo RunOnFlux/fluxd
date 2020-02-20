@@ -206,8 +206,7 @@ public:
 
         nStartZelnodePaymentsHeight = 556000; // Start paying deterministic zelnodes on height
 
-        // TODO update with mainnet benchmarking public key
-        strBenchmarkingPublicKey = "044c09cb66c6bbb91e015aaff03707db7dc43b3dcd2fafeedb746a569e279cf63b28c6e2c01f6458c5e50bbefa3f3ebdafcc0ba02c77965ac1d5080becc42f35f1";
+        strBenchmarkingPublicKey = "042e79d7dd1483996157df6b16c831be2b14b31c69944ea2a585c63b5101af1f9517ba392cee5b1f45a62e9d936488429374535a2f76870bfa8eea6667b13eb39e";
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
@@ -349,7 +348,7 @@ public:
         strSporkKey = "0408c6a3a6cacb673fc38f27c75d79c865e1550441ea8b5295abf21116972379a1b49416da07b7d9b40fb9daf8124f309c608dfc79756a5d3c2a957435642f7f1a";
         networkID = CBaseChainParams::Network::TESTNET;
         strZelnodeTestingDummyAddress= "tmXxZqbmvrxeSFQsXmm4N9CKyME767r47fS";
-        strBenchmarkingPublicKey = "04cf3c34f01486bbb34c1a7ca11c2ddb1b3d98698c3f37d54452ff91a8cd5e92a6910ce5fc2cc7ad63547454a965df53ff5be740d4ef4ac89848c2bafd1e40e6b7";
+        strBenchmarkingPublicKey = "04d422e01f5acff68504b92df96a9004cf61be432a20efe83fe8a94c1aa730fe7dece5d2e8298f2d5672d4e569c55d9f0a73268ef7b92990d8c014e828a7cc48dd";
         nStartZelnodePaymentsHeight = 1300;
 
         checkpointData = (CCheckpointData) {
