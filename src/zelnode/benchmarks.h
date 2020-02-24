@@ -33,15 +33,6 @@ std::string GetBenchmarks();
 std::string GetZelBenchdStatus();
 bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedTx, std::string& error);
 
-// Sysbench stuff
-void SetupSysBench();
-bool CheckSysBenchInstalled();
-bool CheckSysBenchVersion();
-void InstallSysBenchPackage();
-void InstallSysBenchPackage();
-void InstallSysBench_1();
-void InstallSysBench_2();
-
 std::string GetStdoutFromCommand(std::string cmd, bool redirect_stdout = false, bool redirect_devnull = false);
 void RunCommand(std::string cmd);
 

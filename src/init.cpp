@@ -1993,8 +1993,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     if (fZelnode) {
-        SetupSysBench();
-
         // Check if the benchmark application is running
         if (!IsZelBenchdRunning()) {
             StartZelBenchd();
