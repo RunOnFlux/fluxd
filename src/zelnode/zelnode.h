@@ -600,8 +600,8 @@ public:
     // Map only used by local cache to inform the global cache to undo Zelnode added to DoS tacker, and put them back into the Started Zelnode tracking
     std::map<int, std::set<COutPoint>> mapDoSToUndo;
 
-    // Set only used by local cache to inform the global cache when Flushing to move Started Zelnodes to the Confirm list
-    std::set<COutPoint> setAddToConfirm;
+    // Set only used by local cache to inform the global cache when Flushing to move Started Zelnodes to the Confirm list and updating IP address
+    std::map<COutPoint, std::string> setAddToConfirm;
 
     // Int only used by local cache to inform the global cache when Flushing to set the Started Zelnodes Confirm Height
     int setAddToConfirmHeight;
@@ -609,8 +609,8 @@ public:
     // Set only used by local chache to inform the global cache when Flushing to undo the Confirm Zelnodes
     std::set<COutPoint> setUndoAddToConfirm;
 
-    // Set only used by local cache to inform the global cache when Flushing to update the Confirm Zelnodes nLastConfirmHeight
-    std::set<COutPoint> setAddToUpdateConfirm;
+    // Set only used by local cache to inform the global cache when Flushing to update the Confirm Zelnodes nLastConfirmHeight and IP address
+    std::map<COutPoint, std::string> setAddToUpdateConfirm;
 
     // Int only used by local cache to inform the global cache when Flushing to update the Confirm Zelnodes nLastConfirmHeight
     int setAddToUpdateConfirmHeight;

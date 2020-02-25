@@ -977,7 +977,7 @@ void ZelnodeCache::UndoNewStart(const CTransaction& p_transaction, const int p_n
 void ZelnodeCache::AddNewConfirm(const CTransaction& p_transaction, const int p_nHeight)
 {
     LOCK(cs);
-    setAddToConfirm.insert(p_transaction.collateralOut);
+    setAddToConfirm.insert(std::make_pair(p_transaction.collateralOut, p_transaction.ip));
     setAddToConfirmHeight = p_nHeight;
 }
 
@@ -990,7 +990,7 @@ void ZelnodeCache::UndoNewConfirm(const CTransaction& p_transaction)
 void ZelnodeCache::AddUpdateConfirm(const CTransaction& p_transaction, const int p_nHeight)
 {
     LOCK(cs);
-    setAddToUpdateConfirm.insert(p_transaction.collateralOut);
+    setAddToUpdateConfirm.insert(std::make_pair(p_transaction.collateralOut, p_transaction.ip));
     setAddToUpdateConfirmHeight = p_nHeight;
 }
 
@@ -1523,18 +1523,19 @@ bool ZelnodeCache::Flush()
     //! Add the data from Zelnodes that got confirmed this block
     for (const auto& item : setAddToConfirm) {
         // Take the zelnodedata from the mapStartTxTracker and move it to the mapConfirm
-        if (g_zelnodeCache.mapStartTxTracker.count(item)) {
-            ZelnodeCacheData data = g_zelnodeCache.mapStartTxTracker.at(item);
+        if (g_zelnodeCache.mapStartTxTracker.count(item.first)) {
+            ZelnodeCacheData data = g_zelnodeCache.mapStartTxTracker.at(item.first);
 
             // Remove from Start Tracking
-            g_zelnodeCache.mapStartTxTracker.erase(item);
-            g_zelnodeCache.mapStartTxHeights.at(data.nAddedBlockHeight).erase(item);
+            g_zelnodeCache.mapStartTxTracker.erase(item.first);
+            g_zelnodeCache.mapStartTxHeights.at(data.nAddedBlockHeight).erase(item.first);
 
             // Update the data (STARTED --> CONFIRM)
             data.nStatus = ZELNODE_TX_CONFIRMED;
             data.nConfirmedBlockHeight = setAddToConfirmHeight;
             data.nLastConfirmedBlockHeight = setAddToConfirmHeight;
             data.nLastPaidHeight = 0;
+            data.ip = item.second;
 
             // Add the data to the confirm trackers
             g_zelnodeCache.mapConfirmedZelnodeData.insert(std::make_pair(data.collateralIn, data));
@@ -1554,9 +1555,9 @@ bool ZelnodeCache::Flush()
             else if (data.nTier == Zelnode::SUPER) fUndoExpiredAddedToListSuper = true;
             else if (data.nTier == Zelnode::BAMF) fUndoExpiredAddedToListBAMF = true;
 
-            g_zelnodeCache.setDirtyOutPoint.insert(item);
+            g_zelnodeCache.setDirtyOutPoint.insert(item.first);
         } else {
-            error("%s : This should never happen. When moving from start map to confirm map. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__,  item.hash.GetHex());
+            error("%s : This should never happen. When moving from start map to confirm map. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__,  item.first.hash.GetHex());
         }
     }
 
@@ -1582,6 +1583,7 @@ bool ZelnodeCache::Flush()
             data.nConfirmedBlockHeight = 0;
             data.nLastConfirmedBlockHeight = 0;
             data.nLastPaidHeight = 0;
+            data.ip = "";
 
             // Add the data back into the Start tracker
             g_zelnodeCache.mapStartTxTracker.insert(std::make_pair(item, data));
@@ -1601,14 +1603,17 @@ bool ZelnodeCache::Flush()
     //! Update the data for Zelnodes that got the confirmed update this block
     for (const auto& item : setAddToUpdateConfirm) {
         // Take the zelnodedata from the mapStartTxTracker and move it to the mapConfirm
-        if (g_zelnodeCache.mapConfirmedZelnodeData.count(item)) {
+        if (g_zelnodeCache.mapConfirmedZelnodeData.count(item.first)) {
 
             // Update the nLastConfirmedBlockHeight
-            g_zelnodeCache.mapConfirmedZelnodeData.at(item).nLastConfirmedBlockHeight = setAddToUpdateConfirmHeight;
+            g_zelnodeCache.mapConfirmedZelnodeData.at(item.first).nLastConfirmedBlockHeight = setAddToUpdateConfirmHeight;
 
-            g_zelnodeCache.setDirtyOutPoint.insert(item);
+            // Update IP address
+            g_zelnodeCache.mapConfirmedZelnodeData.at(item.first).ip = item.second;
+
+            g_zelnodeCache.setDirtyOutPoint.insert(item.first);
         } else {
-            error("%s : This should never happen. When updating a zelnode from the confirm map. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.hash.GetHex());
+            error("%s : This should never happen. When updating a zelnode from the confirm map. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.first.hash.GetHex());
         }
     }
 
@@ -1890,9 +1895,3 @@ void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion) {
         }
     }
 }
-
-
-
-
-
-
