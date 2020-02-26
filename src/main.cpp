@@ -2816,7 +2816,8 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
                 if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
                     p_zelnodeCache->UndoNewConfirm(tx);
                 } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
-                    // TODO
+                    // Handled by the p_zelnodeCache->AddBackUndoData function
+                    // This function uses the undo block data and handles it accordingly
                 }
             }
         }
