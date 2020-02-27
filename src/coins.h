@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef BITCOIN_COINS_H
 #define BITCOIN_COINS_H
@@ -538,6 +538,9 @@ public:
 
     //! Check whether all prevouts of the transaction are present in the UTXO set represented by this view
     bool HaveInputs(const CTransaction& tx) const;
+
+    //! Check whether the prevout is present in the UTXO set represented by this view
+    bool CheckZelnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier) const;
 
     //! Check whether all joinsplit and sapling spend requirements (anchors/nullifiers) are satisfied
     bool HaveShieldedRequirements(const CTransaction& tx) const;

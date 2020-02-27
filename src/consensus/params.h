@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef BITCOIN_CONSENSUS_PARAMS_H
 #define BITCOIN_CONSENSUS_PARAMS_H
@@ -21,14 +21,15 @@ namespace Consensus {
  * several functions depend on the enum being sorted.
  */
 enum UpgradeIndex {
-    // BASE must be first
-    BASE,
+    // BASE_SPROUT must be first
+    BASE_SPROUT,
     UPGRADE_TESTDUMMY,
     // LWMA algo starts at this block 
     UPGRADE_LWMA,
     UPGRADE_EQUI144_5,	
     UPGRADE_ACADIA,
     UPGRADE_KAMIOOKA,
+    UPGRADE_KAMATA,
     // NOTE: Also add new upgrades to NetworkUpgradeInfo in upgrades.cpp
     MAX_NETWORK_UPGRADES
 };
@@ -61,6 +62,18 @@ struct NetworkUpgrade {
      * should remain disabled on mainnet.
      */
     static constexpr int NO_ACTIVATION_HEIGHT = -1;
+
+    /**
+     * The hash of the block at height nActivationHeight, if known. This is set manually
+     * after a network upgrade activates.
+     *
+     * We use this in IsInitialBlockDownload to detect whether we are potentially being
+     * fed a fake alternate chain. We use NU activation blocks for this purpose instead of
+     * the checkpoint blocks, because network upgrades (should) have significantly more
+     * scrutiny than regular releases. nMinimumChainWork MUST be set to at least the chain
+     * work of this block, otherwise this detection will have false positives.
+     */
+    boost::optional<uint256> hashActivationBlock;
 };
 
 /**

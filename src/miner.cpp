@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "miner.h"
 #ifdef ENABLE_MINING
@@ -220,6 +220,15 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
                 dPriority += (double)nValueIn * nConf;
             }
+
+            if (tx.IsZelnodeTx()) {
+                const CCoins* coins = view.AccessCoins(tx.collateralOut.hash);
+                assert(coins);
+
+                int nConf = nHeight - coins->nHeight;
+
+                dPriority += (double)100 * nConf;
+            }
             nTotalIn += tx.GetShieldedValueIn();
 
             if (fMissingInputs) continue;
@@ -232,6 +241,10 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             mempool.ApplyDeltas(hash, dPriority, nTotalIn);
 
             CFeeRate feeRate(nTotalIn-tx.GetValueOut(), nTxSize);
+
+            if (tx.IsZelnodeTx()) {
+                feeRate = CFeeRate (1 * CENT, nTxSize);
+            }
 
             if (porphan)
             {
@@ -313,6 +326,12 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
             if (!view.HaveInputs(tx))
                 continue;
+
+            if (tx.IsZelnodeTx()) {
+                int nTier;
+                if (!view.CheckZelnodeTxInput(tx, pindexPrev->nHeight + 1, nTier))
+                    continue;
+            }
 
             CAmount nTxFees = view.GetValueIn(tx)-tx.GetValueOut();
 
@@ -408,7 +427,11 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         txNew.nExpiryHeight = 0;
 
         //Zelnode payments
-        FillBlockPayee(txNew, nFees, zelnodePayouts);
+        if (pindexPrev->nHeight + 1 >= chainparams.StartZelnodePayments()) {
+            FillBlockPayeeWithDeterministicPayouts(txNew, nFees, zelnodePayouts);
+        } else {
+            FillBlockPayee(txNew, nFees, zelnodePayouts);
+        }
 
         // Add fees
         txNew.vout[0].nValue += nFees;
@@ -556,7 +579,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
                         LOCK(cs_vNodes);
                         fvNodesEmpty = vNodes.empty();
                     }
-                    if (!fvNodesEmpty && !IsInitialBlockDownload(chainparams) || !zelnodeSync.IsSynced())
+                    if (!fvNodesEmpty && !IsInitialBlockDownload(chainparams))
                         break;
                     MilliSleep(1000);
                 } while (true);
@@ -608,6 +631,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
             arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
 
             while (true) {
+                boost::this_thread::interruption_point();
                 // Hash state
                 crypto_generichash_blake2b_state state;
                 EhInitialiseState(n, k, state);
@@ -634,6 +658,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
                 std::function<bool(std::vector<unsigned char>)> validBlock =
                         [&pblock, &hashTarget, &chainparams, &m_cs, &cancelSolver, &coinbaseScript]
                         (std::vector<unsigned char> soln) {
+                    boost::this_thread::interruption_point();
                     // Write the solution to the hash and compute the result.
                     LogPrint("pow", "- Checking solution against target\n");
                     pblock->nSolution = soln;
@@ -689,6 +714,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
 
                     // Convert solution indices to byte array (decompress) and pass it to validBlock method.
                     for (size_t s = 0; s < eq.nsols; s++) {
+                        boost::this_thread::interruption_point();
                         LogPrint("pow", "Checking solution %d\n", s+1);
                         std::vector<eh_index> index_vector(PROOFSIZE);
                         for (size_t i = 0; i < PROOFSIZE; i++) {

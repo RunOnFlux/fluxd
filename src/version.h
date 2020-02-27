@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef BITCOIN_VERSION_H
 #define BITCOIN_VERSION_H
@@ -9,7 +9,7 @@
  * network protocol versioning
  */
 
-static const int PROTOCOL_VERSION = 170013;
+static const int PROTOCOL_VERSION = 170016;
 
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
@@ -19,6 +19,9 @@ static const int GETHEADERS_VERSION = 31800;
 
 //! disconnect from peers older than this proto version
 static const int MIN_PEER_PROTO_VERSION = 170002;
+
+//! disconnect from peers older than this proto version
+static const int MIN_PEER_PROTO_VERSION_TESTNET = 170016;
 
 //! nTime field added to CAddress, starting with this version;
 //! if possible, avoid requesting addresses nodes older than this
@@ -35,5 +38,8 @@ static const int NO_BLOOM_VERSION = 170004;
 
 //! protocol version that requires zelnode payments
 static const int MIN_PEER_PROTO_VERSION_ZELNODE = 170009;
+
+//! protocol version that means they support deterministic zelnodes, not used as of now, usage of UPGRADE_KAMATA
+static const int DETERMINISTIC_ZELNODES = 170016;
 
 #endif // BITCOIN_VERSION_H

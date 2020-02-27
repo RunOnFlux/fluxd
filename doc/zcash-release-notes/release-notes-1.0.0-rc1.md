@@ -99,7 +99,7 @@ Sean Bowe (1):
       Make 100KB transaction size limit a consensus rule, rather than a standard rule.
 
 Simon (11):
-      Add vJoinSplit to JSON output of RPC call gettransaction
+      Add vjoinsplit to JSON output of RPC call gettransaction
       Fixes #1478 by ensuring wallet tests have the -datadir environment set appropriately.
       Fixes #1491 by updating help message for rpc call z_importkey
       Fix incorrect check of number of parameters for z_getnewaddress.

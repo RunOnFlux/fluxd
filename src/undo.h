@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2013 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef BITCOIN_UNDO_H
 #define BITCOIN_UNDO_H
@@ -9,6 +9,7 @@
 #include "compressor.h" 
 #include "primitives/transaction.h"
 #include "serialize.h"
+#include "zelnode/zelnode.h"
 
 /** Undo information for a CTxIn
  *
@@ -75,6 +76,25 @@ public:
     inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(vtxundo);
         READWRITE(old_sprout_tree_root);
+    }
+};
+
+class CZelnodeTxBlockUndo
+{
+public:
+    std::vector<ZelnodeCacheData> vecExpiredDosData;
+    std::vector<ZelnodeCacheData> vecExpiredConfirmedData;
+    std::map<COutPoint, int> mapUpdateLastConfirmHeight;
+    std::map<COutPoint, int> mapLastPaidHeights;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(vecExpiredDosData);
+        READWRITE(vecExpiredConfirmedData);
+        READWRITE(mapUpdateLastConfirmHeight);
+        READWRITE(mapLastPaidHeights);
     }
 };
 

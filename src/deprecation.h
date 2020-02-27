@@ -1,7 +1,7 @@
 // Copyright (c) 2019 The Zel developers
-// Copyright (c) 2017 The Zcash developers
+// Copyright (c) 2017-2019 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef ZELCASH_DEPRECATION_H
 #define ZELCASH_DEPRECATION_H
@@ -10,7 +10,7 @@
 // * Shut down 16 weeks' worth of blocks after the estimated release block height.
 // * A warning is shown during the 2 weeks' worth of blocks prior to shut down.
 
-static const int APPROX_RELEASE_HEIGHT = 464000;
+static const int APPROX_RELEASE_HEIGHT = 820000; // 1 year after Kamata activation
 static const int WEEKS_UNTIL_DEPRECATION = 26;
 static const int DEPRECATION_HEIGHT = APPROX_RELEASE_HEIGHT + (WEEKS_UNTIL_DEPRECATION * 7 * 24 * 30);
 

@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "primitives/transaction.h"
 
@@ -11,7 +11,6 @@
 #include "librustzcash.h"
 
 JSDescription::JSDescription(
-    bool makeGrothProof,
     ZCJoinSplit& params,
     const uint256& joinSplitPubKey,
     const uint256& anchor,
@@ -26,7 +25,6 @@ JSDescription::JSDescription(
     std::array<libzelcash::SproutNote, ZC_NUM_JS_OUTPUTS> notes;
 
     proof = params.prove(
-        makeGrothProof,
         inputs,
         outputs,
         notes,
@@ -46,7 +44,6 @@ JSDescription::JSDescription(
 }
 
 JSDescription JSDescription::Randomized(
-    bool makeGrothProof,
     ZCJoinSplit& params,
     const uint256& joinSplitPubKey,
     const uint256& anchor,
@@ -71,7 +68,6 @@ JSDescription JSDescription::Randomized(
     MappedShuffle(outputs.begin(), outputMap.begin(), ZC_NUM_JS_OUTPUTS, gen);
 
     return JSDescription(
-        makeGrothProof,
         params, joinSplitPubKey, anchor, inputs, outputs,
         vpub_old, vpub_new, computeProof,
         esk // payment disclosure
@@ -95,18 +91,9 @@ public:
 
     bool operator()(const libzelcash::PHGRProof& proof) const
     {
-        return params.verify(
-            proof,
-            verifier,
-            joinSplitPubKey,
-            jsdesc.randomSeed,
-            jsdesc.macs,
-            jsdesc.nullifiers,
-            jsdesc.commitments,
-            jsdesc.vpub_old,
-            jsdesc.vpub_new,
-            jsdesc.anchor
-        );
+        // We checkpoint after Sapling activation, so we can skip verification
+        // for all Sprout proofs.
+        return true;
     }
 
     bool operator()(const libzelcash::GrothProof& proof) const
@@ -147,6 +134,22 @@ std::string COutPoint::ToString() const
 {
     return strprintf("COutPoint(%s, %u)", hash.ToString().substr(0,10), n);
 }
+
+std::string COutPoint::ToFullString() const
+{
+    return strprintf("COutPoint(%s, %u)", hash.ToString(), n);
+}
+
+std::string COutPoint::GetTxHash() const
+{
+    return strprintf("%s", hash.ToString());
+}
+
+std::string COutPoint::GetTxIndex() const
+{
+    return strprintf("%u", n);
+}
+
 
 std::string SaplingOutPoint::ToString() const
 {
@@ -203,7 +206,7 @@ CMutableTransaction::CMutableTransaction(const CTransaction& tx) : nVersion(tx.n
                                                                    vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime),
                                                                    valueBalance(tx.valueBalance), vShieldedSpend(tx.vShieldedSpend), vShieldedOutput(tx.vShieldedOutput),
                                                                    vJoinSplit(tx.vJoinSplit), joinSplitPubKey(tx.joinSplitPubKey), joinSplitSig(tx.joinSplitSig),
-                                                                   bindingSig(tx.bindingSig)
+                                                                   bindingSig(tx.bindingSig), nType(tx.nType), collateralIn(tx.collateralOut), collateralPubkey(tx.collateralPubkey), pubKey(tx.pubKey), sigTime(tx.sigTime), ip(tx.ip), sig(tx.sig), benchmarkTier(tx.benchmarkTier), benchmarkSig(tx.benchmarkSig), benchmarkSigTime(tx.benchmarkSigTime), nUpdateType(tx.nUpdateType)
 {
     
 }
@@ -234,13 +237,14 @@ void CTransaction::UpdateHash() const
     *const_cast<uint256*>(&hash) = SerializeHash(*this);
 }
 
-CTransaction::CTransaction() : nVersion(CTransaction::SPROUT_MIN_CURRENT_VERSION), fOverwintered(false), nVersionGroupId(0), nExpiryHeight(0), vin(), vout(), nLockTime(0), valueBalance(0), vShieldedSpend(), vShieldedOutput(), vJoinSplit(), joinSplitPubKey(), joinSplitSig(), bindingSig() { }
+CTransaction::CTransaction() : nVersion(CTransaction::SPROUT_MIN_CURRENT_VERSION), fOverwintered(false), nVersionGroupId(0), nExpiryHeight(0), vin(), vout(), nLockTime(0),
+                               valueBalance(0), vShieldedSpend(), vShieldedOutput(), vJoinSplit(), joinSplitPubKey(), joinSplitSig(), bindingSig(), nType(ZELNODE_NO_TYPE), collateralOut(), collateralPubkey(), pubKey(), sigTime(0), ip(), sig(), benchmarkTier(0), benchmarkSig(), benchmarkSigTime(0), nUpdateType(0)  { }
 
 CTransaction::CTransaction(const CMutableTransaction &tx) : nVersion(tx.nVersion), fOverwintered(tx.fOverwintered), nVersionGroupId(tx.nVersionGroupId), nExpiryHeight(tx.nExpiryHeight),
                                                             vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime),
                                                             valueBalance(tx.valueBalance), vShieldedSpend(tx.vShieldedSpend), vShieldedOutput(tx.vShieldedOutput),
                                                             vJoinSplit(tx.vJoinSplit), joinSplitPubKey(tx.joinSplitPubKey), joinSplitSig(tx.joinSplitSig),
-                                                            bindingSig(tx.bindingSig)
+                                                            bindingSig(tx.bindingSig), nType(tx.nType), collateralOut(tx.collateralIn), collateralPubkey(tx.collateralPubkey), pubKey(tx.pubKey), sigTime(tx.sigTime), ip(tx.ip), sig(tx.sig), benchmarkTier(tx.benchmarkTier), benchmarkSig(tx.benchmarkSig), benchmarkSigTime(tx.benchmarkSigTime), nUpdateType(tx.nUpdateType)
 {
     UpdateHash();
 }
@@ -253,7 +257,7 @@ CTransaction::CTransaction(
                               vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime),
                               valueBalance(tx.valueBalance), vShieldedSpend(tx.vShieldedSpend), vShieldedOutput(tx.vShieldedOutput),
                               vJoinSplit(tx.vJoinSplit), joinSplitPubKey(tx.joinSplitPubKey), joinSplitSig(tx.joinSplitSig),
-                              bindingSig(tx.bindingSig)
+                              bindingSig(tx.bindingSig), nType(tx.nType), collateralOut(tx.collateralIn), collateralPubkey(tx.collateralPubkey), pubKey(tx.pubKey), sigTime(tx.sigTime), ip(tx.ip), sig(tx.sig), benchmarkTier(tx.benchmarkTier), benchmarkSig(tx.benchmarkSig), benchmarkSigTime(tx.benchmarkSigTime), nUpdateType(tx.nUpdateType)
 {
     assert(evilDeveloperFlag);
 }
@@ -263,7 +267,8 @@ CTransaction::CTransaction(CMutableTransaction &&tx) : nVersion(tx.nVersion), fO
                                                        valueBalance(tx.valueBalance),
                                                        vShieldedSpend(std::move(tx.vShieldedSpend)), vShieldedOutput(std::move(tx.vShieldedOutput)),
                                                        vJoinSplit(std::move(tx.vJoinSplit)),
-                                                       joinSplitPubKey(std::move(tx.joinSplitPubKey)), joinSplitSig(std::move(tx.joinSplitSig))
+                                                       joinSplitPubKey(std::move(tx.joinSplitPubKey)), joinSplitSig(std::move(tx.joinSplitSig)),
+                                                       nType(tx.nType), collateralOut(tx.collateralIn), collateralPubkey(tx.collateralPubkey), pubKey(tx.pubKey), sigTime(tx.sigTime), ip(tx.ip), sig(tx.sig), benchmarkTier(tx.benchmarkTier), benchmarkSig(tx.benchmarkSig), benchmarkSigTime(tx.benchmarkSigTime), nUpdateType(tx.nUpdateType)
 {
     UpdateHash();
 }
@@ -284,6 +289,21 @@ CTransaction& CTransaction::operator=(const CTransaction &tx) {
     *const_cast<joinsplit_sig_t*>(&joinSplitSig) = tx.joinSplitSig;
     *const_cast<binding_sig_t*>(&bindingSig) = tx.bindingSig;
     *const_cast<uint256*>(&hash) = tx.hash;
+
+    // Zelnode tx data
+    *const_cast<int8_t*>(&nType) = tx.nType;
+    *const_cast<COutPoint*>(&collateralOut) = tx.collateralOut;
+    *const_cast<CPubKey*>(&collateralPubkey) = tx.collateralPubkey;
+    *const_cast<CPubKey*>(&pubKey) = tx.pubKey;
+    *const_cast<uint32_t*>(&sigTime) = tx.sigTime;
+    *const_cast<std::string*>(&ip) = tx.ip;
+    *const_cast<std::vector<unsigned char>*>(&sig) = tx.sig;
+    *const_cast<int8_t*>(&benchmarkTier) = tx.benchmarkTier;
+    *const_cast<std::vector<unsigned char>*>(&benchmarkSig) = tx.benchmarkSig;
+    *const_cast<uint32_t*>(&benchmarkSigTime) = tx.benchmarkSigTime;
+    *const_cast<int8_t*>(&nUpdateType) = tx.nUpdateType;
+
+
     return *this;
 }
 
@@ -370,6 +390,13 @@ unsigned int CTransaction::CalculateModifiedSize(unsigned int nTxSize) const
 
 std::string CTransaction::ToString() const
 {
+    if (nVersion == ZELNODE_TX_VERSION) {
+        return strprintf("CTransaction(hash=%s, ver=%d, type=%d)\n",
+                         GetHash().ToString().substr(0,10),
+                         nVersion,
+                         nType);
+    }
+
     std::string str;
     if (!fOverwintered) {
         str += strprintf("CTransaction(hash=%s, ver=%d, vin.size=%u, vout.size=%u, nLockTime=%u)\n",

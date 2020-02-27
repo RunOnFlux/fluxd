@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "rpc/server.h"
 
@@ -13,6 +13,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "asyncrpcqueue.h"
+#include "zelnode/benchmarks.h"
 
 #include <memory>
 
@@ -248,6 +249,8 @@ UniValue stop(const UniValue& params, bool fHelp)
             "\nStop Zelcash server.");
     // Event loop will exit after current HTTP requests have been handled, so
     // this reply will get back to the client.
+    if (fZelStartedBench)
+        StopZelBenchd();
     StartShutdown();
     return "Zelcash server stopping";
 }

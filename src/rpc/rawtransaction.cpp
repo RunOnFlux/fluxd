@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "consensus/upgrades.h"
 #include "consensus/validation.h"
@@ -20,6 +20,7 @@
 #include "script/sign.h"
 #include "script/standard.h"
 #include "uint256.h"
+#include "zelnode/zelnode.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif
@@ -66,7 +67,9 @@ UniValue TxJoinSplitToJSON(const CTransaction& tx) {
         UniValue joinsplit(UniValue::VOBJ);
 
         joinsplit.push_back(Pair("vpub_old", ValueFromAmount(jsdescription.vpub_old)));
+        joinsplit.push_back(Pair("vpub_oldZat", jsdescription.vpub_old));
         joinsplit.push_back(Pair("vpub_new", ValueFromAmount(jsdescription.vpub_new)));
+        joinsplit.push_back(Pair("vpub_newZat", jsdescription.vpub_new));
 
         joinsplit.push_back(Pair("anchor", jsdescription.anchor.GetHex()));
 
@@ -145,92 +148,116 @@ UniValue TxShieldedOutputsToJSON(const CTransaction& tx) {
     return vdesc;
 }
 
-void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry)
-{
+void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) {
     const uint256 txid = tx.GetHash();
     entry.push_back(Pair("txid", txid.GetHex()));
-    entry.push_back(Pair("overwintered", tx.fOverwintered));
     entry.push_back(Pair("version", tx.nVersion));
-    if (tx.fOverwintered) {
-        entry.push_back(Pair("versiongroupid", HexInt(tx.nVersionGroupId)));
-    }
-    entry.push_back(Pair("locktime", (int64_t)tx.nLockTime));
-    if (tx.fOverwintered) {
-        entry.push_back(Pair("expiryheight", (int64_t)tx.nExpiryHeight));
-    }
-    UniValue vin(UniValue::VARR);
-    BOOST_FOREACH(const CTxIn& txin, tx.vin) {
-        UniValue in(UniValue::VOBJ);
-        if (tx.IsCoinBase())
-            in.push_back(Pair("coinbase", HexStr(txin.scriptSig.begin(), txin.scriptSig.end())));
-        else {
-            in.push_back(Pair("txid", txin.prevout.hash.GetHex()));
-            in.push_back(Pair("vout", (int64_t)txin.prevout.n));
+
+    if (tx.IsZelnodeTx()) {
+        entry.push_back(Pair("type", tx.TypeToString()));
+        entry.push_back(Pair("collateral_output", tx.collateralOut.ToString()));
+        entry.push_back(Pair("sigtime", tx.sigTime));
+        entry.push_back(Pair("sig", EncodeBase64(&tx.sig[0], tx.sig.size())));
+        entry.push_back(Pair("ip", tx.ip));
+
+        if (tx.nType & ZELNODE_START_TX_TYPE) {
+            entry.push_back(
+                    Pair("collateral_pubkey", EncodeBase64(tx.collateralPubkey.begin(), tx.collateralPubkey.size())));
+            entry.push_back(Pair("zelnode_pubkey", EncodeBase64(tx.pubKey.begin(), tx.pubKey.size())));
+        }
+
+        if (tx.nType & ZELNODE_CONFIRM_TX_TYPE) {
+            entry.push_back(Pair("update_type", tx.nUpdateType));
+            entry.push_back(Pair("benchmark_tier", TierToString(tx.benchmarkTier)));
+            entry.push_back(Pair("benchmark_sigtime", tx.benchmarkSigTime));
+            entry.push_back(Pair("benchmark_sig", EncodeBase64(&tx.benchmarkSig[0], tx.benchmarkSig.size())));
+
+        }
+    } else {
+        entry.push_back(Pair("overwintered", tx.fOverwintered));
+
+        if (tx.fOverwintered) {
+            entry.push_back(Pair("versiongroupid", HexInt(tx.nVersionGroupId)));
+        }
+        entry.push_back(Pair("locktime", (int64_t) tx.nLockTime));
+        if (tx.fOverwintered) {
+            entry.push_back(Pair("expiryheight", (int64_t) tx.nExpiryHeight));
+        }
+        UniValue vin(UniValue::VARR);
+        BOOST_FOREACH(const CTxIn &txin, tx.vin) {
+                        UniValue in(UniValue::VOBJ);
+                        if (tx.IsCoinBase())
+                            in.push_back(Pair("coinbase", HexStr(txin.scriptSig.begin(), txin.scriptSig.end())));
+                        else {
+                            in.push_back(Pair("txid", txin.prevout.hash.GetHex()));
+                            in.push_back(Pair("vout", (int64_t) txin.prevout.n));
+                            UniValue o(UniValue::VOBJ);
+                            o.push_back(Pair("asm", ScriptToAsmStr(txin.scriptSig, true)));
+                            o.push_back(Pair("hex", HexStr(txin.scriptSig.begin(), txin.scriptSig.end())));
+                            in.push_back(Pair("scriptSig", o));
+
+                            // Add address and value info if spentindex enabled
+                            CSpentIndexValue spentInfo;
+                            CSpentIndexKey spentKey(txin.prevout.hash, txin.prevout.n);
+                            if (fSpentIndex && GetSpentIndex(spentKey, spentInfo)) {
+                                in.push_back(Pair("value", ValueFromAmount(spentInfo.satoshis)));
+                                in.push_back(Pair("valueSat", spentInfo.satoshis));
+
+                                CTxDestination dest =
+                                        DestFromAddressHash(spentInfo.addressType, spentInfo.addressHash);
+                                if (IsValidDestination(dest)) {
+                                    in.push_back(Pair("address", EncodeDestination(dest)));
+                                }
+                            }
+                        }
+                        in.push_back(Pair("sequence", (int64_t) txin.nSequence));
+                        vin.push_back(in);
+                    }
+        entry.push_back(Pair("vin", vin));
+        UniValue vout(UniValue::VARR);
+        for (unsigned int i = 0; i < tx.vout.size(); i++) {
+            const CTxOut &txout = tx.vout[i];
+            UniValue out(UniValue::VOBJ);
+            out.push_back(Pair("value", ValueFromAmount(txout.nValue)));
+            out.push_back(Pair("valueZat", txout.nValue));
+            out.push_back(Pair("valueSat", txout.nValue));
+            out.push_back(Pair("n", (int64_t) i));
             UniValue o(UniValue::VOBJ);
-            o.push_back(Pair("asm", ScriptToAsmStr(txin.scriptSig, true)));
-            o.push_back(Pair("hex", HexStr(txin.scriptSig.begin(), txin.scriptSig.end())));
-            in.push_back(Pair("scriptSig", o));
+            ScriptPubKeyToJSON(txout.scriptPubKey, o, true);
+            out.push_back(Pair("scriptPubKey", o));
 
-            // Add address and value info if spentindex enabled
+            // Add spent information if spentindex is enabled
             CSpentIndexValue spentInfo;
-            CSpentIndexKey spentKey(txin.prevout.hash, txin.prevout.n);
-            if (GetSpentIndex(spentKey, spentInfo)) {
-                in.push_back(Pair("value", ValueFromAmount(spentInfo.satoshis)));
-                in.push_back(Pair("valueSat", spentInfo.satoshis));
+            CSpentIndexKey spentKey(txid, i);
+            if (fSpentIndex && GetSpentIndex(spentKey, spentInfo)) {
+                out.push_back(Pair("spentTxId", spentInfo.txid.GetHex()));
+                out.push_back(Pair("spentIndex", (int) spentInfo.inputIndex));
+                out.push_back(Pair("spentHeight", spentInfo.blockHeight));
+            }
+            vout.push_back(out);
+        }
+        entry.push_back(Pair("vout", vout));
 
-                boost::optional<CTxDestination> dest =
-                    DestFromAddressHash(spentInfo.addressType, spentInfo.addressHash);
-                if (dest) {
-                    in.push_back(Pair("address", EncodeDestination(*dest)));
-                }
+        UniValue vJoinSplit = TxJoinSplitToJSON(tx);
+        entry.push_back(Pair("vJoinSplit", vJoinSplit));
+
+        if (tx.fOverwintered && tx.nVersion >= SAPLING_TX_VERSION) {
+            entry.push_back(Pair("valueBalance", ValueFromAmount(tx.valueBalance)));
+            entry.push_back(Pair("valueBalanceZat", tx.valueBalance));
+            UniValue vspenddesc = TxShieldedSpendsToJSON(tx);
+            entry.push_back(Pair("vShieldedSpend", vspenddesc));
+            UniValue voutputdesc = TxShieldedOutputsToJSON(tx);
+            entry.push_back(Pair("vShieldedOutput", voutputdesc));
+            if (!(vspenddesc.empty() && voutputdesc.empty())) {
+                entry.push_back(Pair("bindingSig", HexStr(tx.bindingSig.begin(), tx.bindingSig.end())));
             }
         }
-        in.push_back(Pair("sequence", (int64_t)txin.nSequence));
-        vin.push_back(in);
     }
-    entry.push_back(Pair("vin", vin));
-    UniValue vout(UniValue::VARR);
-    for (unsigned int i = 0; i < tx.vout.size(); i++) {
-        const CTxOut& txout = tx.vout[i];
-        UniValue out(UniValue::VOBJ);
-        out.push_back(Pair("value", ValueFromAmount(txout.nValue)));
-        out.push_back(Pair("valueZat", txout.nValue));
-        out.push_back(Pair("n", (int64_t)i));
-        UniValue o(UniValue::VOBJ);
-        ScriptPubKeyToJSON(txout.scriptPubKey, o, true);
-        out.push_back(Pair("scriptPubKey", o));
-
-        // Add spent information if spentindex is enabled
-        CSpentIndexValue spentInfo;
-        CSpentIndexKey spentKey(txid, i);
-        if (GetSpentIndex(spentKey, spentInfo)) {
-            out.push_back(Pair("spentTxId", spentInfo.txid.GetHex()));
-            out.push_back(Pair("spentIndex", (int)spentInfo.inputIndex));
-            out.push_back(Pair("spentHeight", spentInfo.blockHeight));
-        }
-        vout.push_back(out);
-    }
-    entry.push_back(Pair("vout", vout));
-
-    UniValue vJoinSplit = TxJoinSplitToJSON(tx);
-    entry.push_back(Pair("vJoinSplit", vJoinSplit));
-
-    if (tx.fOverwintered && tx.nVersion >= SAPLING_TX_VERSION) {
-        entry.push_back(Pair("valueBalance", ValueFromAmount(tx.valueBalance)));
-        UniValue vspenddesc = TxShieldedSpendsToJSON(tx);
-        entry.push_back(Pair("vShieldedSpend", vspenddesc));
-        UniValue voutputdesc = TxShieldedOutputsToJSON(tx);
-        entry.push_back(Pair("vShieldedOutput", voutputdesc));
-        if (!(vspenddesc.empty() && voutputdesc.empty())) {
-            entry.push_back(Pair("bindingSig", HexStr(tx.bindingSig.begin(), tx.bindingSig.end())));
-        }
-    }
-
     if (!hashBlock.IsNull()) {
         entry.push_back(Pair("blockhash", hashBlock.GetHex()));
         BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
         if (mi != mapBlockIndex.end() && (*mi).second) {
-            CBlockIndex* pindex = (*mi).second;
+            CBlockIndex *pindex = (*mi).second;
             if (chainActive.Contains(pindex)) {
                 entry.push_back(Pair("height", pindex->nHeight));
                 entry.push_back(Pair("confirmations", 1 + chainActive.Height() - pindex->nHeight));
@@ -242,6 +269,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry)
             }
         }
     }
+
 }
 
 UniValue getrawtransaction(const UniValue& params, bool fHelp)
@@ -537,7 +565,7 @@ UniValue createrawtransaction(const UniValue& params, bool fHelp)
                 throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid parameter, expiryheight must be nonnegative and less than %d.", TX_EXPIRY_HEIGHT_THRESHOLD));
             }
             // DoS mitigation: reject transactions expiring soon
-            if (nextBlockHeight + TX_EXPIRING_SOON_THRESHOLD > nExpiryHeight) {
+            if (nExpiryHeight != 0 && nextBlockHeight + TX_EXPIRING_SOON_THRESHOLD > nExpiryHeight) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER,
                     strprintf("Invalid parameter, expiryheight should be at least %d to avoid transaction expiring soon",
                     nextBlockHeight + TX_EXPIRING_SOON_THRESHOLD));

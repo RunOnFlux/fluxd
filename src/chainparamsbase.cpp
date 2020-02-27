@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "chainparamsbase.h"
 
@@ -23,7 +23,7 @@ public:
 static CBaseMainParams mainParams;
 
 /**
- * testnet-kamiooka
+ * testnet-kamata
  */
 class CBaseTestNetParams : public CBaseChainParams
 {
@@ -31,7 +31,7 @@ public:
     CBaseTestNetParams()
     {
         nRPCPort = 26124;
-        strDataDir = "testnet-kamiooka";
+        strDataDir = "testnet-kamata";
     }
 };
 static CBaseTestNetParams testNetParams;

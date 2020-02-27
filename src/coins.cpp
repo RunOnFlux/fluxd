@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "coins.h"
 
@@ -10,6 +10,7 @@
 #include "policy/fees.h"
 
 #include <assert.h>
+#include <zelnode/zelnode.h>
 
 /**
  * calculate number of bytes for the bitmask, and its number of non-zero bytes
@@ -553,6 +554,9 @@ CAmount CCoinsViewCache::GetValueIn(const CTransaction& tx) const
     if (tx.IsCoinBase())
         return 0;
 
+    if (tx.IsZelnodeTx())
+        return 0;
+
     CAmount nResult = 0;
     for (unsigned int i = 0; i < tx.vin.size(); i++)
         nResult += GetOutputFor(tx.vin[i]).nValue;
@@ -618,6 +622,33 @@ bool CCoinsViewCache::HaveInputs(const CTransaction& tx) const
         }
     }
     return true;
+}
+
+bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier) const
+{
+    if (!tx.IsZelnodeTx()) {
+        return false;
+    }
+
+    const COutPoint &prevout = tx.collateralOut;
+    const CCoins* coins = AccessCoins(prevout.hash);
+    if (!coins || !coins->IsAvailable(prevout.n)) {
+        return false;
+    }
+
+    // Check for minimum height requirement
+    if (p_Height - coins->nHeight < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC) {
+        return false;
+    }
+
+    if (coins->vout[prevout.n].nValue == 10000 * COIN)
+        nTier = Zelnode::BASIC;
+    else if (coins->vout[prevout.n].nValue == 25000 * COIN)
+        nTier = Zelnode::SUPER;
+    else if (coins->vout[prevout.n].nValue == 100000 * COIN)
+        nTier = Zelnode::BAMF;
+
+    return nTier >= BASIC && nTier <= BAMF;
 }
 
 double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight) const

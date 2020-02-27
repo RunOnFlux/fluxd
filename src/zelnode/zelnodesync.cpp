@@ -1,8 +1,8 @@
 // Copyright (c) 2014-2015 The Dash developers
 // Copyright (c) 2015-2017 The PIVX developers
 // Copyright (c) 2019 The Zel developers
-// Distributed under the MIT/X11 software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "zelnode/zelnodesync.h"
 #include "main.h"
@@ -214,7 +214,7 @@ void ZelnodeSync::Process()
         return;
     }
 
-    LogPrintf("%s::Process -- Tick %d nCurrentAsset %d\n", __func__, tick, RequestedZelnodeAssets);
+//    LogPrintf("%s::Process -- Tick %d nCurrentAsset %d\n", __func__, tick, RequestedZelnodeAssets);
 
     if (RequestedZelnodeAssets == ZELNODE_SYNC_INITIAL) GetNextAsset();
 

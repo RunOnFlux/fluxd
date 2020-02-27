@@ -1,7 +1,7 @@
 // Copyright 2014 BitPay Inc.
 // Copyright 2015 Bitcoin Core Developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef UNIVALUE_H__
 #define UNIVALUE_H__
@@ -31,6 +31,9 @@ public:
     UniValue(int64_t val_) {
         setInt(val_);
     }
+    UniValue(uint32_t val_) {
+        setInt(val_);
+    }
     UniValue(bool val_) {
         setBool(val_);
     }
@@ -56,6 +59,7 @@ public:
     bool setNumStr(const std::string& val);
     bool setInt(uint64_t val);
     bool setInt(int64_t val);
+    bool setInt(uint32_t val_) { return setInt((int64_t)val_); }
     bool setInt(int val_) { return setInt((int64_t)val_); }
     bool setFloat(double val);
     bool setStr(const std::string& val);
@@ -201,6 +205,13 @@ static inline std::pair<std::string,UniValue> Pair(const char *cKey, int64_t i64
 {
     std::string key(cKey);
     UniValue uVal(i64Val);
+    return std::make_pair(key, uVal);
+}
+
+static inline std::pair<std::string,UniValue> Pair(const char *cKey, uint32_t u32Val)
+{
+    std::string key(cKey);
+    UniValue uVal(u32Val);
     return std::make_pair(key, uVal);
 }
 

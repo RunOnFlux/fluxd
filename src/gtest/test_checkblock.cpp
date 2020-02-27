@@ -109,7 +109,7 @@ protected:
 
         // We now expect this to be a valid block.
         MockCValidationState state;
-        EXPECT_TRUE(ContextualCheckBlock(block, state, Params(), &indexPrev));
+        EXPECT_TRUE(ContextualCheckBlock(block, state, Params(), &indexPrev, false));
     }
 
     // Expects a height-1 block containing a given transaction to fail
@@ -127,7 +127,7 @@ protected:
         // We now expect this to be an invalid block, for the given reason.
         MockCValidationState state;
         EXPECT_CALL(state, DoS(level, false, REJECT_INVALID, reason, false)).Times(1);
-        EXPECT_FALSE(ContextualCheckBlock(block, state, Params(), &indexPrev));
+        EXPECT_FALSE(ContextualCheckBlock(block, state, Params(), &indexPrev, false));
     }
 
 };
@@ -144,7 +144,7 @@ TEST_F(ContextualCheckBlockTest, DISABLED_BadCoinbaseHeight) {
 
     // Treating block as genesis should pass
     MockCValidationState state;
-    EXPECT_TRUE(ContextualCheckBlock(block, state, Params(), NULL));
+    EXPECT_TRUE(ContextualCheckBlock(block, state, Params(), NULL, false));
 
     // Give the block a dummy founders reward
    // mtx.vout.push_back(CTxOut(
@@ -158,20 +158,20 @@ TEST_F(ContextualCheckBlockTest, DISABLED_BadCoinbaseHeight) {
     CBlockIndex indexPrev {prev};
     indexPrev.nHeight = 0;
     EXPECT_CALL(state, DoS(100, false, REJECT_INVALID, "bad-cb-height", false)).Times(1);
-    EXPECT_FALSE(ContextualCheckBlock(block, state, Params(), &indexPrev));
+    EXPECT_FALSE(ContextualCheckBlock(block, state, Params(), &indexPrev, false));
 
     // Setting to an incorrect height should fail
     mtx.vin[0].scriptSig = CScript() << 2 << OP_0;
     CTransaction tx3 {mtx};
     block.vtx[0] = tx3;
     EXPECT_CALL(state, DoS(100, false, REJECT_INVALID, "bad-cb-height", false)).Times(1);
-    EXPECT_FALSE(ContextualCheckBlock(block, state, Params(), &indexPrev));
+    EXPECT_FALSE(ContextualCheckBlock(block, state, Params(), &indexPrev, false));
 
     // After correcting the scriptSig, should pass
     mtx.vin[0].scriptSig = CScript() << 1 << OP_0;
     CTransaction tx4 {mtx};
     block.vtx[0] = tx4;
-    EXPECT_TRUE(ContextualCheckBlock(block, state, Params(), &indexPrev));
+    EXPECT_TRUE(ContextualCheckBlock(block, state, Params(), &indexPrev, false));
 }
 
 // TEST PLAN: first, check that each ruleset accepts its own transaction type.
@@ -246,7 +246,7 @@ TEST_F(ContextualCheckBlockTest, BlockSproutRulesRejectOtherTx) {
 TEST_F(ContextualCheckBlockTest, BlockSaplingRulesRejectOtherTx) {
     SelectParams(CBaseChainParams::REGTEST);
 
-    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, 1);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, 0);
 
     CMutableTransaction mtx = GetFirstBlockCoinbaseTx();
 
@@ -255,6 +255,17 @@ TEST_F(ContextualCheckBlockTest, BlockSaplingRulesRejectOtherTx) {
 
     {
         SCOPED_TRACE("BlockSaplingRulesRejectSproutTx");
-        ExpectInvalidBlockFromTx(CTransaction(mtx), 100, "tx-overwinter-active");
+        ExpectInvalidBlockFromTx(CTransaction(mtx), 100, "tx-sapling-active");
     }
+
+    // Make it an Overwinter transaction
+    mtx.fOverwintered = true;
+    mtx.nVersion = OVERWINTER_TX_VERSION;
+    mtx.nVersionGroupId = OVERWINTER_VERSION_GROUP_ID;
+
+    {
+        SCOPED_TRACE("BlockSaplingRulesRejectOverwinterTx");
+        ExpectInvalidBlockFromTx(CTransaction(mtx), 0, "bad-sapling-tx-version-group-id");
+    }
+
 }

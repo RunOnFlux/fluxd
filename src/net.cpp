@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
@@ -1894,6 +1894,17 @@ void RelayTransaction(const CTransaction& tx, const CDataStream& ss)
     }
 }
 
+void RelayZelnodeTx(const CInv& inv)
+{
+    LOCK(cs_vNodes);
+    BOOST_FOREACH(CNode* pnode, vNodes)
+                {
+                    if((pnode->nServices==NODE_BLOOM_WITHOUT_ZN) && inv.IsZelnodeType())continue;
+
+                    if ((Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION) || (Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION_TESTNET))
+                        pnode->PushInventory(inv);
+                }
+}
 
 void RelayInv(const CInv& inv)
 {
@@ -1902,7 +1913,7 @@ void RelayInv(const CInv& inv)
     {
         if((pnode->nServices==NODE_BLOOM_WITHOUT_ZN) && inv.IsZelnodeType())continue;
 
-        if (pnode->nVersion >= MIN_PEER_PROTO_VERSION)
+        if ((Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION) || (Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION_TESTNET))
             pnode->PushInventory(inv);
     }
 }

@@ -1,8 +1,8 @@
 // Copyright (c) 2014-2016 The Dash developers
 // Copyright (c) 2016-2019 The PIVX developers
 // Copyright (c) 2019 The Zel developers
-// Distributed under the MIT/X11 software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "zelnode/spork.h"
 #include "base58.h"
@@ -216,7 +216,6 @@ int CSporkManager::GetSporkIDByName(std::string strName)
 {
     if (strName == "SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT") return SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT;
     if (strName == "SPORK_2_ZELNODE_UPGRADE_VOTE_ENFORCEMENT") return SPORK_2_ZELNODE_UPGRADE_VOTE_ENFORCEMENT;
-
     return -1;
 }
 

@@ -23,7 +23,7 @@ Sean Bowe (36):
       Initialize libsodium in this routine, which is now necessary because libsnark uses its PRNG.
       Pass our constraint system to libsnark, so that it doesn't need to (de)serialize it in the proving key.
       Rename CPourTx to JSDescription.
-      Rename vpour to vJoinSplit.
+      Rename vpour to vjoinsplit.
       Rename JSDescription's `serials` to `nullifiers`.
       Test fixes.
       Rename GetPourValueIn to GetJoinSplitValueIn

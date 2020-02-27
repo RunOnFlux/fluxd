@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef BITCOIN_PRIMITIVES_TRANSACTION_H
 #define BITCOIN_PRIMITIVES_TRANSACTION_H
@@ -17,11 +17,17 @@
 #include <array>
 
 #include <boost/variant.hpp>
+#include <netbase.h>
+#include <pubkey.h>
 
 #include "zelcash/NoteEncryption.hpp"
 #include "zelcash/Zelcash.h"
 #include "zelcash/JoinSplit.hpp"
 #include "zelcash/Proof.hpp"
+
+#define JOINSPLIT_SIZE GetSerializeSize(JSDescription(), SER_NETWORK, PROTOCOL_VERSION)
+#define OUTPUTDESCRIPTION_SIZE GetSerializeSize(OutputDescription(), SER_NETWORK, PROTOCOL_VERSION)
+#define SPENDDESCRIPTION_SIZE GetSerializeSize(SpendDescription(), SER_NETWORK, PROTOCOL_VERSION)
 
 // Overwinter transaction version
 static const int32_t OVERWINTER_TX_VERSION = 3;
@@ -36,6 +42,8 @@ static_assert(SAPLING_TX_VERSION >= SAPLING_MIN_TX_VERSION,
     "Sapling tx version must not be lower than minimum");
 static_assert(SAPLING_TX_VERSION <= SAPLING_MAX_TX_VERSION,
     "Sapling tx version must not be higher than maximum");
+
+static const int32_t ZELNODE_TX_VERSION = 5;
 
 /**
  * A shielded input to a transaction. It contains data that describes a Spend transfer.
@@ -227,7 +235,6 @@ public:
     JSDescription(): vpub_old(0), vpub_new(0) { }
 
     JSDescription(
-            bool makeGrothProof,
             ZCJoinSplit& params,
             const uint256& joinSplitPubKey,
             const uint256& rt,
@@ -240,7 +247,6 @@ public:
     );
 
     static JSDescription Randomized(
-            bool makeGrothProof,
             ZCJoinSplit& params,
             const uint256& joinSplitPubKey,
             const uint256& rt,
@@ -354,6 +360,9 @@ public:
     COutPoint() : BaseOutPoint() {};
     COutPoint(uint256 hashIn, uint32_t nIn) : BaseOutPoint(hashIn, nIn) {};
     std::string ToString() const;
+    std::string ToFullString() const;
+    std::string GetTxHash() const;
+    std::string GetTxIndex() const;
 };
 
 /** An outpoint - a combination of a transaction hash and an index n into its sapling
@@ -500,6 +509,12 @@ static_assert(OVERWINTER_VERSION_GROUP_ID != 0, "version group id must be non-ze
 static constexpr uint32_t SAPLING_VERSION_GROUP_ID = 0x892F2085;
 static_assert(SAPLING_VERSION_GROUP_ID != 0, "version group id must be non-zero as specified in ZIP 202");
 
+enum {
+    ZELNODE_NO_TYPE = 1 << 0,
+    ZELNODE_START_TX_TYPE = 1 << 1,
+    ZELNODE_CONFIRM_TX_TYPE = 1 << 2
+};
+
 struct CMutableTransaction;
 
 /** The basic transaction that is broadcasted on the network and contained in
@@ -567,6 +582,19 @@ public:
     const joinsplit_sig_t joinSplitSig = {{0}};
     const binding_sig_t bindingSig = {{0}};
 
+    // Zelnode Tx data
+    const int8_t nType;
+    const COutPoint collateralOut; // collateral out
+    const CPubKey collateralPubkey;
+    const CPubKey pubKey; // Pubkey used for VPS signature verification
+    const uint32_t sigTime; // Timestamp to be used for hash verification
+    const std::string ip;
+    const std::vector<unsigned char> sig;
+    const int8_t benchmarkTier;
+    const std::vector<unsigned char> benchmarkSig;
+    const uint32_t benchmarkSigTime;
+    const int8_t nUpdateType;
+
     /** Construct a CTransaction that qualifies as IsNull() */
     CTransaction();
 
@@ -606,6 +634,33 @@ public:
             throw std::ios_base::failure("Unknown transaction format");
         }
 
+        if (nVersion == ZELNODE_TX_VERSION) {
+            READWRITE(*const_cast<int8_t*>(&nType));
+            if (nType & ZELNODE_START_TX_TYPE) {
+                READWRITE(*const_cast<COutPoint*>(&collateralOut));
+                READWRITE(*const_cast<CPubKey*>(&collateralPubkey));
+                READWRITE(*const_cast<CPubKey*>(&pubKey));
+                READWRITE(*const_cast<uint32_t*>(&sigTime));
+                if (!(s.GetType() & SER_GETHASH))
+                    READWRITE(*const_cast<std::vector<unsigned char>*>(&sig));
+
+            } else if (nType & ZELNODE_CONFIRM_TX_TYPE) {
+                READWRITE(*const_cast<COutPoint*>(&collateralOut));
+                READWRITE(*const_cast<uint32_t*>(&sigTime));
+                READWRITE(*const_cast<int8_t*>(&benchmarkTier));
+                READWRITE(*const_cast<uint32_t*>(&benchmarkSigTime));
+                READWRITE(*const_cast<int8_t*>(&nUpdateType));
+                READWRITE(*const_cast<std::string*>(&ip));
+                if (!(s.GetType() & SER_GETHASH)) {
+                    READWRITE(*const_cast<std::vector<unsigned char>*>(&sig));
+                    READWRITE(*const_cast<std::vector<unsigned char>*>(&benchmarkSig));
+                }
+            }
+            if (ser_action.ForRead())
+                UpdateHash();
+            return;
+        }
+
         READWRITE(*const_cast<std::vector<CTxIn>*>(&vin));
         READWRITE(*const_cast<std::vector<CTxOut>*>(&vout));
         READWRITE(*const_cast<uint32_t*>(&nLockTime));
@@ -635,8 +690,22 @@ public:
     template <typename Stream>
     CTransaction(deserialize_type, Stream& s) : CTransaction(CMutableTransaction(deserialize, s)) {}
 
+    bool IsZelnodeTx() const {
+        return nVersion == ZELNODE_TX_VERSION;
+    }
+
     bool IsNull() const {
-        return vin.empty() && vout.empty();
+        return vin.empty() && vout.empty() && !IsZelnodeTx() || (IsZelnodeTx() && collateralOut.IsNull());
+    }
+
+    std::string TypeToString() const {
+        if (nType & ZELNODE_START_TX_TYPE) {
+            return "Starting a zelnode";
+        } else if (nType & ZELNODE_CONFIRM_TX_TYPE) {
+            return "Confirming a zelnode";
+        } else {
+            return "No type (Error)";
+        }
     }
 
     const uint256& GetHash() const {
@@ -714,6 +783,18 @@ struct CMutableTransaction
     CTransaction::joinsplit_sig_t joinSplitSig = {{0}};
     CTransaction::binding_sig_t bindingSig = {{0}};
 
+    int8_t nType;
+    COutPoint collateralIn; // collateral in
+    CPubKey collateralPubkey;
+    CPubKey pubKey; // Pubkey used for VPS signature verification
+    uint32_t sigTime; // Timestamp to be used for hash verification
+    std::string ip;
+    std::vector<unsigned char> sig;
+    int8_t benchmarkTier;
+    std::vector<unsigned char> benchmarkSig;
+    uint32_t benchmarkSigTime;
+    int8_t nUpdateType;
+
     CMutableTransaction();
     CMutableTransaction(const CTransaction& tx);
 
@@ -750,6 +831,31 @@ struct CMutableTransaction
             nVersion == SAPLING_TX_VERSION;
         if (fOverwintered && !(isOverwinterV3 || isSaplingV4)) {
             throw std::ios_base::failure("Unknown transaction format");
+        }
+
+        if (nVersion == ZELNODE_TX_VERSION) {
+            READWRITE(nType);
+            if (nType & ZELNODE_START_TX_TYPE) {
+                READWRITE(collateralIn);
+                READWRITE(collateralPubkey);
+                READWRITE(pubKey);
+                READWRITE(sigTime);
+                if (!(s.GetType() & SER_GETHASH))
+                    READWRITE(sig);
+
+            } else if (nType & ZELNODE_CONFIRM_TX_TYPE) {
+                READWRITE(collateralIn);
+                READWRITE(sigTime);
+                READWRITE(benchmarkTier);
+                READWRITE(benchmarkSigTime);
+                READWRITE(nUpdateType);
+                READWRITE(ip);
+                if (!(s.GetType() & SER_GETHASH)) {
+                    READWRITE(sig);
+                    READWRITE(benchmarkSig);
+                }
+            }
+            return;
         }
 
         READWRITE(vin);

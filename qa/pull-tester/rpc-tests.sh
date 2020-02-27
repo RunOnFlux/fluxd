@@ -15,6 +15,7 @@ testScripts=(
     'prioritisetransaction.py'
     'wallet_treestate.py'
     'wallet_anchorfork.py'
+    'wallet_changeaddresses.py'
     'wallet_changeindicator.py'
     'wallet_import_export.py'
     'wallet_protectcoinbase.py'
@@ -40,6 +41,7 @@ testScripts=(
     'rawtransactions.py'
     'getrawtransaction_insight.py'
     'rest.py'
+    'mempool_limit.py'
     'mempool_spendcoinbase.py'
     'mempool_reorg.py'
     'mempool_tx_input_limit.py'
@@ -56,6 +58,9 @@ testScripts=(
     'key_import_export.py'
     'nodehandling.py'
     'reindex.py'
+    'addressindex.py'
+    'spentindex.py'
+    'timestampindex.py'
     'decodescript.py'
     'blockchain.py'
     'disablewallet.py'
@@ -115,13 +120,14 @@ function runTestScript
 
     echo -e "=== Running testscript ${testName} ==="
 
+    local startTime=$(date +%s)
     if eval "$@"
     then
         successCount=$(expr $successCount + 1)
-        echo "--- Success: ${testName} ---"
+        echo "--- Success: ${testName} ($(($(date +%s) - $startTime))s) ---"
     else
         failures[${#failures[@]}]="$testName"
-        echo "!!! FAIL: ${testName} !!!"
+        echo "!!! FAIL: ${testName} ($(($(date +%s) - $startTime))s) !!!"
     fi
 
     echo

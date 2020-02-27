@@ -1,6 +1,6 @@
 // Copyright (c) 2011-2013 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #define BOOST_TEST_MODULE Bitcoin Test Suite
 
@@ -37,9 +37,7 @@ extern void noui_connect();
 
 JoinSplitTestingSetup::JoinSplitTestingSetup()
 {
-    boost::filesystem::path pk_path = ZC_GetParamsDir() / "sprout-proving.key";
-    boost::filesystem::path vk_path = ZC_GetParamsDir() / "sprout-verifying.key";
-    pzelcashParams = ZCJoinSplit::Prepared(vk_path.string(), pk_path.string());
+    pzelcashParams = ZCJoinSplit::Prepared();
 
     boost::filesystem::path sapling_spend = ZC_GetParamsDir() / "sapling-spend.params";
     boost::filesystem::path sapling_output = ZC_GetParamsDir() / "sapling-output.params";

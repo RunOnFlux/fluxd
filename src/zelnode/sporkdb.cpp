@@ -1,10 +1,12 @@
 // Copyright (c) 2017 The PIVX developers
 // Copyright (c) 2019 The Zel developers
-// Distributed under the MIT/X11 software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "zelnode/sporkdb.h"
 #include "zelnode/spork.h"
+
+static const char DB_ZELNODE_CACHE_DATA = 'd';
 
 CSporkDB::CSporkDB(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "sporks", nCacheSize, fMemory, fWipe) {}
 
@@ -24,3 +26,4 @@ bool CSporkDB::SporkExists(const int nSporkId)
 {
     return Exists(nSporkId);
 }
+

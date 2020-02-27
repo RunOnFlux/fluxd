@@ -1,8 +1,8 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Copyright (c) 2015-2019 The PIVX developers
 // Copyright (c) 2018-2019 The Zel developers
-// Distributed under the MIT/X11 software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "zelnode/activezelnode.h"
 #include "db.h"
@@ -22,23 +22,7 @@
 
 #include <boost/tokenizer.hpp>
 #include <fstream>
-
-bool DecodeHexZelnodeBroadcast(ZelnodeBroadcast& zelnodeBroadcast, std::string strHexZelnodeBroadcast) {
-
-    if (!IsHex(strHexZelnodeBroadcast))
-        return false;
-
-    vector<unsigned char> zelnodeData(ParseHex(strHexZelnodeBroadcast));
-    CDataStream ssData(zelnodeData, SER_NETWORK, PROTOCOL_VERSION);
-    try {
-        ssData >> zelnodeBroadcast;
-    }
-    catch (const std::exception&) {
-        return false;
-    }
-
-    return true;
-}
+#include <consensus/validation.h>
 
 UniValue createzelnodekey(const UniValue& params, bool fHelp)
 {
@@ -117,6 +101,7 @@ UniValue getzelnodeoutputs(const UniValue& params, bool fHelp)
         obj.push_back(Pair("txhash", out.tx->GetHash().ToString()));
         obj.push_back(Pair("outputidx", out.i));
         obj.push_back(Pair("ZEL Amount", pair.second / COIN));
+        obj.push_back(Pair("Confirmations", pair.first.nDepth));
         ret.push_back(obj);
     }
 
@@ -125,10 +110,172 @@ UniValue getzelnodeoutputs(const UniValue& params, bool fHelp)
 
 UniValue startzelnode(const UniValue& params, bool fHelp)
 {
+
     std::string strCommand;
     if (params.size() >= 1)
         strCommand = params[0].get_str();
 
+
+    if (IsZelnodeTransactionsActive()) {
+        if (fHelp || params.size() < 2 || params.size() > 3 ||
+            (params.size() == 2 && (strCommand != "all")) ||
+            (params.size() == 3 && strCommand != "alias"))
+            throw runtime_error(
+                    "startzelnode \"all|alias\" lockwallet ( \"alias\" )\n"
+                    "\nAttempts to start one or more zelnode(s)\n"
+
+                    "\nArguments:\n"
+                    "1. set         (string, required) Specify which set of zelnode(s) to start.\n"
+                    "2. lockwallet  (boolean, required) Lock wallet after completion.\n"
+                    "3. alias       (string) Zelnode alias. Required if using 'alias' as the set.\n"
+
+                    "\nResult: (for 'local' set):\n"
+                    "\"status\"     (string) Zelnode status message\n"
+
+                    "\nResult: (for other sets):\n"
+                    "{\n"
+                    "  \"overall\": \"xxxx\",     (string) Overall status message\n"
+                    "  \"detail\": [\n"
+                    "    {\n"
+                    "      \"node\": \"xxxx\",    (string) Node name or alias\n"
+                    "      \"result\": \"xxxx\",  (string) 'success' or 'failed'\n"
+                    "      \"error\": \"xxxx\"    (string) Error message, if failed\n"
+                    "    }\n"
+                    "    ,...\n"
+                    "  ]\n"
+                    "}\n"
+
+                    "\nExamples:\n" +
+                    HelpExampleCli("startzelnode", "\"alias\" \"0\" \"my_zn\"") + HelpExampleRpc("startzelnode", "\"alias\" \"0\" \"my_zn\""));
+
+
+        if (IsInitialBlockDownload(Params())) {
+            throw runtime_error("Chain is still syncing, please wait until chain is synced\n");
+        }
+
+        bool fLock = (params[1].get_str() == "true" ? true : false);
+
+        EnsureWalletIsUnlocked();
+
+        bool fAlias = false;
+        std::string alias = "";
+        if (params.size() == 3) {
+            fAlias = true;
+            alias = params[2].get_str();
+        }
+
+        bool found = false;
+        int successful = 0;
+        int failed = 0;
+
+        UniValue resultsObj(UniValue::VARR);
+
+        for (ZelnodeConfig::ZelnodeEntry zne : zelnodeConfig.getEntries()) {
+            UniValue zelnodeEntry(UniValue::VOBJ);
+
+            if (fAlias && zne.getAlias() == alias) {
+                found = true;
+            } else if (fAlias) {
+                continue;
+            }
+
+            std::string errorMessage;
+            CMutableTransaction mutTransaction;
+
+            int32_t index;
+            zne.castOutputIndex(index);
+            COutPoint outpoint = COutPoint(uint256S(zne.getTxHash()), index);
+
+            zelnodeEntry.push_back(Pair("outpoint", outpoint.ToString()));
+            zelnodeEntry.push_back(Pair("alias", zne.getAlias()));
+
+            bool fChecked = false;
+            if (mempool.mapZelnodeTxMempool.count(outpoint)) {
+                zelnodeEntry.push_back(Pair("result", "failed"));
+                zelnodeEntry.push_back(Pair("reason", "Mempool already has a zelnode transaction using this outpoint"));
+            } else if (g_zelnodeCache.InStartTracker(outpoint)) {
+                zelnodeEntry.push_back(Pair("result", "failed"));
+                zelnodeEntry.push_back(Pair("reason", "Zelnode already started, waiting to be confirmed"));
+            } else if (g_zelnodeCache.InDoSTracker(outpoint)) {
+                zelnodeEntry.push_back(Pair("result", "failed"));
+                zelnodeEntry.push_back(Pair("reason", "Zelnode already started then not confirmed, in DoS tracker. Must wait until out of DoS tracker to start"));
+            } else if (g_zelnodeCache.InConfirmTracker(outpoint)) {
+                zelnodeEntry.push_back(Pair("result", "failed"));
+                zelnodeEntry.push_back(Pair("reason", "Zelnode already confirmed and in zelnode list"));
+            } else {
+                fChecked = true;
+            }
+
+            if (!fChecked) {
+                resultsObj.push_back(zelnodeEntry);
+
+                if (fAlias)
+                    return resultsObj;
+                else
+                    continue;
+            }
+
+            mutTransaction.nVersion = ZELNODE_TX_VERSION;
+
+            bool result = activeZelnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
+
+            zelnodeEntry.push_back(Pair("transaction_built", result ? "successful" : "failed"));
+
+            if (result) {
+                CReserveKey reservekey(pwalletMain);
+                std::string errorMessage;
+
+                bool fSigned = false;
+                if (activeZelnode.SignDeterministicStartTx(mutTransaction, errorMessage)) {
+                    CTransaction tx(mutTransaction);
+                    fSigned = true;
+
+                    CWalletTx walletTx(pwalletMain, tx);
+                    CValidationState state;
+                    bool fCommited = pwalletMain->CommitTransaction(walletTx, reservekey, &state);
+                    zelnodeEntry.push_back(Pair("transaction_commited", fCommited ? "successful" : "failed"));
+                    if (fCommited) {
+                        successful++;
+                    } else {
+                        errorMessage = state.GetRejectReason();
+                        failed++;
+                    }
+                } else {
+                    failed++;
+                }
+                zelnodeEntry.push_back(Pair("transaction_signed", fSigned ? "successful" : "failed"));
+                zelnodeEntry.push_back(Pair("errorMessage", errorMessage));
+            } else {
+                failed++;
+                zelnodeEntry.push_back(Pair("errorMessage", errorMessage));
+            }
+
+            resultsObj.push_back(zelnodeEntry);
+
+            if (fAlias && found) {
+                break;
+            }
+        }
+
+        UniValue statusObj(UniValue::VOBJ);
+        if (!found && fAlias) {
+            failed++;
+            statusObj.push_back(Pair("result", "failed"));
+            statusObj.push_back(Pair("error", "could not find alias in config. Verify with list-conf."));
+            resultsObj.push_back(statusObj);
+        }
+
+        if (fLock)
+            pwalletMain->Lock();
+
+        UniValue returnObj(UniValue::VOBJ);
+        returnObj.push_back(Pair("overall", strprintf("Successfully started %d zelnodes, failed to start %d, total %d", successful, failed, successful + failed)));
+        returnObj.push_back(Pair("detail", resultsObj));
+
+        return returnObj;
+    }
+
+    // Use regular zelnode sync list
     if (fHelp || params.size() < 2 || params.size() > 3 ||
         (params.size() == 2 && (strCommand != "local" && strCommand != "all" && strCommand != "many" && strCommand != "missing" && strCommand != "disabled")) ||
         (params.size() == 3 && strCommand != "alias"))
@@ -200,13 +347,14 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
             CTxIn vin = CTxIn(uint256S(zne.getTxHash()), uint32_t(nIndex));
             Zelnode* pzn = zelnodeman.Find(vin);
             ZelnodeBroadcast znb;
+            CMutableTransaction mut;
 
             if (pzn != NULL) {
                 if (strCommand == "missing") continue;
                 if (strCommand == "disabled" && pzn->IsEnabled()) continue;
             }
 
-            bool result = activeZelnode.CreateBroadcast(zne.getIp(), zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, znb);
+            bool result = activeZelnode.CreateBroadcast(zne.getIp(), zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, znb, mut);
 
             UniValue statusObj(UniValue::VOBJ);
             statusObj.push_back(Pair("alias", zne.getAlias()));
@@ -251,8 +399,9 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
                             found = true;
                             std::string errorMessage;
                             ZelnodeBroadcast znb;
+                            CMutableTransaction mut;
 
-                            bool result = activeZelnode.CreateBroadcast(zne.getIp(), zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, znb);
+                            bool result = activeZelnode.CreateBroadcast(zne.getIp(), zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, znb, mut);
 
                             statusObj.push_back(Pair("result", result ? "successful" : "failed"));
 
@@ -271,7 +420,7 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
         if (!found) {
             failed++;
             statusObj.push_back(Pair("result", "failed"));
-            statusObj.push_back(Pair("error", "could not find alias in config. Verify with list-conf."));
+            statusObj.push_back(Pair("error", "could not find alias in config. Verify with listzelnodeconf."));
         }
 
         resultsObj.push_back(statusObj);
@@ -286,6 +435,307 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
         return returnObj;
     }
     return NullUniValue;
+}
+
+UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
+{
+    if (!IsZelnodeTransactionsActive()) {
+        throw runtime_error("deterministic zelnodes transactions is not active yet");
+    }
+
+    std::string strCommand;
+    if (params.size() >= 1)
+        strCommand = params[0].get_str();
+
+    if (fHelp || params.size() != 2)
+        throw runtime_error(
+                "startdeterministiczelnode alias_name lockwallet\n"
+                "\nAttempts to start one zelnode\n"
+
+                "\nArguments:\n"
+                "1. set         (string, required) Specify which set of zelnode(s) to start.\n"
+                "2. lockwallet  (boolean, required) Lock wallet after completion.\n"
+                "3. alias       (string) Zelnode alias. Required if using 'alias' as the set.\n"
+
+                "\nResult: (for 'local' set):\n"
+                "\"status\"     (string) Zelnode status message\n"
+
+                "\nResult: (for other sets):\n"
+                "{\n"
+                "  \"overall\": \"xxxx\",     (string) Overall status message\n"
+                "  \"detail\": [\n"
+                "    {\n"
+                "      \"node\": \"xxxx\",    (string) Node name or alias\n"
+                "      \"result\": \"xxxx\",  (string) 'success' or 'failed'\n"
+                "      \"error\": \"xxxx\"    (string) Error message, if failed\n"
+                "    }\n"
+                "    ,...\n"
+                "  ]\n"
+                "}\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("startdeterministiczelnode", "\"alias_name\" false ") + HelpExampleRpc("startdeterministiczelnode", "\"alias_name\" false"));
+
+    bool fLock = (params[1].get_str() == "true" ? true : false);
+
+    EnsureWalletIsUnlocked();
+
+    std::string alias = params[0].get_str();
+
+    bool found = false;
+    int successful = 0;
+    int failed = 0;
+
+    UniValue resultsObj(UniValue::VARR);
+    UniValue statusObj(UniValue::VOBJ);
+    statusObj.push_back(Pair("alias", alias));
+
+    for (ZelnodeConfig::ZelnodeEntry zne : zelnodeConfig.getEntries()) {
+        if (zne.getAlias() == alias) {
+            found = true;
+            std::string errorMessage;
+
+            CMutableTransaction mutTransaction;
+
+            int32_t index;
+            zne.castOutputIndex(index);
+            UniValue returnObj(UniValue::VOBJ);
+            COutPoint outpoint = COutPoint(uint256S(zne.getTxHash()), index);
+            if (mempool.mapZelnodeTxMempool.count(outpoint)) {
+                returnObj.push_back(Pair("result", "failed"));
+                returnObj.push_back(Pair("reason", "Mempool already has a zelnode transaction using this outpoint"));
+                return returnObj;
+            } else if (g_zelnodeCache.InStartTracker(outpoint)) {
+                returnObj.push_back(Pair("result", "failed"));
+                returnObj.push_back(Pair("reason", "Zelnode already started, waiting to be confirmed"));
+                return returnObj;
+            } else if (g_zelnodeCache.InDoSTracker(outpoint)) {
+                returnObj.push_back(Pair("result", "failed"));
+                returnObj.push_back(Pair("reason", "Zelnode already started then not confirmed, in DoS tracker. Must wait until out of DoS tracker to start"));
+                return returnObj;
+            } else if (g_zelnodeCache.InConfirmTracker(outpoint)) {
+                returnObj.push_back(Pair("result", "failed"));
+                returnObj.push_back(Pair("reason", "Zelnode already confirmed and in zelnode list"));
+                return returnObj;
+            }
+
+            mutTransaction.nVersion = ZELNODE_TX_VERSION;
+
+            bool result = activeZelnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
+
+            statusObj.push_back(Pair("result", result ? "successful" : "failed"));
+
+            if (result) {
+                CReserveKey reservekey(pwalletMain);
+                std::string errorMessage;
+
+                if (activeZelnode.SignDeterministicStartTx(mutTransaction, errorMessage)) {
+                    CTransaction tx(mutTransaction);
+
+                    CWalletTx walletTx(pwalletMain, tx);
+                    pwalletMain->CommitTransaction(walletTx, reservekey);
+                    successful++;
+                } else {
+                    failed++;
+                    statusObj.push_back(Pair("errorMessage", errorMessage));
+                }
+            } else {
+                failed++;
+                statusObj.push_back(Pair("errorMessage", errorMessage));
+            }
+            break;
+        }
+    }
+
+    if (!found) {
+        failed++;
+        statusObj.push_back(Pair("result", "failed"));
+        statusObj.push_back(Pair("error", "could not find alias in config. Verify with listzelnodeconf."));
+    }
+
+    resultsObj.push_back(statusObj);
+
+    if (fLock)
+        pwalletMain->Lock();
+
+    UniValue returnObj(UniValue::VOBJ);
+    returnObj.push_back(Pair("overall", strprintf("Successfully started %d zelnodes, failed to start %d, total %d", successful, failed, successful + failed)));
+    returnObj.push_back(Pair("detail", resultsObj));
+
+    return returnObj;
+}
+
+UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)
+        throw runtime_error(
+                "viewdeterministiczelnodelist ( \"filter\" )\n"
+                "\nView the list in deterministric zelnode(s)\n"
+
+                "\nResult:\n"
+                "[\n"
+                "  {\n"
+                "    \"collateral\": n,                       (string) Collateral transaction\n"
+                "    \"txhash\": \"hash\",                    (string) Collateral transaction hash\n"
+                "    \"outidx\": n,                           (numeric) Collateral transaction output index\n"
+                "    \"ip\": \"address\"                      (string) IP address\n"
+                "    \"network\": \"network\"                 (string) Network type (IPv4, IPv6, onion)\n"
+                "    \"added_height\": \"height\"             (string) Block height when zelnode was added\n"
+                "    \"confirmed_height\": \"height\"         (string) Block height when zelnode was confirmed\n"
+                "    \"last_confirmed_height\": \"height\"    (string) Last block height when zelnode was confirmed\n"
+                "    \"last_paid_height\": \"height\"         (string) Last block height when zelnode was paid\n"
+                "    \"tier\": \"type\",                      (string) Tier (BASIC/SUPER/BAMF)\n"
+                "    \"payment_address\": \"addr\",           (string) Zelnode ZEL address\n"
+                "    \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
+                "    \"lastpaid\": ttt,                       (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode was last paid\n"
+                "    \"rank\": n                              (numberic) rank\n"
+                "  }\n"
+                "  ,...\n"
+                "]\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("viewdeterministiczelnodelist", ""));
+
+    std::string strFilter = "";
+
+    if (params.size() == 1) strFilter = params[0].get_str();
+
+    UniValue wholelist(UniValue::VARR);
+    int count = 0;
+    for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::BASIC).listConfirmedZelnodes) {
+
+        auto data = g_zelnodeCache.GetZelnodeData(item.out);
+
+        UniValue info(UniValue::VOBJ);
+
+        if (!data.IsNull()) {
+            std::string strTxHash = data.collateralIn.GetTxHash();
+
+            if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
+                EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
+                continue;
+
+            std::string strHost = data.ip;
+            CNetAddr node = CNetAddr(strHost, false);
+            std::string strNetwork = GetNetworkName(node.GetNetwork());
+
+            info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+            info.push_back(std::make_pair("txhash", strTxHash));
+            info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
+            info.push_back(std::make_pair("ip", data.ip));
+            info.push_back(std::make_pair("network", strNetwork));
+            info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+            info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+            info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+            info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+            info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+            info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+            if (chainActive.Height() >= data.nAddedBlockHeight)
+                info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("activesince", 0));
+            if (chainActive.Height() >= data.nLastPaidHeight)
+                info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("lastpaid", 0));
+
+            info.push_back(std::make_pair("rank", count++));
+
+            wholelist.push_back(info);
+        }
+
+
+    }
+
+    count = 0;
+    for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::SUPER).listConfirmedZelnodes) {
+
+        auto data = g_zelnodeCache.GetZelnodeData(item.out);
+
+        UniValue info(UniValue::VOBJ);
+
+        if (!data.IsNull())  {
+            std::string strTxHash = data.collateralIn.GetTxHash();
+
+            if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
+                EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
+                continue;
+
+            std::string strHost = data.ip;
+            CNetAddr node = CNetAddr(strHost, false);
+            std::string strNetwork = GetNetworkName(node.GetNetwork());
+
+            info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+            info.push_back(std::make_pair("txhash", data.collateralIn.GetTxHash()));
+            info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
+            info.push_back(std::make_pair("ip", data.ip));
+            info.push_back(std::make_pair("network", strNetwork));
+            info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+            info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+            info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+            info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+            info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+            info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+            if (chainActive.Height() >= data.nAddedBlockHeight)
+                info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("activesince", 0));
+            if (chainActive.Height() >= data.nLastPaidHeight)
+                info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("lastpaid", 0));
+            info.push_back(std::make_pair("rank", count++));
+
+            wholelist.push_back(info);
+        }
+
+
+    }
+
+    count = 0;
+    for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::BAMF).listConfirmedZelnodes) {
+
+        auto data = g_zelnodeCache.GetZelnodeData(item.out);
+
+        UniValue info(UniValue::VOBJ);
+
+        if (!data.IsNull()) {
+            std::string strTxHash = data.collateralIn.GetTxHash();
+
+            if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
+                EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
+                continue;
+
+            std::string strHost = data.ip;
+            CNetAddr node = CNetAddr(strHost, false);
+            std::string strNetwork = GetNetworkName(node.GetNetwork());
+
+            info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+            info.push_back(std::make_pair("txhash", data.collateralIn.GetTxHash()));
+            info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
+            info.push_back(std::make_pair("ip", data.ip));
+            info.push_back(std::make_pair("network", strNetwork));
+            info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+            info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+            info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+            info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+            info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+            info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+            if (chainActive.Height() >= data.nAddedBlockHeight)
+                info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("activesince", 0));
+            if (chainActive.Height() >= data.nLastPaidHeight)
+                info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("lastpaid", 0));
+            info.push_back(std::make_pair("rank", count++));
+
+            wholelist.push_back(info);
+        }
+    }
+
+    return wholelist;
 }
 
 UniValue znsync(const UniValue& params, bool fHelp)
@@ -354,9 +804,6 @@ UniValue znsync(const UniValue& params, bool fHelp)
 
 UniValue listzelnodes(const UniValue& params, bool fHelp)
 {
-    std::string strFilter = "";
-
-    if (params.size() == 1) strFilter = params[0].get_str();
 
     if (fHelp || (params.size() > 1))
         throw runtime_error(
@@ -388,136 +835,258 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("listzelnodes", "") + HelpExampleRpc("listzelnodes", ""));
 
-    UniValue ret(UniValue::VARR);
-    int nHeight;
-    {
-        LOCK(cs_main);
-        CBlockIndex* pindex = chainActive.Tip();
-        if(!pindex) return 0;
-        nHeight = pindex->nHeight;
-    }
+    if (IsDZelnodeActive()) {
+        UniValue wholelist(UniValue::VARR);
 
-    std::vector<pair<int, Zelnode> > vBasicZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::BASIC, nHeight);
-    for(PAIRTYPE(int, Zelnode) & s : vBasicZelnodeRanks) {
-                    UniValue obj(UniValue::VOBJ);
-                    std::string strVin = s.second.vin.prevout.ToString();
-                    std::string strTxHash = s.second.vin.prevout.hash.ToString();
-                    uint32_t oIdx = s.second.vin.prevout.n;
+        int count = 0;
+        for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::BASIC).listConfirmedZelnodes) {
 
-                    Zelnode* zn = zelnodeman.Find(s.second.vin);
+            auto data = g_zelnodeCache.GetZelnodeData(item.out);
 
-                    if (zn != NULL) {
-                        if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
-                            zn->Status().find(strFilter) == string::npos && HexStr(zn->pubKeyZelnode).find(strFilter) &&
-                            EncodeDestination(zn->pubKeyCollateralAddress.GetID()).find(strFilter) == string::npos) continue;
+            UniValue info(UniValue::VOBJ);
 
-                        std::string strStatus = zn->Status();
-                        std::string strTier = zn->Tier();
-                        std::string strHost;
-                        int port;
-                        SplitHostPort(zn->addr.ToString(), port, strHost);
-                        CNetAddr node = CNetAddr(strHost, false);
-                        std::string strNetwork = GetNetworkName(node.GetNetwork());
+            if (data.IsNull()) {
+                info.push_back(std::make_pair("collateral", item.out.ToFullString()));
+                info.push_back(std::make_pair("status", "expired"));
+                info.push_back(std::make_pair("last_paid_height", item.nLastPaidHeight));
+                info.push_back(std::make_pair("confirmed_height", item.nConfirmedBlockHeight));
+                info.push_back(std::make_pair("activesince", 0));
+                info.push_back(std::make_pair("lastpaid", 0));
+            } else {
+                info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+                info.push_back(std::make_pair("ip", data.ip));
+                info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+                info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+                info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+                info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+                if (chainActive.Height() >= data.nAddedBlockHeight)
+                    info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("activesince", 0));
+                if (chainActive.Height() >= data.nLastPaidHeight)
+                    info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("lastpaid", 0));
+                info.push_back(std::make_pair("rank", count++));
+            }
 
-                        obj.push_back(Pair("rank", (strStatus == "ENABLED" ? s.first : 0)));
-                        obj.push_back(Pair("network", strNetwork));
-                        obj.push_back(Pair("txhash", strTxHash));
-                        obj.push_back(Pair("outidx", (uint64_t)oIdx));
-                        obj.push_back(Pair("pubkey", HexStr(zn->pubKeyZelnode)));
-                        obj.push_back(Pair("status", strStatus));
-                        obj.push_back(Pair("addr", EncodeDestination(zn->pubKeyCollateralAddress.GetID())));
-                        obj.push_back(Pair("version", zn->protocolVersion));
-                        obj.push_back(Pair("lastseen", (int64_t)zn->lastPing.sigTime));
-                        obj.push_back(Pair("activetime", (int64_t)(zn->lastPing.sigTime - zn->sigTime)));
-                        obj.push_back(Pair("lastpaid", (int64_t)zn->GetLastPaid()));
-                        obj.push_back(Pair("tier", strTier));
-                        obj.push_back(Pair("ipaddress", zn->addr.ToStringIPPort()));
-
-                        ret.push_back(obj);
-                    }
-                }
-
-    std::vector<pair<int, Zelnode> > vSuperZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::SUPER, nHeight);
-    for(PAIRTYPE(int, Zelnode) & s : vSuperZelnodeRanks) {
-        UniValue obj(UniValue::VOBJ);
-        std::string strVin = s.second.vin.prevout.ToString();
-        std::string strTxHash = s.second.vin.prevout.hash.ToString();
-        uint32_t oIdx = s.second.vin.prevout.n;
-
-        Zelnode* zn = zelnodeman.Find(s.second.vin);
-
-        if (zn != NULL) {
-            if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
-                zn->Status().find(strFilter) == string::npos && HexStr(zn->pubKeyZelnode).find(strFilter) &&
-                    EncodeDestination(zn->pubKeyCollateralAddress.GetID()).find(strFilter) == string::npos) continue;
-
-            std::string strStatus = zn->Status();
-            std::string strTier = zn->Tier();
-            std::string strHost;
-            int port;
-            SplitHostPort(zn->addr.ToString(), port, strHost);
-            CNetAddr node = CNetAddr(strHost, false);
-            std::string strNetwork = GetNetworkName(node.GetNetwork());
-
-            obj.push_back(Pair("rank", (strStatus == "ENABLED" ? s.first : 0)));
-            obj.push_back(Pair("network", strNetwork));
-            obj.push_back(Pair("txhash", strTxHash));
-            obj.push_back(Pair("outidx", (uint64_t)oIdx));
-            obj.push_back(Pair("pubkey", HexStr(zn->pubKeyZelnode)));
-            obj.push_back(Pair("status", strStatus));
-            obj.push_back(Pair("addr", EncodeDestination(zn->pubKeyCollateralAddress.GetID())));
-            obj.push_back(Pair("version", zn->protocolVersion));
-            obj.push_back(Pair("lastseen", (int64_t)zn->lastPing.sigTime));
-            obj.push_back(Pair("activetime", (int64_t)(zn->lastPing.sigTime - zn->sigTime)));
-            obj.push_back(Pair("lastpaid", (int64_t)zn->GetLastPaid()));
-            obj.push_back(Pair("tier", strTier));
-            obj.push_back(Pair("ipaddress", zn->addr.ToStringIPPort()));
-
-            ret.push_back(obj);
+            wholelist.push_back(info);
         }
-    }
 
-    std::vector<pair<int, Zelnode> > vBAMFZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::BAMF, nHeight);
-    for(PAIRTYPE(int, Zelnode) & s : vBAMFZelnodeRanks) {
-        UniValue obj(UniValue::VOBJ);
-        std::string strVin = s.second.vin.prevout.ToString();
-        std::string strTxHash = s.second.vin.prevout.hash.ToString();
-        uint32_t oIdx = s.second.vin.prevout.n;
+        count = 0;
+        for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::SUPER).listConfirmedZelnodes) {
 
-        Zelnode* zn = zelnodeman.Find(s.second.vin);
+            auto data = g_zelnodeCache.GetZelnodeData(item.out);
 
-        if (zn != NULL) {
-            if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
-                zn->Status().find(strFilter) == string::npos && HexStr(zn->pubKeyZelnode).find(strFilter) &&
-                EncodeDestination(zn->pubKeyCollateralAddress.GetID()).find(strFilter) == string::npos) continue;
+            UniValue info(UniValue::VOBJ);
+            if (data.IsNull()) {
+                info.push_back(std::make_pair("collateral", item.out.ToFullString()));
+                info.push_back(std::make_pair("status", "expired"));
+                info.push_back(std::make_pair("last_paid_height", item.nLastPaidHeight));
+                info.push_back(std::make_pair("confirmed_height", item.nConfirmedBlockHeight));
+                info.push_back(std::make_pair("activesince", 0));
+                info.push_back(std::make_pair("lastpaid", 0));
+            } else {
+                info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+                info.push_back(std::make_pair("ip", data.ip));
+                info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+                info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+                info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+                info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+                if (chainActive.Height() >= data.nAddedBlockHeight)
+                    info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("activesince", 0));
+                if (chainActive.Height() >= data.nLastPaidHeight)
+                    info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("lastpaid", 0));
+                info.push_back(std::make_pair("rank", count++));
+            }
 
-            std::string strStatus = zn->Status();
-            std::string strTier = zn->Tier();
-            std::string strHost;
-            int port;
-            SplitHostPort(zn->addr.ToString(), port, strHost);
-            CNetAddr node = CNetAddr(strHost, false);
-            std::string strNetwork = GetNetworkName(node.GetNetwork());
-
-            obj.push_back(Pair("rank", (strStatus == "ENABLED" ? s.first : 0)));
-            obj.push_back(Pair("network", strNetwork));
-            obj.push_back(Pair("txhash", strTxHash));
-            obj.push_back(Pair("outidx", (uint64_t)oIdx));
-            obj.push_back(Pair("pubkey", HexStr(zn->pubKeyZelnode)));
-            obj.push_back(Pair("status", strStatus));
-            obj.push_back(Pair("addr", EncodeDestination(zn->pubKeyCollateralAddress.GetID())));
-            obj.push_back(Pair("version", zn->protocolVersion));
-            obj.push_back(Pair("lastseen", (int64_t)zn->lastPing.sigTime));
-            obj.push_back(Pair("activetime", (int64_t)(zn->lastPing.sigTime - zn->sigTime)));
-            obj.push_back(Pair("lastpaid", (int64_t)zn->GetLastPaid()));
-            obj.push_back(Pair("tier", strTier));
-            obj.push_back(Pair("ipaddress", zn->addr.ToStringIPPort()));
-
-            ret.push_back(obj);
+            wholelist.push_back(info);
         }
-    }
 
-    return ret;
+        count = 0;
+        for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::BAMF).listConfirmedZelnodes) {
+
+            auto data = g_zelnodeCache.GetZelnodeData(item.out);
+
+            UniValue info(UniValue::VOBJ);
+
+            if (data.IsNull()) {
+                info.push_back(std::make_pair("collateral", item.out.ToFullString()));
+                info.push_back(std::make_pair("status", "expired"));
+                info.push_back(std::make_pair("last_paid_height", item.nLastPaidHeight));
+                info.push_back(std::make_pair("confirmed_height", item.nConfirmedBlockHeight));
+                info.push_back(std::make_pair("activesince", 0));
+                info.push_back(std::make_pair("lastpaid", 0));
+            } else {
+                info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+                info.push_back(std::make_pair("ip", data.ip));
+                info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+                info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+                info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+                info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+                if (chainActive.Height() >= data.nAddedBlockHeight)
+                    info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("activesince", 0));
+                if (chainActive.Height() >= data.nLastPaidHeight)
+                    info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("lastpaid", 0));
+                info.push_back(std::make_pair("rank", count++));
+            }
+            wholelist.push_back(info);
+        }
+
+        return wholelist;
+    } else {
+        std::string strFilter = "";
+
+        if (params.size() == 1) strFilter = params[0].get_str();
+
+        UniValue ret(UniValue::VARR);
+        int nHeight;
+        {
+            LOCK(cs_main);
+            CBlockIndex *pindex = chainActive.Tip();
+            if (!pindex) return 0;
+            nHeight = pindex->nHeight;
+        }
+
+        std::vector<pair<int, Zelnode> > vBasicZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::BASIC, nHeight);
+        for (PAIRTYPE(int, Zelnode) &s : vBasicZelnodeRanks) {
+            UniValue obj(UniValue::VOBJ);
+            std::string strVin = s.second.vin.prevout.ToString();
+            std::string strTxHash = s.second.vin.prevout.hash.ToString();
+            uint32_t oIdx = s.second.vin.prevout.n;
+
+            Zelnode *zn = zelnodeman.Find(s.second.vin);
+
+            if (zn != NULL) {
+                if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
+                    zn->Status().find(strFilter) == string::npos && HexStr(zn->pubKeyZelnode).find(strFilter) &&
+                    EncodeDestination(zn->pubKeyCollateralAddress.GetID()).find(strFilter) == string::npos)
+                    continue;
+
+                std::string strStatus = zn->Status();
+                std::string strTier = zn->Tier();
+                std::string strHost;
+                int port;
+                SplitHostPort(zn->addr.ToString(), port, strHost);
+                CNetAddr node = CNetAddr(strHost, false);
+                std::string strNetwork = GetNetworkName(node.GetNetwork());
+
+                obj.push_back(Pair("rank", (strStatus == "ENABLED" ? s.first : 0)));
+                obj.push_back(Pair("network", strNetwork));
+                obj.push_back(Pair("txhash", strTxHash));
+                obj.push_back(Pair("outidx", (uint64_t) oIdx));
+                obj.push_back(Pair("pubkey", HexStr(zn->pubKeyZelnode)));
+                obj.push_back(Pair("status", strStatus));
+                obj.push_back(Pair("addr", EncodeDestination(zn->pubKeyCollateralAddress.GetID())));
+                obj.push_back(Pair("version", zn->protocolVersion));
+                obj.push_back(Pair("lastseen", (int64_t) zn->lastPing.sigTime));
+                obj.push_back(Pair("activetime", (int64_t) (zn->lastPing.sigTime - zn->sigTime)));
+                obj.push_back(Pair("lastpaid", (int64_t) zn->GetLastPaid()));
+                obj.push_back(Pair("tier", strTier));
+                obj.push_back(Pair("ipaddress", zn->addr.ToStringIPPort()));
+
+                ret.push_back(obj);
+            }
+        }
+
+        std::vector<pair<int, Zelnode> > vSuperZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::SUPER, nHeight);
+        for (PAIRTYPE(int, Zelnode) &s : vSuperZelnodeRanks) {
+            UniValue obj(UniValue::VOBJ);
+            std::string strVin = s.second.vin.prevout.ToString();
+            std::string strTxHash = s.second.vin.prevout.hash.ToString();
+            uint32_t oIdx = s.second.vin.prevout.n;
+
+            Zelnode *zn = zelnodeman.Find(s.second.vin);
+
+            if (zn != NULL) {
+                if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
+                    zn->Status().find(strFilter) == string::npos && HexStr(zn->pubKeyZelnode).find(strFilter) &&
+                    EncodeDestination(zn->pubKeyCollateralAddress.GetID()).find(strFilter) == string::npos)
+                    continue;
+
+                std::string strStatus = zn->Status();
+                std::string strTier = zn->Tier();
+                std::string strHost;
+                int port;
+                SplitHostPort(zn->addr.ToString(), port, strHost);
+                CNetAddr node = CNetAddr(strHost, false);
+                std::string strNetwork = GetNetworkName(node.GetNetwork());
+
+                obj.push_back(Pair("rank", (strStatus == "ENABLED" ? s.first : 0)));
+                obj.push_back(Pair("network", strNetwork));
+                obj.push_back(Pair("txhash", strTxHash));
+                obj.push_back(Pair("outidx", (uint64_t) oIdx));
+                obj.push_back(Pair("pubkey", HexStr(zn->pubKeyZelnode)));
+                obj.push_back(Pair("status", strStatus));
+                obj.push_back(Pair("addr", EncodeDestination(zn->pubKeyCollateralAddress.GetID())));
+                obj.push_back(Pair("version", zn->protocolVersion));
+                obj.push_back(Pair("lastseen", (int64_t) zn->lastPing.sigTime));
+                obj.push_back(Pair("activetime", (int64_t) (zn->lastPing.sigTime - zn->sigTime)));
+                obj.push_back(Pair("lastpaid", (int64_t) zn->GetLastPaid()));
+                obj.push_back(Pair("tier", strTier));
+                obj.push_back(Pair("ipaddress", zn->addr.ToStringIPPort()));
+
+                ret.push_back(obj);
+            }
+        }
+
+        std::vector<pair<int, Zelnode> > vBAMFZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::BAMF, nHeight);
+        for (PAIRTYPE(int, Zelnode) &s : vBAMFZelnodeRanks) {
+            UniValue obj(UniValue::VOBJ);
+            std::string strVin = s.second.vin.prevout.ToString();
+            std::string strTxHash = s.second.vin.prevout.hash.ToString();
+            uint32_t oIdx = s.second.vin.prevout.n;
+
+            Zelnode *zn = zelnodeman.Find(s.second.vin);
+
+            if (zn != NULL) {
+                if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
+                    zn->Status().find(strFilter) == string::npos && HexStr(zn->pubKeyZelnode).find(strFilter) &&
+                    EncodeDestination(zn->pubKeyCollateralAddress.GetID()).find(strFilter) == string::npos)
+                    continue;
+
+                std::string strStatus = zn->Status();
+                std::string strTier = zn->Tier();
+                std::string strHost;
+                int port;
+                SplitHostPort(zn->addr.ToString(), port, strHost);
+                CNetAddr node = CNetAddr(strHost, false);
+                std::string strNetwork = GetNetworkName(node.GetNetwork());
+
+                obj.push_back(Pair("rank", (strStatus == "ENABLED" ? s.first : 0)));
+                obj.push_back(Pair("network", strNetwork));
+                obj.push_back(Pair("txhash", strTxHash));
+                obj.push_back(Pair("outidx", (uint64_t) oIdx));
+                obj.push_back(Pair("pubkey", HexStr(zn->pubKeyZelnode)));
+                obj.push_back(Pair("status", strStatus));
+                obj.push_back(Pair("addr", EncodeDestination(zn->pubKeyCollateralAddress.GetID())));
+                obj.push_back(Pair("version", zn->protocolVersion));
+                obj.push_back(Pair("lastseen", (int64_t) zn->lastPing.sigTime));
+                obj.push_back(Pair("activetime", (int64_t) (zn->lastPing.sigTime - zn->sigTime)));
+                obj.push_back(Pair("lastpaid", (int64_t) zn->GetLastPaid()));
+                obj.push_back(Pair("tier", strTier));
+                obj.push_back(Pair("ipaddress", zn->addr.ToStringIPPort()));
+
+                ret.push_back(obj);
+            }
+        }
+
+        return ret;
+    }
 }
 
 UniValue getzelnodestatus (const UniValue& params, bool fHelp)
@@ -541,6 +1110,29 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
                 HelpExampleCli("getzelnodestatus", "") + HelpExampleRpc("getzelnodestatus", ""));
 
     if (!fZelnode) throw runtime_error("This is not a zelnode");
+
+    if (IsDZelnodeActive()) {
+        int nLocation = ZELNODE_TX_ERROR;
+        auto data = g_zelnodeCache.GetZelnodeData(activeZelnode.deterministicOutPoint, &nLocation);
+
+        UniValue info(UniValue::VOBJ);
+
+        if (data.IsNull()) {
+            info.push_back(std::make_pair("collateral", activeZelnode.deterministicOutPoint.ToFullString()));
+            info.push_back(std::make_pair("status", "expired"));
+        } else {
+            info.push_back(std::make_pair("location", ZelnodeLocationToString(nLocation)));
+            info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+            info.push_back(std::make_pair("ip", data.ip));
+            info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+            info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+            info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+            info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+            info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+        }
+
+        return info;
+    }
 
     Zelnode* pmn = zelnodeman.Find(activeZelnode.vin);
 
@@ -570,6 +1162,10 @@ UniValue zelnodedebug (const UniValue& params, bool fHelp)
 
                 "\nExamples:\n" +
                 HelpExampleCli("zelnodedebug", "") + HelpExampleRpc("zelnodedebug", ""));
+
+    if (IsDZelnodeActive()) {
+        throw JSONRPCError(RPC_INVALID_REQUEST, "Deterministic Zelnode is now active. This rpc call wont do anything");
+    }
 
     if (activeZelnode.status != ACTIVE_ZELNODE_INITIAL || !zelnodeSync.IsSynced())
         return activeZelnode.GetStatus();
@@ -666,6 +1262,61 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("zelnodecurrentwinner", "") + HelpExampleRpc("zelnodecurrentwinner", ""));
 
+
+
+    if (IsDZelnodeActive()) {
+        CTxDestination dest_basic;
+        COutPoint outpoint_basic;
+        UniValue ret(UniValue::VOBJ);
+        if (g_zelnodeCache.GetNextPayment(dest_basic, BASIC, outpoint_basic)) {
+            UniValue obj(UniValue::VOBJ);
+            auto data = g_zelnodeCache.GetZelnodeData(outpoint_basic);
+            obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+            obj.push_back(std::make_pair("ip", data.ip));
+            obj.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+            obj.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+            obj.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+            obj.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+            obj.push_back(std::make_pair("tier", TierToString(data.nTier)));
+            obj.push_back(std::make_pair("payment_address", EncodeDestination(dest_basic)));
+            ret.push_back(std::make_pair("BASIC Winner", obj));
+        }
+
+        CTxDestination dest_super;
+        COutPoint outpoint_super;
+        if (g_zelnodeCache.GetNextPayment(dest_super, SUPER, outpoint_super)) {
+            UniValue obj(UniValue::VOBJ);
+            auto data = g_zelnodeCache.GetZelnodeData(outpoint_super);
+            obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+            obj.push_back(std::make_pair("ip", data.ip));
+            obj.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+            obj.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+            obj.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+            obj.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+            obj.push_back(std::make_pair("tier", TierToString(data.nTier)));
+            obj.push_back(std::make_pair("payment_address", EncodeDestination(dest_super)));
+            ret.push_back(std::make_pair("SUPER Winner", obj));
+        }
+
+        CTxDestination dest_bamf;
+        COutPoint outpoint_bamf;
+        if (g_zelnodeCache.GetNextPayment(dest_bamf, BAMF, outpoint_bamf)) {
+            UniValue obj(UniValue::VOBJ);
+            auto data = g_zelnodeCache.GetZelnodeData(outpoint_bamf);
+            obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+            obj.push_back(std::make_pair("ip", data.ip));
+            obj.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+            obj.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+            obj.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+            obj.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+            obj.push_back(std::make_pair("tier", TierToString(data.nTier)));
+            obj.push_back(std::make_pair("payment_address", EncodeDestination(dest_bamf)));
+            ret.push_back(std::make_pair("BAMF Winner", obj));
+        }
+
+        return ret;
+    }
+
     Zelnode basicWinner;
     Zelnode superWinner;
     Zelnode bamfWinner;
@@ -727,6 +1378,31 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
                 HelpExampleCli("getzelnodecount", "") + HelpExampleRpc("getzelnodecount", ""));
 
     UniValue obj(UniValue::VOBJ);
+
+    if (IsDZelnodeActive())
+    {
+        int nBasic = g_zelnodeCache.mapZelnodeList.at(BASIC).listConfirmedZelnodes.size();
+        int nSuper = g_zelnodeCache.mapZelnodeList.at(SUPER).listConfirmedZelnodes.size();
+        int nBAMF = g_zelnodeCache.mapZelnodeList.at(BAMF).listConfirmedZelnodes.size();
+
+        int nTotal = g_zelnodeCache.mapConfirmedZelnodeData.size();
+
+        obj.push_back(Pair("total", nTotal));
+        obj.push_back(Pair("stable", nTotal));
+        obj.push_back(Pair("basic-enabled", nBasic));
+        obj.push_back(Pair("super-enabled", nSuper));
+        obj.push_back(Pair("bamf-enabled", nBAMF));
+
+        int ipv4 = 0, ipv6 = 0, onion = 0;
+        g_zelnodeCache.CountNetworks(ipv4, ipv6, onion);
+
+        obj.push_back(Pair("ipv4", ipv4));
+        obj.push_back(Pair("ipv6", ipv6));
+        obj.push_back(Pair("onion", onion));
+
+        return obj;
+    }
+
     int nBasicCount = 0;
     int nSuperCount = 0;
     int nBAMFCount = 0;
@@ -796,6 +1472,10 @@ UniValue getzelnodewinners (const UniValue& params, bool fHelp)
 
                 "\nExamples:\n" +
                 HelpExampleCli("getzelnodewinners", "") + HelpExampleRpc("getzelnodewinners", ""));
+
+    if (IsDZelnodeActive()) {
+        throw JSONRPCError(RPC_INVALID_REQUEST, "Deterministic Zelnode is now active. This rpc call wont do anything");
+    }
 
     int nHeight;
     {
@@ -883,6 +1563,10 @@ UniValue getzelnodescores (const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getzelnodescores", "") + HelpExampleRpc("getzelnodescores", ""));
 
+
+    if (IsDZelnodeActive()) {
+        throw JSONRPCError(RPC_INVALID_REQUEST, "Deterministic Zelnode is now active. This rpc call wont do anything");
+    }
     int nLast = 10;
 
     if (params.size() == 1) {
@@ -972,27 +1656,81 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
     UniValue ret(UniValue::VARR);
 
     for (ZelnodeConfig::ZelnodeEntry zelnode : zelnodeEntries) {
-        int nIndex;
-        if(!zelnode.castOutputIndex(nIndex))
+        if (IsDZelnodeActive()) {
+            int nIndex;
+            if (!zelnode.castOutputIndex(nIndex))
+                continue;
+            COutPoint out = COutPoint(uint256S(zelnode.getTxHash()), uint32_t(nIndex));
+
+            int nLocation = ZELNODE_TX_ERROR;
+            auto data = g_zelnodeCache.GetZelnodeData(out, &nLocation);
+
+            UniValue info(UniValue::VOBJ);
+            info.push_back(Pair("alias", zelnode.getAlias()));
+            info.push_back(Pair("address", zelnode.getIp()));
+            info.push_back(Pair("privateKey", zelnode.getPrivKey()));
+            info.push_back(Pair("txHash", zelnode.getTxHash()));
+            info.push_back(Pair("outputIndex", zelnode.getOutputIndex()));
+            info.push_back(Pair("status", ZelnodeLocationToString(nLocation)));
+            info.push_back(std::make_pair("collateral", out.ToFullString()));
+
+            if (data.IsNull()) {
+                info.push_back(std::make_pair("ip", "UNKNOWN"));
+                info.push_back(std::make_pair("added_height", 0));
+                info.push_back(std::make_pair("confirmed_height", 0));
+                info.push_back(std::make_pair("last_confirmed_height", 0));
+                info.push_back(std::make_pair("last_paid_height", 0));
+                info.push_back(std::make_pair("tier", "UNKNOWN"));
+                info.push_back(std::make_pair("payment_address", "UNKNOWN"));
+                info.push_back(std::make_pair("activesince", 0));
+                info.push_back(std::make_pair("lastpaid", 0));
+            } else {
+                info.push_back(std::make_pair("ip", data.ip));
+                info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+                info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+                info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+                info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+                if (chainActive.Height() >= data.nAddedBlockHeight)
+                    info.push_back(
+                            std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("activesince", 0));
+                if (chainActive.Height() >= data.nLastPaidHeight)
+                    info.push_back(
+                            std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("lastpaid", 0));
+            }
+
+            ret.push_back(info);
             continue;
-        CTxIn vin = CTxIn(uint256S(zelnode.getTxHash()), uint32_t(nIndex));
-        Zelnode* pzelnode = zelnodeman.Find(vin);
+        } else {
 
-        std::string strStatus = pzelnode ? pzelnode->Status() : "MISSING";
+            int nIndex;
+            if (!zelnode.castOutputIndex(nIndex))
+                continue;
+            CTxIn vin = CTxIn(uint256S(zelnode.getTxHash()), uint32_t(nIndex));
+            Zelnode *pzelnode = zelnodeman.Find(vin);
 
-        if (strFilter != "" && zelnode.getAlias().find(strFilter) == string::npos &&
-            zelnode.getIp().find(strFilter) == string::npos &&
-            zelnode.getTxHash().find(strFilter) == string::npos &&
-            strStatus.find(strFilter) == string::npos) continue;
+            std::string strStatus = pzelnode ? pzelnode->Status() : "MISSING";
 
-        UniValue object(UniValue::VOBJ);
-        object.push_back(Pair("alias", zelnode.getAlias()));
-        object.push_back(Pair("address", zelnode.getIp()));
-        object.push_back(Pair("privateKey", zelnode.getPrivKey()));
-        object.push_back(Pair("txHash", zelnode.getTxHash()));
-        object.push_back(Pair("outputIndex", zelnode.getOutputIndex()));
-        object.push_back(Pair("status", strStatus));
-        ret.push_back(object);
+            if (strFilter != "" && zelnode.getAlias().find(strFilter) == string::npos &&
+                zelnode.getIp().find(strFilter) == string::npos &&
+                zelnode.getTxHash().find(strFilter) == string::npos &&
+                strStatus.find(strFilter) == string::npos)
+                continue;
+
+            UniValue object(UniValue::VOBJ);
+            object.push_back(Pair("alias", zelnode.getAlias()));
+            object.push_back(Pair("address", zelnode.getIp()));
+            object.push_back(Pair("privateKey", zelnode.getPrivKey()));
+            object.push_back(Pair("txHash", zelnode.getTxHash()));
+            object.push_back(Pair("outputIndex", zelnode.getOutputIndex()));
+            object.push_back(Pair("status", strStatus));
+            ret.push_back(object);
+        }
     }
 
     return ret;
@@ -1038,6 +1776,10 @@ UniValue createzelnodebroadcast(const UniValue& params, bool fHelp)
                                             "\nExamples:\n" +
                 HelpExampleCli("createzelnodebroadcast", "alias myzn1") + HelpExampleRpc("createzelnodebroadcast", "alias myzn1"));
 
+    if (IsDZelnodeActive()) {
+        throw JSONRPCError(RPC_INVALID_REQUEST, "Deterministic Zelnode is now active. This rpc call wont do anything");
+    }
+
     EnsureWalletIsUnlocked();
 
     if (strCommand == "alias")
@@ -1060,8 +1802,9 @@ UniValue createzelnodebroadcast(const UniValue& params, bool fHelp)
                 found = true;
                 std::string errorMessage;
                 ZelnodeBroadcast zelnodeBroadcast;
+                CMutableTransaction mut;
 
-                bool success = activeZelnode.CreateBroadcast(zelnodeEntry.getIp(), zelnodeEntry.getPrivKey(), zelnodeEntry.getTxHash(), zelnodeEntry.getOutputIndex(), errorMessage, zelnodeBroadcast, true);
+                bool success = activeZelnode.CreateBroadcast(zelnodeEntry.getIp(), zelnodeEntry.getPrivKey(), zelnodeEntry.getTxHash(), zelnodeEntry.getOutputIndex(), errorMessage, zelnodeBroadcast, mut, true);
 
                 statusObj.push_back(Pair("success", success));
                 if(success) {
@@ -1103,8 +1846,9 @@ UniValue createzelnodebroadcast(const UniValue& params, bool fHelp)
 
             CTxIn vin = CTxIn(uint256S(zelnodeEntry.getTxHash()), uint32_t(atoi(zelnodeEntry.getOutputIndex().c_str())));
             ZelnodeBroadcast zelnodeBroadcast;
+            CMutableTransaction mut;
 
-            bool success = activeZelnode.CreateBroadcast(zelnodeEntry.getIp(), zelnodeEntry.getPrivKey(), zelnodeEntry.getTxHash(), zelnodeEntry.getOutputIndex(), errorMessage, zelnodeBroadcast, true);
+            bool success = activeZelnode.CreateBroadcast(zelnodeEntry.getIp(), zelnodeEntry.getPrivKey(), zelnodeEntry.getTxHash(), zelnodeEntry.getOutputIndex(), errorMessage, zelnodeBroadcast, mut, true);
 
             UniValue statusObj(UniValue::VOBJ);
             statusObj.push_back(Pair("alias", zelnodeEntry.getAlias()));
@@ -1162,13 +1906,17 @@ UniValue decodezelnodebroadcast(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("decodezelnodebroadcast", "hexstring") + HelpExampleRpc("decodezelnodebroadcast", "hexstring"));
 
+    if (IsDZelnodeActive()) {
+        throw JSONRPCError(RPC_INVALID_REQUEST, "Deterministic Zelnode is now active. This rpc call wont do anything");
+    }
+
     ZelnodeBroadcast zelnodeBroadcast;
 
     if (!DecodeHexZelnodeBroadcast(zelnodeBroadcast, params[0].get_str()))
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Zelnode broadcast message decode failed");
 
-    if(!zelnodeBroadcast.VerifySignature())
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Zelnode broadcast signature verification failed");
+//    if(!zelnodeBroadcast.VerifySignature())
+//        throw JSONRPCError(RPC_INVALID_PARAMETER, "Zelnode broadcast signature verification failed");
 
     UniValue resultObj(UniValue::VOBJ);
 
@@ -1205,7 +1953,9 @@ UniValue relayzelnodebroadcast(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("relayzelnodebroadcast", "hexstring") + HelpExampleRpc("relayzelnodebroadcast", "hexstring"));
 
-
+    if (IsDZelnodeActive()) {
+        throw JSONRPCError(RPC_INVALID_REQUEST, "Deterministic Zelnode is now active. This rpc call wont do anything");
+    }
     ZelnodeBroadcast zelnodeBroadcast;
 
     if (!DecodeHexZelnodeBroadcast(zelnodeBroadcast, params[0].get_str()))
@@ -1220,27 +1970,91 @@ UniValue relayzelnodebroadcast(const UniValue& params, bool fHelp)
     return strprintf("Zelnode broadcast sent (service %s, vin %s)", zelnodeBroadcast.addr.ToString(), zelnodeBroadcast.vin.ToString());
 }
 
-UniValue getnodebenchmarks(const UniValue& params, bool fHelp)
+UniValue getbenchmarks(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
-                "getnodebenchmarks\n"
+                "getbenchmarks\n"
                 "\nCommand to test node benchmarks\n"
 
                 "\nExamples:\n" +
-                HelpExampleCli("getnodebenchmarks", "") + HelpExampleRpc("getnodebenchmarks", ""));
+                HelpExampleCli("getbenchmarks", "") + HelpExampleRpc("getbenchmarks", ""));
 
-    if (!fZelnode)
-        return "Command must be run on a zelnode";
+    return GetBenchmarks();
 
-    if (fBenchmarkFailed)
-        return "Benchmarking Failed, please restart your node to try again";
-
-    if (!fBenchmarkComplete)
-        return "Benchmarking isn't completed, please try again in a minute";
-
-    return benchmarks.NenchResultToString() + "Event Per Second : " + std::to_string(benchmarks.nEventsPerSecond) + "\n";
+//    // TODO used for testing. Remove this before launch
+//    ZelnodeBroadcast znb;
+//    znb.protocolVersion = BENCHMARKD_PROTO_VERSION;
+//
+//    CDataStream ssHEx(SER_NETWORK, PROTOCOL_VERSION);
+//    ssHEx << znb;
+//
+//    LogPrintf("%s\n", HexStr(ssHEx.begin(), ssHEx.end()));
+//
+//    std::string strError;
+//    ZelnodeBroadcast signedBroadcast;
+//    if (!GetSignedBroadcast(znb, signedBroadcast, strError)) {
+//        LogPrintf("%s - %s\n", __func__, strError);
+//        return "failed";
+//    }
+//
+//    CDataStream ssZelnodeBroadcast(SER_NETWORK, PROTOCOL_VERSION);
+//    ssZelnodeBroadcast << signedBroadcast;
+//    std::string znbHexStr = HexStr(ssZelnodeBroadcast.begin(), ssZelnodeBroadcast.end());
+//
+//    return znbHexStr;
 }
+
+UniValue getbenchstatus(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+                "getbenchstatus\n"
+                "\nCommand to get status of zelbenchd\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("getbenchstatus", "") + HelpExampleRpc("getbenchstatus", ""));
+
+    return GetZelBenchdStatus();
+}
+
+
+UniValue stopzelbenchd(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+                "stopzelbenchd\n"
+                "\nStop zelbenchd\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("stopzelbenchd", "") + HelpExampleRpc("stopzelbenchd", ""));
+
+    if (IsZelBenchdRunning()) {
+        StopZelBenchd();
+        return "Stopping process";
+    }
+
+    return "Not running";
+}
+
+UniValue startzelbenchd(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+                "startzelbenchd\n"
+                "\nStart zelbenchd\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("startzelbenchd", "") + HelpExampleRpc("startzelbenchd", ""));
+
+    if (!IsZelBenchdRunning()) {
+        StartZelBenchd();
+        return "Starting process";
+    }
+
+    return "Already running";
+}
+
 
 
 
@@ -1263,10 +2077,18 @@ static const CRPCCommand commands[] =
                 { "zelnode",    "createzelnodebroadcast", &createzelnodebroadcast, false  },
                 { "zelnode",    "relayzelnodebroadcast",  &relayzelnodebroadcast,  false  },
                 { "zelnode",    "decodezelnodebroadcast", &decodezelnodebroadcast, false  },
-                { "zelnode",    "getnodebenchmarks",      &getnodebenchmarks,      false  },
+
+                {"zelnode",     "startdeterministiczelnode", &startdeterministiczelnode, false },
+                {"zelnode",     "viewdeterministiczelnodelist", &viewdeterministiczelnodelist, false },
+
+                { "benchmarks", "getbenchmarks",         &getbenchmarks,           false  },
+                { "benchmarks", "getbenchstatus",        &getbenchstatus,          false  },
+                { "benchmarks", "stopzelbenchd",        &stopzelbenchd,          false  },
+                { "benchmarks", "startzelbenchd",       &startzelbenchd,         false  },
 
                 /** Not shown in help menu */
                 { "hidden",    "createsporkkeys",        &createsporkkeys,         false  }
+
 
 
         };

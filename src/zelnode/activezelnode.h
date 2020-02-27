@@ -1,8 +1,8 @@
 // Copyright (c) 2014-2016 The Dash developers
 // Copyright (c) 2015-2019 The PIVX developers
 // Copyright (c) 2019 The Zel developers
-// Distributed under the MIT/X11 software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef ZELCASHNODES_ACTIVEZELNODE_H
 #define ZELCASHNODES_ACTIVEZELNODE_H
@@ -34,10 +34,10 @@ private:
     bool SendZelnodePing(std::string& errorMessage);
 
     /// Create Zelnode broadcast, needs to be relayed manually after that
-    bool CreateBroadcast(CTxIn vin, CService service, CKey key, CPubKey pubKey, CKey keyZelnode, CPubKey pubKeyZelnode, std::string& errorMessage, ZelnodeBroadcast &znb);
+    bool CreateBroadcast(CTxIn vin, CService service, CKey key, CPubKey pubKey, CKey keyZelnode, CPubKey pubKeyZelnode, std::string& errorMessage, ZelnodeBroadcast &znb, CMutableTransaction& mutTransaction);
 
     /// Get 10000 ZEL input that can be used for the Zelnode
-    bool GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex);
+    bool GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage);
     bool GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
 
 public:
@@ -48,6 +48,8 @@ public:
     // Initialized while registering Zelnode
     CTxIn vin;
     CService service;
+
+    COutPoint deterministicOutPoint;
 
     int status;
     std::string notCapableReason;
@@ -62,7 +64,7 @@ public:
     std::string GetStatus();
 
     /// Create Zelnode broadcast, needs to be relayed manually after that
-    bool CreateBroadcast(std::string strService, std::string strKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, ZelnodeBroadcast &znb, bool fOffline = false);
+    bool CreateBroadcast(std::string strService, std::string strKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, ZelnodeBroadcast &znb, CMutableTransaction& mutTransaction, bool fOffline = false);
 
     /// Get 10000 ZEL input that can be used for the Zelnode
     bool GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
@@ -70,5 +72,22 @@ public:
 
     /// Enable cold wallet mode (run a Zelnode with no funds)
     bool EnableHotColdZelnode(CTxIn& vin, CService& addr);
+    bool BuildZelnodeBroadcast(std::string& errorMessage);
+
+
+    /** Deterministric Zelnode functions **/
+
+
+    //Manage my active deterministic zelnode
+    void ManageDeterministricZelnode();
+
+    bool BuildDeterministicStartTx(std::string strKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, CMutableTransaction& mutTransaction);
+    void BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType);
+    bool SignDeterministicStartTx(CMutableTransaction& mutableTransaction, std::string& errorMessage);
+    bool SignDeterministicConfirmTx(CMutableTransaction& mutableTransaction, std::string& errorMessage);
+
+    bool CheckDefaultPort(std::string strService, std::string& strErrorRet, std::string strContext);
+
+    int nLastTriedToConfirm;
 };
 #endif //ZELCASHNODES_ACTIVEZELNODE_H

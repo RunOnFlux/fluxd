@@ -1,16 +1,17 @@
-# Zel 3.3.3 Kamiooka [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
+# Zel 4.0.0 Kamata [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
 <img align="right" height=112 width=562 src="doc/imgs/Kamiooka.png">
 
-## Mandatory Upgrade to at least version 3.3.0 - current version 3.3.3
+## Mandatory Upgrade to at least version 4.0.0
 
 What is Zel?
 --------------
 
-[Zel](https://zel.network/) is a fork of 2.0.6 Zcash (with fixes for: [Zcash vulnerability: Security Announcement 2019-09-24](https://z.cash/support/security/announcements/security-announcement-2019-09-24/) and [Bitcoin Vulnerability CVE-2017-18350](https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2019-November/017453.html)) aiming to provide a decentralized development platform via ZelNodes, ZelCore and more.
+[Zel](https://zel.network/) is a fork of 2.1.0-1 Zcash aiming to provide a decentralized development platform via ZelFlux, ZelNodes, ZelCore and more.
 
-Zel is PoW asic resistant with ZelHash (Modified Equihash 125,4) with the personalisation string ZelProof and utilises the LWMA3 difficulty algorithm.
+Zel is PoW and "ASIC resistant" with ZelHash (Modified Equihash 125,4) with the personalisation string ZelProof and utilises the LWMA3 difficulty algorithm.
+The Kamata network upgrade which activates in December 2019 brings ZelFlux, ZelBenchd and Determenistic ZelNodes.
 
-To speed up synchronisation you can download the Zel blockchain (state 18. 12. 2018) here https://zelcore.io/Zelcash.zip 
+To speed up synchronisation you can download the Zel blockchain (state 18. 12. 2018) here https://zelcore.io/Zelcash.zip
 For ZelNodes/Control Wallets you need to use this bootstrap with txindex enabled (state 18. 02. 2019) https://zelcore.io/zelcashbootstraptxindex.zip
 
 

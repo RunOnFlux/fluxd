@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef BITCOIN_MAIN_H
 #define BITCOIN_MAIN_H
@@ -24,6 +24,7 @@
 #include "script/standard.h"
 #include "sync.h"
 #include "tinyformat.h"
+#include "txdb.h"
 #include "txmempool.h"
 #include "uint256.h"
 #include "addressindex.h"
@@ -41,6 +42,8 @@
 
 #include <boost/unordered_map.hpp>
 
+#include "zelnode/zelnodecachedb.h"
+
 class CBlockIndex;
 class CBlockTreeDB;
 class CBloomFilter;
@@ -51,6 +54,8 @@ class CValidationInterface;
 class CValidationState;
 class PrecomputedTransactionData;
 class CSporkDB;
+
+class ZelnodeCache;
 
 struct CNodeStateStats;
 
@@ -149,6 +154,9 @@ extern bool fAddressIndex;
 
 // Maintain a full spent index, used to query the spending txid and input index for an outpoint
 extern bool fSpentIndex;
+
+// Maintain a full timestamp index, used to query for blocks within a time range
+extern bool fTimestampIndex;
 
 // END insightexplorer
 
@@ -343,7 +351,7 @@ bool ContextualCheckInputs(const CTransaction& tx, CValidationState &state, cons
 
 /** Check a transaction contextually against a set of consensus rules */
 bool ContextualCheckTransaction(const CTransaction& tx, CValidationState &state,
-                                const CChainParams& chainparams, int nHeight, int dosLevel,
+                                const CChainParams& chainparams, int nHeight, int dosLevel, bool fFromAccept,
                                 bool (*isInitBlockDownload)(const CChainParams&) = IsInitialBlockDownload);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
@@ -439,6 +447,13 @@ public:
 };
 
 bool GetSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value);
+bool GetAddressIndex(const uint160& addressHash, int type,
+        std::vector<CAddressIndexDbEntry> &addressIndex,
+        int start = 0, int end = 0);
+bool GetAddressUnspent(const uint160& addressHash, int type,
+        std::vector<CAddressUnspentDbEntry>& unspentOutputs);
+bool GetTimestampIndex(unsigned int high, unsigned int low, bool fActiveOnly,
+    std::vector<std::pair<uint256, unsigned int> > &hashes);
 
 /** Functions for disk access for blocks */
 bool WriteBlockToDisk(const CBlock& block, CDiskBlockPos& pos, const CMessageHeader::MessageStartChars& messageStart);
@@ -462,13 +477,13 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
 bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state,
                                 const CChainParams& chainparams, CBlockIndex *pindexPrev);
 bool ContextualCheckBlock(const CBlock& block, CValidationState& state,
-                          const CChainParams& chainparams, CBlockIndex *pindexPrev);
+                          const CChainParams& chainparams, CBlockIndex *pindexPrev, bool fComeFromAccept);
 
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins.
  *  Validity checks that depend on the UTXO set are also done; ConnectBlock()
  *  can fail if those validity checks fail (among other reasons). */
 bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& coins,
-                  const CChainParams& chainparams, bool fJustCheck = false);
+                  const CChainParams& chainparams, bool fJustCheck = false, ZelnodeCache* p_zelnodeCache = nullptr);
 
 /** Check a block is completely valid from start to finish (only works on top of our current best block, with cs_main held) */
 bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams, const CBlock& block, CBlockIndex* pindexPrev, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
@@ -512,6 +527,9 @@ extern CBlockTreeDB *pblocktree;
 
 /** Global variable that points to the spork database (protected by cs_main) */
 extern CSporkDB* pSporkDB;
+
+/** Global variable that points to the zelnode database (protected by cs_main) */
+extern CDeterministicZelnodeDB* pZelnodeDB;
 
 /**
  * Return the spend height, which is one more than the inputs.GetBestBlock().

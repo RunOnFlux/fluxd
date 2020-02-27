@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "key_io.h"
 #include "main.h"
@@ -101,8 +101,8 @@ public:
 	consensus.nPowAllowMinDifficultyBlocksAfterHeight = boost::none;
         consensus.nPowTargetSpacing = 2 * 60;
 
-        consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
-        consensus.vUpgrades[Consensus::BASE].nActivationHeight =
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
             Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
 
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nProtocolVersion = 170002;
@@ -117,19 +117,30 @@ public:
 
 	consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January 12th
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].hashActivationBlock =
+                uint256S("0000001d65fa78f2f6c172a51b5aca59ee1927e51f728647fca21b180becfe59");
 
     consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
-        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 372500;  // Approx July 2nd - Zel Team Boulder Meetup 
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 372500;  // Approx July 2nd - Zel Team Boulder Meetup
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].hashActivationBlock =
+                uint256S("00000052e2ac144c2872ff641c646e41dac166ac577bc9b0837f501aba19de4a");
 
-	consensus.nZawyLWMAAveragingWindow = 60;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 558000;  // 18th March
+        // TODO, add the activation block hash after activation
+
+
+        consensus.nZawyLWMAAveragingWindow = 60;
 	consensus.eh_epoch_fade_length = 11;
 
 	eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
         eh_epoch_3 = zelHash;
 
-        // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0x00");
+        // The best chain should have at least this much work. 
+        // nMinimumChainWork MUST be set to at least the chain work of hashActivationBlock, otherwise the detection of fake alternate chain will have false positives.
+        // Updated to match the chainwork associated with upgrade_kamiooka
+        consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000000000021f5d5da5d73");
 
         /**
          * The message start string should be awesome! ⓩ❤
@@ -190,9 +201,12 @@ public:
         fTestnetToBeDeprecatedFieldRPC = false;
 
         strSporkKey = "04f5382d5868ae49aedfd67efce7c0f56a66a9405a2cc13f8ef236aabb3f0f1d00031f9b9ca67edc93044918a1cf265655108bab531e94c7d48918e40a94a34f77";
-        nStartZelnodePayments = 1550748576; //Thu, 21 Feb 2019 11:29:36 UTC // Not being used, but could be in the future
         networkID = CBaseChainParams::Network::MAIN;
         strZelnodeTestingDummyAddress= "t1Ub8iNuaoCAKTaiVyCh8d3iZ31QJFxnGzU";
+
+        nStartZelnodePaymentsHeight = 558000; // Start paying deterministic zelnodes on height
+
+        strBenchmarkingPublicKey = "042e79d7dd1483996157df6b16c831be2b14b31c69944ea2a585c63b5101af1f9517ba392cee5b1f45a62e9d936488429374535a2f76870bfa8eea6667b13eb39e";
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
@@ -200,12 +214,13 @@ public:
             (5500, uint256S("0x0000000e7724f8bace09dd762657169c10622af4a6a8e959152cd00b9119848e"))
             (35000, uint256S("0x000000004646dd797644b9c67aff320961e95c311b4f26985424b720d09fcaa5"))
             (70000, uint256S("0x00000001edcf7768ed39fac55414e53a78d077b1b41fccdaf9307d7bc219626a"))
-            (94071, uint256S("0x00000005ec83876bc5288badf0971ae83ac7c6a286851f7b22a75a03e73b401a")), //Halep won French Open 2018
-            1528556469,     // * UNIX timestamp of last checkpoint block
-            248945,              // * total number of transactions between genesis and last checkpoint
+            (94071, uint256S("0x00000005ec83876bc5288badf0971ae83ac7c6a286851f7b22a75a03e73b401a")) //Halep won French Open 2018
+            (530000, uint256S("0x0000004b4459ec6904e8116d178c357b0f25a7d45c5c5836ce3714791f1ed124")),
+            1581212778,     // * UNIX timestamp of last checkpoint block
+            1429455,              // * total number of transactions between genesis and last checkpoint
                             //   (the tx=... number in the SetBestChain debug.log lines)
-            1525            // * estimated number of transactions per day
-                            //   total number of tx / (checkpoint block height / (24 * 24))
+            1941            // * estimated number of transactions per day
+                            //   total number of tx / (checkpoint block height / (24 * 30))
         };
 
         // Hardcoded fallback value for the Sprout shielded value pool balance
@@ -220,7 +235,7 @@ public:
 static CMainParams mainParams;
 
 /**
- * testnet-kamiooka
+ * testnet-kamata
  */
 class CTestNetParams : public CChainParams {
 public:
@@ -234,16 +249,16 @@ public:
         consensus.nMajorityEnforceBlockUpgrade = 51;
         consensus.nMajorityRejectBlockOutdated = 75;
         consensus.nMajorityWindow = 400;
-        consensus.powLimit = uint256S("07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        consensus.powLimit = uint256S("0effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // to be slightly above 17
         consensus.nDigishieldAveragingWindow = 17;
         assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
-        consensus.nPowAllowMinDifficultyBlocksAfterHeight = 299187;
+        consensus.nPowAllowMinDifficultyBlocksAfterHeight = 1;
         consensus.nPowTargetSpacing = 2 * 60;
 
-        consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
-        consensus.vUpgrades[Consensus::BASE].nActivationHeight =
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
         Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
 
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nProtocolVersion = 170002;
@@ -254,23 +269,24 @@ public:
 	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 70;
 
 	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
-	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 100;
+	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 140;
 
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
-        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 120;
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 210;
 
 	    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
-        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 720;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 280;
+
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 350;
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 10;
 
-	    //eh_epoch_1 = eh96_5;
-    eh_epoch_1 = eh200_9;
+        eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
         eh_epoch_3 = zelHash;
-
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -283,23 +299,23 @@ public:
         nPruneAfterHeight = 1000;
 
         genesis = CreateGenesisBlock(
-            1548888451,
-            uint256S("0x000000000000000000000000000000000000000000000000000000000000000b"),
-            ParseHex("0061731d8ec027c60bfe22531440d7f0b2df6642e611ad5ca66dd26fadaa4411c6d2264abcdb8f7ac96908a3046f4443f84d1d5cf0b3d541864870e5d283070ca2977b3e2f1cc59784a0f9f87c2e30b3edee15ee0667406cd7c3ed265448a51bbef8f11e61b8bbcfae07390c57fa683db5c9d423cb94dbe98d70b878eaa51731736a930bb0d3991d81c2b225e1957ba573052b403da4397027b7a7e7937482c5f0a205a7d1b04bb90090f5265458172b56e245b14bd8b6958dd4af75b96cc5458a3f1bfd57838677c96f68f81255687a797402a1e4fbce62865518d4e0e38d10116cc332d281105e623f552b97f40d4d819673df7407be3282f5a28d03d852eb7353bba2e36b20b6862fbf35c9142f1e1c1be72f7da2e5a437dda88445456005b520034d97ae0b11fff3cd61b8eb0fb7d9ac77ec56df56c31fe0391908da23805a6bebd93d56ce20eebcdb9a87fe9543021701b49a8b1c71df5573708cf477ea0ecd50d61d077f968963d4bf5b6eb9b0b8e6f2832e8bfbf9358b0e013dd7635ead3770e40405a6ab9e45a097bed534306aa7b52a9a4680d6e2e739b6f1689661e3f8c54b06136936b756399ef054783d8c6689db0ee97ea4651a441544b0d98913c2af71a6c6b8f4691595dd3f0f0dafff67181bd96351b2311d18174a098eba7dfc38479e05ae4558b55b7b64d5f73ecce129cb553f951b04372d50fbde0687b5a4643797fdac6d3ea0badaae298c672ddabb9e1ff174c35e936ae2c4e4921543ba1be24ea38a9c5b333058220f7dba301890a010584f2467d3a917b6ba81dcf3a6aa8e67e70dce349341921b5dbe6f1c256ab3c73912778241cefe432114c9473d273dd5b84fa29ae85418b48558e79a57d4f92376231614b009d2962eef1727a21d7b408e7c20b58c4e394ecddb061c7f27d2902c06dcfbd6af28c41d49d101d802c0c321be7d6a0cea24b56f3a379dacded1c71a74e35b1e93abff53e102783325d0cb17c63a78953d22fbdd2bfb4861ec33e569cfd02e279dd89df9ff52bd2707fb2d5cc1b7abc67c656faac6524e9d33ee06bfbe9b64d72fe97c8512fd136cde4a69723ba4440d926d7a4ff63203d3b0522fd749baa8a533badab508756ac9e396b5f13f6d6091d841a6ed952591175c2710e4a306a0e1bbfd161728d658118306d11c64ae02edd5ea4b42f456681cc85c3a561fab45a57ed2e8118fde25db14f48d64cd5257ab9d9bc2cd6b1e771d178c947346b00417c678c34a63333bd1a627d63e021f403423dfa2a3a7dbab2522a64341ba65ac174820063b41ccf4826bbc34ae928be6ba8f14bef896c88b0ad8ac0c2083bf24923011afdbe34c50eacb5c446e1903ce949560c95b6bc058fcb9ea3d66cd2f59366028049a05e45cb6b5e804c8b49ee04d5640077259af030e7e53eae787c7528bd71f9b782a4df39bf661c31f8bb683f0a255d5d746544975cbfb115cb32ecb79072176804f056ba0fd58a10cb515063d6c957d8bc836c106299c55c05f9ab3b5e3e3f746e1c00e92c483043c53ba8d60e9f5545b805074242e6d0b023e58030a6e385b5b0ca428d867da6a485e8c73018ebecf231ae77fd3a9a8789b8162221f56993820fad5b647ad23a5ab2ffa10dcb3190486bd285f75d60bf3372884067c13597804d248b67f756c4832611dcd67128e001ee391a2c8893b130b05d2ec7f791534d694ae7fe8289c27c0b8d3d70aeb4b9553ab31a9438d4c7fea55392013e75db239d3d40b64e7af739e458fecb4aad70fd29437b5c932c5635d618c511f0fdc7a8a0f413a2068dd7c17cf9d8f5760f369496536d58009dd37a8101adf29796df65fcec271d153f1ea2ca7b6abab242257c610369c600782a4a924b253caca6321594b1e"),
+            1582228940, // 2020-2-20-20-2-20
+            uint256S("0x000000000000000000000000000000000000000000000000000000000000021c"),
+            ParseHex("00069ae382cf568d3f3ba00d15f9d09c8977cd37d90d2c4d612e053e4cdfd4d226db220e51495bfb00d1019180b34c25091fbee2a08e4f08c974a4356760690b00d8da0c8baa3b6902130202e60391a16a5fa1ea08d6d0b63a60ec91dd0790cb432261483fe7fbe9d80d6a07af5599cc6d0b717780184fc0523e5ada8c07134262b9676c0269709501d4403c621cb9a15f55602b400e3fc093034f84ec583f25e6f16a111372ab4f031d6d12270259d7066520f71e63893e8dcedd8db2255272add167e4cd4a0045a6815a16818f9efb075106090b8e47d089dd7d50c838ea4b22caca1fdb866e485f0248c763faada47f8555b8cdb1222e45f2f0a10e3f3dffcb9733090bf2e58eb8f11399ffd7fc58302db98d5d978dac49b88f849ad4af4972b37d3cf2ca1797c28af99b3addc356c460ba6eb161d3304eeef863237c61006b486df070bb29026895172ae79bd9f3018637fe01dbc18d3829a2ed211a7218fcd8f4def308c3a8bd60cb999565f253435f1af115d1d473750c0233fda7aaeff783b8265083a9c0369852a459fe2c093dec6929cfc31cea57a3579fed30add42cfc02260700796ea2d3054dc04020a50c5a8079863b15f68c0e0354bb0aa8f1dd48fec84923d02f1a300d3ec598071a9f0584d918e36ec892450abdfe7d41acfe870624de69f988db06f7790897459c7d9899f290b60f2102a1df05bca84a7f54e746d274625f3322ae5a3eaa02b4565a125c948cf8682396e72494995793bf9379196014fec46c4c3769861808ed6b3fd2b4e57cadb92a7c81fc7fd630c4bae2549aa6efdc02df0f5e1ff20a834d35372301334b214229e872f8ac9415d57d1a325ac539a4a62eb1c685c6478867cf3ea0f999768a0d66fc9e36a35a2f1f768481613da1a99a17739fab0dd2ffe73f58f95ef1a6c2495167b485207dabe48001a200b4a371cf1df817f0b1fb6208d0d77b38d5cf170d83a6b7633a4fb605f44665a314ab5de8dc0ace1091611148705b3fe81e945857291daeb3657c98602cda23a350ed209ba19b6312fdefe765f3de7a16031580eba06145f64bfdf284dca4713335e9735031c71cf36da5f1145c8ed6e69352a7d763be253bd5fc7e1e45660e8d4f2beb98377268bc6303f5de2dd6ce1a35652b7090a8be51d43ef5c779376de1cbabf4758b064259d545524781801e18d005dd2a1ea4d27e1eaf27578c6a5acdf4a27d226293ae7c49d645c07adc8b0dfb0c35e519a6d95e9bb3f4a8bbbc72551e5ab9191d552104620b954523376637077c2e32aa42dec58b07ad0d91e4b93651d74b220070d22171e1b116dda1428082cb54122c27276f283260e1249ed483f97d053a0ad3abc6a032d7b8a5672ad7ec2232010655136e6e1507cbd9fa4a27ec674724a8cf4bdae91e3e34080291899bbb53c209bb3936a9c2d9194de89179396803cdf6bcb5cf9bbaf95b56c613d161c21ff1defe0f056f27e953891fd310aa6760d6f5a5edef8011d8780de5c681261331aed69ee2eccd3bb413cdf55f2e500686b231cbaf451fecdc1327e14bde0973fb4cbd8835b7c31a1a1aaf47eecbb57849ad3eb960cdbd5cdb0e4c53a8d7f10459cbc572faab1ffbd8ca9d0919e0113099339910e897e21fd390f450c3b13b5d198d7306927f258a0297c50daa10a4f29aed6a184df29c0a32a666744bef2c358401350cfb54797a02a35afeba0bfefa865890dded2694d88ad86a5b327662bd7b932c6ce97a7f300bfd8b544316696a4f2e6c197ddf9d0e9b008e3f85427fd6b661970e4177c947fbb6d43324a4f47c26983b55ea90d3bffcbc87c15cab5ba2751314819e7eb21a29b9b915cce6f7cf01ff05936317161b9dae29637d89cb88b55ac74348878b017e7942"),
             0x2007ffff, 4, 0);
-        
+
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256S("0x00c1c5904ead2647d0d56e56165ec568b83bee34ce467ae473e75057327e5805"));
+        assert(consensus.hashGenesisBlock == uint256S("0x0042202a64a929fc25cc10e68615ddbe38007b1b40da08acd3f530f83c79b9d1"));
         assert(genesis.hashMerkleRoot == uint256S("0x94c7aed6b2c67f1718006684bfc3b92081a2f19d59075691b189160d6f3aa13a"));
 
         vFixedSeeds.clear();
         vSeeds.clear();
+        vSeeds.push_back(CDNSSeedData("zel-testnet-seed.asoftwaresolution.com", "zel-testnet-seed.asoftwaresolution.com")); // Blondfrogs
         vSeeds.push_back(CDNSSeedData("test.vps.zel.network", "test.singapore.zel.network")); // MilesManley
         vSeeds.push_back(CDNSSeedData("test.vpsone.zel.network", "test.bangalore.zel.network")); // MilesManley
         vSeeds.push_back(CDNSSeedData("test.vpstwo.zel.network", "test.frankfurt.zel.network")); // MilesManley
         vSeeds.push_back(CDNSSeedData("test.vpsthree.zel.network", "test.newyork.zel.network")); // MilesManley
-        //vSeeds.push_back(CDNSSeedData("vps.testnet.zelcash.online", "dnsseedtestnet.zelcash.online")); // TheTrunk
-
+        vSeeds.push_back(CDNSSeedData("vps.testnet.zelcash.online", "dnsseedtestnet.zelcash.online")); // TheTrunk
 
         // guarantees the first 2 characters, when base58 encoded, are "tm"
         base58Prefixes[PUBKEY_ADDRESS]     = {0x1D,0x25};
@@ -330,18 +346,15 @@ public:
         fMineBlocksOnDemand = false;
         fTestnetToBeDeprecatedFieldRPC = true;
         strSporkKey = "0408c6a3a6cacb673fc38f27c75d79c865e1550441ea8b5295abf21116972379a1b49416da07b7d9b40fb9daf8124f309c608dfc79756a5d3c2a957435642f7f1a";
-        nStartZelnodePayments = 1550748576; //Thu, 21 Feb 2019 11:29:36 UTC // Currently not being used.
         networkID = CBaseChainParams::Network::TESTNET;
         strZelnodeTestingDummyAddress= "tmXxZqbmvrxeSFQsXmm4N9CKyME767r47fS";
-
-
-
+        strBenchmarkingPublicKey = "04d422e01f5acff68504b92df96a9004cf61be432a20efe83fe8a94c1aa730fe7dece5d2e8298f2d5672d4e569c55d9f0a73268ef7b92990d8c014e828a7cc48dd";
+        nStartZelnodePaymentsHeight = 350;
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
-            (0, consensus.hashGenesisBlock)
-            (3, uint256S("0x07e441f9f675fc69c5567f6470bdce27b9a9bcff3c25cea1f93a401157544660")),
-            1560190235,  // * UNIX timestamp of last checkpoint block
+            (0, consensus.hashGenesisBlock),
+            1582228940,  // * UNIX timestamp of last checkpoint block
             0,           // * total number of transactions between genesis and last checkpoint
                          //   (the tx=... number in the SetBestChain debug.log lines)
             750          // * estimated number of transactions per day after checkpoint 720 newly mined +30 for txs that users are doing
@@ -382,39 +395,43 @@ public:
         consensus.nDigishieldMaxAdjustUp = 0; // Turn off adjustment up
 
         consensus.nPowTargetSpacing = 2 * 60;
-	consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
+	    consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
 
-        consensus.vUpgrades[Consensus::BASE].nProtocolVersion = 170002;
-        consensus.vUpgrades[Consensus::BASE].nActivationHeight =
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
             Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight =
-	    Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight =
+        consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-    consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170006;
-    consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight =
-            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
-    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight =
-            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170006;
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
 
-	consensus.nZawyLWMAAveragingWindow = 60;
-	consensus.eh_epoch_fade_length = 11;
+        consensus.nZawyLWMAAveragingWindow = 60;
+        consensus.eh_epoch_fade_length = 11;
 
-	eh_epoch_1 = eh48_5;
+	    eh_epoch_1 = eh48_5;
         eh_epoch_2 = eh48_5;
 
         pchMessageStart[0] = 0xaa;
@@ -445,6 +462,7 @@ public:
         fTestnetToBeDeprecatedFieldRPC = false;
 
         networkID = CBaseChainParams::Network::REGTEST;
+        strBenchmarkingPublicKey = "04cf3c34f01486bbb34c1a7ca11c2ddb1b3d98698c3f37d54452ff91a8cd5e92a6910ce5fc2cc7ad63547454a965df53ff5be740d4ef4ac89848c2bafd1e40e6b7";
 
         checkpointData = (CCheckpointData){
             boost::assign::map_list_of
@@ -472,7 +490,7 @@ public:
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)
     {
-        assert(idx > Consensus::BASE && idx < Consensus::MAX_NETWORK_UPGRADES);
+        assert(idx > Consensus::BASE_SPROUT && idx < Consensus::MAX_NETWORK_UPGRADES);
         consensus.vUpgrades[idx].nActivationHeight = nActivationHeight;
     }
 
