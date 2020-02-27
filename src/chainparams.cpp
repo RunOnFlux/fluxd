@@ -126,7 +126,7 @@ public:
                 uint256S("00000052e2ac144c2872ff641c646e41dac166ac577bc9b0837f501aba19de4a");
 
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
-        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 556000;  // 15th March
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 558000;  // 18th March
         // TODO, add the activation block hash after activation
 
 
@@ -204,7 +204,7 @@ public:
         networkID = CBaseChainParams::Network::MAIN;
         strZelnodeTestingDummyAddress= "t1Ub8iNuaoCAKTaiVyCh8d3iZ31QJFxnGzU";
 
-        nStartZelnodePaymentsHeight = 556000; // Start paying deterministic zelnodes on height
+        nStartZelnodePaymentsHeight = 558000; // Start paying deterministic zelnodes on height
 
         strBenchmarkingPublicKey = "042e79d7dd1483996157df6b16c831be2b14b31c69944ea2a585c63b5101af1f9517ba392cee5b1f45a62e9d936488429374535a2f76870bfa8eea6667b13eb39e";
 
