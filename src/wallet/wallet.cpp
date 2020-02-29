@@ -1370,7 +1370,7 @@ int CWallet::VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessO
     }
   }
   //enable z_sendmany when the wallet has no Notes
-  if (!walletHasNotes)
+  if (!walletHasNotes || nMinimumHeight == pindex->nHeight)
     initWitnessesBuilt = true;
 
   return nMinimumHeight;
