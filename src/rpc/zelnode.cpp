@@ -1102,12 +1102,21 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
 
                 "\nResult:\n"
                 "{\n"
-                "  \"txhash\": \"xxxx\",      (string) Collateral transaction hash\n"
-                "  \"outputidx\": n,        (numeric) Collateral transaction output index number\n"
-                "  \"netaddr\": \"xxxx\",     (string) Zelnode network address\n"
-                "  \"addr\": \"xxxx\",        (string) ZEL address for zelnode payments\n"
-                "  \"status\": \"xxxx\",      (string) Zelnode status\n"
-                "  \"message\": \"xxxx\"      (string) Zelnode status message\n"
+                "  \"status\": \"xxxx\",                    (string) Zelnode status\n"
+                "  \"collateral\": n,                       (string) Collateral transaction\n"
+                "  \"txhash\": \"xxxx\",                    (string) Collateral transaction hash\n"
+                "  \"outidx\": n,                           (numeric) Collateral transaction output index number\n"
+                "  \"ip\": \"xxxx\",                        (string) Zelnode network address\n"
+                "  \"network\": \"network\",                (string) Network type (IPv4, IPv6, onion)\n"
+                "  \"added_height\": \"height\",            (string) Block height when zelnode was added\n"
+                "  \"confirmed_height\": \"height\",        (string) Block height when zelnode was confirmed\n"
+                "  \"last_confirmed_height\": \"height\",   (string) Last block height when zelnode was confirmed\n"
+                "  \"last_paid_height\": \"height\",        (string) Last block height when zelnode was paid\n"
+                "  \"tier\": \"type\",                      (string) Tier (BASIC/SUPER/BAMF)\n"
+                "  \"payment_address\": \"xxxx\",           (string) ZEL address for zelnode payments\n"
+                "  \"pubkey\": \"key\",                     (string) Zelnode public key used for message broadcasting\n"
+                "  \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
+                "  \"lastpaid\": ttt,                       (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode was last paid\n"
                 "}\n"
 
                 "\nExamples:\n" +
@@ -1122,17 +1131,35 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
         UniValue info(UniValue::VOBJ);
 
         if (data.IsNull()) {
-            info.push_back(std::make_pair("collateral", activeZelnode.deterministicOutPoint.ToFullString()));
             info.push_back(std::make_pair("status", "expired"));
+            info.push_back(std::make_pair("collateral", activeZelnode.deterministicOutPoint.ToFullString()));
         } else {
-            info.push_back(std::make_pair("location", ZelnodeLocationToString(nLocation)));
+            std::string strTxHash = data.collateralIn.GetTxHash();
+            std::string strHost = data.ip;
+            CNetAddr node = CNetAddr(strHost, false);
+            std::string strNetwork = GetNetworkName(node.GetNetwork());
+
+            info.push_back(std::make_pair("status", ZelnodeLocationToString(nLocation)));
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+            info.push_back(std::make_pair("txhash", strTxHash));
+            info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
             info.push_back(std::make_pair("ip", data.ip));
+            info.push_back(std::make_pair("network", strNetwork));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
             info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
             info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
             info.push_back(std::make_pair("tier", TierToString(data.nTier)));
+            info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+            info.push_back(std::make_pair("pubkey", HexStr(data.pubKey)));
+            if (chainActive.Height() >= data.nAddedBlockHeight)
+                info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("activesince", 0));
+            if (chainActive.Height() >= data.nLastPaidHeight)
+                info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+            else
+                info.push_back(std::make_pair("lastpaid", 0));
         }
 
         return info;
@@ -1641,12 +1668,23 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
                 "\nResult:\n"
                 "[\n"
                 "  {\n"
-                "    \"alias\": \"xxxx\",        (string) zelnode alias\n"
-                "    \"address\": \"xxxx\",      (string) zelnode IP address\n"
-                "    \"privateKey\": \"xxxx\",   (string) zelnode private key\n"
-                "    \"txHash\": \"xxxx\",       (string) transaction hash\n"
-                "    \"outputIndex\": n,       (numeric) transaction output index\n"
-                "    \"status\": \"xxxx\"        (string) zelnode status\n"
+                "    \"alias\": \"xxxx\",                       (string) zelnode alias\n"
+                "    \"status\": \"xxxx\",                      (string) zelnode status\n"
+                "    \"collateral\": n,                         (string) Collateral transaction\n"
+                "    \"txhash\": \"xxxx\",                      (string) transaction hash\n"
+                "    \"outidx\": n,                             (numeric) transaction output index\n"
+                "    \"privatekey\": \"xxxx\",                  (string) zelnode private key\n"
+                "    \"address\": \"xxxx\",                     (string) zelnode IP address\n"
+                "    \"ip\": \"xxxx\",                          (string) Zelnode network address\n"
+                "    \"network\": \"network\",                  (string) Network type (IPv4, IPv6, onion)\n"
+                "    \"added_height\": \"height\",              (string) Block height when zelnode was added\n"
+                "    \"confirmed_height\": \"height\",          (string) Block height when zelnode was confirmed\n"
+                "    \"last_confirmed_height\": \"height\",     (string) Last block height when zelnode was confirmed\n"
+                "    \"last_paid_height\": \"height\",          (string) Last block height when zelnode was paid\n"
+                "    \"tier\": \"type\",                        (string) Tier (BASIC/SUPER/BAMF)\n"
+                "    \"payment_address\": \"xxxx\",             (string) ZEL address for zelnode payments\n"
+                "    \"activesince\": ttt,                      (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
+                "    \"lastpaid\": ttt,                         (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode was last paid\n"
                 "  }\n"
                 "  ,...\n"
                 "]\n"
@@ -1670,16 +1708,17 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
             auto data = g_zelnodeCache.GetZelnodeData(out, &nLocation);
 
             UniValue info(UniValue::VOBJ);
+            info.push_back(Pair("status", ZelnodeLocationToString(nLocation)));
             info.push_back(Pair("alias", zelnode.getAlias()));
-            info.push_back(Pair("address", zelnode.getIp()));
-            info.push_back(Pair("privateKey", zelnode.getPrivKey()));
+            info.push_back(Pair("collateral", out.ToFullString()));
             info.push_back(Pair("txHash", zelnode.getTxHash()));
             info.push_back(Pair("outputIndex", zelnode.getOutputIndex()));
-            info.push_back(Pair("status", ZelnodeLocationToString(nLocation)));
-            info.push_back(std::make_pair("collateral", out.ToFullString()));
+            info.push_back(Pair("privateKey", zelnode.getPrivKey()));
+            info.push_back(Pair("address", zelnode.getIp()));
 
             if (data.IsNull()) {
                 info.push_back(std::make_pair("ip", "UNKNOWN"));
+                info.push_back(std::make_pair("network", "UNKOWN"));
                 info.push_back(std::make_pair("added_height", 0));
                 info.push_back(std::make_pair("confirmed_height", 0));
                 info.push_back(std::make_pair("last_confirmed_height", 0));
@@ -1689,7 +1728,11 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
                 info.push_back(std::make_pair("activesince", 0));
                 info.push_back(std::make_pair("lastpaid", 0));
             } else {
+                std::string strHost = data.ip;
+                CNetAddr node = CNetAddr(strHost, false);
+                std::string strNetwork = GetNetworkName(node.GetNetwork());
                 info.push_back(std::make_pair("ip", data.ip));
+                info.push_back(std::make_pair("network", strNetwork));
                 info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
                 info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
                 info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
