@@ -586,6 +586,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
                 "    \"last_paid_height\": \"height\"         (string) Last block height when zelnode was paid\n"
                 "    \"tier\": \"type\",                      (string) Tier (BASIC/SUPER/BAMF)\n"
                 "    \"payment_address\": \"addr\",           (string) Zelnode ZEL address\n"
+                "    \"pubkey\": \"key\",                     (string) Zelnode public key used for message broadcasting\n"
                 "    \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
                 "    \"lastpaid\": ttt,                       (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode was last paid\n"
                 "    \"rank\": n                              (numberic) rank\n"
@@ -611,7 +612,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
         if (!data.IsNull()) {
             std::string strTxHash = data.collateralIn.GetTxHash();
 
-            if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
+            if (strFilter != "" && strTxHash.find(strFilter) == string::npos && HexStr(data.pubKey).find(strFilter) &&
                 EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
                 continue;
 
@@ -630,6 +631,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
             info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
             info.push_back(std::make_pair("tier", TierToString(data.nTier)));
             info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+            info.push_back(std::make_pair("pubkey", HexStr(data.pubKey)));
             if (chainActive.Height() >= data.nAddedBlockHeight)
                 info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
             else
@@ -657,7 +659,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
         if (!data.IsNull())  {
             std::string strTxHash = data.collateralIn.GetTxHash();
 
-            if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
+            if (strFilter != "" && strTxHash.find(strFilter) == string::npos && HexStr(data.pubKey).find(strFilter) &&
                 EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
                 continue;
 
@@ -676,6 +678,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
             info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
             info.push_back(std::make_pair("tier", TierToString(data.nTier)));
             info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+            info.push_back(std::make_pair("pubkey", HexStr(data.pubKey)));
             if (chainActive.Height() >= data.nAddedBlockHeight)
                 info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
             else
@@ -702,7 +705,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
         if (!data.IsNull()) {
             std::string strTxHash = data.collateralIn.GetTxHash();
 
-            if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
+            if (strFilter != "" && strTxHash.find(strFilter) == string::npos && HexStr(data.pubKey).find(strFilter) &&
                 EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
                 continue;
 
@@ -721,6 +724,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
             info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
             info.push_back(std::make_pair("tier", TierToString(data.nTier)));
             info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+            info.push_back(std::make_pair("pubkey", HexStr(data.pubKey)));
             if (chainActive.Height() >= data.nAddedBlockHeight)
                 info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
             else
