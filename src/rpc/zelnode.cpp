@@ -613,7 +613,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
             std::string strTxHash = data.collateralIn.GetTxHash();
 
             if (strFilter != "" && strTxHash.find(strFilter) == string::npos && HexStr(data.pubKey).find(strFilter) &&
-                EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
+                data.ip.find(strFilter) && EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
                 continue;
 
             std::string strHost = data.ip;
@@ -660,7 +660,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
             std::string strTxHash = data.collateralIn.GetTxHash();
 
             if (strFilter != "" && strTxHash.find(strFilter) == string::npos && HexStr(data.pubKey).find(strFilter) &&
-                EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
+                data.ip.find(strFilter) && EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
                 continue;
 
             std::string strHost = data.ip;
@@ -706,7 +706,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
             std::string strTxHash = data.collateralIn.GetTxHash();
 
             if (strFilter != "" && strTxHash.find(strFilter) == string::npos && HexStr(data.pubKey).find(strFilter) &&
-                EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
+                data.ip.find(strFilter) && EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
                 continue;
 
             std::string strHost = data.ip;
