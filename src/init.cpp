@@ -1592,7 +1592,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                         MIN_BLOCKS_TO_KEEP, GetArg("-checkblocks", 288));
                 }
                 if (!CVerifyDB().VerifyDB(chainparams, pcoinsdbview, GetArg("-checklevel", 3),
-                              GetArg("-checkblocks", 288))) {
+                              GetArg("-checkblocks", 100))) {
                     strLoadError = _("Corrupted block database detected");
                     break;
                 }
@@ -1975,8 +1975,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             pwalletMain->LockCoin(outpoint);
         }
     }
-
-    threadGroup.create_thread(boost::bind(&ThreadCheckZelnodes));
 
     if (fZelnode) {
         if (!FindBenchmarkPath(strBenchmarkPathing, "zelbenchd")) {

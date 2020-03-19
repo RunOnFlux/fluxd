@@ -1419,7 +1419,8 @@ void ZelnodeCache::AddBackUndoData(const CZelnodeTxBlockUndo& p_undoData)
             mapConfirmedZelnodeData[item.first] = g_zelnodeCache.mapConfirmedZelnodeData.at(item.first);
             mapConfirmedZelnodeData[item.first].nLastConfirmedBlockHeight = item.second;
         } else {
-            error("%s : This should never happen. When undo an update confirm. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.first.hash.GetHex());
+            error("%s : This should never happen. When undo an update confirm. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
+                  __func__, item.first.hash.GetHex());
         }
     }
 
