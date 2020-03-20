@@ -127,7 +127,8 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 558000;  // 18th March
-        // TODO, add the activation block hash after activation
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].hashActivationBlock =
+                uint256S("000000a33d38f37f586b843a9c8cf6d1ff1269e6114b34604cabcd14c44268d4");
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
