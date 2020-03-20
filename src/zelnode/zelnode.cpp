@@ -1666,23 +1666,33 @@ bool ZelnodeCache::Flush()
 
             int nTier = g_zelnodeCache.mapConfirmedZelnodeData.at(item.first).nTier;
 
+            bool fFoundIt = false;
             if (g_zelnodeCache.mapZelnodeList.at(nTier).setConfirmedTxInList.count(item.first)) {
 
-                if (g_zelnodeCache.mapZelnodeList.at(nTier).listConfirmedZelnodes.back().out != item.first) {
-                    error("%s : This should never happen. When undoing a paid node. The back most item in the list isn't the correct outpoint. Report this to the dev team to figure out what is happening: %s\n", __func__, item.first.hash.GetHex());
+                auto it = g_zelnodeCache.mapZelnodeList.at(nTier).listConfirmedZelnodes.end();
+                    while (--it != g_zelnodeCache.mapZelnodeList.at(nTier).listConfirmedZelnodes.begin()) {
+
+                        if (it->out == item.first) {
+                            // The node that we are undoing the paid height on, should always be near the last node in the list. So, we need
+                            // to get the data. Remove the entry from near the back of the list, and put it at the front.
+                            // This allows us to not have to sort() the list afterwards. If this was the only change
+                            ZelnodeListData old_data = *it;
+                            g_zelnodeCache.mapZelnodeList.at(nTier).listConfirmedZelnodes.erase(it);
+                            old_data.nLastPaidHeight = item.second;
+                            g_zelnodeCache.mapZelnodeList.at(nTier).listConfirmedZelnodes.emplace_front(old_data);
+                            fFoundIt = true;
+                            break;
+                        }
+                    }
                 }
 
-                // The node that we are undoing the paid height on, should always be the last node in the list. So, we need
-                // to get the data. Remove the entry from the back of the list, and put it at the front.
-                // This allows us to not have to sort() the list afterwards. If this was the only change
-                ZelnodeListData old_data = g_zelnodeCache.mapZelnodeList.at(nTier).listConfirmedZelnodes.back();
-                g_zelnodeCache.mapZelnodeList.at(nTier).listConfirmedZelnodes.pop_back();
-                old_data.nLastPaidHeight = item.second;
-                g_zelnodeCache.mapZelnodeList.at(nTier).listConfirmedZelnodes.emplace_front(old_data);
+                if (!fFoundIt)
+                    error("%s : This should never happen. When undoing a paid node. The back most item in the list isn't the correct outpoint. Report this to the dev team to figure out what is happening: %s\n",
+                          __func__, item.first.hash.GetHex());
+            } else {
+                error("%s : This should never happen. When undoing a paid node. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
+                      __func__, item.first.hash.GetHex());
             }
-        } else {
-            error("%s : This should never happen. When undoing a paid node. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.first.hash.GetHex());
-        }
     }
 
     //! DO ALL REMOVAL FROM THE ITEMS IN THE LIST HERE (using iterators so we can remove items while going over the list a single time
@@ -1705,7 +1715,7 @@ bool ZelnodeCache::Flush()
     if (vecNodesToAdd.size()) {
         // Add the list data to the sort zelnode list
         for (const auto& item : vecNodesToAdd)
-        g_zelnodeCache.InsertIntoList(item);
+            g_zelnodeCache.InsertIntoList(item);
     }
 
     //! ALWAYS THE LAST CALL IN THE FLUSH COMMAND
