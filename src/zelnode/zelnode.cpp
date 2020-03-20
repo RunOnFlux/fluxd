@@ -1521,6 +1521,10 @@ bool ZelnodeCache::Flush()
     if (setUndoStartTxHeight > 0)
         g_zelnodeCache.mapStartTxDosHeights.erase(setUndoStartTxHeight);
 
+    bool fRemoveBasic = false;
+    bool fRemoveSuper = false;
+    bool fRemoveBAMF = false;
+
     //! Add the data from Zelnodes that got confirmed this block
     for (const auto& item : setAddToConfirm) {
         // Take the zelnodedata from the mapStartTxTracker and move it to the mapConfirm
@@ -1546,6 +1550,13 @@ bool ZelnodeCache::Flush()
             // Then we can add it to the list
             if (g_zelnodeCache.mapZelnodeList.at(data.nTier).setConfirmedTxInList.count(data.collateralIn)) {
                 setRemoveFromList.insert(data.collateralIn);
+                if (data.nTier == BASIC) {
+                    fRemoveBasic = true;
+                } else if (data.nTier == SUPER) {
+                    fRemoveSuper = true;
+                } else if (data.nTier == BAMF) {
+                    fRemoveBAMF = true;
+                }
             }
 
             // TODO, once we are running smoothly. We should be able to place into a list, sort the list. Add add the nodes in order that is is sorted.
@@ -1562,9 +1573,7 @@ bool ZelnodeCache::Flush()
         }
     }
 
-    bool fRemoveBasic = false;
-    bool fRemoveSuper = false;
-    bool fRemoveBAMF = false;
+
     for (const auto& item : setUndoAddToConfirm) {
         if (g_zelnodeCache.mapConfirmedZelnodeData.count(item)) {
             ZelnodeCacheData data = g_zelnodeCache.mapConfirmedZelnodeData.at(item);

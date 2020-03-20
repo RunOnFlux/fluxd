@@ -204,7 +204,7 @@ public:
         networkID = CBaseChainParams::Network::MAIN;
         strZelnodeTestingDummyAddress= "t1Ub8iNuaoCAKTaiVyCh8d3iZ31QJFxnGzU";
 
-        nStartZelnodePaymentsHeight = 558000; // Start paying deterministic zelnodes on height
+        nStartZelnodePaymentsHeight = 560000; // Start paying deterministic zelnodes on height
 
         strBenchmarkingPublicKey = "042e79d7dd1483996157df6b16c831be2b14b31c69944ea2a585c63b5101af1f9517ba392cee5b1f45a62e9d936488429374535a2f76870bfa8eea6667b13eb39e";
 
