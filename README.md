@@ -1,5 +1,5 @@
 # Zel 4.0.0 Kamata [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
-<img align="right" height=112 width=562 src="doc/imgs/Kamiooka.png">
+<img align="right" height=112 width=562 src="doc/imgs/kamata.png">
 
 ## Mandatory Upgrade to at least version 4.0.0
 
@@ -9,19 +9,18 @@ What is Zel?
 [Zel](https://zel.network/) is a fork of 2.1.0-1 Zcash aiming to provide a decentralized development platform via ZelFlux, ZelNodes, ZelCore and more.
 
 Zel is PoW and "ASIC resistant" with ZelHash (Modified Equihash 125,4) with the personalisation string ZelProof and utilises the LWMA3 difficulty algorithm.
-The Kamata network upgrade which activates in December 2019 brings ZelFlux, ZelBenchd and Determenistic ZelNodes.
-
-To speed up synchronisation you can download the Zel blockchain (state 18. 12. 2018) here https://zelcore.io/Zelcash.zip
-For ZelNodes/Control Wallets you need to use this bootstrap with txindex enabled (state 18. 02. 2019) https://zelcore.io/zelcashbootstraptxindex.zip
+The latest Kamata network upgrade activates on block 558,000 - around the 18th of March 2020. Kamata brings ZelFlux, ZelBenchd, Determenistic ZelNodes and more.
 
 
 <p align="center">
-  <img src="doc/imgs/mandatory-kamiooka.png" height=500 >
+  <img src="doc/imgs/kamata-mandatory.png" height=500 >
 </p>
 
 ## :rocket: Getting Started
 
 Please see our [user guide](https://zel.gitbook.io/zeldocs/) for any and all info.
+
+To setup a Zelnode please follow this[script](https://github.com/zelcash/deterministic-zelnode-script/) and wiki.
 
 ### Need Help?
 
@@ -41,7 +40,7 @@ If you have the dependencies you can build Zel from source by running:
 
 #### :lock: Security Warnings
 
-See important security warnings on the Zcash 
+See important security warnings on Zcash 
 [Security Information page](https://z.cash/support/security/).
 
 License
