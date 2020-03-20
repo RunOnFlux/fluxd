@@ -1671,9 +1671,9 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
                 "    \"alias\": \"xxxx\",                       (string) zelnode alias\n"
                 "    \"status\": \"xxxx\",                      (string) zelnode status\n"
                 "    \"collateral\": n,                         (string) Collateral transaction\n"
-                "    \"txhash\": \"xxxx\",                      (string) transaction hash\n"
-                "    \"outidx\": n,                             (numeric) transaction output index\n"
-                "    \"privatekey\": \"xxxx\",                  (string) zelnode private key\n"
+                "    \"txHash\": \"xxxx\",                      (string) transaction hash\n"
+                "    \"outputIndex\": n,                        (numeric) transaction output index\n"
+                "    \"privateKey\": \"xxxx\",                  (string) zelnode private key\n"
                 "    \"address\": \"xxxx\",                     (string) zelnode IP address\n"
                 "    \"ip\": \"xxxx\",                          (string) Zelnode network address\n"
                 "    \"network\": \"network\",                  (string) Network type (IPv4, IPv6, onion)\n"
@@ -1708,8 +1708,8 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
             auto data = g_zelnodeCache.GetZelnodeData(out, &nLocation);
 
             UniValue info(UniValue::VOBJ);
-            info.push_back(Pair("status", ZelnodeLocationToString(nLocation)));
             info.push_back(Pair("alias", zelnode.getAlias()));
+            info.push_back(Pair("status", ZelnodeLocationToString(nLocation)));
             info.push_back(Pair("collateral", out.ToFullString()));
             info.push_back(Pair("txHash", zelnode.getTxHash()));
             info.push_back(Pair("outputIndex", zelnode.getOutputIndex()));
