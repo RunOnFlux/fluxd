@@ -1080,13 +1080,11 @@ bool ContextualCheckTransaction(
     if (tx.IsZelnodeTx()) {
         if (tx.nType == ZELNODE_START_TX_TYPE) {
 
-            // TODO move all the accept block checks to make sure the block is from the future.
             bool fFailure = false;
             std::string strFailMessage;
             if (!g_zelnodeCache.CheckNewStartTx(tx.collateralOut)) {
                 fFailure = true;
                 strFailMessage = "zelnode-tx-already-in-chain-or-waiting-for-dos-unban";
-                return state.DoS(dosLevel, error("zelnode-tx-already-in-chain-or-waiting-for-dos-unban"), REJECT_INVALID, "zelnode-tx-already-in-chain-or-waiting-for-dos-unban");
             }
 
             if (!fFailure && g_zelnodeCache.CheckIfConfirmed(tx.collateralOut)) {
@@ -2779,6 +2777,8 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
     std::vector<CAddressUnspentDbEntry> addressUnspentIndex;
     std::vector<CSpentIndexDbEntry> spentIndex;
 
+    p_zelnodeCache->CheckForUndoExpiredStartTx(pindex->nHeight);
+
     // undo transactions in reverse order
     for (int i = block.vtx.size() - 1; i >= 0; i--) {
         const CTransaction &tx = block.vtx[i];
@@ -2805,8 +2805,6 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
                 }
             }
         }
-
-        p_zelnodeCache->CheckForUndoExpiredStartTx(pindex->nHeight);
 
         if (tx.IsZelnodeTx()) {
             if (tx.nType == ZELNODE_START_TX_TYPE) {
@@ -4462,7 +4460,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
     // Check transactions
     BOOST_FOREACH(const CTransaction& tx, block.vtx)
         if (!CheckTransaction(tx, state, verifier))
-            return error("CheckBlock(): CheckTransaction failed");
+            return error("CheckBlock(): CheckTransaction failed: %s", tx.GetHash().GetHex());
 
     unsigned int nSigOps = 0;
     BOOST_FOREACH(const CTransaction& tx, block.vtx)
@@ -4548,7 +4546,7 @@ bool ContextualCheckBlock(
 
         // Check transaction contextually against consensus rules at block height
         if (!ContextualCheckTransaction(tx, state, chainparams, nHeight,100, fFromAccept)) {
-            return false; // Failure reason has been set in validation state object
+            return error("%s: Failed Check tx : %s, on block : %s",__func__, tx.GetHash().GetHex(), block.GetHash().GetHex()); // Failure reason has been set in validation state object
         }
 
         int nLockTimeFlags = 0;

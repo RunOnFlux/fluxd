@@ -1,9 +1,9 @@
 Zel Contributors
 ==================
 
-Jeremy Anderson (15)
-Miles Manley (14)
-Tadeas Kmenta (11)
+Jeremy Anderson (46)
+Tadeas Kmenta (30)
+Miles Manley (20)
 Wilke Trei (7)
 Jules 'Coinblockers' (1)
 

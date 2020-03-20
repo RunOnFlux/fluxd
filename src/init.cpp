@@ -1976,8 +1976,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
     }
 
-    threadGroup.create_thread(boost::bind(&ThreadCheckZelnodes));
-
     if (fZelnode) {
         if (!FindBenchmarkPath(strBenchmarkPathing, "zelbenchd")) {
             return InitError("Failed to find daemon application");
