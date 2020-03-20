@@ -83,6 +83,7 @@ bool fCoinbaseEnforcedProtectionEnabled = true;
 size_t nCoinCacheUsage = 5000 * 300;
 uint64_t nPruneTarget = 0;
 bool fAlerts = DEFAULT_ALERTS;
+bool fIsVerifying = false;
 /* If the tip is older than this (in seconds), the node is considered to be in initial block download.
  */
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
@@ -1115,8 +1116,12 @@ bool ContextualCheckTransaction(
                 std::string strMessage = tx.collateralOut.ToString() + std::to_string(tx.collateralOut.n) +
                                          std::to_string(tx.nUpdateType) + std::to_string(tx.sigTime);
 
-                if (!obfuScationSigner.VerifyMessage(data.pubKey, tx.sig, strMessage, errorMessage))
-                    return error("%s - CONFIRM Error: %s", __func__, errorMessage);
+                if (!obfuScationSigner.VerifyMessage(data.pubKey, tx.sig, strMessage, errorMessage)) {
+                    if (!fFromAccept) {
+                        if (!fIsVerifying)
+                            return error("%s - CONFIRM Error: %s", __func__, errorMessage);
+                    }
+                }
             } else {
                 if (!fFromAccept) {
                     return error("%s - Zelnode data not found. Not from accept", __func__);

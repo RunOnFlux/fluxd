@@ -142,6 +142,8 @@ extern bool fReindex;
 extern int nScriptCheckThreads;
 extern bool fTxIndex;
 
+extern bool fIsVerifying;
+
 // START insightexplorer
 extern bool fInsightExplorer;
 

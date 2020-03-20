@@ -876,8 +876,10 @@ bool CheckZelnodeTxSignatures(const CTransaction& transaction)
 
         // Someone a node can be kicked on the list. So when we are verifying from the db transaction. we dont have the data.pubKey
         if (!data.IsNull()) {
-            if (!obfuScationSigner.VerifyMessage(data.pubKey, transaction.sig, strMessage, errorMessage))
-                return error("%s - CONFIRM Error: %s", __func__, errorMessage);
+            if (!obfuScationSigner.VerifyMessage(data.pubKey, transaction.sig, strMessage, errorMessage)) {
+                if (!fIsVerifying)
+                    return error("%s - CONFIRM Error: %s", __func__, errorMessage);
+            }
         }
 
         if (!CheckBenchmarkSignature(transaction)) {
@@ -1419,7 +1421,8 @@ void ZelnodeCache::AddBackUndoData(const CZelnodeTxBlockUndo& p_undoData)
             mapConfirmedZelnodeData[item.first] = g_zelnodeCache.mapConfirmedZelnodeData.at(item.first);
             mapConfirmedZelnodeData[item.first].nLastConfirmedBlockHeight = item.second;
         } else {
-            error("%s : This should never happen. When undo an update confirm. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
+            if (!fIsVerifying)
+                error("%s : This should never happen. When undo an update confirm. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
                   __func__, item.first.hash.GetHex());
         }
     }
