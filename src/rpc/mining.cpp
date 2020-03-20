@@ -544,12 +544,6 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     if (IsInitialBlockDownload(Params()))
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Zelcash is downloading blocks...");
 
-    if (chainActive.Tip()->nHeight + 1 < Params().StartZelnodePayments()) {    // when enforcement is on we need information about a zelnode payee or otherwise our block is going to be orphaned by the network
-        if (IsSporkActive(SPORK_1_ZELNODE_PAYMENT_ENFORCEMENT)
-            && !zelnodeSync.IsZelnodeWinnersSynced())
-            throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Zelcash is downloading zelnode winners...");
-    }
-
     static unsigned int nTransactionsUpdatedLast;
 
     if (!lpval.isNull())
