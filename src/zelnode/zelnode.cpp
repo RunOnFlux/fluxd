@@ -1583,7 +1583,8 @@ bool ZelnodeCache::Flush()
 
             // Remove from Start Tracking
             g_zelnodeCache.mapStartTxTracker.erase(item.first);
-            g_zelnodeCache.mapStartTxHeights.at(data.nAddedBlockHeight).erase(item.first);
+            if (g_zelnodeCache.mapStartTxHeights.count(data.nAddedBlockHeight))
+                g_zelnodeCache.mapStartTxHeights.at(data.nAddedBlockHeight).erase(item.first);
 
             // Update the data (STARTED --> CONFIRM)
             data.nStatus = ZELNODE_TX_CONFIRMED;

@@ -23,6 +23,118 @@
 #include <boost/tokenizer.hpp>
 #include <fstream>
 #include <consensus/validation.h>
+#include <undo.h>
+
+UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
+    if (fHelp || params.size() > 0)
+        throw runtime_error(
+                "rebuildzelnodedb \n"
+                "\nRescans the blockchain from the start of the zelnode transactions to rebuild the zelnodedb\n"
+                "\nNote: This call can take minutes to complete\n"
+
+                "\nExamples:\n"
+                + HelpExampleCli("rebuildzelnodedb", "")
+                + HelpExampleRpc("rebuildzelnodedb", "")
+        );
+    {
+        LOCK2(cs_main, g_zelnodeCache.cs);
+
+        g_zelnodeCache.SetNull();
+        g_zelnodeCache.InitMapZelnodeList();
+
+        delete pZelnodeDB;
+        pZelnodeDB = NULL;
+        pZelnodeDB = new CDeterministicZelnodeDB(0, false, true);
+
+        CBlockIndex *rescanIndex = nullptr;
+
+        rescanIndex = chainActive[Params().GetConsensus().vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight - 10];
+
+        while (rescanIndex) {
+            ZelnodeCache zelnodeCache;
+            CZelnodeTxBlockUndo zelnodeTxBlockUndo;
+            std::set<COutPoint> setSpentOutPoints;
+            CBlock block;
+            ReadBlockFromDisk(block, rescanIndex, Params().GetConsensus());
+            BOOST_FOREACH(CTransaction &tx, block.vtx) {
+                            if (!tx.IsCoinBase()) {
+                                for (const auto &input : tx.vin) {
+                                    setSpentOutPoints.insert(input.prevout);
+                                }
+                            }
+
+                            if (tx.IsZelnodeTx()) {
+                                int nTier = 0;
+                                CTransaction get_tx;
+                                uint256 block_hash;
+                                if (GetTransaction(tx.collateralOut.hash, get_tx, Params().GetConsensus(), block_hash,
+                                                   true)) {
+                                    if (get_tx.vout[tx.collateralOut.n].nValue == 10000 * COIN)
+                                        nTier = Zelnode::BASIC;
+                                    else if (get_tx.vout[tx.collateralOut.n].nValue == 25000 * COIN)
+                                        nTier = Zelnode::SUPER;
+                                    else if (get_tx.vout[tx.collateralOut.n].nValue == 100000 * COIN)
+                                        nTier = Zelnode::BAMF;
+
+                                } else {
+                                    return error("Failed to find tx");
+                                }
+
+                                if (tx.nType == ZELNODE_START_TX_TYPE) {
+                                    // Add new Zelnode Start Tx into local cache
+                                    zelnodeCache.AddNewStart(tx, rescanIndex->nHeight, nTier);
+                                } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
+                                    if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
+                                        zelnodeCache.AddNewConfirm(tx, rescanIndex->nHeight);
+
+                                    } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
+                                        zelnodeCache.AddUpdateConfirm(tx, rescanIndex->nHeight);
+                                        auto global_data = g_zelnodeCache.GetZelnodeData(tx.collateralOut);
+                                        if (global_data.IsNull())
+                                            return error("Failed to find global data on update confirm tx, %s",
+                                                         tx.GetHash().GetHex());
+                                        zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.insert(
+                                                std::make_pair(tx.collateralOut,
+                                                               global_data.nLastConfirmedBlockHeight));
+                                    }
+                                }
+                            }
+                        }
+
+            // Update the temp cache with the set of started outpoints that have now expired from the dos list
+            GetUndoDataForExpiredZelnodeDosScores(zelnodeTxBlockUndo, rescanIndex->nHeight);
+            zelnodeCache.AddExpiredDosTx(zelnodeTxBlockUndo, rescanIndex->nHeight);
+
+            // Update the temp cache with the set of confirmed outpoints that have now expired
+            GetUndoDataForExpiredConfirmZelnodes(zelnodeTxBlockUndo, rescanIndex->nHeight, setSpentOutPoints);
+            zelnodeCache.AddExpiredConfirmTx(zelnodeTxBlockUndo);
+
+            // Update the block undo, with the paid nodes last paid height.
+            GetUndoDataForPaidZelnodes(zelnodeTxBlockUndo, zelnodeCache);
+
+            // Check for Start tx that are going to expire
+            zelnodeCache.CheckForExpiredStartTx(rescanIndex->nHeight);
+
+
+            if (zelnodeTxBlockUndo.vecExpiredDosData.size() ||
+                zelnodeTxBlockUndo.vecExpiredConfirmedData.size() ||
+                zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.size() ||
+                zelnodeTxBlockUndo.mapLastPaidHeights.size()) {
+                if (!pZelnodeDB->WriteBlockUndoZelnodeData(block.GetHash(), zelnodeTxBlockUndo))
+                    return error("Failed to write zelnodetx undo data");
+            }
+
+
+            assert(zelnodeCache.Flush());
+
+            rescanIndex = chainActive.Next(rescanIndex);
+        }
+        g_zelnodeCache.DumpZelnodeCache();
+    }
+
+    return true;
+}
+
 
 UniValue createzelnodekey(const UniValue& params, bool fHelp)
 {
@@ -2302,6 +2414,7 @@ static const CRPCCommand commands[] =
                 { "zelnode",    "createzelnodebroadcast", &createzelnodebroadcast, false  },
                 { "zelnode",    "relayzelnodebroadcast",  &relayzelnodebroadcast,  false  },
                 { "zelnode",    "decodezelnodebroadcast", &decodezelnodebroadcast, false  },
+                { "zelnode",    "rebuildzelnodedb",       &rebuildzelnodedb,       false  },
 
                 {"zelnode",     "startdeterministiczelnode", &startdeterministiczelnode, false },
                 {"zelnode",     "viewdeterministiczelnodelist", &viewdeterministiczelnodelist, false },
