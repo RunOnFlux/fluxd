@@ -223,7 +223,11 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
             if (tx.IsZelnodeTx()) {
                 const CCoins* coins = view.AccessCoins(tx.collateralOut.hash);
-                assert(coins);
+                if (!coins) {
+                    std::list<CTransaction> removed;
+                    mempool.remove(tx, removed, false);
+                    continue;
+                }
 
                 int nConf = nHeight - coins->nHeight;
 
