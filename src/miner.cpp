@@ -224,6 +224,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             if (tx.IsZelnodeTx()) {
                 const CCoins* coins = view.AccessCoins(tx.collateralOut.hash);
                 if (!coins) {
+                    LogPrintf("Remove zelnode transaction because its collateral is not found. %s\n", tx.GetHash().GetHex());
                     std::list<CTransaction> removed;
                     mempool.remove(tx, removed, false);
                     continue;
@@ -461,7 +462,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
         CValidationState state;
         if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
-            throw std::runtime_error("CreateNewBlock(): TestBlockValidity failed");
+            throw std::runtime_error(strprintf("CreateNewBlock(): TestBlockValidity failed: %s", state.GetRejectReason()));
     }
 
     return pblocktemplate.release();
