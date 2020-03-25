@@ -230,6 +230,18 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                     continue;
                 }
 
+                if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
+                    auto data = g_zelnodeCache.GetZelnodeData(tx.collateralOut);
+
+                    if (data.IsNull()) {
+                        LogPrintf("Remove zelnode transaction because its confirm isn't ready. %s\n", tx.GetHash().GetHex());
+                        std::list<CTransaction> removed;
+                        mempool.remove(tx, removed, false);
+                        continue;
+                    }
+                }
+
+
                 int nConf = nHeight - coins->nHeight;
 
                 dPriority += (double)100 * nConf;
