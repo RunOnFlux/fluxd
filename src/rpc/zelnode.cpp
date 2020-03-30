@@ -575,6 +575,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
                 "\nResult:\n"
                 "[\n"
                 "  {\n"
+                "    \"status\": \"xxxx\",                    (string) Zelnode status\n"
                 "    \"collateral\": n,                       (string) Collateral transaction\n"
                 "    \"txhash\": \"hash\",                    (string) Collateral transaction hash\n"
                 "    \"outidx\": n,                           (numeric) Collateral transaction output index\n"
@@ -604,8 +605,8 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
     UniValue wholelist(UniValue::VARR);
     int count = 0;
     for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::BASIC).listConfirmedZelnodes) {
-
-        auto data = g_zelnodeCache.GetZelnodeData(item.out);
+        int nLocation = ZELNODE_TX_ERROR;
+        auto data = g_zelnodeCache.GetZelnodeData(item.out, &nLocation);
 
         UniValue info(UniValue::VOBJ);
 
@@ -620,6 +621,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
             CNetAddr node = CNetAddr(strHost, false);
             std::string strNetwork = GetNetworkName(node.GetNetwork());
 
+            info.push_back(std::make_pair("status", ZelnodeLocationToString(nLocation)));
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             info.push_back(std::make_pair("txhash", strTxHash));
             info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
@@ -651,8 +653,8 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
 
     count = 0;
     for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::SUPER).listConfirmedZelnodes) {
-
-        auto data = g_zelnodeCache.GetZelnodeData(item.out);
+        int nLocation = ZELNODE_TX_ERROR;
+        auto data = g_zelnodeCache.GetZelnodeData(item.out, &nLocation);
 
         UniValue info(UniValue::VOBJ);
 
@@ -667,6 +669,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
             CNetAddr node = CNetAddr(strHost, false);
             std::string strNetwork = GetNetworkName(node.GetNetwork());
 
+            info.push_back(std::make_pair("status", ZelnodeLocationToString(nLocation)));
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             info.push_back(std::make_pair("txhash", data.collateralIn.GetTxHash()));
             info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
@@ -697,8 +700,8 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
 
     count = 0;
     for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::BAMF).listConfirmedZelnodes) {
-
-        auto data = g_zelnodeCache.GetZelnodeData(item.out);
+        int nLocation = ZELNODE_TX_ERROR;
+        auto data = g_zelnodeCache.GetZelnodeData(item.out, &nLocation);
 
         UniValue info(UniValue::VOBJ);
 
@@ -713,6 +716,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
             CNetAddr node = CNetAddr(strHost, false);
             std::string strNetwork = GetNetworkName(node.GetNetwork());
 
+            info.push_back(std::make_pair("status", ZelnodeLocationToString(nLocation)));
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             info.push_back(std::make_pair("txhash", data.collateralIn.GetTxHash()));
             info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
