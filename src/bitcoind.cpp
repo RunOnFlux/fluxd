@@ -19,6 +19,11 @@
 #include <boost/thread.hpp>
 
 #include <stdio.h>
+#include <string>
+#include <signal.h>
+#include <dirent.h>
+
+using namespace std;
 
 /* Introduction text for doxygen: */
 
@@ -37,6 +42,51 @@
  */
 
 static bool fDaemon;
+
+int getProcIdByName(std::string procName)
+{
+    int process_pid = -1;
+
+    DIR *dp = opendir("/proc");
+    if (dp != NULL)
+    {
+        
+        struct dirent *dirp;
+        while (process_pid < 0 && (dirp = readdir(dp)))
+        {
+            
+            int id = atoi(dirp->d_name);
+            if (id > 0)
+            {
+                
+                string cmdPath = string("/proc/") + dirp->d_name + "/cmdline";
+                ifstream cmdFile(cmdPath.c_str());
+                string cmdLine;
+                getline(cmdFile, cmdLine);
+                if (!cmdLine.empty())
+                {
+                    
+                    size_t pos = cmdLine.find('\0');
+                    if (pos != string::npos)
+                        cmdLine = cmdLine.substr(0, pos);
+                   
+                    pos = cmdLine.rfind('/');
+                    if (pos != string::npos)
+                        cmdLine = cmdLine.substr(pos + 1);
+                    
+                    if (procName == cmdLine)
+                        process_pid = id;
+                }
+            }
+        }
+    }
+
+    closedir(dp);
+
+
+return process_pid;
+}
+
 
 void WaitForShutdown(boost::thread_group* threadGroup)
 {
@@ -151,6 +201,40 @@ bool AppInit(int argc, char* argv[])
         fDaemon = GetBoolArg("-daemon", false);
         if (fDaemon)
         {
+
+           int zelbenchd_pid = getProcIdByName("zelbenchd");
+
+                if ( zelbenchd_pid > 0 )
+                 {
+                    fprintf(stdout, "Zelbenchd process detected pid=%d\n",zelbenchd_pid);
+                    fprintf(stdout, "Kill signal sending... \n");
+                    kill(zelbenchd_pid,SIGKILL);
+                    sleep(2);
+
+                 } else {
+
+                   fprintf(stdout, "Zelbenchd process not found\n");
+
+                 }
+
+
+            int zelcashd_pid = getProcIdByName("zelcashd");
+
+
+                if ( zelcashd_pid > 0 && zelcashd_pid != getpid() )
+                 {
+
+                   fprintf(stdout, "Zelcashd process detected pid=%d\n",zelcashd_pid);
+                   fprintf(stdout, "Kill signal sending... \n");
+                   kill(zelcashd_pid,SIGKILL);
+                   sleep(2);
+
+                 } else {
+
+                   fprintf(stdout, "Zelcashd process not found\n");
+
+                 }
+
             fprintf(stdout, "Zelcash server starting\n");
 
             // Daemonize
