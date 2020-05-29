@@ -118,6 +118,8 @@ public:
         } else if (nZelnodeTier == Zelnode::BAMF) {
             return GetFullBAMFZelnodeVector();
         }
+
+        return std::vector<Zelnode>();
     }
 
     std::vector<Zelnode> GetAllZelnodeVector()

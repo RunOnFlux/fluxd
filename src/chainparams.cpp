@@ -209,7 +209,11 @@ public:
 
         nStartZelnodePaymentsHeight = 560000; // Start paying deterministic zelnodes on height
 
-        strBenchmarkingPublicKey = "042e79d7dd1483996157df6b16c831be2b14b31c69944ea2a585c63b5101af1f9517ba392cee5b1f45a62e9d936488429374535a2f76870bfa8eea6667b13eb39e";
+        // These are the benchmarking public keys, if you are adding a key, you must increase the resize integer
+        vecBenchmarkingPublicKeys.resize(1);
+        vecBenchmarkingPublicKeys[0] = std::make_pair("042e79d7dd1483996157df6b16c831be2b14b31c69944ea2a585c63b5101af1f9517ba392cee5b1f45a62e9d936488429374535a2f76870bfa8eea6667b13eb39e", 0);
+        assert(vecBenchmarkingPublicKeys.size() > 0);
+
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
@@ -369,8 +373,12 @@ public:
         strSporkKey = "0408c6a3a6cacb673fc38f27c75d79c865e1550441ea8b5295abf21116972379a1b49416da07b7d9b40fb9daf8124f309c608dfc79756a5d3c2a957435642f7f1a";
         networkID = CBaseChainParams::Network::TESTNET;
         strZelnodeTestingDummyAddress= "tmXxZqbmvrxeSFQsXmm4N9CKyME767r47fS";
-        strBenchmarkingPublicKey = "04d422e01f5acff68504b92df96a9004cf61be432a20efe83fe8a94c1aa730fe7dece5d2e8298f2d5672d4e569c55d9f0a73268ef7b92990d8c014e828a7cc48dd";
+
         nStartZelnodePaymentsHeight = 350;
+
+        vecBenchmarkingPublicKeys.resize(1);
+        vecBenchmarkingPublicKeys[0] = std::make_pair("04d422e01f5acff68504b92df96a9004cf61be432a20efe83fe8a94c1aa730fe7dece5d2e8298f2d5672d4e569c55d9f0a73268ef7b92990d8c014e828a7cc48dd", 0);
+        assert(vecBenchmarkingPublicKeys.size() > 0);
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
@@ -502,7 +510,9 @@ public:
         fTestnetToBeDeprecatedFieldRPC = false;
 
         networkID = CBaseChainParams::Network::REGTEST;
-        strBenchmarkingPublicKey = "04cf3c34f01486bbb34c1a7ca11c2ddb1b3d98698c3f37d54452ff91a8cd5e92a6910ce5fc2cc7ad63547454a965df53ff5be740d4ef4ac89848c2bafd1e40e6b7";
+        vecBenchmarkingPublicKeys.resize(1);
+        vecBenchmarkingPublicKeys[0] = std::make_pair("04cf3c34f01486bbb34c1a7ca11c2ddb1b3d98698c3f37d54452ff91a8cd5e92a6910ce5fc2cc7ad63547454a965df53ff5be740d4ef4ac89848c2bafd1e40e6b7", 0);
+        assert(vecBenchmarkingPublicKeys.size() > 0);
 
         checkpointData = (CCheckpointData){
             boost::assign::map_list_of

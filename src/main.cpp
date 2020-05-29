@@ -3868,7 +3868,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     if(nZelnodeLastManaged == 0){
         nZelnodeLastManaged = pindexNew->nHeight;
     }
-    
+
     // Get the current commitment tree
     SproutMerkleTree oldSproutTree;
     SaplingMerkleTree oldSaplingTree;
@@ -3944,7 +3944,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     if (fZelnode && pindexNew->nHeight - nZelnodeLastManaged >= numberOfBlocksBeforeNextCheck) {
         nZelnodeLastManaged = pindexNew->nHeight;
         //getrand(1,4) is used to get a number between 1 and 4 with same probability, this is used to prevent zelnode grouping transactions
-        numberOfBlocksBeforeNextCheck = getrand(1,4);
+        numberOfBlocksBeforeNextCheck = getrand(1,6);
         activeZelnode.ManageDeterministricZelnode();
     }
 

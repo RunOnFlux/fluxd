@@ -130,7 +130,7 @@ public:
     std::string ZelnodeTestingDummyAddress() const { return strZelnodeTestingDummyAddress; }
     int64_t StartZelnodePayments() const { return nStartZelnodePaymentsHeight; }
     CBaseChainParams::Network NetworkID() const { return networkID; }
-    std::string BenchmarkingPublicKey() const { return strBenchmarkingPublicKey; }
+    std::vector<std::pair<std::string, uint32_t> > BenchmarkingPublicKeys() const { return vecBenchmarkingPublicKeys; }
 
     /** Flux Rebrand **/
     std::string GetExchangeFundingAddress() const { return strExchangeFundingAddress; }
@@ -188,6 +188,7 @@ protected:
     int64_t nStartZelnodePaymentsHeight;
     CBaseChainParams::Network networkID;
     std::string strBenchmarkingPublicKey;
+    std::vector< std::pair<std::string, uint32_t> > vecBenchmarkingPublicKeys;
 
     /** Flux params **/
     std::string strExchangeFundingAddress;

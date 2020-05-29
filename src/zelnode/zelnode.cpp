@@ -854,7 +854,7 @@ std::string TierToString(int tier)
     return strStatus;
 }
 
-bool CheckZelnodeTxSignatures(const CTransaction& transaction)
+bool CheckZelnodeTxSignatures(const CTransaction&  transaction)
 {
     if (transaction.nType & ZELNODE_START_TX_TYPE) {
         // We need to sign the mutable transaction
@@ -894,7 +894,7 @@ bool CheckZelnodeTxSignatures(const CTransaction& transaction)
 
 bool CheckBenchmarkSignature(const CTransaction& transaction)
 {
-    std::string public_key = Params().BenchmarkingPublicKey();
+    std::string public_key = GetZelnodeBenchmarkPublicKey(transaction);
     CPubKey pubkey(ParseHex(public_key));
     std::string errorMessage = "";
     std::string strMessage = std::string(transaction.sig.begin(), transaction.sig.end()) + std::to_string(transaction.benchmarkTier) + std::to_string(transaction.benchmarkSigTime) + transaction.ip;
@@ -921,7 +921,8 @@ void GetUndoDataForExpiredZelnodeDosScores(CZelnodeTxBlockUndo& p_zelnodeTxUndoD
 void GetUndoDataForExpiredConfirmZelnodes(CZelnodeTxBlockUndo& p_zelnodeTxUndoData, const int& p_nHeight, const std::set<COutPoint> setSpentOuts)
 {
     LOCK(g_zelnodeCache.cs);
-    int nHeightToExpire = p_nHeight - ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT;
+    int nExpirationCount = GetZelnodeExpirationCount(p_nHeight);
+    int nHeightToExpire = p_nHeight - nExpirationCount;
 
     for (const auto& item : g_zelnodeCache.mapConfirmedZelnodeData) {
         // The p_zelnodeTxUndoData has a map of all new confirms that have been updated this block. So if it is in there don't expire it. They made it barely in time
@@ -1919,4 +1920,40 @@ void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion) {
                 break;
         }
     }
+}
+
+int GetZelnodeExpirationCount(const int& p_nHeight)
+{
+    // Get the status on if Zelnode params1 is activated
+    bool fFluxActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
+
+    if (fFluxActive) {
+        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_PARAMS_1;
+    } else {
+        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT;
+    }
+}
+
+std::string GetZelnodeBenchmarkPublicKey(const CTransaction& tx)
+{
+    // Get the public keys and timestamps from the chainparams
+    std::vector< std::pair<std::string, uint32_t> > vectorPublicKeys = Params().BenchmarkingPublicKeys();
+
+    // If only have one public key return it
+    if (vectorPublicKeys.size() == 1) {
+        return vectorPublicKeys[0].first;
+    }
+
+    // Get the last index in the array
+    int nLast = vectorPublicKeys.size() - 1;
+
+    // Loop backwards until we find the correct public key
+    for (int i = nLast; i >= 0; i--) {
+        if (tx.benchmarkSigTime >= vectorPublicKeys[i].second) {
+            return vectorPublicKeys[i].first;
+        }
+    }
+
+    // Only reason this should happen is if there is a problem with the chainparams
+    return vectorPublicKeys[0].first;
 }
