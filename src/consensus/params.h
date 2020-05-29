@@ -30,6 +30,7 @@ enum UpgradeIndex {
     UPGRADE_ACADIA,
     UPGRADE_KAMIOOKA,
     UPGRADE_KAMATA,
+    UPGRADE_ZELNODE_PARAMS,
     // NOTE: Also add new upgrades to NetworkUpgradeInfo in upgrades.cpp
     MAX_NETWORK_UPGRADES
 };

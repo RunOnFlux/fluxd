@@ -172,7 +172,7 @@ void ActiveZelnode::ManageDeterministricZelnode()
         if (mempool.mapZelnodeTxMempool.count(activeZelnode.deterministicOutPoint)) {
             if (pwalletMain)
                 pwalletMain->ResendWalletTransactions(GetAdjustedTime());
-            LogPrintf("Zelnode found in start tracker. Skipping confirm transaction creation, because tranasaction already in mempool %s\n", activeZelnode.deterministicOutPoint.ToString());
+            LogPrintf("Zelnode found in start tracker. Skipping confirm transaction creation, because transaction already in mempool %s\n", activeZelnode.deterministicOutPoint.ToString());
             return;
         }
 

@@ -41,6 +41,7 @@
 
 // How often a new confirmation transaction needs to be seen on chain to keep a node up and running
 #define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT 60
+#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_PARAMS_1 80
 
 // Nodes are allowed to send a update confirm notification only after this many blocks past there last confirm
 #define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT 40
@@ -721,6 +722,9 @@ public:
 
     void CountNetworks(int& ipv4, int& ipv6, int& onion);
 };
+
+int GetZelnodeExpirationCount(const int& p_nHeight);
+std::string GetZelnodeBenchmarkPublicKey(const CTransaction& tx);
 
 bool IsDZelnodeActive();
 bool IsZelnodeTransactionsActive();

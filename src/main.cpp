@@ -3703,6 +3703,10 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
             return AbortNode(state, "Failed to read block");
         pblock = &block;
     }
+
+    // Set the starting lastManaged height for zelnodes
+    static int nZelnodeLastManaged = pindexNew->nHeight;
+
     // Get the current commitment tree
     SproutMerkleTree oldSproutTree;
     SaplingMerkleTree oldSaplingTree;
@@ -3775,7 +3779,9 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
     EnforceNodeDeprecation(pindexNew->nHeight);
 
-    if (fZelnode && pindexNew->nHeight % 2) {
+    // Every 3 blocks check to see if the zelnode should do anything
+    if (fZelnode && pindexNew->nHeight - nZelnodeLastManaged >= 3) {
+        nZelnodeLastManaged = pindexNew->nHeight;
         activeZelnode.ManageDeterministricZelnode();
     }
 
