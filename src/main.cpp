@@ -52,6 +52,7 @@ using namespace std;
 #endif
 
 #include "librustzcash.h"
+#include "key_io.h"
 
 /**
  * Global state
@@ -1091,6 +1092,28 @@ bool ContextualCheckTransaction(
             if (!fFailure && g_zelnodeCache.CheckIfConfirmed(tx.collateralOut)) {
                 fFailure = true;
                 strFailMessage = "zelnode-tx-already-in-confirm-chain";
+            }
+
+            if (!fFailure) {
+                COutPoint outPoint = tx.collateralOut;
+                CPubKey userpubkey = tx.collateralPubkey;
+
+                CCoins coins;
+                if (!pcoinsTip->GetCoins(outPoint.hash, coins)) {
+                    fFailure = true;
+                    strFailMessage = "zelnode-tx-coins-not-found";
+                }
+
+                CTxDestination destination;
+                if (!fFailure && !ExtractDestination(coins.vout[outPoint.n].scriptPubKey, destination)) {
+                    fFailure = true;
+                    strFailMessage = "zelnode-tx-failed-to-extract-destination";
+                }
+
+                if (!fFailure && EncodeDestination(destination) != EncodeDestination(userpubkey.GetID())) {
+                    fFailure = true;
+                    strFailMessage = "zelnode-tx-destinations-didn't-match";
+                }
             }
 
             if (fFailure && !fFromAccept) {
@@ -3049,6 +3072,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     // Check it again to verify JoinSplit proofs, and in case a previous version let a bad block in
     if (!CheckBlock(block, state, chainparams, fExpensiveChecks ? verifier : disabledVerifier, !fJustCheck, !fJustCheck))
+        return false;
+
+    if (!ContextualCheckBlock(block,state, chainparams,pindex->pprev, false))
         return false;
 
     // verify that the view's current state corresponds to the previous block
