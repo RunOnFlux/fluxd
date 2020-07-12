@@ -1093,6 +1093,129 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
     }
 }
 
+UniValue getdoslist(const UniValue& params, bool fHelp)
+{
+    if (fHelp || (params.size() > 0))
+        throw runtime_error(
+                "getdoslist\n"
+                "\nGet a list of all zelnodes in the DOS list\n"
+
+                "\nResult:\n"
+                "[\n"
+                "  {\n"
+                "    \"collateral\": \"hash\",  (string) Collateral transaction hash\n"
+                "    \"added_height\": n,   (numeric) Height the zelnode start transaction was added to the chain\n"
+                "    \"payment_address\": \"xxx\",   (string) The payment address associated with the zelnode\n"
+                "    \"eligible_in\": n,     (numeric) The amount of blocks before the zelnode is eligible to be started again\n"
+                "  }\n"
+                "  ,...\n"
+                "]\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("getdoslist", "") + HelpExampleRpc("getdoslist", ""));
+
+    if (IsDZelnodeActive()) {
+        UniValue wholelist(UniValue::VARR);
+
+        std::map<int, std::vector<UniValue>> mapOrderedDosList;
+
+        for (const auto& item : g_zelnodeCache.mapStartTxDosTracker) {
+
+            // Get the data from the item in the map of dox tracking
+            const ZelnodeCacheData data = item.second;
+
+            UniValue info(UniValue::VOBJ);
+
+            info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+            info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+            info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+
+            int nCurrentHeight = chainActive.Height();
+            int nEligibleIn = ZELNODE_DOS_REMOVE_AMOUNT - (nCurrentHeight - data.nAddedBlockHeight);
+            info.push_back(std::make_pair("eligible_in",  nEligibleIn));
+
+            mapOrderedDosList[nEligibleIn].emplace_back(info);
+        }
+
+        if (mapOrderedDosList.size()) {
+            for (int i = 0; i < ZELNODE_DOS_REMOVE_AMOUNT + 1; i++) {
+                if (mapOrderedDosList.count(i)) {
+                    for (const auto& item : mapOrderedDosList.at(i)) {
+                        wholelist.push_back(item);
+                    }
+                }
+            }
+        }
+
+        return wholelist;
+    }
+
+    return NullUniValue;
+}
+
+UniValue getstartlist(const UniValue& params, bool fHelp)
+{
+    if (fHelp || (params.size() > 0))
+        throw runtime_error(
+                "getstartlist\n"
+                "\nGet a list of all zelnodes in the start list\n"
+
+                "\nResult:\n"
+                "[\n"
+                "  {\n"
+                "    \"collateral\": \"hash\",  (string) Collateral transaction hash\n"
+                "    \"added_height\": n,   (numeric) Height the zelnode start transaction was added to the chain\n"
+                "    \"payment_address\": \"xxx\",   (string) The payment address associated with the zelnode\n"
+                "    \"expires_in\": n,     (numeric) The amount of blocks before the start transaction expires, unless a confirmation transaction is added to a block\n"
+                "  }\n"
+                "  ,...\n"
+                "]\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("getstartlist", "") + HelpExampleRpc("getstartlist", ""));
+
+    if (IsDZelnodeActive()) {
+        UniValue wholelist(UniValue::VARR);
+
+        std::map<int, std::vector<UniValue>> mapOrderedStartList;
+
+        for (const auto& item : g_zelnodeCache.mapStartTxTracker) {
+
+            // Get the data from the item in the map of dox tracking
+            const ZelnodeCacheData data = item.second;
+
+            UniValue info(UniValue::VOBJ);
+
+            info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+            info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+            info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+
+
+            // TODO, when merged with the code that increasese the start tx expiration to 80 -> ZELNODE_START_TX_EXPIRATION_HEIGHT
+            // TODO Grab the expiration height with the new function that was created that takes into account he block height :)
+            int nCurrentHeight = chainActive.Height();
+            int nExpiresIn = ZELNODE_START_TX_EXPIRATION_HEIGHT - (nCurrentHeight - data.nAddedBlockHeight);
+            info.push_back(std::make_pair("expires_in",  nExpiresIn));
+
+            mapOrderedStartList[nExpiresIn].emplace_back(info);
+        }
+
+        if (mapOrderedStartList.size()) {
+            for (int i = 0; i < ZELNODE_START_TX_EXPIRATION_HEIGHT + 1; i++) {
+                if (mapOrderedStartList.count(i)) {
+                    for (const auto& item : mapOrderedStartList.at(i)) {
+                        wholelist.push_back(item);
+                    }
+                }
+            }
+        }
+
+        return wholelist;
+    }
+
+    return NullUniValue;
+}
+
 UniValue getzelnodestatus (const UniValue& params, bool fHelp)
 {
     if (fHelp || (params.size() != 0))
@@ -2113,6 +2236,8 @@ static const CRPCCommand commands[] =
                 { "zelnode",    "znsync",                 &znsync,                 false  },
                 { "zelnode",    "startzelnode",           &startzelnode,           false  },
                 { "zelnode",    "listzelnodes",           &listzelnodes,           false  },
+                { "zelnode",    "getdoslist",             &getdoslist,             false  },
+                { "zelnode",    "getstartlist",           &getstartlist,           false  },
                 { "zelnode",    "zelnodedebug",           &zelnodedebug,           false  },
                 { "zelnode",    "spork",                  &spork,                  false  },
                 { "zelnode",    "getzelnodecount",        &getzelnodecount,        false  },
