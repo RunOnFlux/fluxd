@@ -1,6 +1,3 @@
-Zel Changelog - Zel 4.0.0
-===============
-
 Jeremy "Blondfrogs" Anderson (39):
       Fix wallet finding ZelNode vin
       Fix gbt transactions
@@ -41,7 +38,7 @@ Jeremy "Blondfrogs" Anderson (39):
       Remove ip from start tx
       add comment zelnode code
 
-Tadeas Kmenta(20):
+Tadeas Kmenta (20):
       Extend RPC
       Add confirmations, time to z_listreceivedbyaddress
       Correct sapling confs and time
