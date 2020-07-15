@@ -1,11 +1,6 @@
-Zel Changelog - Zel 4.0.1
+(note: this is a temporary file, to be added-to by anybody, and moved to
+release-notes at release time)
+
+Notable changes
 ===============
 
-Tadeas Kmenta(3):
-      Extend and correct RPC of listzelnodes, getzelnodestatus
-      Add filtering of IP and public key to viewdeterministiczelnodelist RPC
-      versioning, release notes, authors
-
-Jeremy "Blondfrogs" Anderson (2):
-      Fix not accepting blocks from future
-      Fix some reorg undo zelnode payouts

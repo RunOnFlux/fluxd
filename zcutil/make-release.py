@@ -319,10 +319,10 @@ def chdir_to_repo(repo):
 def patch_README(release, releaseprev):
     with PathPatcher('README.md') as (inf, outf):
         firstline = inf.readline()
-        assert firstline == 'Zelcash {}\n'.format(releaseprev.novtext), \
+        assert firstline == '# Zel {}\n'.format(releaseprev.novtext), \
             repr(firstline)
 
-        outf.write('Zelcash {}\n'.format(release.novtext))
+        outf.write('# Zel {}\n'.format(release.novtext))
         outf.write(inf.read())
 
 

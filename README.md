@@ -1,4 +1,5 @@
-# Zel 4.0.1 Kamata [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
+# Zel 4.0.2
+[![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
 <img align="right" height=112 width=562 src="doc/imgs/kamata.png">
 
 ## Mandatory Upgrade to at least version 4.0.0

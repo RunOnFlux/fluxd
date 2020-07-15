@@ -1,6 +1,2 @@
-Notable Zel changes
-===============
-
-Difficulty algorithm
-------------------------------------------
-Difficulty algorithm adjustment fix - Mandatory 
+Wilke "Lolliedieb" Trei (1):
+	Difficulty algorithm adjustment
