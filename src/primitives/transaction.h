@@ -695,7 +695,7 @@ public:
     }
 
     bool IsNull() const {
-        return vin.empty() && vout.empty() && !IsZelnodeTx() || (IsZelnodeTx() && collateralOut.IsNull());
+        return (vin.empty() && vout.empty() && !IsZelnodeTx()) || (IsZelnodeTx() && collateralOut.IsNull());
     }
 
     std::string TypeToString() const {
