@@ -1772,7 +1772,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             nLastTime = nNow;
             // -limitfreerelay unit is thousand-bytes-per-minute
             // At default rate it would take over a month to fill 1GB
-            if (dFreeCount >= GetArg("-limitfreerelay", 15)*10*1000)
+            if (dFreeCount >= GetArg("-limitfreerelay", 500)*10*1000)
                 return state.DoS(0, error("AcceptToMemoryPool: free transaction rejected by rate limiter"),
                                  REJECT_INSUFFICIENTFEE, "rate limited free transaction");
             LogPrint("mempool", "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount+nSize);
@@ -1986,7 +1986,7 @@ bool AcceptableInputs(CTxMemPool& pool, CValidationState& state, const CTransact
         }
 
         // Require that free transactions have sufficient priority to be mined in the next block.
-        if (GetBoolArg("-relaypriority", true) && nFees < ::minRelayTxFee.GetFee(nSize) && !AllowFree(view.GetPriority(tx, chainActive.Height() + 1))) {
+        if (GetBoolArg("-relaypriority", false) && nFees < ::minRelayTxFee.GetFee(nSize) && !AllowFree(view.GetPriority(tx, chainActive.Height() + 1))) {
             return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "insufficient priority");
         }
 
@@ -2006,7 +2006,7 @@ bool AcceptableInputs(CTxMemPool& pool, CValidationState& state, const CTransact
             nLastTime = nNow;
             // -limitfreerelay unit is thousand-bytes-per-minute
             // At default rate it would take over a month to fill 1GB
-            if (dFreeCount >= GetArg("-limitfreerelay", 30) * 10 * 1000)
+            if (dFreeCount >= GetArg("-limitfreerelay", 500) * 10 * 1000)
                 return state.DoS(0, error("AcceptableInputs : free transaction rejected by rate limiter"),
                                  REJECT_INSUFFICIENTFEE, "rate limited free transaction");
             LogPrint("mempool", "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount + nSize);
@@ -3901,7 +3901,7 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
     if (reorgLength > MAX_REORG_LENGTH) {
         auto msg = strprintf(_(
             "A block chain reorganization has been detected that would roll back %d blocks! "
-            "This is larger than the maximum of %d blocks, and so the node is shutting down for your safety."
+            "This is larger than the maximum of %d blocks, and so the node is not following this reorganisation."
             ), reorgLength, MAX_REORG_LENGTH) + "\n\n" +
             _("Reorganization details") + ":\n" +
             "- " + strprintf(_("Current tip: %s, height %d, work %s"),
@@ -3909,11 +3909,9 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
             "- " + strprintf(_("New tip:     %s, height %d, work %s"),
                 pindexMostWork->phashBlock->GetHex(), pindexMostWork->nHeight, pindexMostWork->nChainWork.GetHex()) + "\n" +
             "- " + strprintf(_("Fork point:  %s, height %d"),
-                pindexFork->phashBlock->GetHex(), pindexFork->nHeight) + "\n\n" +
-            _("Please help, human!");
+                pindexFork->phashBlock->GetHex(), pindexFork->nHeight);
         LogPrintf("*** %s\n", msg);
         uiInterface.ThreadSafeMessageBox(msg, "", CClientUIInterface::MSG_ERROR);
-        StartShutdown();
         return false;
     }
 
@@ -5298,17 +5296,15 @@ bool RewindBlockIndex(const CChainParams& chainparams, bool& clearWitnessCaches)
             auto pindexRewind = chainActive[nHeight - 1];
             auto msg = strprintf(_(
                 "A block chain rewind has been detected that would roll back %d blocks! "
-                "This is larger than the maximum of %d blocks, and so the node is shutting down for your safety."
+                "This is larger than the maximum of %d blocks, and so the node is not following this reorganisation."
                 ), rewindLength, MAX_REORG_LENGTH) + "\n\n" +
                 _("Rewind details") + ":\n" +
                 "- " + strprintf(_("Current tip:   %s, height %d"),
                     pindexOldTip->phashBlock->GetHex(), pindexOldTip->nHeight) + "\n" +
                 "- " + strprintf(_("Rewinding to:  %s, height %d"),
-                    pindexRewind->phashBlock->GetHex(), pindexRewind->nHeight) + "\n\n" +
-                _("Please help, human!");
+                    pindexRewind->phashBlock->GetHex(), pindexRewind->nHeight);
             LogPrintf("*** %s\n", msg);
             uiInterface.ThreadSafeMessageBox(msg, "", CClientUIInterface::MSG_ERROR);
-            StartShutdown();
             return false;
         }
     }
