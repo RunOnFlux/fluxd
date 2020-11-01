@@ -43,7 +43,7 @@
 #define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT 60
 
 // Nodes are allowed to send a update confirm notification only after this many blocks past there last confirm
-#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT 40
+#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT 30
 
 
 /// Mempool only

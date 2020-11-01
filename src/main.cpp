@@ -3801,7 +3801,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
     EnforceNodeDeprecation(pindexNew->nHeight);
 
-    if (fZelnode && pindexNew->nHeight % 2) {
+    if (fZelnode) {
         activeZelnode.ManageDeterministricZelnode();
     }
 
