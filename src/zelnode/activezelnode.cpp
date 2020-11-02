@@ -185,9 +185,9 @@ void ActiveZelnode::ManageDeterministricZelnode()
         }
     } else if (g_zelnodeCache.CheckIfNeedsNextConfirm(activeZelnode.deterministicOutPoint)) {
         activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::UPDATE_CONFIRM);
-        LogPrintf("Time to Confirm Zelnode reached, Creating Update Confirm Transaction %s\n", activeZelnode.deterministicOutPoint.ToString());
+        LogPrintf("Time to Confirm Zelnode reached, Creating Update Confirm Transaction on height: %s for outpoint: %s\n", nHeight, activeZelnode.deterministicOutPoint.ToString());
     } else {
-        LogPrintf("Zelnode found nothing to do: %s\n", activeZelnode.deterministicOutPoint.ToString());
+        LogPrintf("Zelnode found nothing to do on height: %s for outpoint: %s\n", nHeight, activeZelnode.deterministicOutPoint.ToString());
         return;
     }
 
