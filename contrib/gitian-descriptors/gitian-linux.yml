@@ -1,5 +1,5 @@
 ---
-name: "zelcash-4.0.4"
+name: "zelcash-4.0.3"
 enable_cache: true
 distro: "debian"
 suites:
