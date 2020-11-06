@@ -3818,7 +3818,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
     if (fZelnode && pindexNew->nHeight - nZelnodeLastManaged >= numberOfBlocksBeforeNextCheck) {
         nZelnodeLastManaged = pindexNew->nHeight;
-        numberOfBlocksBeforeNextCheck = getrand(1,10);
+        numberOfBlocksBeforeNextCheck = getrand(1,4);
         activeZelnode.ManageDeterministricZelnode();
     }
 
