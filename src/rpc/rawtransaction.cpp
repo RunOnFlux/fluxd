@@ -156,9 +156,20 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
     if (tx.IsZelnodeTx()) {
         entry.push_back(Pair("type", tx.TypeToString()));
         entry.push_back(Pair("collateral_output", tx.collateralOut.ToString()));
+        entry.push_back(Pair("collateral", tx.collateralOut.ToFullString()));
+        entry.push_back(Pair("txhash", tx.collateralOut.GetTxHash()));
+        entry.push_back(Pair("outidx", tx.collateralOut.GetTxIndex()));
         entry.push_back(Pair("sigtime", tx.sigTime));
         entry.push_back(Pair("sig", EncodeBase64(&tx.sig[0], tx.sig.size())));
         entry.push_back(Pair("ip", tx.ip));
+
+        // shall always be true otherwise invalid tx
+        COutPoint outPoint = tx.collateralOut;
+        CCoins coins;
+        CTxDestination destination;
+        pcoinsTip->GetCoins(outPoint.hash, coins);
+        ExtractDestination(coins.vout[outPoint.n].scriptPubKey, destination);
+        entry.push_back(Pair("payment_address", EncodeDestination(destination)));
 
         if (tx.nType & ZELNODE_START_TX_TYPE) {
             entry.push_back(

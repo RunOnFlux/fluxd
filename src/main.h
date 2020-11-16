@@ -551,4 +551,6 @@ int GetInputAge(CTxIn& vin);
 /** Return a CMutableTransaction with contextual default values based on set of consensus rules at nHeight, and given expiry delta. */
 CMutableTransaction CreateNewContextualCMutableTransaction(const Consensus::Params& consensusParams, int nHeight, int nExpiryDelta);
 
+int getrand(int min, int max);
+
 #endif // BITCOIN_MAIN_H

@@ -179,13 +179,15 @@ void ActiveZelnode::ManageDeterministricZelnode()
         // If we don't have one in our mempool. That means it is time to confirm the zelnode
         if (nHeight - nLastTriedToConfirm > 3) { // Only try this every couple blocks
             activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::INITIAL_CONFIRM);
+            LogPrintf("Zelnode found in start tracker. Creating Initial Confirm Transactions %s\n", activeZelnode.deterministicOutPoint.ToString());
         } else {
             return;
         }
     } else if (g_zelnodeCache.CheckIfNeedsNextConfirm(activeZelnode.deterministicOutPoint)) {
         activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::UPDATE_CONFIRM);
+        LogPrintf("Time to Confirm Zelnode reached, Creating Update Confirm Transaction on height: %s for outpoint: %s\n", nHeight, activeZelnode.deterministicOutPoint.ToString());
     } else {
-        LogPrintf("Zelnode found nothing to do: %s\n", activeZelnode.deterministicOutPoint.ToString());
+        LogPrintf("Zelnode found nothing to do on height: %s for outpoint: %s\n", nHeight, activeZelnode.deterministicOutPoint.ToString());
         return;
     }
 

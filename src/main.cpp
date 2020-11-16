@@ -3713,6 +3713,15 @@ static int64_t nTimeFlush = 0;
 static int64_t nTimeChainState = 0;
 static int64_t nTimePostConnect = 0;
 
+static int nZelnodeLastManaged = 0;
+
+int getrand(int min,int max){
+    return((rand()%(max-min+1))+min);
+}
+
+// Set the number of blocks since last check to check again
+static int numberOfBlocksBeforeNextCheck = getrand(1,4);
+
 /**
  * Connect a new block to chainActive. pblock is either NULL or a pointer to a CBlock
  * corresponding to pindexNew, to bypass loading it again from disk.
@@ -3729,6 +3738,12 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
             return AbortNode(state, "Failed to read block");
         pblock = &block;
     }
+
+    // Set the starting lastManaged height for zelnodes
+    if(nZelnodeLastManaged == 0){
+        nZelnodeLastManaged = pindexNew->nHeight;
+    }
+    
     // Get the current commitment tree
     SproutMerkleTree oldSproutTree;
     SaplingMerkleTree oldSaplingTree;
@@ -3801,7 +3816,10 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
     EnforceNodeDeprecation(pindexNew->nHeight);
 
-    if (fZelnode && pindexNew->nHeight % 2) {
+    if (fZelnode && pindexNew->nHeight - nZelnodeLastManaged >= numberOfBlocksBeforeNextCheck) {
+        nZelnodeLastManaged = pindexNew->nHeight;
+        //getrand(1,4) is used to get a number between 1 and 4 with same probability, this is used to prevent zelnode grouping transactions
+        numberOfBlocksBeforeNextCheck = getrand(1,4);
         activeZelnode.ManageDeterministricZelnode();
     }
 
