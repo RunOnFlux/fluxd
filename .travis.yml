@@ -35,9 +35,7 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install cmake autoconf libtool automake coreutils pkgconfig gmp wget; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install gcc5 --without-multilib; fi
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo apt-get update; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python curl zlib1g-dev wget bsdmainutils automake cmake mingw-w64 zip; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix; fi
+  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake mingw-w64 cmake zip; fi
   - export VERSION=`head -n 1 README.md | cut -c 7-`
   - echo $VERSION
   - export BRANCH=$(if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then echo $TRAVIS_BRANCH; else echo $TRAVIS_PULL_REQUEST_BRANCH; fi)
@@ -46,25 +44,25 @@ script:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./zcutil/build.sh -j4; fi
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then ./zcutil/build-win.sh -j4; fi
 before_deploy:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx ./src/zelcash-gtest
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; cp ./src/zelcashd .
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; cp ./src/zelcash-cli .
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; cp ./src/zelcash-tx .
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; cp ./src/zelcash-gtest .
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; cp ./zcutil/fetch-params.sh .
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; tar -cvzf Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx zelcash-gtest fetch-params.sh
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; cp ./src/zelcashd .
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; cp ./src/zelcash-cli .
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; cp ./src/zelcash-tx .
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; cp ./zcutil/fetch-params.sh .
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; tar -cvzf Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx fetch-params.sh
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; strip ./src/zelcashd.exe ./src/zelcash-cli.exe ./src/zelcash-tx.exe
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; cp ./src/zelcashd.exe .
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; cp ./src/zelcash-cli.exe .
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; cp ./src/zelcash-tx.exe .
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; cp ./zcutil/fetch-params.bat .
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; zip Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip zelcashd.exe zelcash-cli.exe zelcash-tx.exe fetch-params.bat
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx ./src/zelcash-gtest; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./src/zelcashd .; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./src/zelcash-cli .; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./src/zelcash-tx .; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./src/zelcash-gtest .; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./zcutil/fetch-params.sh .; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then tar -cvzf Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx zelcash-gtest fetch-params.sh; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./src/zelcashd .; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./src/zelcash-cli .; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./src/zelcash-tx .; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./zcutil/fetch-params.sh .; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then tar -cvzf Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx fetch-params.sh; fi
+  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then strip ./src/zelcashd.exe ./src/zelcash-cli.exe ./src/zelcash-tx.exe; fi
+  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then cp ./src/zelcashd.exe .; fi
+  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then cp ./src/zelcash-cli.exe .; fi
+  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then cp ./src/zelcash-tx.exe .; fi
+  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then cp ./zcutil/fetch-params.bat .; fi
+  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then zip Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip zelcashd.exe zelcash-cli.exe zelcash-tx.exe fetch-params.bat; fi
 deploy:
   provider: releases
   skip_cleanup: true
@@ -73,9 +71,9 @@ deploy:
     secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
   file_glob: true
   file:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; "Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; "Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; "Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip"
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then "Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then "Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"; fi
+  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then "Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip"; fi
   on:
     repo: zelcash/zelcash
     all_branches: true
