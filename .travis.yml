@@ -46,22 +46,21 @@ script:
 #  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then ./zcutil/build-win.sh -j4; fi
 before_deploy:
   - strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx ./src/zelcash-gtest
-  - cp ./src/zelcashd $HOME/zelcashd-$BRANCH-$TRAVIS_BUILD_NUMBER-travis
-  - cp ./src/zelcash-cli $HOME/zelcash-cli-$BRANCH-$TRAVIS_BUILD_NUMBER-travis
-  - cp ./src/zelcash-tx $HOME/zelcash-tx-$BRANCH-$TRAVIS_BUILD_NUMBER-travis
-  - cp ./src/zelcash-gtest $HOME/zelcash-gtest-$BRANCH-$TRAVIS_BUILD_NUMBER-travis
+  - cp ./src/zelcashd .
+  - cp ./src/zelcash-cli .
+  - cp ./src/zelcash-tx .
+  - cp ./src/zelcash-gtest .
+  - cp ./zcutil/fetch-params.sh .
+  - tar -cvzf ZelCash-Linux-$BRANCH-$TRAVIS_BUILD_NUMBER-travis.tar.gz zelcashd zelcash-cli zelcash-tx zelcash-gtest fetch-params.sh
 deploy:
   provider: releases
   skip_cleanup: true
   draft: true
   api_key:
-    secure: B3R37GKUWzr4ZM9j/Fgr5u0jtw9CKha57O70gbgj7IkjggShhRMQuKnJrkLduSSLFyk0OtckmFlvf0UQcVW2YVJj5F9OlqEPP51tooeWT7L7kneRWX6CD23o1Y7F0JmXEIoOb+2pnlhAgtnoIwUaAbhg0iipMx5pu2RJwWuCb/7iFGtAZI5ZukKRCc+Se0tRDs/yqh6rkbbFqPgK5kk02EXV926+HKnKwzOParwRaqbdAquT1JqXTePEl+8O5RJpQdMeH1goMu3RVp+9QE9Rh3wmSjvebhBC5fE03ws/aclk0Nj5wvnI3qxDYnHHcUVXpGetGNg38xHt6NAm12m99lgadKv5QUS8sMTwjr55tTDVFlmCuM+AKXLRLsOo1ZlneacVBkRCXz7pifTAtLMKXxl08RtpTXT5xjSeoerhyellHaZAAxrlWf/XSuiBBQUFZ+MTsRxUcOPjYnT2T0tBt+7lrTsy4tQz+aITkdAxQEm64DaSdJPQGEs78NUm0FYQJnIBCAKUVnICkfRlIys3pKsmx+a7pEEWMdj+eoxnEUfYxdeRUk0YUahQgN39ChOexac4raq1tUCTpvTTDTxDmFGn7jleA+chDfnm+mMCOlKWcEYMYnQ5uP7JeFPb/H6p4X33n5343edZb1OGho6EIWADtejfm59NbBOzwH6vGpI=
+    secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
   file_glob: true
   file:
-  - "$HOME/zelcashd-$BRANCH-$TRAVIS_BUILD_NUMBER-travis"
-  - "$HOME/zelcash-cli-$BRANCH-$TRAVIS_BUILD_NUMBER-travis"
-  - "$HOME/zelcash-tx-$BRANCH-$TRAVIS_BUILD_NUMBER-travis"
-  - "$HOME/zelcash-gtest-$BRANCH-$TRAVIS_BUILD_NUMBER-travis"
+  - "ZelCash-Linux-$BRANCH-$TRAVIS_BUILD_NUMBER-travis.tar.gz"
   on:
     repo: zelcash/zelcash
     all_branches: true
