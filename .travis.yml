@@ -74,6 +74,3 @@ deploy:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then "Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then "Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"; fi
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then "Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip"; fi
-  on:
-    repo: zelcash/zelcash
-    all_branches: true
