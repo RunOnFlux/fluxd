@@ -163,6 +163,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
         entry.push_back(Pair("sig", EncodeBase64(&tx.sig[0], tx.sig.size())));
         entry.push_back(Pair("ip", tx.ip));
 
+        /* Commented until furter investigation - possible cause of daemon crash
         // shall always be true otherwise invalid tx
         COutPoint outPoint = tx.collateralOut;
         CCoins coins;
@@ -170,6 +171,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
         pcoinsTip->GetCoins(outPoint.hash, coins);
         ExtractDestination(coins.vout[outPoint.n].scriptPubKey, destination);
         entry.push_back(Pair("payment_address", EncodeDestination(destination)));
+        */
 
         if (tx.nType & ZELNODE_START_TX_TYPE) {
             entry.push_back(
