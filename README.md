@@ -1,4 +1,4 @@
-# Zel 4.0.4
+# Zel 4.0.5
 [![Build Status](https://travis-ci.com/zelcash/zelcash.svg?branch=master)](https://travis-ci.com/zelcash/zelcash)
 <img align="right" height=112 width=562 src="doc/imgs/kamata.png">
 
