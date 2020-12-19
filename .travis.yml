@@ -24,7 +24,7 @@ matrix:
     #   sudo: required
     #   env: $TRAVIS_OS_NAME="arm"
     - os: linux
-      dist: xenial
+      dist: bionic
       sudo: required
       env: $TRAVIS_OS_NAME="win"
     # - os: osx
