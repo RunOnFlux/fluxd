@@ -12,7 +12,6 @@ group: legacy
 
 os: linux
 language: cpp
-compiler: gcc
 matrix:
   include:
     # - os: linux
