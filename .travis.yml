@@ -1,17 +1,14 @@
 sudo: required
 matrix:
   include:
-    # - os: linux
-    #   dist: xenial
-    #   env: $TRAVIS_OS_NAME="linux"
-    # - os: linux
-    #   dist: xenial
-    #   env: $TRAVIS_OS_NAME="arm"
     - os: linux
       dist: xenial
-      env: $TRAVIS_OS_NAME="win"
+      env: $TRAVIS_OS_NAME="linux"
     - os: linux
-      dist: bionic
+      dist: xenial
+      env: $TRAVIS_OS_NAME="arm"
+    - os: linux
+      dist: xenial
       env: $TRAVIS_OS_NAME="win"
     # - os: osx
     #   osx_image: xcode10.2
