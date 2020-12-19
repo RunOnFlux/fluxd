@@ -33,15 +33,18 @@ matrix:
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get update; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake libtinfo5; fi
   - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then sudo apt-get update; fi
-  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake gcc-5-aarch64-linux-gnu g++-5-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-aarch64-linux-gnu; fi
+  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake libtinfo5; fi
+  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then sudo apt-get install g++-aarch64-linux-gnu; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install cmake autoconf libtool automake coreutils pkgconfig gmp wget; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install gcc5 --without-multilib; fi
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo apt-get update; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake mingw-w64 cmake zip; fi
+  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake libtinfo5 mingw-w64 mingw-w64-tools cmake zip; fi
+  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo update-alternatives --set i686-w64-mingw32-g++ /usr/bin/i686-w64-mingw32-g++-posix; fi
+  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-posix fi
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix; fi
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix; fi
   - export VERSION=`head -n 1 README.md | cut -c 7-`
@@ -60,7 +63,7 @@ before_deploy:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./src/zelcash-gtest .; fi
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./zcutil/fetch-params.sh .; fi
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then tar -cvzf Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx zelcash-gtest fetch-params.sh; fi
-  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx; fi
+  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx; fi # disable as of error
   - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./src/zelcashd .; fi
   - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./src/zelcash-cli .; fi
   - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./src/zelcash-tx .; fi
