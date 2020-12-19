@@ -42,7 +42,7 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install cmake autoconf libtool automake coreutils pkgconfig gmp wget; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install gcc5 --without-multilib; fi
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo apt-get update; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake libtinfo5 mingw-w64 mingw-w64-tools cmake zip; fi
+  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake libtinfo5 mingw-w64 mingw-w64-tools gfortran-mingw-w64 gcc-mingw-w64-x86-64 cmake zip; fi
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo update-alternatives --get-selections|grep mingw32; fi
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo update-alternatives --set i686-w64-mingw32-g++ /usr/bin/i686-w64-mingw32-g++-win32; fi
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-win32; fi
