@@ -1,16 +1,18 @@
+sudo: required
+language: cpp
 matrix:
   include:
     # - os: linux
     #   dist: xenial
-    #   sudo: required
     #   env: $TRAVIS_OS_NAME="linux"
     # - os: linux
     #   dist: xenial
-    #   sudo: required
     #   env: $TRAVIS_OS_NAME="arm"
     - os: linux
+      dist: xenial
+      env: $TRAVIS_OS_NAME="win"
+    - os: linux
       dist: bionic
-      sudo: required
       env: $TRAVIS_OS_NAME="win"
     # - os: osx
     #   osx_image: xcode10.2
