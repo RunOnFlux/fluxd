@@ -61,16 +61,47 @@ before_deploy:
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then cp ./zcutil/fetch-params.bat .; fi
   - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then zip Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip zelcashd.exe zelcash-cli.exe zelcash-tx.exe fetch-params.bat; fi
 deploy:
-  provider: releases
-  skip_cleanup: true
-  draft: true
-  api_key:
-    secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
-  file_glob: true
-  file:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then "Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"; fi
-  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then "Zel-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then "Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then "Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip"; fi
-  on:
-    all_branches: true
+  - provider: releases
+    skip_cleanup: true
+    draft: true
+    api_key:
+      secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
+    file_glob: true
+    file:
+      - "Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
+    on:
+      condition: $TRAVIS_OS_NAME == "linux
+      all_branches: true
+  - provider: releases
+    skip_cleanup: true
+    draft: true
+    api_key:
+      secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
+    file_glob: true
+    file:
+      - "Zel-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
+    on:
+      condition: $TRAVIS_OS_NAME == "arm
+      all_branches: true
+  - provider: releases
+    skip_cleanup: true
+    draft: true
+    api_key:
+      secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
+    file_glob: true
+    file:
+      - "Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
+    on:
+      condition: $TRAVIS_OS_NAME == "osx"
+      all_branches: true
+  - provider: releases
+    skip_cleanup: true
+    draft: true
+    api_key:
+      secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
+    file_glob: true
+    file:
+      - "Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip"
+    on:
+      condition: $TRAVIS_OS_NAME == "win"
+      all_branches: true
