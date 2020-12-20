@@ -1,4 +1,5 @@
 sudo: required
+language: generic
 matrix:
   include:
     - os: linux
@@ -46,7 +47,7 @@ before_deploy:
   - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./src/zelcash-cli .; fi
   - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./src/zelcash-tx .; fi
   - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./zcutil/fetch-params.sh .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then tar -cvzf Zel-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx zelcash-gtest fetch-params.sh; fi
+  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then tar -cvzf Zel-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx fetch-params.sh; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./src/zelcashd .; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./src/zelcash-cli .; fi
