@@ -70,7 +70,7 @@ deploy:
     file:
       - "Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
     on:
-      condition: $TRAVIS_OS_NAME == "linux
+      condition: $TRAVIS_OS_NAME == "linux"
       all_branches: true
   - provider: releases
     skip_cleanup: true
@@ -81,7 +81,7 @@ deploy:
     file:
       - "Zel-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
     on:
-      condition: $TRAVIS_OS_NAME == "arm
+      condition: $TRAVIS_OS_NAME == "arm"
       all_branches: true
   - provider: releases
     skip_cleanup: true
