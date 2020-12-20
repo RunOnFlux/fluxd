@@ -31,35 +31,38 @@ before_install:
   - echo $VERSION
   - export BRANCH=$(if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then echo $TRAVIS_BRANCH; else echo $TRAVIS_PULL_REQUEST_BRANCH; fi)
 script:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./zcutil/build.sh; fi
-  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then HOST=aarch64-linux-gnu ./zcutil/build.sh; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./zcutil/build.sh; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then ./zcutil/build-win.sh; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./zcutil/build.sh; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then HOST=aarch64-linux-gnu ./zcutil/build.sh; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./zcutil/build.sh; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then ./zcutil/build-win.sh; fi
+    - echo $TRAVIS_OS_NAME
 before_deploy:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx ./src/zelcash-gtest; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./src/zelcashd .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./src/zelcash-cli .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./src/zelcash-tx .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./src/zelcash-gtest .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./zcutil/fetch-params.sh .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then tar -cvzf Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx zelcash-gtest fetch-params.sh; fi
-  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./src/zelcashd .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./src/zelcash-cli .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./src/zelcash-tx .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./zcutil/fetch-params.sh .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then tar -cvzf Zel-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx fetch-params.sh; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./src/zelcashd .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./src/zelcash-cli .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./src/zelcash-tx .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./zcutil/fetch-params.sh .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then tar -cvzf Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx fetch-params.sh; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then strip ./src/zelcashd.exe ./src/zelcash-cli.exe ./src/zelcash-tx.exe; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then cp ./src/zelcashd.exe .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then cp ./src/zelcash-cli.exe .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then cp ./src/zelcash-tx.exe .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then cp ./zcutil/fetch-params.bat .; fi
-  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then zip Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip zelcashd.exe zelcash-cli.exe zelcash-tx.exe fetch-params.bat; fi
+    - tar -cvzf Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz autogen.sh
+    - echo $TRAVIS_OS_NAME
+  # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx ./src/zelcash-gtest; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./src/zelcashd .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./src/zelcash-cli .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./src/zelcash-tx .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./src/zelcash-gtest .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then cp ./zcutil/fetch-params.sh .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then tar -cvzf Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx zelcash-gtest fetch-params.sh; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./src/zelcashd .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./src/zelcash-cli .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./src/zelcash-tx .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then cp ./zcutil/fetch-params.sh .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "arm" ]]; then tar -cvzf Zel-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx fetch-params.sh; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./src/zelcashd .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./src/zelcash-cli .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./src/zelcash-tx .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp ./zcutil/fetch-params.sh .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then tar -cvzf Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx fetch-params.sh; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then strip ./src/zelcashd.exe ./src/zelcash-cli.exe ./src/zelcash-tx.exe; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then cp ./src/zelcashd.exe .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then cp ./src/zelcash-cli.exe .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then cp ./src/zelcash-tx.exe .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then cp ./zcutil/fetch-params.bat .; fi
+  # - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then zip Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip zelcashd.exe zelcash-cli.exe zelcash-tx.exe fetch-params.bat; fi
 deploy:
   - provider: releases
     skip_cleanup: true
@@ -70,7 +73,7 @@ deploy:
     file:
       - "Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
     on:
-      condition: $TRAVIS_OS_NAME = linux
+      condition: $TRAVIS_OS_NAME = "linux"
       all_branches: true
   - provider: releases
     skip_cleanup: true
@@ -79,10 +82,21 @@ deploy:
       secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
     file_glob: true
     file:
-      - "Zel-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
+      - "Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
     on:
-      condition: $TRAVIS_OS_NAME = arm
+      condition: $TRAVIS_OS_NAME == "arm"
       all_branches: true
+  # - provider: releases
+  #   skip_cleanup: true
+  #   draft: true
+  #   api_key:
+  #     secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
+  #   file_glob: true
+  #   file:
+  #     - "Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
+  #   on:
+  #     condition: $TRAVIS_OS_NAME = osx
+  #     all_branches: true
   - provider: releases
     skip_cleanup: true
     draft: true
@@ -90,18 +104,7 @@ deploy:
       secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
     file_glob: true
     file:
-      - "Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
+      - "Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
     on:
-      condition: $TRAVIS_OS_NAME = osx
-      all_branches: true
-  - provider: releases
-    skip_cleanup: true
-    draft: true
-    api_key:
-      secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
-    file_glob: true
-    file:
-      - "Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip"
-    on:
-      condition: $TRAVIS_OS_NAME = win
+      condition: $TRAVIS_OS_NAME == win
       all_branches: true
