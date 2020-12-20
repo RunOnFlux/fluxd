@@ -62,7 +62,6 @@ before_deploy:
   - if [[ "$PLATFORM" == "win" ]]; then zip Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip zelcashd.exe zelcash-cli.exe zelcash-tx.exe fetch-params.bat; fi
 deploy:
   - provider: releases
-    overwrite: true
     skip_cleanup: true
     draft: true
     api_key:
@@ -74,7 +73,6 @@ deploy:
       condition: $PLATFORM = linux
       all_branches: true
   - provider: releases
-    overwrite: true
     skip_cleanup: true
     draft: true
     api_key:
@@ -86,7 +84,6 @@ deploy:
       condition: $PLATFORM = arm
       all_branches: true
   - provider: releases
-    overwrite: true
     skip_cleanup: true
     draft: true
     api_key:
@@ -98,7 +95,6 @@ deploy:
       condition: $PLATFORM = osx
       all_branches: true
   - provider: releases
-    overwrite: true
     skip_cleanup: true
     draft: true
     api_key:
