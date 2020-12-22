@@ -1,46 +1,107 @@
-# errata:
-# - A travis bug causes caches to trample eachother when using the same
-#   compiler key (which we don't use anyway). This is worked around for now by
-#   replacing the "compilers" with a build name prefixed by the no-op ":"
-#   command. See: https://github.com/travis-ci/travis-ci/issues/4393
-# - sudo/dist/group are set so as to get Blue Box VMs, necessary for [loopback]
-#   IPv6 support
-
 sudo: required
-dist: precise
-group: legacy
-
-os: linux
-language: cpp
-compiler: gcc
+language: generic
 matrix:
   include:
     - os: linux
       dist: xenial
-      sudo: required
-      env: $TRAVIS_OS_NAME="linux"
-#    - os: linux
-#      dist: bionic
-#      sudo: required
-#      env: $TRAVIS_OS_NAME="win"
-#    - os: osx
-#      osx_image: xcode10.1
-#      env: $TRAVIS_OS_NAME="osx"
+      env: PLATFORM="linux"
+    - os: linux
+      dist: xenial
+      env: PLATFORM="arm"
+    - os: linux
+      dist: xenial
+      env: PLATFORM="win"
+    # - os: osx
+    #   osx_image: xcode10.2
+    #   env: $PLATFORM="osx"
 
 before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get update; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake; fi
-#  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"; fi
-#  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
-#  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install cmake autoconf libtool automake coreutils pkgconfig gmp wget; fi
-#  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install gcc5 --without-multilib; fi
-#  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo apt-get update; fi
-#  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python curl zlib1g-dev wget bsdmainutils automake cmake mingw-w64; fi
-#  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix; fi
-#  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then sudo apt-get update; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake libtinfo5; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then sudo apt-get update; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake libtinfo5; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then sudo apt-get install g++-aarch64-linux-gnu; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then brew update; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then brew install cmake autoconf libtool automake coreutils pkgconfig gmp wget; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then brew install gcc5 --without-multilib; fi
+  - if [[ "$PLATFORM" == "win" ]]; then sudo apt-get update; fi
+  - if [[ "$PLATFORM" == "win" ]]; then sudo apt-get install -y build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake libtinfo5 mingw-w64 mingw-w64-tools gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 cmake zip; fi
+  - export VERSION=`head -n 1 README.md | cut -c 7-`
+  - echo $VERSION
+  - export BRANCH=$(if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then echo $TRAVIS_BRANCH; else echo $TRAVIS_PULL_REQUEST_BRANCH; fi)
 script:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./zcutil/build.sh -j4; fi
-#  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./zcutil/fetch-params.sh -j4; fi
-#  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./src/zelcash-gtest -j4; fi
-#  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./zcutil/build.sh -j4; fi
-#  - if [[ "$TRAVIS_OS_NAME" == "win" ]]; then ./zcutil/build-win.sh -j4; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then ./zcutil/build.sh; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then HOST=aarch64-linux-gnu ./zcutil/build.sh; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then ./zcutil/build.sh; fi
+  - if [[ "$PLATFORM" == "win" ]]; then ./zcutil/build-win.sh; fi
+before_deploy:
+  - if [[ "$PLATFORM" == "linux" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx ./src/zelcash-gtest; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/zelcashd .; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/zelcash-cli .; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/zelcash-tx .; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/zelcash-gtest .; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then cp ./zcutil/fetch-params.sh .; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then tar -cvzf Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx zelcash-gtest fetch-params.sh; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/zelcashd .; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/zelcash-cli .; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/zelcash-tx .; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then cp ./zcutil/fetch-params.sh .; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then tar -cvzf Zel-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx fetch-params.sh; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then cp ./src/zelcashd .; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then cp ./src/zelcash-cli .; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then cp ./src/zelcash-tx .; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then cp ./zcutil/fetch-params.sh .; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then tar -cvzf Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx fetch-params.sh; fi
+  - if [[ "$PLATFORM" == "win" ]]; then strip ./src/zelcashd.exe ./src/zelcash-cli.exe ./src/zelcash-tx.exe; fi
+  - if [[ "$PLATFORM" == "win" ]]; then cp ./src/zelcashd.exe .; fi
+  - if [[ "$PLATFORM" == "win" ]]; then cp ./src/zelcash-cli.exe .; fi
+  - if [[ "$PLATFORM" == "win" ]]; then cp ./src/zelcash-tx.exe .; fi
+  - if [[ "$PLATFORM" == "win" ]]; then cp ./zcutil/fetch-params.bat .; fi
+  - if [[ "$PLATFORM" == "win" ]]; then zip Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip zelcashd.exe zelcash-cli.exe zelcash-tx.exe fetch-params.bat; fi
+deploy:
+  - provider: releases
+    skip_cleanup: true
+    draft: true
+    api_key:
+      secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
+    file_glob: true
+    file:
+      - "Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
+    on:
+      condition: $PLATFORM = linux
+      all_branches: true
+  - provider: releases
+    skip_cleanup: true
+    draft: true
+    api_key:
+      secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
+    file_glob: true
+    file:
+      - "Zel-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
+    on:
+      condition: $PLATFORM = arm
+      all_branches: true
+  - provider: releases
+    skip_cleanup: true
+    draft: true
+    api_key:
+      secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
+    file_glob: true
+    file:
+      - "Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
+    on:
+      condition: $PLATFORM = osx
+      all_branches: true
+  - provider: releases
+    skip_cleanup: true
+    draft: true
+    api_key:
+      secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
+    file_glob: true
+    file:
+      - "Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip"
+    on:
+      condition: $PLATFORM = win
+      all_branches: true
