@@ -86,7 +86,7 @@ public:
     CMainParams() {
         strNetworkID = "main";
         strCurrencyUnits = "ZEL";
-	bip44CoinType = 19167;
+	    bip44CoinType = 19167;
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 5000;
         consensus.nSubsidyHalvingInterval = 655350; // 2.5 years
@@ -98,7 +98,7 @@ public:
         assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
-	consensus.nPowAllowMinDifficultyBlocksAfterHeight = boost::none;
+	    consensus.nPowAllowMinDifficultyBlocksAfterHeight = boost::none;
         consensus.nPowTargetSpacing = 2 * 60;
 
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
@@ -109,31 +109,34 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 125000;
+	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
+	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 125000;
 
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 125100;
+	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
+	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 125100;
 
-	consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
+	    consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January 12th
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].hashActivationBlock =
                 uint256S("0000001d65fa78f2f6c172a51b5aca59ee1927e51f728647fca21b180becfe59");
 
-    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
         consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 372500;  // Approx July 2nd - Zel Team Boulder Meetup
         consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].hashActivationBlock =
                 uint256S("00000052e2ac144c2872ff641c646e41dac166ac577bc9b0837f501aba19de4a");
 
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 558000;  // 18th March
-        // TODO, add the activation block hash after activation
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].hashActivationBlock =
+                uint256S("000000a33d38f37f586b843a9c8cf6d1ff1269e6114b34604cabcd14c44268d4");
 
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 9999999;  // TODO Set this height
 
         consensus.nZawyLWMAAveragingWindow = 60;
-	consensus.eh_epoch_fade_length = 11;
+	    consensus.eh_epoch_fade_length = 11;
 
-	eh_epoch_1 = eh200_9;
+	    eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
         eh_epoch_3 = zelHash;
 
@@ -223,6 +226,17 @@ public:
                             //   total number of tx / (checkpoint block height / (24 * 30))
         };
 
+        // Flux rebrand values
+        strExchangeFundingAddress = "xxx"; // TODO Add exchange funding address
+        nExchangeFundingHeight = 9999999; // TODO Add exchange funding height
+        nExchangeFundingAmount = 3000000 * COIN;
+
+        strSwapPoolAddress = "xxx"; // TODO Add swappool funding address
+        nSwapPoolStartHeight = 9999999; // TODO Add swappool funding height
+        nSwapPoolAmount = 2100000 * COIN;
+        nSwapPoolInterval = 10; // TODO
+        nSwapPoolMaxTimes = 10 ; // TODO
+
         // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
         // in #2795.
@@ -279,6 +293,9 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 350;
+
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 9999999;  // TODO Set this height
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
@@ -361,6 +378,17 @@ public:
                          //   total number of tx / (checkpoint block height / (24 * 24))
         };
 
+        // Flux rebrand values
+        strExchangeFundingAddress = "xxx"; // TODO Add exchange funding address
+        nExchangeFundingHeight = 9999999; // TODO Add exchange funding height
+        nExchangeFundingAmount = 3000000 * COIN;
+
+        strSwapPoolAddress = "xxx"; // TODO Add swappool funding address
+        nSwapPoolStartHeight = 9999999; // TODO Add swappool funding height
+        nSwapPoolAmount = 2100000 * COIN;
+        nSwapPoolInterval = 10; // TODO
+        nSwapPoolMaxTimes = 10 ; // TODO
+
     // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
         // in #2795.
@@ -425,6 +453,10 @@ public:
                 Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 105;
+
+
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
 
@@ -486,6 +518,17 @@ public:
         bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviewregtestsapling";
         bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivkregtestsapling";
         bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-regtest";
+
+        // Flux rebrand values
+        strExchangeFundingAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
+        nExchangeFundingHeight = 10;
+        nExchangeFundingAmount = 3000000 * COIN;
+
+        strSwapPoolAddress = "tm9kJLJWaWPtUdxsrjCyao4YAwHJX32mZzS";
+        nSwapPoolStartHeight = 10;
+        nSwapPoolAmount = 2100000 * COIN;
+        nSwapPoolInterval = 10;
+        nSwapPoolMaxTimes = 5;
     }
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)

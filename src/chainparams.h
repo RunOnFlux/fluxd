@@ -132,6 +132,16 @@ public:
     CBaseChainParams::Network NetworkID() const { return networkID; }
     std::string BenchmarkingPublicKey() const { return strBenchmarkingPublicKey; }
 
+    /** Flux Rebrand **/
+    std::string GetExchangeFundingAddress() const { return strExchangeFundingAddress; }
+    int64_t GetExchangeFundingHeight() const { return nExchangeFundingHeight; }
+    CAmount GetExchangeFundingAmount() const { return nExchangeFundingAmount; }
+
+    std::string GetSwapPoolAddress() const { return strSwapPoolAddress; }
+    int64_t GetSwapPoolStartHeight() const { return nSwapPoolStartHeight; }
+    CAmount GetSwapPoolAmount() const { return nSwapPoolAmount; }
+    int64_t GetSwapPoolInterval() const { return nSwapPoolInterval; }
+    int GetSwapPoolMaxTimes() const { return nSwapPoolMaxTimes; }
 
 protected:
     CChainParams() {}
@@ -174,6 +184,17 @@ protected:
     int64_t nStartZelnodePaymentsHeight;
     CBaseChainParams::Network networkID;
     std::string strBenchmarkingPublicKey;
+
+    /** Flux params **/
+    std::string strExchangeFundingAddress;
+    int64_t nExchangeFundingHeight;
+    CAmount nExchangeFundingAmount;
+
+    std::string strSwapPoolAddress;
+    CAmount nSwapPoolAmount;
+    int64_t nSwapPoolStartHeight;
+    int64_t nSwapPoolInterval;
+    int64_t nSwapPoolMaxTimes;
 };
 
 /**
