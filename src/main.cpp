@@ -928,6 +928,7 @@ bool ContextualCheckTransaction(
     if (tx.IsCoinBase()) {
         // Check for exchange address funding
         CAmount nExchangeAmount = GetExchangeFundAmount(nHeight, chainparams.GetConsensus());
+        CAmount nFoundationAmount = GetFoundationFundAmount(nHeight, chainparams.GetConsensus());
         if (nExchangeAmount > 0) {
             bool fFoundExchangeFund = false;
             for (const auto& out : tx.vout) {
@@ -941,6 +942,23 @@ bool ContextualCheckTransaction(
             if (!fFoundExchangeFund) {
                 return state.DoS(dosLevel, error("ContextualCheckTransaction(): exchange funding not correct in coinbase"),
                                  REJECT_INVALID, "tx-coinbase-missing-exchange-funding");
+            }
+        }
+
+        // Check for foundation address funding
+        if (nFoundationAmount > 0) {
+            bool fFoundFoundationFund = false;
+            for (const auto& out : tx.vout) {
+                if (out.scriptPubKey == GetScriptForDestination(DecodeDestination(Params().GetFoundationFundingAddress()))) {
+                    if (out.nValue == nFoundationAmount) {
+                        fFoundFoundationFund = true;
+                        break;
+                    }
+                }
+            }
+            if (!fFoundFoundationFund) {
+                return state.DoS(dosLevel, error("ContextualCheckTransaction(): foundation funding not correct in coinbase"),
+                                 REJECT_INVALID, "tx-coinbase-missing-foundation-funding");
             }
         }
 
@@ -2320,6 +2338,17 @@ CAmount GetExchangeFundAmount(int nHeight, const Consensus::Params& consensusPar
     return 0;
 }
 
+CAmount GetFoundationFundAmount(int nHeight, const Consensus::Params& consensusParams) {
+    CAmount nFoundationFundAmount = Params().GetFoundationFundingAmount();
+    CAmount nFoundationFundHeight = Params().GetFoundationFundingHeight();
+
+    if (nHeight == nFoundationFundHeight) {
+        return nFoundationFundAmount;
+    }
+
+    return 0;
+}
+
 CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier) // TODO tie in consensusParams
 {
     float fMultiple = 1.0;
@@ -2328,13 +2357,13 @@ CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier)
         fMultiple = 2.0;
     }
 
-    std::cout << "Testing Zelnode Subsidy" << std::endl;
-    CAmount tb = blockValue * (0.0375 * fMultiple);
-    CAmount ts = blockValue * (0.0625 * fMultiple);
-    CAmount tba = blockValue * (0.15 * fMultiple);
-
-    CAmount total = tb + ts + tba;
-    std::cout << "Got total of: " << total << std::endl;
+//    std::cout << "Testing Zelnode Subsidy" << std::endl;
+//    CAmount tb = blockValue * (0.0375 * fMultiple);
+//    CAmount ts = blockValue * (0.0625 * fMultiple);
+//    CAmount tba = blockValue * (0.15 * fMultiple);
+//
+//    CAmount total = tb + ts + tba;
+//    std::cout << "Got total of: " << total << std::endl;
 
 
     if (nNodeTier == Zelnode::BASIC) {
@@ -3480,8 +3509,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
     CAmount exchangeFund = GetExchangeFundAmount(pindex->nHeight, chainparams.GetConsensus());
+    CAmount foundationFund = GetFoundationFundAmount(pindex->nHeight, chainparams.GetConsensus());
     CAmount swapPoolFund = IsSwapPoolInterval(pindex->nHeight) ? chainparams.GetSwapPoolAmount() : 0;
-    if (pindex->nHeight > 2 && block.vtx[0].GetValueOut() > blockReward + exchangeFund + swapPoolFund)
+    if (pindex->nHeight > 2 && block.vtx[0].GetValueOut() > blockReward + exchangeFund + swapPoolFund + foundationFund)
         return state.DoS(100,
                          error("ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)",
                                block.vtx[0].GetValueOut(), blockReward),

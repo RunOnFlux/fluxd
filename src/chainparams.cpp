@@ -229,13 +229,17 @@ public:
         // Flux rebrand values
         strExchangeFundingAddress = "xxx"; // TODO Add exchange funding address
         nExchangeFundingHeight = 9999999; // TODO Add exchange funding height
-        nExchangeFundingAmount = 3000000 * COIN;
+        nExchangeFundingAmount = 7500000 * COIN; // 7.5 Million
+
+        strFoundationFundingAddress = "xxx"; // TODO Add foundation funding address
+        nFoundationFundingHeight = 9999999; // TODO Add exchange funding height
+        nFoundationFundingAmount = 2500000 * COIN; // 2.5 Million
 
         strSwapPoolAddress = "xxx"; // TODO Add swappool funding address
         nSwapPoolStartHeight = 9999999; // TODO Add swappool funding height
-        nSwapPoolAmount = 2100000 * COIN;
-        nSwapPoolInterval = 10; // TODO
-        nSwapPoolMaxTimes = 10 ; // TODO
+        nSwapPoolAmount = 22000000 * COIN; // 22 Million every time
+        nSwapPoolInterval = 10; // TODO - Make this a montly amount of blocks
+        nSwapPoolMaxTimes = 10 ;
 
         // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
@@ -381,13 +385,17 @@ public:
         // Flux rebrand values
         strExchangeFundingAddress = "xxx"; // TODO Add exchange funding address
         nExchangeFundingHeight = 9999999; // TODO Add exchange funding height
-        nExchangeFundingAmount = 3000000 * COIN;
+        nExchangeFundingAmount = 7500000 * COIN; // 7.5 Million
+
+        strFoundationFundingAddress = "xxx"; // TODO Add foundation funding address
+        nFoundationFundingHeight = 9999999; // TODO Add exchange funding height
+        nFoundationFundingAmount = 2500000 * COIN; // 2.5 Million
 
         strSwapPoolAddress = "xxx"; // TODO Add swappool funding address
         nSwapPoolStartHeight = 9999999; // TODO Add swappool funding height
-        nSwapPoolAmount = 2100000 * COIN;
+        nSwapPoolAmount = 2200000 * COIN;
         nSwapPoolInterval = 10; // TODO
-        nSwapPoolMaxTimes = 10 ; // TODO
+        nSwapPoolMaxTimes = 10 ;
 
     // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
@@ -524,7 +532,11 @@ public:
         nExchangeFundingHeight = 10;
         nExchangeFundingAmount = 3000000 * COIN;
 
-        strSwapPoolAddress = "tm9kJLJWaWPtUdxsrjCyao4YAwHJX32mZzS";
+        strFoundationFundingAddress = "t2DFGpj2tciojsGKKrGVwQ92hUwAxWQQgJ9"; // TODO Add foundation funding address
+        nFoundationFundingHeight = 10; // TODO Add exchange funding height
+        nFoundationFundingAmount = 2500000 * COIN; // 2.5 Million
+
+        strSwapPoolAddress = "t2Dsexh4v5g2dpL2LLCsR1p9TshMm63jSBM";
         nSwapPoolStartHeight = 10;
         nSwapPoolAmount = 2100000 * COIN;
         nSwapPoolInterval = 10;

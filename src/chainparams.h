@@ -137,6 +137,10 @@ public:
     int64_t GetExchangeFundingHeight() const { return nExchangeFundingHeight; }
     CAmount GetExchangeFundingAmount() const { return nExchangeFundingAmount; }
 
+    std::string GetFoundationFundingAddress() const { return strFoundationFundingAddress; }
+    int64_t GetFoundationFundingHeight() const { return nFoundationFundingHeight; }
+    CAmount GetFoundationFundingAmount() const { return nFoundationFundingAmount; }
+
     std::string GetSwapPoolAddress() const { return strSwapPoolAddress; }
     int64_t GetSwapPoolStartHeight() const { return nSwapPoolStartHeight; }
     CAmount GetSwapPoolAmount() const { return nSwapPoolAmount; }
@@ -189,6 +193,10 @@ protected:
     std::string strExchangeFundingAddress;
     int64_t nExchangeFundingHeight;
     CAmount nExchangeFundingAmount;
+
+    std::string strFoundationFundingAddress;
+    int64_t nFoundationFundingHeight;
+    CAmount nFoundationFundingAmount;
 
     std::string strSwapPoolAddress;
     CAmount nSwapPoolAmount;

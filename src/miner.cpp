@@ -464,6 +464,19 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             txNew.vout[newSize -1].scriptPubKey = GetScriptForDestination(exchangeDestination);
         }
 
+        // Foundation Fund
+        if (pindexPrev->nHeight + 1 == chainparams.GetFoundationFundingHeight()) {
+            CTxDestination foundationDestination = DecodeDestination(Params().GetFoundationFundingAddress());
+            CAmount nAmount = Params().GetFoundationFundingAmount();
+
+            // Change coinbase transaction to include exchange address funding
+            int currentSize = txNew.vout.size();
+            int newSize = currentSize + 1;
+            txNew.vout.resize(newSize);
+            txNew.vout[newSize -1].nValue = nAmount;
+            txNew.vout[newSize -1].scriptPubKey = GetScriptForDestination(foundationDestination);
+        }
+
         // Swap Pool Fund
         if (IsSwapPoolInterval(pindexPrev->nHeight + 1)) {
             CTxDestination swapPoolDestination = DecodeDestination(Params().GetSwapPoolAddress());

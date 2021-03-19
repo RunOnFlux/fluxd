@@ -745,6 +745,11 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         result.push_back(Pair("exchange_fund_amount", Params().GetExchangeFundingAmount()));
     }
 
+    if (pindexPrev->nHeight + 1 == Params().GetFoundationFundingHeight()) {
+        result.push_back(Pair("foundation_fund_address", Params().GetFoundationFundingAddress()));
+        result.push_back(Pair("foundation_fund_amount", Params().GetFoundationFundingAmount()));
+    }
+
     if (IsSwapPoolInterval(pindexPrev->nHeight + 1)) {
         result.push_back(Pair("swap_pool_fund_address", Params().GetSwapPoolAddress()));
         result.push_back(Pair("swap_pool_fund_amount", Params().GetSwapPoolAmount()));

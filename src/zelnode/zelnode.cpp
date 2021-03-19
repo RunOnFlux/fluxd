@@ -1792,6 +1792,8 @@ bool ZelnodeCache::CheckListHas(const ZelnodeCacheData& p_zelnodeData)
         return mapZelnodeList.at(Zelnode::SUPER).setConfirmedTxInList.count(p_zelnodeData.collateralIn);
     else if (p_zelnodeData.nTier == Zelnode::BAMF)
         return mapZelnodeList.at(Zelnode::BAMF).setConfirmedTxInList.count(p_zelnodeData.collateralIn);
+
+    return false;
 }
 
 // Needs to be protected by locking cs before calling
