@@ -103,6 +103,7 @@ string strZelnodeAddr = "";
 string strZelnodePrivKey = "";
 bool fZelnode = false;
 
+CCriticalSection cs_args;
 map<string, string> mapArgs;
 map<string, vector<string> > mapMultiArgs;
 bool fDebug = false;
@@ -341,6 +342,7 @@ static void InterpretNegativeSetting(string name, map<string, string>& mapSettin
 
 void ParseParameters(int argc, const char* const argv[])
 {
+    LOCK(cs_args);
     mapArgs.clear();
     mapMultiArgs.clear();
 
@@ -380,8 +382,16 @@ void ParseParameters(int argc, const char* const argv[])
     }
 }
 
+bool IsArgSet(const std::string& strArg)
+{
+    LOCK(cs_args);
+    return mapArgs.count(strArg);
+}
+
+
 std::string GetArg(const std::string& strArg, const std::string& strDefault)
 {
+    LOCK(cs_args);
     if (mapArgs.count(strArg))
         return mapArgs[strArg];
     return strDefault;
@@ -389,6 +399,7 @@ std::string GetArg(const std::string& strArg, const std::string& strDefault)
 
 int64_t GetArg(const std::string& strArg, int64_t nDefault)
 {
+    LOCK(cs_args);
     if (mapArgs.count(strArg))
         return atoi64(mapArgs[strArg]);
     return nDefault;
@@ -396,6 +407,7 @@ int64_t GetArg(const std::string& strArg, int64_t nDefault)
 
 bool GetBoolArg(const std::string& strArg, bool fDefault)
 {
+    LOCK(cs_args);
     if (mapArgs.count(strArg))
     {
         if (mapArgs[strArg].empty())
@@ -407,6 +419,7 @@ bool GetBoolArg(const std::string& strArg, bool fDefault)
 
 bool SoftSetArg(const std::string& strArg, const std::string& strValue)
 {
+    LOCK(cs_args);
     if (mapArgs.count(strArg))
         return false;
     mapArgs[strArg] = strValue;
@@ -460,16 +473,17 @@ void PrintExceptionContinue(const std::exception* pex, const char* pszThread)
     strMiscWarning = message;
 }
 
-boost::filesystem::path GetDefaultDataDir()
+boost::filesystem::path GetDefaultDataDirForCoinName(const std::string &coinName)
 {
     namespace fs = boost::filesystem;
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\Zelcash
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\Zelcash
-    // Mac: ~/Library/Application Support/Zelcash
-    // Unix: ~/.zelcash
+    // Windows < Vista: C:\Documents and Settings\Username\Application Data\Flux
+    // Windows >= Vista: C:\Users\Username\AppData\Roaming\Flux
+    // Mac: ~/Library/Application Support/Flux
+    // Unix: ~/.flux
 #ifdef WIN32
     // Windows
-    return GetSpecialFolderPath(CSIDL_APPDATA) / "Zelcash";
+
+    return GetSpecialFolderPath(CSIDL_APPDATA) / coinName;
 #else
     fs::path pathRet;
     char* pszHome = getenv("HOME");
@@ -479,14 +493,33 @@ boost::filesystem::path GetDefaultDataDir()
         pathRet = fs::path(pszHome);
 #ifdef MAC_OSX
     // Mac
-    pathRet /= "Library/Application Support";
-    TryCreateDirectory(pathRet);
-    return pathRet / "Zelcash";
+    return pathRet / "Library/Application Support" / coinName;
 #else
+    std::string flux_lowercase = "flux";
+    std::string zelcash_lowercase = "zelcash";
     // Unix
-    return pathRet / ".zelcash";
+    if (coinName == "Flux")
+        return pathRet / ("." + flux_lowercase);
+
+    return pathRet / ("." + zelcash_lowercase);
 #endif
 #endif
+}
+
+
+boost::filesystem::path GetDefaultDataDir()
+{
+    namespace fs = boost::filesystem;
+
+    fs::path fluxDefaultDir = GetDefaultDataDirForCoinName("Flux");
+    if (!fs::is_directory(fluxDefaultDir)) {
+        // try "zelcash" in case we're upgrading from pre-firo version
+        fs::path zelcashDefaultDir = GetDefaultDataDirForCoinName("Zelcash");
+        if (fs::is_directory(zelcashDefaultDir))
+            return zelcashDefaultDir;
+    }
+
+    return fluxDefaultDir;
 }
 
 static boost::filesystem::path pathCached;
@@ -593,6 +626,43 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
     return path;
 }
 
+bool RenameDirectoriesFromZelcashToFlux()
+{
+    namespace fs = boost::filesystem;
+
+    fs::path zelcashPath = GetDefaultDataDirForCoinName("Zelcash");
+    fs::path fluxPath = GetDefaultDataDirForCoinName("Flux");
+
+    // rename is possible only if zcoin directory exists and firo doesn't
+    if (fs::exists(fluxPath) || !fs::is_directory(zelcashPath))
+        return false;
+
+    fs::path zelcashConfFileName = zelcashPath / "zelcash.conf";
+    fs::path fluxConfFileName = zelcashPath / "flux.conf";
+    if (fs::exists(fluxConfFileName))
+        return false;
+
+    try {
+        if (fs::is_regular_file(zelcashConfFileName))
+            fs::rename(zelcashConfFileName, fluxConfFileName);
+
+        try {
+            fs::rename(zelcashPath, fluxPath);
+        }
+        catch (const fs::filesystem_error &) {
+            // rename config file back
+            fs::rename(fluxConfFileName, zelcashConfFileName);
+            throw;
+        }
+    }
+    catch (const fs::filesystem_error &) {
+        return false;
+    }
+
+    ClearDatadirCache();
+    return true;
+}
+
 void ClearDatadirCache()
 {
     pathCached = boost::filesystem::path();
@@ -601,11 +671,23 @@ void ClearDatadirCache()
 
 boost::filesystem::path GetConfigFile()
 {
-    boost::filesystem::path pathConfigFile(GetArg("-conf", "zelcash.conf"));
-    if (!pathConfigFile.is_complete())
-        pathConfigFile = GetDataDir(false) / pathConfigFile;
+    boost::filesystem::path pathFluxConfigFile(GetArg("-conf", "flux.conf"));
+    boost::filesystem::path dataDir = GetDataDir(false);
+    if (!pathFluxConfigFile.is_complete()) {
+        pathFluxConfigFile = dataDir / pathFluxConfigFile;
+    }
 
-    return pathConfigFile;
+    boost::filesystem::ifstream streamConfig(pathFluxConfigFile);
+    if (streamConfig.good()) {
+        return pathFluxConfigFile;
+    }
+
+    boost::filesystem::path pathZelcashConfigFile(GetArg("-conf", "zelcash.conf"));
+    if (!pathZelcashConfigFile.is_complete()) {
+        pathZelcashConfigFile = dataDir / pathZelcashConfigFile;
+    }
+
+    return pathZelcashConfigFile;
 }
 
 boost::filesystem::path GetZelnodeConfigFile()
