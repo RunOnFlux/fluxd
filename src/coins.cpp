@@ -642,13 +642,13 @@ bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_H
     }
 
     if (coins->vout[prevout.n].nValue == 10000 * COIN)
-        nTier = Zelnode::BASIC;
+        nTier = Zelnode::CUMULUS;
     else if (coins->vout[prevout.n].nValue == 25000 * COIN)
-        nTier = Zelnode::SUPER;
+        nTier = Zelnode::NIMBUS;
     else if (coins->vout[prevout.n].nValue == 100000 * COIN)
-        nTier = Zelnode::BAMF;
+        nTier = Zelnode::STRATUS;
 
-    return nTier >= BASIC && nTier <= BAMF;
+    return nTier >= CUMULUS && nTier <= STRATUS;
 }
 
 double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight) const

@@ -26,9 +26,9 @@
 
 
 /// Deterministic Zelnode consensus
-#define ZELNODE_BASIC_COLLATERAL 10000
-#define ZELNODE_SUPER_COLLATERAL 25000
-#define ZELNODE_BAMF_COLLATERAL 100000
+#define ZELNODE_CUMULUS_COLLATERAL 10000
+#define ZELNODE_NIMBUS_COLLATERAL 25000
+#define ZELNODE_STRATUS_COLLATERAL 100000
 
 // How old the output must be for zelnodes collateral to be considered valid
 #define ZELNODE_MIN_CONFIRMATION_DETERMINISTIC 100
@@ -150,9 +150,9 @@ public:
 
     enum tier {
         NONE = 0,
-        BASIC = 1,
-        SUPER = 2,
-        BAMF = 3
+        CUMULUS = 1,
+        NIMBUS = 2,
+        STRATUS = 3
     };
 
     CTxIn vin;
@@ -288,17 +288,17 @@ public:
 
     bool IsBasic()
     {
-        return tier == BASIC;
+        return tier == CUMULUS;
     }
 
     bool IsSuper()
     {
-        return tier == SUPER;
+        return tier == NIMBUS;
     }
 
-    bool IsBAMF()
+    bool IsSTRATUS()
     {
-        return tier == BAMF;
+        return tier == STRATUS;
     }
 
     int GetZelnodeInputAge()
@@ -332,9 +332,9 @@ public:
     {
         std::string strStatus = "NONE";
 
-        if (tier == Zelnode::BASIC) strStatus = "BASIC";
-        if (tier == Zelnode::SUPER) strStatus = "SUPER";
-        if (tier == Zelnode::BAMF) strStatus = "BAMF";
+        if (tier == Zelnode::CUMULUS) strStatus = "CUMULUS";
+        if (tier == Zelnode::NIMBUS) strStatus = "NIMBUS";
+        if (tier == Zelnode::STRATUS) strStatus = "STRATUS";
 
         return strStatus;
     }
@@ -416,9 +416,9 @@ enum  ZelnodeUpdateType {
 
 enum Tier {
     NONE = 0,
-    BASIC = 1,
-    SUPER = 2,
-    BAMF = 3
+    CUMULUS = 1,
+    NIMBUS = 2,
+    STRATUS = 3
 };
 
 std::string ZelnodeLocationToString(int nLocation);
@@ -465,26 +465,26 @@ public:
 
     bool IsBasic()
     {
-        return nTier == BASIC;
+        return nTier == CUMULUS;
     }
 
     bool IsSuper()
     {
-        return nTier == SUPER;
+        return nTier == NIMBUS;
     }
 
-    bool IsBAMF()
+    bool IsSTRATUS()
     {
-        return nTier == BAMF;
+        return nTier == STRATUS;
     }
 
     std::string Tier()
     {
         std::string strStatus = "NONE";
 
-        if (nTier == Zelnode::BASIC) strStatus = "BASIC";
-        if (nTier == Zelnode::SUPER) strStatus = "SUPER";
-        if (nTier == Zelnode::BAMF) strStatus = "BAMF";
+        if (nTier == Zelnode::CUMULUS) strStatus = "CUMULUS";
+        if (nTier == Zelnode::NIMBUS) strStatus = "NIMBUS";
+        if (nTier == Zelnode::STRATUS) strStatus = "STRATUS";
 
         return strStatus;
     }
@@ -644,9 +644,9 @@ public:
     }
 
     void InitMapZelnodeList() {
-        mapZelnodeList.insert(std::make_pair(Zelnode::BASIC, ZelnodeList()));
-        mapZelnodeList.insert(std::make_pair(Zelnode::SUPER, ZelnodeList()));
-        mapZelnodeList.insert(std::make_pair(Zelnode::BAMF, ZelnodeList()));
+        mapZelnodeList.insert(std::make_pair(Zelnode::CUMULUS, ZelnodeList()));
+        mapZelnodeList.insert(std::make_pair(Zelnode::NIMBUS, ZelnodeList()));
+        mapZelnodeList.insert(std::make_pair(Zelnode::STRATUS, ZelnodeList()));
     }
 
     void SetNull() {

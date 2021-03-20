@@ -730,14 +730,26 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
 
     for (auto payout : mapZelnodePayouts) {
         std::string start = "basic";
-        if (payout.first == Zelnode::SUPER) start = "super";
-        else if (payout.first == Zelnode::BAMF) start = "bamf";
+        std::string start_rename = "cumulus";
+
+        if (payout.first == Zelnode::NIMBUS) {
+            start = "super";
+            start_rename = "nimbus";
+        }
+
+        else if (payout.first == Zelnode::STRATUS) {
+            start = "bamf";
+            start_rename = "stratus";
+        }
 
         CTxDestination dest;
         ExtractDestination(payout.second.first, dest);
 
         result.push_back(Pair(std::string(start + "_zelnode_address"), EncodeDestination(dest)));
         result.push_back(Pair(std::string(start + "_zelnode_payout"), payout.second.second));
+
+        result.push_back(Pair(std::string(start_rename + "_fluxnode_address"), EncodeDestination(dest)));
+        result.push_back(Pair(std::string(start_rename + "_fluxnode_payout"), payout.second.second));
     }
 
     if (pindexPrev->nHeight + 1 == Params().GetExchangeFundingHeight()) {

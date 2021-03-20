@@ -1538,9 +1538,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 pZelnodeDB->LoadZelnodeCacheData();
 
                 uiInterface.InitMessage(_("Sorting zelnode list"));
-                g_zelnodeCache.SortList(Zelnode::BASIC);
-                g_zelnodeCache.SortList(Zelnode::SUPER);
-                g_zelnodeCache.SortList(Zelnode::BAMF);
+                g_zelnodeCache.SortList(Zelnode::CUMULUS);
+                g_zelnodeCache.SortList(Zelnode::NIMBUS);
+                g_zelnodeCache.SortList(Zelnode::STRATUS);
 
                 uiInterface.InitMessage(_("Loading block index..."));
                 if (!LoadBlockIndex()) {

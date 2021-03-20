@@ -37,7 +37,7 @@ private:
     // map to hold all MNs
     std::map<CTxIn, Zelnode> mapBasicZelnodes;
     std::map<CTxIn, Zelnode> mapSuperZelnodes;
-    std::map<CTxIn, Zelnode> mapBAMFZelnodes;
+    std::map<CTxIn, Zelnode> mapSTRATUSZelnodes;
     // who's asked for the Zelnode list and the last time
     std::map<CNetAddr, int64_t> mAskedUsForZelnodeList;
     // who we asked for the Zelnode list and the last time
@@ -62,7 +62,7 @@ public:
         LOCK(cs);
         READWRITE(mapBasicZelnodes);
         READWRITE(mapSuperZelnodes);
-        READWRITE(mapBAMFZelnodes);
+        READWRITE(mapSTRATUSZelnodes);
         READWRITE(mAskedUsForZelnodeList);
         READWRITE(mWeAskedForZelnodeList);
         READWRITE(mWeAskedForZelnodeListEntry);
@@ -102,7 +102,7 @@ public:
     Zelnode* Find(const CPubKey& pubKeyZelnode);
 
     /// Find an entry in the zelnode list that is next to be paid
-    vector<Zelnode*> GetNextZelnodeInQueueForPayment(int nBlockHeight, bool fFilterSigTime, int& nBasicCount, int& nSuperCount, int& nBAMFCount);
+    vector<Zelnode*> GetNextZelnodeInQueueForPayment(int nBlockHeight, bool fFilterSigTime, int& nBasicCount, int& nSuperCount, int& nSTRATUSCount);
 
     /// Get the current winner for this block
     bool GetCurrentZelnode(Zelnode& winner, int nNodeTier, int mod = 1, int64_t nBlockHeight = 0, int minProtocol = 0);
@@ -111,12 +111,12 @@ public:
     std::vector<Zelnode> GetFullZelnodeVector(int nZelnodeTier)
     {
         Check();
-        if (nZelnodeTier == Zelnode::BASIC) {
+        if (nZelnodeTier == Zelnode::CUMULUS) {
             return GetFullBasicZelnodeVector();
-        } else if (nZelnodeTier == Zelnode::SUPER) {
+        } else if (nZelnodeTier == Zelnode::NIMBUS) {
             return GetFullSuperZelnodeVector();
-        } else if (nZelnodeTier == Zelnode::BAMF) {
-            return GetFullBAMFZelnodeVector();
+        } else if (nZelnodeTier == Zelnode::STRATUS) {
+            return GetFullSTRATUSZelnodeVector();
         }
 
         return std::vector<Zelnode>();
@@ -128,7 +128,7 @@ public:
 
         std::vector<Zelnode> basic = GetFullBasicZelnodeVector();
         std::vector<Zelnode> super = GetFullSuperZelnodeVector();
-        std::vector<Zelnode> bamf = GetFullBAMFZelnodeVector();
+        std::vector<Zelnode> bamf = GetFullSTRATUSZelnodeVector();
 
         vecZelnode = basic;
         vecZelnode.insert(vecZelnode.end(), super.begin(), super.end());
@@ -144,7 +144,7 @@ public:
     void ProcessMessage(CNode* pfrom, std::string& strCommand, CDataStream& vRecv);
 
     /// Return the number of (unique) Zelnodes
-    int size() { return mapBasicZelnodes.size() + mapSuperZelnodes.size() + mapBAMFZelnodes.size(); }
+    int size() { return mapBasicZelnodes.size() + mapSuperZelnodes.size() + mapSTRATUSZelnodes.size(); }
 
     /// Return the number of Zelnode older than (default) 8000 seconds
     int stable_size ();
@@ -178,10 +178,10 @@ private:
         return ret;
     }
 
-    std::vector<Zelnode> GetFullBAMFZelnodeVector()
+    std::vector<Zelnode> GetFullSTRATUSZelnodeVector()
     {
         std::vector<Zelnode> ret;
-        for (const pair<CTxIn, Zelnode> entry : mapBAMFZelnodes)
+        for (const pair<CTxIn, Zelnode> entry : mapSTRATUSZelnodes)
             ret.emplace_back(entry.second);
 
         return ret;

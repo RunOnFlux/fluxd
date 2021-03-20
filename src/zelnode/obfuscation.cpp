@@ -52,21 +52,21 @@ bool CObfuScationSigner::IsVinAssociatedWithPubkey(CTxIn& vin, CPubKey& pubkey, 
     uint256 hash;
     if (GetTransaction(vin.prevout.hash, txVin, Params().GetConsensus(), hash, true)) {
         for (CTxOut out : txVin.vout) {
-            if (out.nValue == ZELNODE_BASIC_COLLATERAL * COIN) {
+            if (out.nValue == ZELNODE_CUMULUS_COLLATERAL * COIN) {
                 if (out.scriptPubKey == payee2) {
-                    nNodeTier = Zelnode::BASIC;
+                    nNodeTier = Zelnode::CUMULUS;
                     return true;
                 }
             }
-            else if (out.nValue == ZELNODE_SUPER_COLLATERAL * COIN) {
+            else if (out.nValue == ZELNODE_NIMBUS_COLLATERAL * COIN) {
                 if (out.scriptPubKey == payee2) {
-                    nNodeTier = Zelnode::SUPER;
+                    nNodeTier = Zelnode::NIMBUS;
                     return true;
                 }
             }
-            else if (out.nValue == ZELNODE_BAMF_COLLATERAL * COIN) {
+            else if (out.nValue == ZELNODE_STRATUS_COLLATERAL * COIN) {
                 if (out.scriptPubKey == payee2) {
-                    nNodeTier = Zelnode::BAMF;
+                    nNodeTier = Zelnode::STRATUS;
                     return true;
                 }
             }
