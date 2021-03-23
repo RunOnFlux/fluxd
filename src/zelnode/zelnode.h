@@ -45,6 +45,7 @@
 
 // Nodes are allowed to send a update confirm notification only after this many blocks past there last confirm
 #define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT 40
+#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE 5
 
 
 /// Mempool only
@@ -700,7 +701,7 @@ public:
     void CheckForUndoExpiredStartTx(const int& p_nHeight);
     bool CheckIfStarted(const COutPoint& out);
     bool CheckIfConfirmed(const COutPoint& out);
-    bool CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight = 0);
+    bool CheckUpdateHeight(const CTransaction& p_transaction, const ZelnodeCacheData& data, const int p_nHeight = 0);
 
     bool CheckZelnodePayout(const CTransaction& coinbase, const int p_Height, ZelnodeCache* p_zelnodeCache = nullptr);
 

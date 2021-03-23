@@ -1019,7 +1019,7 @@ bool ZelnodeCache::CheckIfConfirmed(const COutPoint& out)
     return false;
 }
 
-bool ZelnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight)
+bool ZelnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const ZelnodeCacheData& data, const int p_nHeight)
 {
     int nCurrentHeight;
     if (p_nHeight)
@@ -1046,7 +1046,17 @@ bool ZelnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const in
         return false;
     }
 
-    // Check to make sure they don't confirm until it has been atleast 30 blocks from there last confirmation
+    bool fFluxActive = NetworkUpgradeActive(nCurrentHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
+    // Allow ip address changes at a different interval
+    if (fFluxActive) {
+        if (p_transaction.ip != data.ip) {
+            if (nCurrentHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight >= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE) {
+                return true;
+            }
+        }
+    }
+
+    // Check to make sure they don't confirm until it has been atleast 40 blocks from there last confirmation
     if (nCurrentHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight <= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT) {
         return false;
     }
