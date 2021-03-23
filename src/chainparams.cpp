@@ -210,8 +210,10 @@ public:
         nStartZelnodePaymentsHeight = 560000; // Start paying deterministic zelnodes on height
 
         // These are the benchmarking public keys, if you are adding a key, you must increase the resize integer
-        vecBenchmarkingPublicKeys.resize(1);
+        vecBenchmarkingPublicKeys.resize(2);
         vecBenchmarkingPublicKeys[0] = std::make_pair("042e79d7dd1483996157df6b16c831be2b14b31c69944ea2a585c63b5101af1f9517ba392cee5b1f45a62e9d936488429374535a2f76870bfa8eea6667b13eb39e", 0);
+        vecBenchmarkingPublicKeys[1] = std::make_pair("04517413e51fa9b2e94f200b254cca69beb86f2d74bf66ca53854ba66bc376dde9b52e9b4403731d9a4f3e8edd9687f1e1824b688fe26454bd9fb823a3307b4682", 1618113600); // Sun Apr 11 2021 04:00:00 UTC
+
         assert(vecBenchmarkingPublicKeys.size() > 0);
 
 
@@ -376,8 +378,10 @@ public:
 
         nStartZelnodePaymentsHeight = 350;
 
-        vecBenchmarkingPublicKeys.resize(1);
+        vecBenchmarkingPublicKeys.resize(2);
         vecBenchmarkingPublicKeys[0] = std::make_pair("04d422e01f5acff68504b92df96a9004cf61be432a20efe83fe8a94c1aa730fe7dece5d2e8298f2d5672d4e569c55d9f0a73268ef7b92990d8c014e828a7cc48dd", 0);
+        vecBenchmarkingPublicKeys[1] = std::make_pair("042023568fbcc4715c34d8596feaabf0683b3dfa7280b2f4df0436311a31086a73fdf507d63c3ec89455037ba738375d17b309c2cd226f173a5ef7841400cd09ec", 1617508800); // Sun Apr 04 2021 04:00:00
+
         assert(vecBenchmarkingPublicKeys.size() > 0);
 
         checkpointData = (CCheckpointData) {
@@ -510,8 +514,10 @@ public:
         fTestnetToBeDeprecatedFieldRPC = false;
 
         networkID = CBaseChainParams::Network::REGTEST;
-        vecBenchmarkingPublicKeys.resize(1);
+        vecBenchmarkingPublicKeys.resize(2);
         vecBenchmarkingPublicKeys[0] = std::make_pair("04cf3c34f01486bbb34c1a7ca11c2ddb1b3d98698c3f37d54452ff91a8cd5e92a6910ce5fc2cc7ad63547454a965df53ff5be740d4ef4ac89848c2bafd1e40e6b7", 0);
+        vecBenchmarkingPublicKeys[1] = std::make_pair("045d54130187b4c4bba25004bf615881c2d79b16950a59114df27dc9858d8e531fda4f3a27aa95ceb2bcc87ddd734be40a6808422655e5350fa9417874556b7342", 1617508800); // Sun Apr 04 2021 04:00:00
+
         assert(vecBenchmarkingPublicKeys.size() > 0);
 
         checkpointData = (CCheckpointData){

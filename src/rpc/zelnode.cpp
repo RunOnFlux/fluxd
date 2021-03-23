@@ -108,6 +108,38 @@ UniValue getzelnodeoutputs(const UniValue& params, bool fHelp)
     return ret;
 }
 
+UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
+{
+    if (fHelp || (params.size() != 0))
+        throw runtime_error(
+                "createconfirmationtransaction\n"
+                "\nCreate a new confirmation transaction and return the raw hex\n"
+
+                "\nResult:\n"
+                "    \"hex\": \"xxxx\",    (string) output transaction hex\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("createconfirmationtransaction", "") + HelpExampleRpc("createconfirmationtransaction", ""));
+
+    if (!fZelnode) throw runtime_error("This is not a fluxnode");
+
+    std::string errorMessage;
+    CMutableTransaction mutTx;
+    mutTx.nVersion = ZELNODE_TX_VERSION;
+
+    activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::UPDATE_CONFIRM);
+
+    if (!activeZelnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
+        throw runtime_error(strprintf("Failed to sign new confirmation transaction: %s\n", errorMessage));
+    }
+
+    CTransaction tx(mutTx);
+
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    ss << tx;
+    return HexStr(ss.begin(), ss.end());
+}
+
 UniValue startzelnode(const UniValue& params, bool fHelp)
 {
 
@@ -2268,7 +2300,9 @@ static const CRPCCommand commands[] =
                 { "benchmarks", "startzelbenchd",       &startzelbenchd,         false  },
 
                 /** Not shown in help menu */
-                { "hidden",    "createsporkkeys",        &createsporkkeys,         false  }
+                { "hidden",    "createsporkkeys",        &createsporkkeys,         false  },
+                { "hidden",    "createconfirmationtransaction",        &createconfirmationtransaction,         false  }
+
 
 
 
