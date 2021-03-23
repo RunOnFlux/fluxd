@@ -131,7 +131,7 @@ public:
                 uint256S("000000a33d38f37f586b843a9c8cf6d1ff1269e6114b34604cabcd14c44268d4");
 
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
-        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 9999999;  // TODO Set this height
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 835554;  // Around 10th April 2021
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 11;
@@ -233,18 +233,18 @@ public:
         };
 
         // Flux rebrand values
-        strExchangeFundingAddress = "xxx"; // TODO Add exchange funding address
-        nExchangeFundingHeight = 9999999; // TODO Add exchange funding height
+        strExchangeFundingAddress = "t3PMbbA5YBMrjSD3dD16SSdXKuKovwmj6tS";
+        nExchangeFundingHeight = 836274; // Around 10th April 2021
         nExchangeFundingAmount = 7500000 * COIN; // 7.5 Million
 
-        strFoundationFundingAddress = "xxx"; // TODO Add foundation funding address
-        nFoundationFundingHeight = 9999999; // TODO Add exchange funding height
+        strFoundationFundingAddress = "t3XjYMBvwxnXVv9jqg4CgokZ3f7kAoXPQL8";
+        nFoundationFundingHeight = 836994;  // Around 11th April 2021
         nFoundationFundingAmount = 2500000 * COIN; // 2.5 Million
 
-        strSwapPoolAddress = "xxx"; // TODO Add swappool funding address
-        nSwapPoolStartHeight = 9999999; // TODO Add swappool funding height
+        strSwapPoolAddress = "t3ThbWogDoAjGuS6DEnmN1GWJBRbVjSUK4T";
+        nSwapPoolStartHeight = 837714; //  // Around 12th April 2021
         nSwapPoolAmount = 22000000 * COIN; // 22 Million every time
-        nSwapPoolInterval = 10; // TODO - Make this a montly amount of blocks
+        nSwapPoolInterval = 21600; // Avg Block per day (720) *  - Trying to get to around once a month
         nSwapPoolMaxTimes = 10 ;
 
         // Hardcoded fallback value for the Sprout shielded value pool balance
@@ -305,7 +305,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 350;
 
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
-        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 9999999;  // TODO Set this height
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 828000; // Around March 30 2021
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
@@ -395,18 +395,18 @@ public:
         };
 
         // Flux rebrand values
-        strExchangeFundingAddress = "xxx"; // TODO Add exchange funding address
-        nExchangeFundingHeight = 9999999; // TODO Add exchange funding height
+        strExchangeFundingAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
+        nExchangeFundingHeight = 828361; // Around March 30th
         nExchangeFundingAmount = 7500000 * COIN; // 7.5 Million
 
-        strFoundationFundingAddress = "xxx"; // TODO Add foundation funding address
-        nFoundationFundingHeight = 9999999; // TODO Add exchange funding height
+        strFoundationFundingAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
+        nFoundationFundingHeight = 828370;
         nFoundationFundingAmount = 2500000 * COIN; // 2.5 Million
 
-        strSwapPoolAddress = "xxx"; // TODO Add swappool funding address
-        nSwapPoolStartHeight = 9999999; // TODO Add swappool funding height
+        strSwapPoolAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
+        nSwapPoolStartHeight = 828380;
         nSwapPoolAmount = 2200000 * COIN;
-        nSwapPoolInterval = 10; // TODO
+        nSwapPoolInterval = 25;
         nSwapPoolMaxTimes = 10 ;
 
     // Hardcoded fallback value for the Sprout shielded value pool balance
@@ -548,8 +548,8 @@ public:
         nExchangeFundingHeight = 10;
         nExchangeFundingAmount = 3000000 * COIN;
 
-        strFoundationFundingAddress = "t2DFGpj2tciojsGKKrGVwQ92hUwAxWQQgJ9"; // TODO Add foundation funding address
-        nFoundationFundingHeight = 10; // TODO Add exchange funding height
+        strFoundationFundingAddress = "t2DFGpj2tciojsGKKrGVwQ92hUwAxWQQgJ9";
+        nFoundationFundingHeight = 10;
         nFoundationFundingAmount = 2500000 * COIN; // 2.5 Million
 
         strSwapPoolAddress = "t2Dsexh4v5g2dpL2LLCsR1p9TshMm63jSBM";

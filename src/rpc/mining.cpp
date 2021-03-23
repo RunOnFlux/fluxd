@@ -752,19 +752,21 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         result.push_back(Pair(std::string(start_rename + "_fluxnode_payout"), payout.second.second));
     }
 
+    // These should never be on the same block. So to keep it clean for pools we will use the same
+    // name for address and amount specifics
     if (pindexPrev->nHeight + 1 == Params().GetExchangeFundingHeight()) {
-        result.push_back(Pair("exchange_fund_address", Params().GetExchangeFundingAddress()));
-        result.push_back(Pair("exchange_fund_amount", Params().GetExchangeFundingAmount()));
+        result.push_back(Pair("flux_creation_address", Params().GetExchangeFundingAddress()));
+        result.push_back(Pair("flux_creation_amount", Params().GetExchangeFundingAmount()));
     }
 
     if (pindexPrev->nHeight + 1 == Params().GetFoundationFundingHeight()) {
-        result.push_back(Pair("foundation_fund_address", Params().GetFoundationFundingAddress()));
-        result.push_back(Pair("foundation_fund_amount", Params().GetFoundationFundingAmount()));
+        result.push_back(Pair("flux_creation_address", Params().GetFoundationFundingAddress()));
+        result.push_back(Pair("flux_creation_amount", Params().GetFoundationFundingAmount()));
     }
 
     if (IsSwapPoolInterval(pindexPrev->nHeight + 1)) {
-        result.push_back(Pair("swap_pool_fund_address", Params().GetSwapPoolAddress()));
-        result.push_back(Pair("swap_pool_fund_amount", Params().GetSwapPoolAmount()));
+        result.push_back(Pair("flux_creation_address", Params().GetSwapPoolAddress()));
+        result.push_back(Pair("flux_creation_amount", Params().GetSwapPoolAmount()));
     }
 
     return result;
