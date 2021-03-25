@@ -250,11 +250,11 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees, std::ma
 
     bool hasBasicPayment = true;
     bool hasSuperPayment = true;
-    bool hasBAMFPayment = true;
+    bool hasSTRATUSPayment = true;
 
     CScript basicPayee;
     CScript superPayee;
-    CScript BAMFPayee;
+    CScript STRATUSPayee;
 
     int nTotalPayouts = 3; // Total number of zelnode payments there could be
 
@@ -262,7 +262,7 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees, std::ma
     if (!zelnodePayments.GetBlockBasicPayee(pindexPrev->nHeight + 1, basicPayee)) {
         //no zelnode detected
         Zelnode winningBasicNode;
-        if (zelnodeman.GetCurrentZelnode(winningBasicNode, Zelnode::BASIC, 1)) {
+        if (zelnodeman.GetCurrentZelnode(winningBasicNode, Zelnode::CUMULUS, 1)) {
             basicPayee = GetScriptForDestination(winningBasicNode.pubKeyCollateralAddress.GetID());
         } else {
             LogPrint("zelnode","CreateNewBlock: Failed to detect Basic zelnode to pay\n");
@@ -274,7 +274,7 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees, std::ma
     if (!zelnodePayments.GetBlockSuperPayee(pindexPrev->nHeight + 1, superPayee)) {
         //no zelnode detected
         Zelnode winningSuperNode;
-        if (zelnodeman.GetCurrentZelnode(winningSuperNode, Zelnode::SUPER, 1)) {
+        if (zelnodeman.GetCurrentZelnode(winningSuperNode, Zelnode::NIMBUS, 1)) {
             superPayee = GetScriptForDestination(winningSuperNode.pubKeyCollateralAddress.GetID());
         } else {
             LogPrint("zelnode","CreateNewBlock: Failed to detect Super zelnode to pay\n");
@@ -283,22 +283,22 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees, std::ma
         }
     }
 
-    if (!zelnodePayments.GetBlockBAMFPayee(pindexPrev->nHeight + 1, BAMFPayee)) {
+    if (!zelnodePayments.GetBlockSTRATUSPayee(pindexPrev->nHeight + 1, STRATUSPayee)) {
         //no zelnode detected
-        Zelnode winningBAMFNode;
-        if (zelnodeman.GetCurrentZelnode(winningBAMFNode, Zelnode::BAMF, 1)) {
-            BAMFPayee = GetScriptForDestination(winningBAMFNode.pubKeyCollateralAddress.GetID());
+        Zelnode winningSTRATUSNode;
+        if (zelnodeman.GetCurrentZelnode(winningSTRATUSNode, Zelnode::STRATUS, 1)) {
+            STRATUSPayee = GetScriptForDestination(winningSTRATUSNode.pubKeyCollateralAddress.GetID());
         } else {
-            LogPrint("zelnode","CreateNewBlock: Failed to detect BAMF zelnode to pay\n");
-            hasBAMFPayment = false;
+            LogPrint("zelnode","CreateNewBlock: Failed to detect STRATUS zelnode to pay\n");
+            hasSTRATUSPayment = false;
             nTotalPayouts--;
         }
     }
 
     CAmount blockValue = GetBlockSubsidy(pindexPrev->nHeight + 1, Params().GetConsensus());
-    CAmount basicZelnodePayment = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, Zelnode::BASIC);
-    CAmount superZelnodePayment = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, Zelnode::SUPER);
-    CAmount BAMFZelnodePayment = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, Zelnode::BAMF);
+    CAmount basicZelnodePayment = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, Zelnode::CUMULUS);
+    CAmount superZelnodePayment = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, Zelnode::NIMBUS);
+    CAmount STRATUSZelnodePayment = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, Zelnode::STRATUS);
 
     if (nTotalPayouts > 0) {
         txNew.vout.resize(nTotalPayouts + 1);
@@ -313,7 +313,7 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees, std::ma
         currentIndex++;
 
         if (payments)
-            payments->insert(std::make_pair(Zelnode::BASIC, std::make_pair(basicPayee, basicZelnodePayment)));
+            payments->insert(std::make_pair(Zelnode::CUMULUS, std::make_pair(basicPayee, basicZelnodePayment)));
     }
 
     if (hasSuperPayment) {
@@ -323,16 +323,16 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees, std::ma
         currentIndex++;
 
         if (payments)
-            payments->insert(std::make_pair(Zelnode::SUPER, std::make_pair(superPayee, superZelnodePayment)));
+            payments->insert(std::make_pair(Zelnode::NIMBUS, std::make_pair(superPayee, superZelnodePayment)));
     }
 
-    if (hasBAMFPayment) {
-        txNew.vout[currentIndex].scriptPubKey = BAMFPayee;
-        txNew.vout[currentIndex].nValue = BAMFZelnodePayment;
-        nMinerReward -= BAMFZelnodePayment;
+    if (hasSTRATUSPayment) {
+        txNew.vout[currentIndex].scriptPubKey = STRATUSPayee;
+        txNew.vout[currentIndex].nValue = STRATUSZelnodePayment;
+        nMinerReward -= STRATUSZelnodePayment;
 
         if (payments)
-            payments->insert(std::make_pair(Zelnode::BAMF, std::make_pair(BAMFPayee, BAMFZelnodePayment)));
+            payments->insert(std::make_pair(Zelnode::STRATUS, std::make_pair(STRATUSPayee, STRATUSZelnodePayment)));
     }
 
     txNew.vout[0].nValue = nMinerReward;
@@ -343,12 +343,12 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees, std::ma
     CTxDestination superaddress1;
     ExtractDestination(superPayee, superaddress1);
 
-    CTxDestination BAMFaddress1;
-    ExtractDestination(BAMFPayee, BAMFaddress1);
+    CTxDestination STRATUSaddress1;
+    ExtractDestination(STRATUSPayee, STRATUSaddress1);
 
     LogPrint("zelnode","Zelnode Basic payment of %s to %s\n", FormatMoney(basicZelnodePayment).c_str(), EncodeDestination(basicaddress1).c_str());
     LogPrint("zelnode","Zelnode Super payment of %s to %s\n", FormatMoney(superZelnodePayment).c_str(), EncodeDestination(superaddress1).c_str());
-    LogPrint("zelnode","Zelnode BAMF payment of %s to %s\n", FormatMoney(BAMFZelnodePayment).c_str(), EncodeDestination(BAMFaddress1).c_str());
+    LogPrint("zelnode","Zelnode STRATUS payment of %s to %s\n", FormatMoney(STRATUSZelnodePayment).c_str(), EncodeDestination(STRATUSaddress1).c_str());
 }
 
 
@@ -476,10 +476,10 @@ bool Payments::GetBlockSuperPayee(int nBlockHeight, CScript& payee)
     return false;
 }
 
-bool Payments::GetBlockBAMFPayee(int nBlockHeight, CScript& payee)
+bool Payments::GetBlockSTRATUSPayee(int nBlockHeight, CScript& payee)
 {
     if (mapZelnodeBlocks.count(nBlockHeight)) {
-        return mapZelnodeBlocks[nBlockHeight].GetBAMFPayee(payee);
+        return mapZelnodeBlocks[nBlockHeight].GetSTRATUSPayee(payee);
     }
 
     return false;
@@ -517,8 +517,8 @@ bool Payments::IsScheduled(Zelnode& zelnode, int nNotBlockHeight)
                         return true;
                     }
                 }
-            } else if (zelnode.IsBAMF()) {
-                if (mapZelnodeBlocks[h].GetBAMFPayee(payee)) {
+            } else if (zelnode.IsSTRATUS()) {
+                if (mapZelnodeBlocks[h].GetSTRATUSPayee(payee)) {
                     if (mnpayee == payee) {
                         return true;
                     }
@@ -537,7 +537,7 @@ bool Payments::AddWinningZelnode(PaymentWinner& winnerIn, int nNodeTier)
         return false;
     }
 
-    if (nNodeTier != Zelnode::BASIC && nNodeTier != Zelnode::SUPER && nNodeTier != Zelnode::BAMF)
+    if (nNodeTier != Zelnode::CUMULUS && nNodeTier != Zelnode::NIMBUS && nNodeTier != Zelnode::STRATUS)
         return false;
 
     {
@@ -568,24 +568,24 @@ bool ZelnodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
 
     int nMaxBasicSignatures = 0;
     int nMaxSuperSignatures = 0;
-    int nMaxBAMFSignatures = 0;
+    int nMaxSTRATUSSignatures = 0;
 
     std::string strBasicPayeesPossible = "";
     std::string strSuperPayeesPossible = "";
-    std::string strBAMFPayeesPossible = "";
+    std::string strSTRATUSPayeesPossible = "";
 
     bool fBasicSigCountFound = false;
     bool fSuperSigCountFound = false;
-    bool fBAMFSigCountFound = false;
+    bool fSTRATUSSigCountFound = false;
 
     ZelnodePayee selectedBasicPayee;
     ZelnodePayee selectedSuperPayee;
-    ZelnodePayee selectedBAMFPayee;
+    ZelnodePayee selectedSTRATUSPayee;
 
     CAmount nReward = GetBlockSubsidy(nBlockHeight, Params().GetConsensus());
-    CAmount requiredBasicZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::BASIC);
-    CAmount requiredSuperZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::SUPER);
-    CAmount requiredBAMFZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::BAMF);
+    CAmount requiredBasicZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::CUMULUS);
+    CAmount requiredSuperZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::NIMBUS);
+    CAmount requiredSTRATUSZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::STRATUS);
 
     // Get the required amount of signatures based on if the upgrade is active or not
     int nSignaturesRequired = fKamiookaUpgradeActive ? ZNPAYMENTS_SIGNATURES_REQUIRED_AFTER_UPGRADE : ZNPAYMENTS_SIGNATURES_REQUIRED;
@@ -602,27 +602,27 @@ bool ZelnodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
             selectedSuperPayee = payee;
         }
 
-    for (ZelnodePayee& payee : vecBAMFPayments)
-        if (payee.nVotes >= nMaxBAMFSignatures) {
-            nMaxBAMFSignatures = payee.nVotes;
-            selectedBAMFPayee = payee;
+    for (ZelnodePayee& payee : vecSTRATUSPayments)
+        if (payee.nVotes >= nMaxSTRATUSSignatures) {
+            nMaxSTRATUSSignatures = payee.nVotes;
+            selectedSTRATUSPayee = payee;
         }
 
     if (fKamiookaUpgradeActive) {
         fBasicSigCountFound = nMaxBasicSignatures >= nSignaturesRequired;
         fSuperSigCountFound = nMaxSuperSignatures >= nSignaturesRequired;
-        fBAMFSigCountFound = nMaxBAMFSignatures >= nSignaturesRequired;
+        fSTRATUSSigCountFound = nMaxSTRATUSSignatures >= nSignaturesRequired;
     }
 
     if (fKamiookaUpgradeActive) {
         // If we don't have at least 6 signatures on each payee tier, follow the longest chain.
-        if (!fBasicSigCountFound && !fSuperSigCountFound && !fBAMFSigCountFound)
+        if (!fBasicSigCountFound && !fSuperSigCountFound && !fSTRATUSSigCountFound)
             return true;
     }
 
     if (!fKamiookaUpgradeActive) {
         // if we don't have at least 16 signatures on a payee, approve whichever is the longest chain
-        if (nMaxBasicSignatures < nSignaturesRequired || nMaxSuperSignatures < nSignaturesRequired || nMaxBAMFSignatures < nSignaturesRequired)
+        if (nMaxBasicSignatures < nSignaturesRequired || nMaxSuperSignatures < nSignaturesRequired || nMaxSTRATUSSignatures < nSignaturesRequired)
             return true;
     }
 
@@ -679,31 +679,31 @@ bool ZelnodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
         }
     }
 
-    bool fFoundBAMF = false;
-    if(!fKamiookaUpgradeActive || fBAMFSigCountFound) {
+    bool fFoundSTRATUS = false;
+    if(!fKamiookaUpgradeActive || fSTRATUSSigCountFound) {
         for (CTxOut out : txNew.vout) {
-            if (selectedBAMFPayee.scriptPubKey == out.scriptPubKey) {
-                if (out.nValue == requiredBAMFZelnodePayment)
-                    fFoundBAMF = true;
+            if (selectedSTRATUSPayee.scriptPubKey == out.scriptPubKey) {
+                if (out.nValue == requiredSTRATUSZelnodePayment)
+                    fFoundSTRATUS = true;
                 else
-                    LogPrint("zelnode", "BAMF Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n",
-                             FormatMoney(out.nValue).c_str(), FormatMoney(requiredBAMFZelnodePayment).c_str());
+                    LogPrint("zelnode", "STRATUS Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n",
+                             FormatMoney(out.nValue).c_str(), FormatMoney(requiredSTRATUSZelnodePayment).c_str());
             }
         }
 
-        if (selectedBAMFPayee.nVotes >= nSignaturesRequired) {
-            if (fFoundBAMF && fFoundSuper && fFoundBAMF) {
+        if (selectedSTRATUSPayee.nVotes >= nSignaturesRequired) {
+            if (fFoundSTRATUS && fFoundSuper && fFoundSTRATUS) {
                 if (!fKamiookaUpgradeActive)
                     return true;
             }
 
             CTxDestination address1;
-            ExtractDestination(selectedBAMFPayee.scriptPubKey, address1);
+            ExtractDestination(selectedSTRATUSPayee.scriptPubKey, address1);
 
-            if (strBAMFPayeesPossible == "") {
-                strBAMFPayeesPossible += EncodeDestination(address1);
+            if (strSTRATUSPayeesPossible == "") {
+                strSTRATUSPayeesPossible += EncodeDestination(address1);
             } else {
-                strBAMFPayeesPossible += "," + EncodeDestination(address1);
+                strSTRATUSPayeesPossible += "," + EncodeDestination(address1);
             }
         }
     }
@@ -718,8 +718,8 @@ bool ZelnodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
             LogPrint("zelnode","%s- Missing required Super payment of %s to %s\n", __func__, FormatMoney(requiredSuperZelnodePayment).c_str(), strSuperPayeesPossible.c_str());
             fFail = true;
         }
-        if (fBAMFSigCountFound && !fFoundBAMF) {
-            LogPrint("zelnode","%s- Missing required BAMF payment of %s to %s\n", __func__, FormatMoney(requiredBAMFZelnodePayment).c_str(), strBAMFPayeesPossible.c_str());
+        if (fSTRATUSSigCountFound && !fFoundSTRATUS) {
+            LogPrint("zelnode","%s- Missing required STRATUS payment of %s to %s\n", __func__, FormatMoney(requiredSTRATUSZelnodePayment).c_str(), strSTRATUSPayeesPossible.c_str());
             fFail = true;
         }
         return !fFail;
@@ -728,7 +728,7 @@ bool ZelnodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
     // TODO, once upgrade is complete remove
     if (!fFoundBasic) LogPrint("zelnode","%s- Missing required Basic payment of %s to %s\n", __func__, FormatMoney(requiredBasicZelnodePayment).c_str(), strBasicPayeesPossible.c_str());
     if (!fFoundSuper) LogPrint("zelnode","%s- Missing required Super payment of %s to %s\n", __func__, FormatMoney(requiredSuperZelnodePayment).c_str(), strSuperPayeesPossible.c_str());
-    if (!fFoundBAMF) LogPrint("zelnode","%s- Missing required BAMF payment of %s to %s\n", __func__, FormatMoney(requiredBAMFZelnodePayment).c_str(), strBAMFPayeesPossible.c_str());
+    if (!fFoundSTRATUS) LogPrint("zelnode","%s- Missing required STRATUS payment of %s to %s\n", __func__, FormatMoney(requiredSTRATUSZelnodePayment).c_str(), strSTRATUSPayeesPossible.c_str());
 
     return false;
 }
@@ -761,14 +761,14 @@ std::string ZelnodeBlockPayees::GetRequiredPaymentsString()
         }
     }
 
-    for (ZelnodePayee& payee : vecBAMFPayments) {
+    for (ZelnodePayee& payee : vecSTRATUSPayments) {
         CTxDestination address1;
         ExtractDestination(payee.scriptPubKey, address1);
 
         if (ret != "Unknown") {
-            ret += ",BAMF|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
+            ret += ",STRATUS|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         } else {
-            ret = "BAMF|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
+            ret = "STRATUS|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         }
     }
 
@@ -857,7 +857,7 @@ bool PaymentWinner::IsValid(CNode* pnode, std::string& strError)
         return false;
     }
 
-    if (tier < Zelnode::NONE || tier > Zelnode::BAMF) {
+    if (tier < Zelnode::NONE || tier > Zelnode::STRATUS) {
         strError = strprintf("Zelnode winner tier is %s", TierToString(tier));
         LogPrint("zelnode","%s - %s\n", __func__, strError);
         return false;
@@ -907,11 +907,11 @@ bool Payments::ProcessBlock(int nBlockHeight)
     // pay to the oldest MN that still had no payment but its input is old enough and it was active long enough
     int nBasicCount = 0;
     int nSuperCount = 0;
-    int nBAMFCount = 0;
+    int nSTRATUSCount = 0;
 
 
     auto activeNode = zelnodeman.Find(activeZelnode.pubKeyZelnode);
-    vector<Zelnode*> vpzn = zelnodeman.GetNextZelnodeInQueueForPayment(nBlockHeight, true, nBasicCount, nSuperCount, nBAMFCount);
+    vector<Zelnode*> vpzn = zelnodeman.GetNextZelnodeInQueueForPayment(nBlockHeight, true, nBasicCount, nSuperCount, nSTRATUSCount);
 
     for (Zelnode * pzn : vpzn) {
         PaymentWinner newWinner(activeZelnode.vin);

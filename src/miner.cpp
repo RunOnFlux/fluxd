@@ -440,6 +440,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         txNew.vout.resize(1);
         txNew.vout[0].scriptPubKey = scriptPubKeyIn;
         txNew.vout[0].nValue = GetBlockSubsidy(nHeight, chainparams.GetConsensus());
+
         // Set to 0 so expiry height does not apply to coinbase txs
         txNew.nExpiryHeight = 0;
 
@@ -448,6 +449,45 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             FillBlockPayeeWithDeterministicPayouts(txNew, nFees, zelnodePayouts);
         } else {
             FillBlockPayee(txNew, nFees, zelnodePayouts);
+        }
+
+        // Exchange Fund
+        if (pindexPrev->nHeight + 1 == chainparams.GetExchangeFundingHeight()) {
+            CTxDestination exchangeDestination = DecodeDestination(Params().GetExchangeFundingAddress());
+            CAmount nAmount = Params().GetExchangeFundingAmount();
+
+            // Change coinbase transaction to include exchange address funding
+            int currentSize = txNew.vout.size();
+            int newSize = currentSize + 1;
+            txNew.vout.resize(newSize);
+            txNew.vout[newSize -1].nValue = nAmount;
+            txNew.vout[newSize -1].scriptPubKey = GetScriptForDestination(exchangeDestination);
+        }
+
+        // Foundation Fund
+        if (pindexPrev->nHeight + 1 == chainparams.GetFoundationFundingHeight()) {
+            CTxDestination foundationDestination = DecodeDestination(Params().GetFoundationFundingAddress());
+            CAmount nAmount = Params().GetFoundationFundingAmount();
+
+            // Change coinbase transaction to include exchange address funding
+            int currentSize = txNew.vout.size();
+            int newSize = currentSize + 1;
+            txNew.vout.resize(newSize);
+            txNew.vout[newSize -1].nValue = nAmount;
+            txNew.vout[newSize -1].scriptPubKey = GetScriptForDestination(foundationDestination);
+        }
+
+        // Swap Pool Fund
+        if (IsSwapPoolInterval(pindexPrev->nHeight + 1)) {
+            CTxDestination swapPoolDestination = DecodeDestination(Params().GetSwapPoolAddress());
+            CAmount nAmount = Params().GetSwapPoolAmount();
+
+            // Change coinbase transaction to include exchange address funding
+            int currentSize = txNew.vout.size();
+            int newSize = currentSize + 1;
+            txNew.vout.resize(newSize);
+            txNew.vout[newSize -1].nValue = nAmount;
+            txNew.vout[newSize -1].scriptPubKey = GetScriptForDestination(swapPoolDestination);
         }
 
         // Add fees

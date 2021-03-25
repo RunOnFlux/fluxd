@@ -130,8 +130,22 @@ public:
     std::string ZelnodeTestingDummyAddress() const { return strZelnodeTestingDummyAddress; }
     int64_t StartZelnodePayments() const { return nStartZelnodePaymentsHeight; }
     CBaseChainParams::Network NetworkID() const { return networkID; }
-    std::string BenchmarkingPublicKey() const { return strBenchmarkingPublicKey; }
+    std::vector<std::pair<std::string, uint32_t> > BenchmarkingPublicKeys() const { return vecBenchmarkingPublicKeys; }
 
+    /** Flux Rebrand **/
+    std::string GetExchangeFundingAddress() const { return strExchangeFundingAddress; }
+    int64_t GetExchangeFundingHeight() const { return nExchangeFundingHeight; }
+    CAmount GetExchangeFundingAmount() const { return nExchangeFundingAmount; }
+
+    std::string GetFoundationFundingAddress() const { return strFoundationFundingAddress; }
+    int64_t GetFoundationFundingHeight() const { return nFoundationFundingHeight; }
+    CAmount GetFoundationFundingAmount() const { return nFoundationFundingAmount; }
+
+    std::string GetSwapPoolAddress() const { return strSwapPoolAddress; }
+    int64_t GetSwapPoolStartHeight() const { return nSwapPoolStartHeight; }
+    CAmount GetSwapPoolAmount() const { return nSwapPoolAmount; }
+    int64_t GetSwapPoolInterval() const { return nSwapPoolInterval; }
+    int GetSwapPoolMaxTimes() const { return nSwapPoolMaxTimes; }
 
 protected:
     CChainParams() {}
@@ -174,6 +188,22 @@ protected:
     int64_t nStartZelnodePaymentsHeight;
     CBaseChainParams::Network networkID;
     std::string strBenchmarkingPublicKey;
+    std::vector< std::pair<std::string, uint32_t> > vecBenchmarkingPublicKeys;
+
+    /** Flux params **/
+    std::string strExchangeFundingAddress;
+    int64_t nExchangeFundingHeight;
+    CAmount nExchangeFundingAmount;
+
+    std::string strFoundationFundingAddress;
+    int64_t nFoundationFundingHeight;
+    CAmount nFoundationFundingAmount;
+
+    std::string strSwapPoolAddress;
+    CAmount nSwapPoolAmount;
+    int64_t nSwapPoolStartHeight;
+    int64_t nSwapPoolInterval;
+    int64_t nSwapPoolMaxTimes;
 };
 
 /**

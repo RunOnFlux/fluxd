@@ -98,28 +98,28 @@ public:
     int nBlockHeight;
     std::vector<ZelnodePayee> vecBasicPayments;
     std::vector<ZelnodePayee> vecSuperPayments;
-    std::vector<ZelnodePayee> vecBAMFPayments;
+    std::vector<ZelnodePayee> vecSTRATUSPayments;
 
     ZelnodeBlockPayees()
     {
         nBlockHeight = 0;
         vecBasicPayments.clear();
         vecSuperPayments.clear();
-        vecBAMFPayments.clear();
+        vecSTRATUSPayments.clear();
     }
     ZelnodeBlockPayees(int nBlockHeightIn)
     {
         nBlockHeight = nBlockHeightIn;
         vecBasicPayments.clear();
         vecSuperPayments.clear();
-        vecBAMFPayments.clear();
+        vecSTRATUSPayments.clear();
     }
 
     void AddPayee(CScript payeeIn, int nIncrement, int nNodeTier)
     {
         LOCK(cs_vecPayments);
 
-        if (nNodeTier == Zelnode::BASIC) {
+        if (nNodeTier == Zelnode::CUMULUS) {
             for (ZelnodePayee& payee : vecBasicPayments) {
                 if (payee.scriptPubKey == payeeIn) {
                     payee.nVotes += nIncrement;
@@ -128,7 +128,7 @@ public:
             }
         }
 
-        else if (nNodeTier == Zelnode::SUPER) {
+        else if (nNodeTier == Zelnode::NIMBUS) {
             for (ZelnodePayee& payee : vecSuperPayments) {
                 if (payee.scriptPubKey == payeeIn) {
                     payee.nVotes += nIncrement;
@@ -137,8 +137,8 @@ public:
             }
         }
 
-        else if (nNodeTier == Zelnode::BAMF) {
-            for (ZelnodePayee& payee : vecBAMFPayments) {
+        else if (nNodeTier == Zelnode::STRATUS) {
+            for (ZelnodePayee& payee : vecSTRATUSPayments) {
                 if (payee.scriptPubKey == payeeIn) {
                     payee.nVotes += nIncrement;
                     return;
@@ -147,9 +147,9 @@ public:
         }
 
         ZelnodePayee c(payeeIn, nIncrement);
-        if (nNodeTier == Zelnode::BASIC) vecBasicPayments.push_back(c);
-        else if (nNodeTier == Zelnode::SUPER) vecSuperPayments.push_back(c);
-        else if (nNodeTier == Zelnode::BAMF) vecBAMFPayments.push_back(c);
+        if (nNodeTier == Zelnode::CUMULUS) vecBasicPayments.push_back(c);
+        else if (nNodeTier == Zelnode::NIMBUS) vecSuperPayments.push_back(c);
+        else if (nNodeTier == Zelnode::STRATUS) vecSTRATUSPayments.push_back(c);
     }
 
     bool GetBasicPayee(CScript& basicPayee)
@@ -182,14 +182,14 @@ public:
         return (nVotes > -1);
     }
 
-    bool GetBAMFPayee(CScript& BAMFPayee)
+    bool GetSTRATUSPayee(CScript& STRATUSPayee)
     {
         LOCK(cs_vecPayments);
 
         int nVotes = -1;
-        for (ZelnodePayee& p : vecBAMFPayments) {
+        for (ZelnodePayee& p : vecSTRATUSPayments) {
             if (p.nVotes > nVotes) {
-                BAMFPayee = p.scriptPubKey;
+                STRATUSPayee = p.scriptPubKey;
                 nVotes = p.nVotes;
             }
         }
@@ -209,7 +209,7 @@ public:
             if (p.nVotes >= nVotesReq && p.scriptPubKey == payee) return true;
         }
 
-        for (ZelnodePayee& p : vecBAMFPayments) {
+        for (ZelnodePayee& p : vecSTRATUSPayments) {
             if (p.nVotes >= nVotesReq && p.scriptPubKey == payee) return true;
         }
 
@@ -227,7 +227,7 @@ public:
         READWRITE(nBlockHeight);
         READWRITE(vecBasicPayments);
         READWRITE(vecSuperPayments);
-        READWRITE(vecBAMFPayments);
+        READWRITE(vecSTRATUSPayments);
     }
 };
 
@@ -328,7 +328,7 @@ public:
     std::map<int, ZelnodeBlockPayees> mapZelnodeBlocks;
     std::map<COutPoint, int> mapBasicZelnodeLastVote; //prevout.hash, prevout.n, nBlockHeight
     std::map<COutPoint, int> mapSuperZelnodeLastVote; //prevout.hash, prevout.n, nBlockHeight
-    std::map<COutPoint, int> mapBAMFZelnodeLastVote; //prevout.hash, prevout.n, nBlockHeight
+    std::map<COutPoint, int> mapSTRATUSZelnodeLastVote; //prevout.hash, prevout.n, nBlockHeight
 
     Payments()
     {
@@ -352,7 +352,7 @@ public:
 
     bool GetBlockBasicPayee(int nBlockHeight, CScript& payee);
     bool GetBlockSuperPayee(int nBlockHeight, CScript& payee);
-    bool GetBlockBAMFPayee(int nBlockHeight, CScript& payee);
+    bool GetBlockSTRATUSPayee(int nBlockHeight, CScript& payee);
     bool IsTransactionValid(const CTransaction& txNew, int nBlockHeight);
     bool IsScheduled(Zelnode& mn, int nNotBlockHeight);
 
@@ -362,7 +362,7 @@ public:
 
         COutPoint out = winner.vinZelnode.prevout;
 
-        if (winner.tier == Zelnode::BASIC) {
+        if (winner.tier == Zelnode::CUMULUS) {
             if (mapBasicZelnodeLastVote.count(out))
                 if (mapBasicZelnodeLastVote[out] == winner.nBlockHeight)
                     return false;
@@ -372,7 +372,7 @@ public:
             return true;
         }
 
-        else if (winner.tier == Zelnode::SUPER) {
+        else if (winner.tier == Zelnode::NIMBUS) {
             if (mapSuperZelnodeLastVote.count(out))
                 if (mapSuperZelnodeLastVote[out] == winner.nBlockHeight)
                     return false;
@@ -382,13 +382,13 @@ public:
             return true;
         }
 
-        else if (winner.tier == Zelnode::BAMF) {
-            if (mapBAMFZelnodeLastVote.count(out))
-                if (mapBAMFZelnodeLastVote[out] == winner.nBlockHeight)
+        else if (winner.tier == Zelnode::STRATUS) {
+            if (mapSTRATUSZelnodeLastVote.count(out))
+                if (mapSTRATUSZelnodeLastVote[out] == winner.nBlockHeight)
                     return false;
 
             //record this zelnode voted
-            mapBAMFZelnodeLastVote[out] = winner.nBlockHeight;
+            mapSTRATUSZelnodeLastVote[out] = winner.nBlockHeight;
             return true;
         }
 

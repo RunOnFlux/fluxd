@@ -127,8 +127,10 @@ int RaiseFileDescriptorLimit(int nMinFD);
 void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length);
 bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest);
 bool TryCreateDirectory(const boost::filesystem::path& p);
+boost::filesystem::path GetDefaultDataDirForCoinName(const std::string &coinName);
 boost::filesystem::path GetDefaultDataDir();
 const boost::filesystem::path &GetDataDir(bool fNetSpecific = true);
+bool RenameDirectoriesFromZelcashToFlux();
 void ClearDatadirCache();
 boost::filesystem::path GetConfigFile();
 boost::filesystem::path GetZelnodeConfigFile();
@@ -164,6 +166,14 @@ inline bool IsSwitchChar(char c)
     return c == '-';
 #endif
 }
+
+/**
+ * Return true if the given argument has been manually set
+ *
+ * @param strArg Argument to get (e.g. "-foo")
+ * @return true if the argument has been set
+ */
+bool IsArgSet(const std::string& strArg);
 
 /**
  * Return string argument or default value

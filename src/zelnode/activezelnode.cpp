@@ -172,7 +172,7 @@ void ActiveZelnode::ManageDeterministricZelnode()
         if (mempool.mapZelnodeTxMempool.count(activeZelnode.deterministicOutPoint)) {
             if (pwalletMain)
                 pwalletMain->ResendWalletTransactions(GetAdjustedTime());
-            LogPrintf("Zelnode found in start tracker. Skipping confirm transaction creation, because tranasaction already in mempool %s\n", activeZelnode.deterministicOutPoint.ToString());
+            LogPrintf("Zelnode found in start tracker. Skipping confirm transaction creation, because transaction already in mempool %s\n", activeZelnode.deterministicOutPoint.ToString());
             return;
         }
 
@@ -486,16 +486,16 @@ vector<std::pair<COutput, CAmount>> ActiveZelnode::SelectCoinsZelnode()
 
     // Filter
     for (const COutput& out : vCoins) {
-        if (out.tx->vout[out.i].nValue == ZELNODE_BASIC_COLLATERAL * COIN) { //exactly
-            filteredCoins.push_back(std::make_pair(out, ZELNODE_BASIC_COLLATERAL * COIN));
+        if (out.tx->vout[out.i].nValue == ZELNODE_CUMULUS_COLLATERAL * COIN) { //exactly
+            filteredCoins.push_back(std::make_pair(out, ZELNODE_CUMULUS_COLLATERAL * COIN));
         }
 
-        else if (out.tx->vout[out.i].nValue == ZELNODE_SUPER_COLLATERAL * COIN) { //exactly
-            filteredCoins.push_back(std::make_pair(out, ZELNODE_SUPER_COLLATERAL * COIN));
+        else if (out.tx->vout[out.i].nValue == ZELNODE_NIMBUS_COLLATERAL * COIN) { //exactly
+            filteredCoins.push_back(std::make_pair(out, ZELNODE_NIMBUS_COLLATERAL * COIN));
         }
 
-        else if (out.tx->vout[out.i].nValue == ZELNODE_BAMF_COLLATERAL * COIN) { //exactly
-            filteredCoins.push_back(std::make_pair(out, ZELNODE_BAMF_COLLATERAL * COIN));
+        else if (out.tx->vout[out.i].nValue == ZELNODE_STRATUS_COLLATERAL * COIN) { //exactly
+            filteredCoins.push_back(std::make_pair(out, ZELNODE_STRATUS_COLLATERAL * COIN));
         }
     }
     return filteredCoins;
@@ -551,6 +551,8 @@ bool ActiveZelnode::BuildZelnodeBroadcast(std::string& errorMessage) {
 
         return true;
     }
+
+    return false;
 }
 
 bool ActiveZelnode::SignDeterministicStartTx(CMutableTransaction& mutableTransaction, std::string& errorMessage)

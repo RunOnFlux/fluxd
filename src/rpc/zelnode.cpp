@@ -108,6 +108,38 @@ UniValue getzelnodeoutputs(const UniValue& params, bool fHelp)
     return ret;
 }
 
+UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
+{
+    if (fHelp || (params.size() != 0))
+        throw runtime_error(
+                "createconfirmationtransaction\n"
+                "\nCreate a new confirmation transaction and return the raw hex\n"
+
+                "\nResult:\n"
+                "    \"hex\": \"xxxx\",    (string) output transaction hex\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("createconfirmationtransaction", "") + HelpExampleRpc("createconfirmationtransaction", ""));
+
+    if (!fZelnode) throw runtime_error("This is not a fluxnode");
+
+    std::string errorMessage;
+    CMutableTransaction mutTx;
+    mutTx.nVersion = ZELNODE_TX_VERSION;
+
+    activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::UPDATE_CONFIRM);
+
+    if (!activeZelnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
+        throw runtime_error(strprintf("Failed to sign new confirmation transaction: %s\n", errorMessage));
+    }
+
+    CTransaction tx(mutTx);
+
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    ss << tx;
+    return HexStr(ss.begin(), ss.end());
+}
+
 UniValue startzelnode(const UniValue& params, bool fHelp)
 {
 
@@ -584,7 +616,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
                 "    \"confirmed_height\": \"height\"         (string) Block height when zelnode was confirmed\n"
                 "    \"last_confirmed_height\": \"height\"    (string) Last block height when zelnode was confirmed\n"
                 "    \"last_paid_height\": \"height\"         (string) Last block height when zelnode was paid\n"
-                "    \"tier\": \"type\",                      (string) Tier (BASIC/SUPER/BAMF)\n"
+                "    \"tier\": \"type\",                      (string) Tier (CUMULUS/NIMBUS/STRATUS)\n"
                 "    \"payment_address\": \"addr\",           (string) Zelnode ZEL address\n"
                 "    \"pubkey\": \"key\",                     (string) Zelnode public key used for message broadcasting\n"
                 "    \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
@@ -603,7 +635,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
 
     UniValue wholelist(UniValue::VARR);
     int count = 0;
-    for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::BASIC).listConfirmedZelnodes) {
+    for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::CUMULUS).listConfirmedZelnodes) {
 
         auto data = g_zelnodeCache.GetZelnodeData(item.out);
 
@@ -650,7 +682,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
     }
 
     count = 0;
-    for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::SUPER).listConfirmedZelnodes) {
+    for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::NIMBUS).listConfirmedZelnodes) {
 
         auto data = g_zelnodeCache.GetZelnodeData(item.out);
 
@@ -696,7 +728,7 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
     }
 
     count = 0;
-    for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::BAMF).listConfirmedZelnodes) {
+    for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::STRATUS).listConfirmedZelnodes) {
 
         auto data = g_zelnodeCache.GetZelnodeData(item.out);
 
@@ -830,7 +862,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
                 "    \"lastseen\": ttt,     (numeric) The time in seconds since epoch (Jan 1 1970 GMT) of the last seen\n"
                 "    \"activetime\": ttt,   (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
                 "    \"lastpaid\": ttt,     (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode was last paid\n"
-                "    \"tier\": \"type\",    (string) Tier (BASIC/SUPER/BAMF)\n"
+                "    \"tier\": \"type\",    (string) Tier (CUMULUS/NIMBUS/STRATUS)\n"
                 "    \"ip\": \"address\"    (string) IP address\n"
                 "  }\n"
                 "  ,...\n"
@@ -843,7 +875,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
         UniValue wholelist(UniValue::VARR);
 
         int count = 0;
-        for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::BASIC).listConfirmedZelnodes) {
+        for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::CUMULUS).listConfirmedZelnodes) {
 
             auto data = g_zelnodeCache.GetZelnodeData(item.out);
 
@@ -880,7 +912,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
         }
 
         count = 0;
-        for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::SUPER).listConfirmedZelnodes) {
+        for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::NIMBUS).listConfirmedZelnodes) {
 
             auto data = g_zelnodeCache.GetZelnodeData(item.out);
 
@@ -916,7 +948,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
         }
 
         count = 0;
-        for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::BAMF).listConfirmedZelnodes) {
+        for (const auto& item : g_zelnodeCache.mapZelnodeList.at(Zelnode::STRATUS).listConfirmedZelnodes) {
 
             auto data = g_zelnodeCache.GetZelnodeData(item.out);
 
@@ -966,7 +998,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
             nHeight = pindex->nHeight;
         }
 
-        std::vector<pair<int, Zelnode> > vBasicZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::BASIC, nHeight);
+        std::vector<pair<int, Zelnode> > vBasicZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::CUMULUS, nHeight);
         for (PAIRTYPE(int, Zelnode) &s : vBasicZelnodeRanks) {
             UniValue obj(UniValue::VOBJ);
             std::string strVin = s.second.vin.prevout.ToString();
@@ -1007,7 +1039,7 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
             }
         }
 
-        std::vector<pair<int, Zelnode> > vSuperZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::SUPER, nHeight);
+        std::vector<pair<int, Zelnode> > vSuperZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::NIMBUS, nHeight);
         for (PAIRTYPE(int, Zelnode) &s : vSuperZelnodeRanks) {
             UniValue obj(UniValue::VOBJ);
             std::string strVin = s.second.vin.prevout.ToString();
@@ -1048,8 +1080,8 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
             }
         }
 
-        std::vector<pair<int, Zelnode> > vBAMFZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::BAMF, nHeight);
-        for (PAIRTYPE(int, Zelnode) &s : vBAMFZelnodeRanks) {
+        std::vector<pair<int, Zelnode> > vSTRATUSZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::STRATUS, nHeight);
+        for (PAIRTYPE(int, Zelnode) &s : vSTRATUSZelnodeRanks) {
             UniValue obj(UniValue::VOBJ);
             std::string strVin = s.second.vin.prevout.ToString();
             std::string strTxHash = s.second.vin.prevout.hash.ToString();
@@ -1235,7 +1267,7 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
                 "  \"confirmed_height\": \"height\",        (string) Block height when zelnode was confirmed\n"
                 "  \"last_confirmed_height\": \"height\",   (string) Last block height when zelnode was confirmed\n"
                 "  \"last_paid_height\": \"height\",        (string) Last block height when zelnode was paid\n"
-                "  \"tier\": \"type\",                      (string) Tier (BASIC/SUPER/BAMF)\n"
+                "  \"tier\": \"type\",                      (string) Tier (CUMULUS/NIMBUS/STRATUS)\n"
                 "  \"payment_address\": \"xxxx\",           (string) ZEL address for zelnode payments\n"
                 "  \"pubkey\": \"key\",                     (string) Zelnode public key used for message broadcasting\n"
                 "  \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
@@ -1422,7 +1454,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
         CTxDestination dest_basic;
         COutPoint outpoint_basic;
         UniValue ret(UniValue::VOBJ);
-        if (g_zelnodeCache.GetNextPayment(dest_basic, BASIC, outpoint_basic)) {
+        if (g_zelnodeCache.GetNextPayment(dest_basic, CUMULUS, outpoint_basic)) {
             UniValue obj(UniValue::VOBJ);
             auto data = g_zelnodeCache.GetZelnodeData(outpoint_basic);
             obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
@@ -1433,12 +1465,12 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
             obj.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
             obj.push_back(std::make_pair("tier", TierToString(data.nTier)));
             obj.push_back(std::make_pair("payment_address", EncodeDestination(dest_basic)));
-            ret.push_back(std::make_pair("BASIC Winner", obj));
+            ret.push_back(std::make_pair("CUMULUS Winner", obj));
         }
 
         CTxDestination dest_super;
         COutPoint outpoint_super;
-        if (g_zelnodeCache.GetNextPayment(dest_super, SUPER, outpoint_super)) {
+        if (g_zelnodeCache.GetNextPayment(dest_super, NIMBUS, outpoint_super)) {
             UniValue obj(UniValue::VOBJ);
             auto data = g_zelnodeCache.GetZelnodeData(outpoint_super);
             obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
@@ -1449,12 +1481,12 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
             obj.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
             obj.push_back(std::make_pair("tier", TierToString(data.nTier)));
             obj.push_back(std::make_pair("payment_address", EncodeDestination(dest_super)));
-            ret.push_back(std::make_pair("SUPER Winner", obj));
+            ret.push_back(std::make_pair("NIMBUS Winner", obj));
         }
 
         CTxDestination dest_bamf;
         COutPoint outpoint_bamf;
-        if (g_zelnodeCache.GetNextPayment(dest_bamf, BAMF, outpoint_bamf)) {
+        if (g_zelnodeCache.GetNextPayment(dest_bamf, STRATUS, outpoint_bamf)) {
             UniValue obj(UniValue::VOBJ);
             auto data = g_zelnodeCache.GetZelnodeData(outpoint_bamf);
             obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
@@ -1465,7 +1497,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
             obj.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
             obj.push_back(std::make_pair("tier", TierToString(data.nTier)));
             obj.push_back(std::make_pair("payment_address", EncodeDestination(dest_bamf)));
-            ret.push_back(std::make_pair("BAMF Winner", obj));
+            ret.push_back(std::make_pair("STRATUS Winner", obj));
         }
 
         return ret;
@@ -1476,7 +1508,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
     Zelnode bamfWinner;
 
     UniValue ret(UniValue::VOBJ);
-    if (zelnodeman.GetCurrentZelnode(basicWinner, Zelnode::BASIC, 1)) {
+    if (zelnodeman.GetCurrentZelnode(basicWinner, Zelnode::CUMULUS, 1)) {
         UniValue obj(UniValue::VOBJ);
 
         obj.push_back(Pair("protocol", (int64_t)basicWinner.protocolVersion));
@@ -1486,7 +1518,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
         obj.push_back(Pair("activeseconds", (basicWinner.lastPing == ZelnodePing()) ? 0 : (int64_t)(basicWinner.lastPing.sigTime - basicWinner.sigTime)));
         ret.push_back(Pair("Basic Winner", obj));
     }
-    if (zelnodeman.GetCurrentZelnode(superWinner, Zelnode::SUPER, 1)) {
+    if (zelnodeman.GetCurrentZelnode(superWinner, Zelnode::NIMBUS, 1)) {
         UniValue obj(UniValue::VOBJ);
 
         obj.push_back(Pair("protocol", (int64_t)superWinner.protocolVersion));
@@ -1496,7 +1528,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
         obj.push_back(Pair("activeseconds", (superWinner.lastPing == ZelnodePing()) ? 0 : (int64_t)(superWinner.lastPing.sigTime - superWinner.sigTime)));
         ret.push_back(Pair("Super Winner", obj));
     }
-    if (zelnodeman.GetCurrentZelnode(bamfWinner, Zelnode::BAMF, 1)) {
+    if (zelnodeman.GetCurrentZelnode(bamfWinner, Zelnode::STRATUS, 1)) {
         UniValue obj(UniValue::VOBJ);
 
         obj.push_back(Pair("protocol", (int64_t)bamfWinner.protocolVersion));
@@ -1504,7 +1536,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
         obj.push_back(Pair("pubkey", EncodeDestination(bamfWinner.pubKeyCollateralAddress.GetID())));
         obj.push_back(Pair("lastseen", (bamfWinner.lastPing == ZelnodePing()) ? bamfWinner.sigTime : (int64_t)bamfWinner.lastPing.sigTime));
         obj.push_back(Pair("activeseconds", (bamfWinner.lastPing == ZelnodePing()) ? 0 : (int64_t)(bamfWinner.lastPing.sigTime - bamfWinner.sigTime)));
-        ret.push_back(Pair("BAMF Winner", obj));
+        ret.push_back(Pair("STRATUS Winner", obj));
     }
 
     if (ret.size())
@@ -1535,9 +1567,9 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
 
     if (IsDZelnodeActive())
     {
-        int nBasic = g_zelnodeCache.mapZelnodeList.at(BASIC).listConfirmedZelnodes.size();
-        int nSuper = g_zelnodeCache.mapZelnodeList.at(SUPER).listConfirmedZelnodes.size();
-        int nBAMF = g_zelnodeCache.mapZelnodeList.at(BAMF).listConfirmedZelnodes.size();
+        int nBasic = g_zelnodeCache.mapZelnodeList.at(CUMULUS).listConfirmedZelnodes.size();
+        int nSuper = g_zelnodeCache.mapZelnodeList.at(NIMBUS).listConfirmedZelnodes.size();
+        int nSTRATUS = g_zelnodeCache.mapZelnodeList.at(STRATUS).listConfirmedZelnodes.size();
 
         int nTotal = g_zelnodeCache.mapConfirmedZelnodeData.size();
 
@@ -1545,7 +1577,10 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
         obj.push_back(Pair("stable", nTotal));
         obj.push_back(Pair("basic-enabled", nBasic));
         obj.push_back(Pair("super-enabled", nSuper));
-        obj.push_back(Pair("bamf-enabled", nBAMF));
+        obj.push_back(Pair("bamf-enabled", nSTRATUS));
+        obj.push_back(Pair("cumulus-enabled", nBasic));
+        obj.push_back(Pair("nimbus-enabled", nSuper));
+        obj.push_back(Pair("stratus-enabled", nSTRATUS));
 
         int ipv4 = 0, ipv6 = 0, onion = 0;
         g_zelnodeCache.CountNetworks(ipv4, ipv6, onion);
@@ -1559,15 +1594,15 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
 
     int nBasicCount = 0;
     int nSuperCount = 0;
-    int nBAMFCount = 0;
+    int nSTRATUSCount = 0;
     int ipv4 = 0, ipv6 = 0, onion = 0;
 
     if (chainActive.Tip())
-        zelnodeman.GetNextZelnodeInQueueForPayment(chainActive.Tip()->nHeight, true, nBasicCount, nSuperCount, nBAMFCount);
+        zelnodeman.GetNextZelnodeInQueueForPayment(chainActive.Tip()->nHeight, true, nBasicCount, nSuperCount, nSTRATUSCount);
 
-    int basicCount = zelnodeman.CountEnabled(-1, Zelnode::BASIC);
-    int superCount = zelnodeman.CountEnabled(-1, Zelnode::SUPER);
-    int bamfCount = zelnodeman.CountEnabled(-1, Zelnode::BAMF);
+    int basicCount = zelnodeman.CountEnabled(-1, Zelnode::CUMULUS);
+    int superCount = zelnodeman.CountEnabled(-1, Zelnode::NIMBUS);
+    int bamfCount = zelnodeman.CountEnabled(-1, Zelnode::STRATUS);
 
     zelnodeman.CountNetworks(MIN_PEER_PROTO_VERSION_ZELNODE, ipv4, ipv6, onion);
 
@@ -1576,9 +1611,15 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
     obj.push_back(Pair("basic-enabled", basicCount));
     obj.push_back(Pair("super-enabled", superCount));
     obj.push_back(Pair("bamf-enabled", bamfCount));
+    obj.push_back(Pair("cumulus-enabled", basicCount));
+    obj.push_back(Pair("nimbus-enabled", superCount));
+    obj.push_back(Pair("stratus-enabled", bamfCount));
     obj.push_back(Pair("basic-inqueue", nBasicCount));
     obj.push_back(Pair("super-inqueue", nSuperCount));
-    obj.push_back(Pair("bamf-inqueue", nBAMFCount));
+    obj.push_back(Pair("bamf-inqueue", nSTRATUSCount));
+    obj.push_back(Pair("cumulus-inqueue", nBasicCount));
+    obj.push_back(Pair("nimbus-inqueue", nSuperCount));
+    obj.push_back(Pair("stratus-inqueue", nSTRATUSCount));
     obj.push_back(Pair("ipv4", ipv4));
     obj.push_back(Pair("ipv6", ipv6));
     obj.push_back(Pair("onion", onion));
@@ -1732,14 +1773,14 @@ UniValue getzelnodescores (const UniValue& params, bool fHelp)
     }
     UniValue obj(UniValue::VOBJ);
 
-    std::vector<Zelnode> vBasicZelnodes = zelnodeman.GetFullZelnodeVector(Zelnode::BASIC);
-    std::vector<Zelnode> vSuperZelnodes = zelnodeman.GetFullZelnodeVector(Zelnode::SUPER);
-    std::vector<Zelnode> vBAMFZelnodes = zelnodeman.GetFullZelnodeVector(Zelnode::BAMF);
+    std::vector<Zelnode> vBasicZelnodes = zelnodeman.GetFullZelnodeVector(Zelnode::CUMULUS);
+    std::vector<Zelnode> vSuperZelnodes = zelnodeman.GetFullZelnodeVector(Zelnode::NIMBUS);
+    std::vector<Zelnode> vSTRATUSZelnodes = zelnodeman.GetFullZelnodeVector(Zelnode::STRATUS);
     for (int nHeight = chainActive.Tip()->nHeight - nLast; nHeight < chainActive.Tip()->nHeight + 20; nHeight++) {
         uint256 nHigh = uint256();
         Zelnode* pBestBasicZelnode = NULL;
         Zelnode* pBestSuperZelnode = NULL;
-        Zelnode* pBestBAMFZelnode = NULL;
+        Zelnode* pBestSTRATUSZelnode = NULL;
         for (Zelnode& zn : vBasicZelnodes) {
                         uint256 n = zn.CalculateScore(1, nHeight - 100);
                         if (n > nHigh) {
@@ -1756,19 +1797,19 @@ UniValue getzelnodescores (const UniValue& params, bool fHelp)
             }
         }
         nHigh = uint256();
-        for (Zelnode& zn : vBAMFZelnodes) {
+        for (Zelnode& zn : vSTRATUSZelnodes) {
             uint256 n = zn.CalculateScore(1, nHeight - 100);
             if (n > nHigh) {
                 nHigh = n;
-                pBestBAMFZelnode = &zn;
+                pBestSTRATUSZelnode = &zn;
             }
         }
         if (pBestBasicZelnode)
             obj.push_back(Pair(strprintf("Basic: %d", nHeight), pBestBasicZelnode->vin.prevout.hash.ToString().c_str()));
         if (pBestSuperZelnode)
             obj.push_back(Pair(strprintf("Super: %d", nHeight), pBestSuperZelnode->vin.prevout.hash.ToString().c_str()));
-        if (pBestBAMFZelnode)
-            obj.push_back(Pair(strprintf("BAMF: %d", nHeight), pBestBAMFZelnode->vin.prevout.hash.ToString().c_str()));
+        if (pBestSTRATUSZelnode)
+            obj.push_back(Pair(strprintf("STRATUS: %d", nHeight), pBestSTRATUSZelnode->vin.prevout.hash.ToString().c_str()));
     }
 
     return obj;
@@ -1804,7 +1845,7 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
                 "    \"confirmed_height\": \"height\",          (string) Block height when zelnode was confirmed\n"
                 "    \"last_confirmed_height\": \"height\",     (string) Last block height when zelnode was confirmed\n"
                 "    \"last_paid_height\": \"height\",          (string) Last block height when zelnode was paid\n"
-                "    \"tier\": \"type\",                        (string) Tier (BASIC/SUPER/BAMF)\n"
+                "    \"tier\": \"type\",                        (string) Tier (CUMULUS/NIMBUS/STRATUS)\n"
                 "    \"payment_address\": \"xxxx\",             (string) ZEL address for zelnode payments\n"
                 "    \"activesince\": ttt,                      (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
                 "    \"lastpaid\": ttt,                         (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode was last paid\n"
@@ -2259,7 +2300,9 @@ static const CRPCCommand commands[] =
                 { "benchmarks", "startzelbenchd",       &startzelbenchd,         false  },
 
                 /** Not shown in help menu */
-                { "hidden",    "createsporkkeys",        &createsporkkeys,         false  }
+                { "hidden",    "createsporkkeys",        &createsporkkeys,         false  },
+                { "hidden",    "createconfirmationtransaction",        &createconfirmationtransaction,         false  }
+
 
 
 

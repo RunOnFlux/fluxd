@@ -86,7 +86,7 @@ public:
     CMainParams() {
         strNetworkID = "main";
         strCurrencyUnits = "ZEL";
-	bip44CoinType = 19167;
+	    bip44CoinType = 19167;
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 5000;
         consensus.nSubsidyHalvingInterval = 655350; // 2.5 years
@@ -98,7 +98,7 @@ public:
         assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
-	consensus.nPowAllowMinDifficultyBlocksAfterHeight = boost::none;
+	    consensus.nPowAllowMinDifficultyBlocksAfterHeight = boost::none;
         consensus.nPowTargetSpacing = 2 * 60;
 
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
@@ -109,31 +109,34 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
-	consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 125000;
+	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
+	    consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 125000;
 
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
-	consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 125100;
+	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
+	    consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 125100;
 
-	consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
+	    consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 250000;		// Approx January 12th
         consensus.vUpgrades[Consensus::UPGRADE_ACADIA].hashActivationBlock =
                 uint256S("0000001d65fa78f2f6c172a51b5aca59ee1927e51f728647fca21b180becfe59");
 
-    consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
         consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 372500;  // Approx July 2nd - Zel Team Boulder Meetup
         consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].hashActivationBlock =
                 uint256S("00000052e2ac144c2872ff641c646e41dac166ac577bc9b0837f501aba19de4a");
 
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 558000;  // 18th March
-        // TODO, add the activation block hash after activation
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].hashActivationBlock =
+                uint256S("000000a33d38f37f586b843a9c8cf6d1ff1269e6114b34604cabcd14c44268d4");
 
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 835554;  // Around 10th April 2021
 
         consensus.nZawyLWMAAveragingWindow = 60;
-	consensus.eh_epoch_fade_length = 11;
+	    consensus.eh_epoch_fade_length = 11;
 
-	eh_epoch_1 = eh200_9;
+	    eh_epoch_1 = eh200_9;
         eh_epoch_2 = eh144_5;
         eh_epoch_3 = zelHash;
 
@@ -206,7 +209,13 @@ public:
 
         nStartZelnodePaymentsHeight = 560000; // Start paying deterministic zelnodes on height
 
-        strBenchmarkingPublicKey = "042e79d7dd1483996157df6b16c831be2b14b31c69944ea2a585c63b5101af1f9517ba392cee5b1f45a62e9d936488429374535a2f76870bfa8eea6667b13eb39e";
+        // These are the benchmarking public keys, if you are adding a key, you must increase the resize integer
+        vecBenchmarkingPublicKeys.resize(2);
+        vecBenchmarkingPublicKeys[0] = std::make_pair("042e79d7dd1483996157df6b16c831be2b14b31c69944ea2a585c63b5101af1f9517ba392cee5b1f45a62e9d936488429374535a2f76870bfa8eea6667b13eb39e", 0);
+        vecBenchmarkingPublicKeys[1] = std::make_pair("04517413e51fa9b2e94f200b254cca69beb86f2d74bf66ca53854ba66bc376dde9b52e9b4403731d9a4f3e8edd9687f1e1824b688fe26454bd9fb823a3307b4682", 1618113600); // Sun Apr 11 2021 04:00:00 UTC
+
+        assert(vecBenchmarkingPublicKeys.size() > 0);
+
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
@@ -222,6 +231,21 @@ public:
             1941            // * estimated number of transactions per day
                             //   total number of tx / (checkpoint block height / (24 * 30))
         };
+
+        // Flux rebrand values
+        strExchangeFundingAddress = "t3PMbbA5YBMrjSD3dD16SSdXKuKovwmj6tS";
+        nExchangeFundingHeight = 836274; // Around 10th April 2021
+        nExchangeFundingAmount = 7500000 * COIN; // 7.5 Million
+
+        strFoundationFundingAddress = "t3XjYMBvwxnXVv9jqg4CgokZ3f7kAoXPQL8";
+        nFoundationFundingHeight = 836994;  // Around 11th April 2021
+        nFoundationFundingAmount = 2500000 * COIN; // 2.5 Million
+
+        strSwapPoolAddress = "t3ThbWogDoAjGuS6DEnmN1GWJBRbVjSUK4T";
+        nSwapPoolStartHeight = 837714; //  // Around 12th April 2021
+        nSwapPoolAmount = 22000000 * COIN; // 22 Million every time
+        nSwapPoolInterval = 21600; // Avg Block per day (720) *  - Trying to get to around once a month
+        nSwapPoolMaxTimes = 10 ;
 
         // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
@@ -279,6 +303,9 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 350;
+
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 828000; // Around March 30 2021
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
@@ -348,8 +375,14 @@ public:
         strSporkKey = "0408c6a3a6cacb673fc38f27c75d79c865e1550441ea8b5295abf21116972379a1b49416da07b7d9b40fb9daf8124f309c608dfc79756a5d3c2a957435642f7f1a";
         networkID = CBaseChainParams::Network::TESTNET;
         strZelnodeTestingDummyAddress= "tmXxZqbmvrxeSFQsXmm4N9CKyME767r47fS";
-        strBenchmarkingPublicKey = "04d422e01f5acff68504b92df96a9004cf61be432a20efe83fe8a94c1aa730fe7dece5d2e8298f2d5672d4e569c55d9f0a73268ef7b92990d8c014e828a7cc48dd";
+
         nStartZelnodePaymentsHeight = 350;
+
+        vecBenchmarkingPublicKeys.resize(2);
+        vecBenchmarkingPublicKeys[0] = std::make_pair("04d422e01f5acff68504b92df96a9004cf61be432a20efe83fe8a94c1aa730fe7dece5d2e8298f2d5672d4e569c55d9f0a73268ef7b92990d8c014e828a7cc48dd", 0);
+        vecBenchmarkingPublicKeys[1] = std::make_pair("042023568fbcc4715c34d8596feaabf0683b3dfa7280b2f4df0436311a31086a73fdf507d63c3ec89455037ba738375d17b309c2cd226f173a5ef7841400cd09ec", 1617508800); // Sun Apr 04 2021 04:00:00
+
+        assert(vecBenchmarkingPublicKeys.size() > 0);
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
@@ -360,6 +393,21 @@ public:
             750          // * estimated number of transactions per day after checkpoint 720 newly mined +30 for txs that users are doing
                          //   total number of tx / (checkpoint block height / (24 * 24))
         };
+
+        // Flux rebrand values
+        strExchangeFundingAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
+        nExchangeFundingHeight = 828361; // Around March 30th
+        nExchangeFundingAmount = 7500000 * COIN; // 7.5 Million
+
+        strFoundationFundingAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
+        nFoundationFundingHeight = 828370;
+        nFoundationFundingAmount = 2500000 * COIN; // 2.5 Million
+
+        strSwapPoolAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
+        nSwapPoolStartHeight = 828380;
+        nSwapPoolAmount = 2200000 * COIN;
+        nSwapPoolInterval = 25;
+        nSwapPoolMaxTimes = 10 ;
 
     // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
@@ -425,6 +473,10 @@ public:
                 Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 105;
+
+
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
 
@@ -462,7 +514,11 @@ public:
         fTestnetToBeDeprecatedFieldRPC = false;
 
         networkID = CBaseChainParams::Network::REGTEST;
-        strBenchmarkingPublicKey = "04cf3c34f01486bbb34c1a7ca11c2ddb1b3d98698c3f37d54452ff91a8cd5e92a6910ce5fc2cc7ad63547454a965df53ff5be740d4ef4ac89848c2bafd1e40e6b7";
+        vecBenchmarkingPublicKeys.resize(2);
+        vecBenchmarkingPublicKeys[0] = std::make_pair("04cf3c34f01486bbb34c1a7ca11c2ddb1b3d98698c3f37d54452ff91a8cd5e92a6910ce5fc2cc7ad63547454a965df53ff5be740d4ef4ac89848c2bafd1e40e6b7", 0);
+        vecBenchmarkingPublicKeys[1] = std::make_pair("045d54130187b4c4bba25004bf615881c2d79b16950a59114df27dc9858d8e531fda4f3a27aa95ceb2bcc87ddd734be40a6808422655e5350fa9417874556b7342", 1617508800); // Sun Apr 04 2021 04:00:00
+
+        assert(vecBenchmarkingPublicKeys.size() > 0);
 
         checkpointData = (CCheckpointData){
             boost::assign::map_list_of
@@ -486,6 +542,21 @@ public:
         bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviewregtestsapling";
         bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivkregtestsapling";
         bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-regtest";
+
+        // Flux rebrand values
+        strExchangeFundingAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
+        nExchangeFundingHeight = 10;
+        nExchangeFundingAmount = 3000000 * COIN;
+
+        strFoundationFundingAddress = "t2DFGpj2tciojsGKKrGVwQ92hUwAxWQQgJ9";
+        nFoundationFundingHeight = 10;
+        nFoundationFundingAmount = 2500000 * COIN; // 2.5 Million
+
+        strSwapPoolAddress = "t2Dsexh4v5g2dpL2LLCsR1p9TshMm63jSBM";
+        nSwapPoolStartHeight = 10;
+        nSwapPoolAmount = 2100000 * COIN;
+        nSwapPoolInterval = 10;
+        nSwapPoolMaxTimes = 5;
     }
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)
