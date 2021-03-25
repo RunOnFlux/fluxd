@@ -31,7 +31,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     if (pindexLast->nHeight > chainParams.eh_epoch_1_end() - 1
         && pindexLast->nHeight < chainParams.eh_epoch_1_end() + 61) {
         return nProofOfWorkLimit;
-    }	
+    }
 
     // Reset the difficulty for ZelHash fork 
      if (pindexLast->nHeight > chainParams.eh_epoch_2_end() - 1
@@ -63,7 +63,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
             // Special difficulty rule for testnet:
             // If the new block's timestamp is more than 6 * 2.5 minutes
             // then allow mining of a min-difficulty block.
-            if (pblock && pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing * 6)
+            if (pblock && pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing * 2)
                 return nProofOfWorkLimit;
         }
     }  
@@ -230,7 +230,7 @@ bool CheckEquihashSolution(const CBlockHeader *pblock, const Consensus::Params& 
         case 36:   n=48;  k=5; break;
         default: return error("CheckEquihashSolution: Unsupported solution size of %d", nSolSize);
     }
-    
+
     LogPrint("pow", "selected n,k : %d, %d \n", n,k);
 
     //need to put block height param switching code here

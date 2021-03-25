@@ -265,7 +265,7 @@ public:
         strCurrencyUnits = "TESTZEL";
         bip44CoinType = 1;
         consensus.fCoinbaseMustBeProtected = true;
-        consensus.nSubsidySlowStartInterval = 5000;
+        consensus.nSubsidySlowStartInterval = 1;
         consensus.nSubsidyHalvingInterval = 655350; // 2.5 years
         consensus.nMajorityEnforceBlockUpgrade = 51;
         consensus.nMajorityRejectBlockOutdated = 75;
@@ -275,8 +275,8 @@ public:
         assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
-        consensus.nPowAllowMinDifficultyBlocksAfterHeight = 1;
-        consensus.nPowTargetSpacing = 2 * 60;
+        consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
+        consensus.nPowTargetSpacing = 15;
 
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
@@ -302,15 +302,15 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 350;
 
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
-        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 828000; // Around March 30 2021
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 4000; // Around March 30 2021
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 10;
 
-        eh_epoch_1 = eh200_9;
-        eh_epoch_2 = eh144_5;
-        eh_epoch_3 = zelHash;
+        eh_epoch_1 = eh48_5;
+        eh_epoch_2 = eh48_5;
+        eh_epoch_3 = eh48_5;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -334,6 +334,7 @@ public:
 
         vFixedSeeds.clear();
         vSeeds.clear();
+        vSeeds.push_back(CDNSSeedData("zel-testnet-seed.asoftwaresolution.com", "zel-testnet-seed.asoftwaresolution.com")); // Blondfrogs
         vSeeds.push_back(CDNSSeedData("test.vps.zel.network", "test.dnsseed.zel.network")); // Zel
         vSeeds.push_back(CDNSSeedData("test.vps.runonflux.io", "test.dnsseed.runonflux.io")); // Flux
         // guarantees the first 2 characters, when base58 encoded, are "tm"
@@ -359,7 +360,7 @@ public:
 
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
 
-        fMiningRequiresPeers = true;
+        fMiningRequiresPeers = false;
         fDefaultConsistencyChecks = false;
         fRequireStandard = true;
         fMineBlocksOnDemand = false;
@@ -388,17 +389,17 @@ public:
 
         // Flux rebrand values
         strExchangeFundingAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
-        nExchangeFundingHeight = 828361; // Around March 30th
+        nExchangeFundingHeight = 4100; // Around March 30th
         nExchangeFundingAmount = 7500000 * COIN; // 7.5 Million
 
         strFoundationFundingAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
-        nFoundationFundingHeight = 828370;
+        nFoundationFundingHeight = 4200;
         nFoundationFundingAmount = 2500000 * COIN; // 2.5 Million
 
         strSwapPoolAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
-        nSwapPoolStartHeight = 828380;
+        nSwapPoolStartHeight = 4300;
         nSwapPoolAmount = 2200000 * COIN;
-        nSwapPoolInterval = 25;
+        nSwapPoolInterval = 100;
         nSwapPoolMaxTimes = 10;
 
     // Hardcoded fallback value for the Sprout shielded value pool balance
