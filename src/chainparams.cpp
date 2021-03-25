@@ -242,7 +242,7 @@ public:
         nSwapPoolStartHeight = 837714; //  // Around 12th April 2021
         nSwapPoolAmount = 22000000 * COIN; // 22 Million every time
         nSwapPoolInterval = 21600; // Avg Block per day (720) *  - Trying to get to around once a month
-        nSwapPoolMaxTimes = 10 ;
+        nSwapPoolMaxTimes = 10;
 
         // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
@@ -399,7 +399,7 @@ public:
         nSwapPoolStartHeight = 828380;
         nSwapPoolAmount = 2200000 * COIN;
         nSwapPoolInterval = 25;
-        nSwapPoolMaxTimes = 10 ;
+        nSwapPoolMaxTimes = 10;
 
     // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
