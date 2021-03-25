@@ -1213,8 +1213,8 @@ bool ZelnodeCache::CheckZelnodePayout(const CTransaction& coinbase, const int p_
     CTxDestination basic_dest;
     CTxDestination super_dest;
     CTxDestination bamf_dest;
-    bool fBasicFound = false;
-    bool fSuperFound = false;
+    bool fCUMULUSFound = false;
+    bool fNIMBUSFound = false;
     bool fSTRATUSFound = false;
     CScript basic_script;
     CScript super_script;
@@ -1226,12 +1226,12 @@ bool ZelnodeCache::CheckZelnodePayout(const CTransaction& coinbase, const int p_
 
     // Get the addresses the should be paid
     if (GetNextPayment(basic_dest, CUMULUS, basic_out)) {
-        fBasicFound = true;
+        fCUMULUSFound = true;
     }
 
     // Get the addresses the should be paid
     if (GetNextPayment(super_dest, NIMBUS, super_out)) {
-        fSuperFound = true;
+        fNIMBUSFound = true;
     }
 
     // Get the addresses the should be paid
@@ -1239,8 +1239,8 @@ bool ZelnodeCache::CheckZelnodePayout(const CTransaction& coinbase, const int p_
         fSTRATUSFound = true;
     }
 
-    if (fBasicFound) basic_script = GetScriptForDestination(basic_dest);
-    if (fSuperFound) super_script = GetScriptForDestination(super_dest);
+    if (fCUMULUSFound) basic_script = GetScriptForDestination(basic_dest);
+    if (fNIMBUSFound) super_script = GetScriptForDestination(super_dest);
     if (fSTRATUSFound) bamf_script = GetScriptForDestination(bamf_dest);
 
     // Get the amounts that should be paid per address
@@ -1249,21 +1249,21 @@ bool ZelnodeCache::CheckZelnodePayout(const CTransaction& coinbase, const int p_
     CAmount super_amount = GetZelnodeSubsidy(p_Height, blockValue, Zelnode::NIMBUS);
     CAmount bamf_amount = GetZelnodeSubsidy(p_Height, blockValue, Zelnode::STRATUS);
 
-    bool fBasicApproved = false;
-    bool fSuperApproved = false;
+    bool fCUMULUSApproved = false;
+    bool fNIMBUSApproved = false;
     bool fSTRATUSApproved = false;
 
     // Loop through Tx to make sure they all got paid
     for (const auto& out : coinbase.vout) {
-        if (fBasicFound)
+        if (fCUMULUSFound)
             if (out.scriptPubKey == basic_script)
                 if (out.nValue == basic_amount)
-                    fBasicApproved = true;
+                    fCUMULUSApproved = true;
 
-        if (fSuperFound)
+        if (fNIMBUSFound)
             if (out.scriptPubKey == super_script)
                 if (out.nValue == super_amount)
-                    fSuperApproved = true;
+                    fNIMBUSApproved = true;
 
         if (fSTRATUSFound)
             if (out.scriptPubKey == bamf_script)
@@ -1272,14 +1272,14 @@ bool ZelnodeCache::CheckZelnodePayout(const CTransaction& coinbase, const int p_
     }
 
     bool fFail = false;
-    if (fBasicFound && !fBasicApproved) {
+    if (fCUMULUSFound && !fCUMULUSApproved) {
         fFail = true;
-        error("Invalid block zelnode payee list: Invalid basic payee. Should be paying : %s -> %u", EncodeDestination(basic_dest), basic_amount);
+        error("Invalid block zelnode payee list: Invalid CUMULUS payee. Should be paying : %s -> %u", EncodeDestination(basic_dest), basic_amount);
     }
 
-    if (fSuperFound && !fSuperApproved) {
+    if (fNIMBUSFound && !fNIMBUSApproved) {
         fFail = true;
-        error("Invalid block zelnode payee list: Invalid super payee. Should be paying : %s -> %u", EncodeDestination(super_dest), super_amount);
+        error("Invalid block zelnode payee list: Invalid NIMBUS payee. Should be paying : %s -> %u", EncodeDestination(super_dest), super_amount);
     }
 
     if (fSTRATUSFound && !fSTRATUSApproved) {
@@ -1288,9 +1288,9 @@ bool ZelnodeCache::CheckZelnodePayout(const CTransaction& coinbase, const int p_
     }
 
     if (p_zelnodeCache) {
-        if (fBasicFound)
+        if (fCUMULUSFound)
             p_zelnodeCache->AddPaidNode(basic_out, p_Height);
-        if (fSuperFound)
+        if (fNIMBUSFound)
             p_zelnodeCache->AddPaidNode(super_out, p_Height);
         if (fSTRATUSFound)
             p_zelnodeCache->AddPaidNode(bamf_out, p_Height);
@@ -1306,8 +1306,8 @@ void FillBlockPayeeWithDeterministicPayouts(CMutableTransaction& txNew, CAmount 
     CTxDestination basic_dest;
     CTxDestination super_dest;
     CTxDestination bamf_dest;
-    bool fBasicFound = true;
-    bool fSuperFound = true;
+    bool fCUMULUSFound = true;
+    bool fNIMBUSFound = true;
     bool fSTRATUSFound = true;
 
     COutPoint basic_out;
@@ -1317,12 +1317,12 @@ void FillBlockPayeeWithDeterministicPayouts(CMutableTransaction& txNew, CAmount 
     int nTotalPayouts = 3; // Total number of zelnode payments there could be
 
     if (!g_zelnodeCache.GetNextPayment(basic_dest, CUMULUS, basic_out)) {
-        fBasicFound = false;
+        fCUMULUSFound = false;
         nTotalPayouts--;
     }
 
     if (!g_zelnodeCache.GetNextPayment(super_dest, NIMBUS, super_out)) {
-        fSuperFound = false;
+        fNIMBUSFound = false;
         nTotalPayouts--;
     }
 
@@ -1342,7 +1342,7 @@ void FillBlockPayeeWithDeterministicPayouts(CMutableTransaction& txNew, CAmount 
 
     CAmount nMinerReward = blockValue;
     int currentIndex = 1;
-    if (fBasicFound) {
+    if (fCUMULUSFound) {
         txNew.vout[currentIndex].scriptPubKey = GetScriptForDestination(basic_dest);
         txNew.vout[currentIndex].nValue = basic_amount;
         nMinerReward -= basic_amount;
@@ -1352,7 +1352,7 @@ void FillBlockPayeeWithDeterministicPayouts(CMutableTransaction& txNew, CAmount 
             payments->insert(std::make_pair(Zelnode::CUMULUS, std::make_pair(GetScriptForDestination(basic_dest), basic_amount)));
     }
 
-    if (fSuperFound) {
+    if (fNIMBUSFound) {
         txNew.vout[currentIndex].scriptPubKey = GetScriptForDestination(super_dest);
         txNew.vout[currentIndex].nValue = super_amount;
         nMinerReward -= super_amount;
@@ -1373,8 +1373,8 @@ void FillBlockPayeeWithDeterministicPayouts(CMutableTransaction& txNew, CAmount 
 
     txNew.vout[0].nValue = nMinerReward;
 
-    LogPrint("dzelnode","Zelnode Basic payment of %s to %s\n", FormatMoney(basic_amount).c_str(), EncodeDestination(basic_dest).c_str());
-    LogPrint("dzelnode","Zelnode Super payment of %s to %s\n", FormatMoney(super_amount).c_str(), EncodeDestination(super_dest).c_str());
+    LogPrint("dzelnode","Zelnode CUMULUS payment of %s to %s\n", FormatMoney(basic_amount).c_str(), EncodeDestination(basic_dest).c_str());
+    LogPrint("dzelnode","Zelnode NIMBUS payment of %s to %s\n", FormatMoney(super_amount).c_str(), EncodeDestination(super_dest).c_str());
     LogPrint("dzelnode","Zelnode STRATUS payment of %s to %s\n", FormatMoney(bamf_amount).c_str(), EncodeDestination(bamf_dest).c_str());
 }
 
@@ -1507,8 +1507,8 @@ bool ZelnodeCache::Flush()
     }
 
     bool fUndoExpiredAddedToList = false;
-    bool fUndoExpiredAddedToListBasic = false;
-    bool fUndoExpiredAddedToListSuper = false;
+    bool fUndoExpiredAddedToListCUMULUS = false;
+    bool fUndoExpiredAddedToListNIMBUS = false;
     bool fUndoExpiredAddedToListSTRATUS = false;
     for (const auto& item : setUndoExpireConfirm) {
         g_zelnodeCache.mapConfirmedZelnodeData.insert(std::make_pair(item.collateralIn, item));
@@ -1519,8 +1519,8 @@ bool ZelnodeCache::Flush()
             continue;
         } else {
             vecNodesToAdd.emplace_back(item);
-            if (item.nTier == Zelnode::CUMULUS) fUndoExpiredAddedToListBasic = true;
-            else if (item.nTier == Zelnode::NIMBUS) fUndoExpiredAddedToListSuper = true;
+            if (item.nTier == Zelnode::CUMULUS) fUndoExpiredAddedToListCUMULUS = true;
+            else if (item.nTier == Zelnode::NIMBUS) fUndoExpiredAddedToListNIMBUS = true;
             else if (item.nTier == Zelnode::STRATUS) fUndoExpiredAddedToListSTRATUS = true;
             fUndoExpiredAddedToList = true;
         }
@@ -1535,8 +1535,8 @@ bool ZelnodeCache::Flush()
     if (setUndoStartTxHeight > 0)
         g_zelnodeCache.mapStartTxDosHeights.erase(setUndoStartTxHeight);
 
-    bool fRemoveBasic = false;
-    bool fRemoveSuper = false;
+    bool fRemoveCUMULUS = false;
+    bool fRemoveNIMBUS = false;
     bool fRemoveSTRATUS = false;
 
     //! Add the data from Zelnodes that got confirmed this block
@@ -1565,9 +1565,9 @@ bool ZelnodeCache::Flush()
             if (g_zelnodeCache.mapZelnodeList.at(data.nTier).setConfirmedTxInList.count(data.collateralIn)) {
                 setRemoveFromList.insert(data.collateralIn);
                 if (data.nTier == CUMULUS) {
-                    fRemoveBasic = true;
+                    fRemoveCUMULUS = true;
                 } else if (data.nTier == NIMBUS) {
-                    fRemoveSuper = true;
+                    fRemoveNIMBUS = true;
                 } else if (data.nTier == STRATUS) {
                     fRemoveSTRATUS = true;
                 }
@@ -1577,8 +1577,8 @@ bool ZelnodeCache::Flush()
             // TODO, if we do this, we should be able to not sort the list, if we only add new confirmed nodes to it.
             vecNodesToAdd.emplace_back(data);
 
-            if (data.nTier == Zelnode::CUMULUS) fUndoExpiredAddedToListBasic = true;
-            else if (data.nTier == Zelnode::NIMBUS) fUndoExpiredAddedToListSuper = true;
+            if (data.nTier == Zelnode::CUMULUS) fUndoExpiredAddedToListCUMULUS = true;
+            else if (data.nTier == Zelnode::NIMBUS) fUndoExpiredAddedToListNIMBUS = true;
             else if (data.nTier == Zelnode::STRATUS) fUndoExpiredAddedToListSTRATUS = true;
 
             g_zelnodeCache.setDirtyOutPoint.insert(item.first);
@@ -1598,8 +1598,8 @@ bool ZelnodeCache::Flush()
             // adding it to this set, means that it will go and remove the outpoint from the list, and the set if it is in there
             setRemoveFromList.insert(data.collateralIn);
 
-            if (data.nTier == Zelnode::CUMULUS) fRemoveBasic = true;
-            else if (data.nTier == Zelnode::CUMULUS) fRemoveSuper = true;
+            if (data.nTier == Zelnode::CUMULUS) fRemoveCUMULUS = true;
+            else if (data.nTier == Zelnode::CUMULUS) fRemoveNIMBUS = true;
             else if (data.nTier == Zelnode::CUMULUS) fRemoveSTRATUS = true;
 
             // Update the data (CONFIRM --> STARTED)
@@ -1721,11 +1721,11 @@ bool ZelnodeCache::Flush()
     //! DO ALL REMOVAL FROM THE ITEMS IN THE LIST HERE (using iterators so we can remove items while going over the list a single time
     // Currently only have to do this when moving from CONFIRM->START (undo blocks only)
     if (setRemoveFromList.size()) {
-        if (fRemoveBasic) {
+        if (fRemoveCUMULUS) {
             g_zelnodeCache.EraseFromList(setRemoveFromList, Zelnode::CUMULUS);
         }
 
-        if (fRemoveSuper) {
+        if (fRemoveNIMBUS) {
             g_zelnodeCache.EraseFromList(setRemoveFromList, Zelnode::NIMBUS);
         }
 
@@ -1744,11 +1744,11 @@ bool ZelnodeCache::Flush()
     //! ALWAYS THE LAST CALL IN THE FLUSH COMMAND
     // Always the last thing to do in the Flush. Sort the list if any data was added to it
     if (setAddToConfirm.size() || fUndoExpiredAddedToList || setRemoveFromList.size() || mapPaidNodes.size()) {
-        if (fRemoveBasic || fUndoExpiredAddedToListBasic || mapPaidNodes.count(CUMULUS)) {
+        if (fRemoveCUMULUS || fUndoExpiredAddedToListCUMULUS || mapPaidNodes.count(CUMULUS)) {
             g_zelnodeCache.SortList(Zelnode::CUMULUS);
         }
 
-        if (fRemoveSuper || fUndoExpiredAddedToListSuper || mapPaidNodes.count(NIMBUS)) {
+        if (fRemoveNIMBUS || fUndoExpiredAddedToListNIMBUS || mapPaidNodes.count(NIMBUS)) {
             g_zelnodeCache.SortList(Zelnode::NIMBUS);
         }
 

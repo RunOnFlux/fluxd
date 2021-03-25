@@ -214,13 +214,13 @@ bool ZelnodeMan::Add(Zelnode& zelnode)
     if (pzn == NULL) {
         LogPrint("zelnode", "%s: Adding new Zelnode %s - %i now\n", __func__, zelnode.vin.prevout.hash.ToString(), size() + 1);
 
-        if (zelnode.IsBasic()) {
-            mapBasicZelnodes.insert(make_pair(zelnode.vin, zelnode));
+        if (zelnode.isCUMULUS()) {
+            mapCUMULUSZelnodes.insert(make_pair(zelnode.vin, zelnode));
             return true;
         }
 
-        if (zelnode.IsSuper()) {
-            mapSuperZelnodes.insert(make_pair(zelnode.vin, zelnode));
+        if (zelnode.isNIMBUS()) {
+            mapNIMBUSZelnodes.insert(make_pair(zelnode.vin, zelnode));
             return true;
         }
 
@@ -253,14 +253,14 @@ void ZelnodeMan::Check()
 {
     LOCK(cs);
 
-    map<CTxIn, Zelnode>::iterator basicIt = mapBasicZelnodes.begin();
-    while(basicIt != mapBasicZelnodes.end()) {
+    map<CTxIn, Zelnode>::iterator basicIt = mapCUMULUSZelnodes.begin();
+    while(basicIt != mapCUMULUSZelnodes.end()) {
         basicIt->second.Check();
         ++basicIt;
     }
 
-    map<CTxIn, Zelnode>::iterator superIt = mapSuperZelnodes.begin();
-    while(superIt != mapSuperZelnodes.end()) {
+    map<CTxIn, Zelnode>::iterator superIt = mapNIMBUSZelnodes.begin();
+    while(superIt != mapNIMBUSZelnodes.end()) {
         superIt->second.Check();
         ++superIt;
     }
@@ -279,17 +279,17 @@ void ZelnodeMan::CheckAndRemove(bool forceExpiredRemoval)
     LOCK(cs);
 
     //remove inactive and outdated
-    map<CTxIn, Zelnode>::iterator basicIt = mapBasicZelnodes.begin();
-    map<CTxIn, Zelnode>::iterator superIt = mapSuperZelnodes.begin();
+    map<CTxIn, Zelnode>::iterator basicIt = mapCUMULUSZelnodes.begin();
+    map<CTxIn, Zelnode>::iterator superIt = mapNIMBUSZelnodes.begin();
     map<CTxIn, Zelnode>::iterator bamfIt = mapSTRATUSZelnodes.begin();
 
-    // Remove Basic Nodes
-    while (basicIt != mapBasicZelnodes.end()) {
+    // Remove CUMULUS Nodes
+    while (basicIt != mapCUMULUSZelnodes.end()) {
         if ((basicIt->second).activeState == Zelnode::ZELNODE_REMOVE ||
             (basicIt->second).activeState == Zelnode::ZELNODE_VIN_SPENT ||
             (forceExpiredRemoval && (basicIt->second).activeState == Zelnode::ZELNODE_EXPIRED) ||
             (basicIt->second).protocolVersion < zelnodePayments.GetMinZelnodePaymentsProto()) {
-            LogPrint("zelnode", "%s: Removing inactive Basic Zelnode %s - %i now\n", __func__, (basicIt->second).vin.prevout.hash.ToString(), size() - 1);
+            LogPrint("zelnode", "%s: Removing inactive CUMULUS Zelnode %s - %i now\n", __func__, (basicIt->second).vin.prevout.hash.ToString(), size() - 1);
 
             //erase all of the broadcasts we've seen from this vin
             // -- if we missed a few pings and the node was removed, this will allow is to get it back without them
@@ -314,19 +314,19 @@ void ZelnodeMan::CheckAndRemove(bool forceExpiredRemoval)
                 }
             }
 
-            basicIt = mapBasicZelnodes.erase(basicIt);
+            basicIt = mapCUMULUSZelnodes.erase(basicIt);
         } else {
             ++basicIt;
         }
     }
 
-    // Remove Super Nodes
-    while (superIt != mapSuperZelnodes.end()) {
+    // Remove NIMBUS Nodes
+    while (superIt != mapNIMBUSZelnodes.end()) {
         if ((superIt->second).activeState == Zelnode::ZELNODE_REMOVE ||
             (superIt->second).activeState == Zelnode::ZELNODE_VIN_SPENT ||
             (forceExpiredRemoval && (superIt->second).activeState == Zelnode::ZELNODE_EXPIRED) ||
             (superIt->second).protocolVersion < zelnodePayments.GetMinZelnodePaymentsProto()) {
-            LogPrint("zelnode", "%s: Removing inactive Super Zelnode %s - %i now\n", __func__, (superIt->second).vin.prevout.hash.ToString(), size() - 1);
+            LogPrint("zelnode", "%s: Removing inactive NIMBUS Zelnode %s - %i now\n", __func__, (superIt->second).vin.prevout.hash.ToString(), size() - 1);
 
             //erase all of the broadcasts we've seen from this vin
             // -- if we missed a few pings and the node was removed, this will allow is to get it back without them
@@ -351,7 +351,7 @@ void ZelnodeMan::CheckAndRemove(bool forceExpiredRemoval)
                 }
             }
 
-            superIt = mapSuperZelnodes.erase(superIt);
+            superIt = mapNIMBUSZelnodes.erase(superIt);
         } else {
             ++superIt;
         }
@@ -449,8 +449,8 @@ void ZelnodeMan::CheckAndRemove(bool forceExpiredRemoval)
 void ZelnodeMan::Clear()
 {
     LOCK(cs);
-    mapBasicZelnodes.clear();
-    mapSuperZelnodes.clear();
+    mapCUMULUSZelnodes.clear();
+    mapNIMBUSZelnodes.clear();
     mapSTRATUSZelnodes.clear();
     mAskedUsForZelnodeList.clear();
     mWeAskedForZelnodeList.clear();
@@ -467,7 +467,7 @@ int ZelnodeMan::stable_size ()
     int64_t nZelnode_Min_Age = ZN_WINNER_MINIMUM_AGE;
     int64_t nZelnode_Age = 0;
 
-    for (auto& entry : mapBasicZelnodes) {
+    for (auto& entry : mapCUMULUSZelnodes) {
         if (entry.second.protocolVersion < nMinProtocol) {
             continue; // Skip obsolete versions
         }
@@ -486,7 +486,7 @@ int ZelnodeMan::stable_size ()
         nStable_size++;
     }
 
-    for (auto& entry : mapSuperZelnodes) {
+    for (auto& entry : mapNIMBUSZelnodes) {
         if (entry.second.protocolVersion < nMinProtocol) {
             continue; // Skip obsolete versions
         }
@@ -535,7 +535,7 @@ int ZelnodeMan::CountEnabled(int protocolVersion, int nNodeTier)
     protocolVersion = protocolVersion == -1 ? zelnodePayments.GetMinZelnodePaymentsProto() : protocolVersion;
 
     if (nNodeTier == Zelnode::NONE || nNodeTier == Zelnode::CUMULUS) {
-        for (auto& entry : mapBasicZelnodes) {
+        for (auto& entry : mapCUMULUSZelnodes) {
             entry.second.Check();
             if (entry.second.protocolVersion < protocolVersion || !entry.second.IsEnabled()) continue;
             cumulus++;
@@ -545,7 +545,7 @@ int ZelnodeMan::CountEnabled(int protocolVersion, int nNodeTier)
 
 
     if (nNodeTier == Zelnode::NONE || nNodeTier == Zelnode::NIMBUS) {
-        for (auto& entry : mapSuperZelnodes) {
+        for (auto& entry : mapNIMBUSZelnodes) {
             entry.second.Check();
             if (entry.second.protocolVersion < protocolVersion || !entry.second.IsEnabled()) continue;
             nimbus++;
@@ -569,7 +569,7 @@ void ZelnodeMan::CountNetworks(int protocolVersion, int& ipv4, int& ipv6, int& o
 {
     protocolVersion = protocolVersion == -1 ? zelnodePayments.GetMinZelnodePaymentsProto() : protocolVersion;
 
-    for (auto& entry : mapBasicZelnodes) {
+    for (auto& entry : mapCUMULUSZelnodes) {
         entry.second.Check();
         std::string strHost;
         int port;
@@ -589,7 +589,7 @@ void ZelnodeMan::CountNetworks(int protocolVersion, int& ipv4, int& ipv6, int& o
         }
     }
 
-    for (auto& entry : mapSuperZelnodes) {
+    for (auto& entry : mapNIMBUSZelnodes) {
         entry.second.Check();
         std::string strHost;
         int port;
@@ -657,13 +657,13 @@ Zelnode* ZelnodeMan::Find(const CScript& payee)
     LOCK(cs);
     CScript payee2;
 
-    for (auto& pair : mapBasicZelnodes) {
+    for (auto& pair : mapCUMULUSZelnodes) {
         payee2 = GetScriptForDestination(pair.second.pubKeyCollateralAddress.GetID());
         if (payee2 == payee)
             return &pair.second;
     }
 
-    for (auto& pair : mapSuperZelnodes) {
+    for (auto& pair : mapNIMBUSZelnodes) {
         payee2 = GetScriptForDestination(pair.second.pubKeyCollateralAddress.GetID());
         if (payee2 == payee)
             return &pair.second;
@@ -682,12 +682,12 @@ Zelnode* ZelnodeMan::Find(const CTxIn& vin)
 {
     LOCK(cs);
 
-    if (mapBasicZelnodes.count(vin)) {
-        return &mapBasicZelnodes.at(vin);
+    if (mapCUMULUSZelnodes.count(vin)) {
+        return &mapCUMULUSZelnodes.at(vin);
     }
 
-    if (mapSuperZelnodes.count(vin)) {
-        return &mapSuperZelnodes.at(vin);
+    if (mapNIMBUSZelnodes.count(vin)) {
+        return &mapNIMBUSZelnodes.at(vin);
     }
 
     if (mapSTRATUSZelnodes.count(vin)) {
@@ -701,12 +701,12 @@ Zelnode* ZelnodeMan::Find(const CPubKey& pubKeyZelnode)
 {
     LOCK(cs);
 
-    for (auto& entry : mapBasicZelnodes) {
+    for (auto& entry : mapCUMULUSZelnodes) {
         if (entry.second.pubKeyZelnode == pubKeyZelnode)
             return &entry.second;
     }
 
-    for (auto& entry : mapSuperZelnodes) {
+    for (auto& entry : mapNIMBUSZelnodes) {
         if (entry.second.pubKeyZelnode == pubKeyZelnode)
             return &entry.second;
     }
@@ -724,23 +724,23 @@ Zelnode* ZelnodeMan::Find(const CPubKey& pubKeyZelnode)
 // Deterministically select the oldest/best zelnode to pay on the network
 //
 
-vector<Zelnode*> ZelnodeMan::GetNextZelnodeInQueueForPayment(int nBlockHeight, bool fFilterSigTime, int& nBasicCount, int& nSuperCount, int& nSTRATUSCount)
+vector<Zelnode*> ZelnodeMan::GetNextZelnodeInQueueForPayment(int nBlockHeight, bool fFilterSigTime, int& nCUMULUSCount, int& nNIMBUSCount, int& nSTRATUSCount)
 {
     LOCK(cs);
 
-    Zelnode* pBestBasicZelnode = NULL;
-    Zelnode* pBestSuperZelnode = NULL;
+    Zelnode* pBestCUMULUSZelnode = NULL;
+    Zelnode* pBestNIMBUSZelnode = NULL;
     Zelnode* pBestSTRATUSZelnode = NULL;
-    std::vector<pair<int64_t, CTxIn> > vecBasicZelnodeLastPaid;
-    std::vector<pair<int64_t, CTxIn> > vecSuperZelnodeLastPaid;
+    std::vector<pair<int64_t, CTxIn> > vecCUMULUSZelnodeLastPaid;
+    std::vector<pair<int64_t, CTxIn> > vecNIMBUSZelnodeLastPaid;
     std::vector<pair<int64_t, CTxIn> > vecSTRATUSZelnodeLastPaid;
 
     /*
         Make a vector with all of the last paid times
     */
 
-    int nBasicZnCount = CountEnabled(-1, Zelnode::CUMULUS);
-    for (auto& entry : mapBasicZelnodes) {
+    int nCUMULUSZnCount = CountEnabled(-1, Zelnode::CUMULUS);
+    for (auto& entry : mapCUMULUSZelnodes) {
         entry.second.Check();
         if (!entry.second.IsEnabled()) continue;
 
@@ -751,16 +751,16 @@ vector<Zelnode*> ZelnodeMan::GetNextZelnodeInQueueForPayment(int nBlockHeight, b
         if (zelnodePayments.IsScheduled(entry.second, nBlockHeight)) continue;
 
         //it's too new, wait for a cycle
-        if (fFilterSigTime && entry.second.sigTime + (nBasicZnCount * 2.6 * 60) > GetAdjustedTime()) continue;
+        if (fFilterSigTime && entry.second.sigTime + (nCUMULUSZnCount * 2.6 * 60) > GetAdjustedTime()) continue;
 
         //make sure it has as many confirmations as there are zelnodes
-        if (entry.second.GetZelnodeInputAge() < nBasicZnCount) continue;
+        if (entry.second.GetZelnodeInputAge() < nCUMULUSZnCount) continue;
 
-        vecBasicZelnodeLastPaid.push_back(make_pair(entry.second.SecondsSincePayment(), entry.second.vin));
+        vecCUMULUSZelnodeLastPaid.push_back(make_pair(entry.second.SecondsSincePayment(), entry.second.vin));
     }
 
-    int nSuperZnCount = CountEnabled(-1, Zelnode::NIMBUS);
-    for (auto& entry : mapSuperZelnodes) {
+    int nNIMBUSZnCount = CountEnabled(-1, Zelnode::NIMBUS);
+    for (auto& entry : mapNIMBUSZelnodes) {
         entry.second.Check();
         if (!entry.second.IsEnabled()) continue;
 
@@ -771,12 +771,12 @@ vector<Zelnode*> ZelnodeMan::GetNextZelnodeInQueueForPayment(int nBlockHeight, b
         if (zelnodePayments.IsScheduled(entry.second, nBlockHeight)) continue;
 
         //it's too new, wait for a cycle
-        if (fFilterSigTime && entry.second.sigTime + (nSuperZnCount * 2.6 * 60) > GetAdjustedTime()) continue;
+        if (fFilterSigTime && entry.second.sigTime + (nNIMBUSZnCount * 2.6 * 60) > GetAdjustedTime()) continue;
 
         //make sure it has as many confirmations as there are zelnodes
-        if (entry.second.GetZelnodeInputAge() < nSuperZnCount) continue;
+        if (entry.second.GetZelnodeInputAge() < nNIMBUSZnCount) continue;
 
-        vecSuperZelnodeLastPaid.push_back(make_pair(entry.second.SecondsSincePayment(), entry.second.vin));
+        vecNIMBUSZelnodeLastPaid.push_back(make_pair(entry.second.SecondsSincePayment(), entry.second.vin));
     }
 
     int nSTRATUSZnCount = CountEnabled(-1, Zelnode::STRATUS);
@@ -799,53 +799,53 @@ vector<Zelnode*> ZelnodeMan::GetNextZelnodeInQueueForPayment(int nBlockHeight, b
         vecSTRATUSZelnodeLastPaid.push_back(make_pair(entry.second.SecondsSincePayment(), entry.second.vin));
     }
 
-    nBasicCount = (int)vecBasicZelnodeLastPaid.size();
-    nSuperCount = (int)vecSuperZelnodeLastPaid.size();
+    nCUMULUSCount = (int)vecCUMULUSZelnodeLastPaid.size();
+    nNIMBUSCount = (int)vecNIMBUSZelnodeLastPaid.size();
     nSTRATUSCount = (int)vecSTRATUSZelnodeLastPaid.size();
 
     //when the network is in the process of upgrading, don't penalize nodes that recently restarted
-    if (fFilterSigTime && ((nBasicCount < nBasicZnCount / 3) || (nSuperCount < nSuperZnCount / 3) || (nSTRATUSCount < nSTRATUSZnCount / 3))) return GetNextZelnodeInQueueForPayment(nBlockHeight, false, nBasicCount, nSuperCount, nSTRATUSCount);
+    if (fFilterSigTime && ((nCUMULUSCount < nCUMULUSZnCount / 3) || (nNIMBUSCount < nNIMBUSZnCount / 3) || (nSTRATUSCount < nSTRATUSZnCount / 3))) return GetNextZelnodeInQueueForPayment(nBlockHeight, false, nCUMULUSCount, nNIMBUSCount, nSTRATUSCount);
 
     // Sort them high to low
-    sort(vecBasicZelnodeLastPaid.rbegin(), vecBasicZelnodeLastPaid.rend(), CompareLastPaid());
-    sort(vecSuperZelnodeLastPaid.rbegin(), vecSuperZelnodeLastPaid.rend(), CompareLastPaid());
+    sort(vecCUMULUSZelnodeLastPaid.rbegin(), vecCUMULUSZelnodeLastPaid.rend(), CompareLastPaid());
+    sort(vecNIMBUSZelnodeLastPaid.rbegin(), vecNIMBUSZelnodeLastPaid.rend(), CompareLastPaid());
     sort(vecSTRATUSZelnodeLastPaid.rbegin(), vecSTRATUSZelnodeLastPaid.rend(), CompareLastPaid());
 
     // Look at 1/10 of the oldest nodes (by last payment), calculate their scores and pay the best one
     //  -- This doesn't look at who is being paid in the +8-10 blocks, allowing for double payments very rarely
     //  -- 1/100 payments should be a double payment on mainnet - (1/(3000/10))*2
     //  -- (chance per block * chances before IsScheduled will fire)
-    int nBasicTenthNetwork = nBasicZnCount / 10;
+    int nCUMULUSTenthNetwork = nCUMULUSZnCount / 10;
     int nCountTenth = 0;
     uint256 nHigh = uint256();
-    for (PAIRTYPE(int64_t, CTxIn)& s : vecBasicZelnodeLastPaid) {
+    for (PAIRTYPE(int64_t, CTxIn)& s : vecCUMULUSZelnodeLastPaid) {
         Zelnode* pzn = Find(s.second);
         if (!pzn) break;
 
         uint256 n = pzn->CalculateScore(1, nBlockHeight - 100);
         if (nHigh < n) {
             nHigh = n;
-            pBestBasicZelnode = pzn;
+            pBestCUMULUSZelnode = pzn;
         }
         nCountTenth++;
-        if (nCountTenth >= nBasicTenthNetwork) break;
+        if (nCountTenth >= nCUMULUSTenthNetwork) break;
     }
 
-    int nSuperTenthNetwork = nSuperZnCount / 10;
+    int nNIMBUSTenthNetwork = nNIMBUSZnCount / 10;
     nCountTenth = 0;
     nHigh = uint256();
 
-    for (PAIRTYPE(int64_t, CTxIn)& s : vecSuperZelnodeLastPaid) {
+    for (PAIRTYPE(int64_t, CTxIn)& s : vecNIMBUSZelnodeLastPaid) {
         Zelnode* pzn = Find(s.second);
         if (!pzn) break;
 
         uint256 n = pzn->CalculateScore(1, nBlockHeight - 100);
         if (nHigh < n) {
             nHigh = n;
-            pBestSuperZelnode = pzn;
+            pBestNIMBUSZelnode = pzn;
         }
         nCountTenth++;
-        if (nCountTenth >= nSuperTenthNetwork) break;
+        if (nCountTenth >= nNIMBUSTenthNetwork) break;
     }
 
     int nSTRATUSTenthNetwork = nSTRATUSZnCount / 10;
@@ -866,8 +866,8 @@ vector<Zelnode*> ZelnodeMan::GetNextZelnodeInQueueForPayment(int nBlockHeight, b
     }
 
     std::vector<Zelnode*> vecPointers;
-    vecPointers.emplace_back(pBestBasicZelnode);
-    vecPointers.emplace_back(pBestSuperZelnode);
+    vecPointers.emplace_back(pBestCUMULUSZelnode);
+    vecPointers.emplace_back(pBestNIMBUSZelnode);
     vecPointers.emplace_back(pBestSTRATUSZelnode);
     return vecPointers;
 }
@@ -878,7 +878,7 @@ bool ZelnodeMan::GetCurrentZelnode(Zelnode& winner, int nNodeTier, int mod, int6
 
     if (nNodeTier == Zelnode::CUMULUS) {
         bool found = false;
-        for (auto& entry : mapBasicZelnodes) {
+        for (auto& entry : mapCUMULUSZelnodes) {
             entry.second.Check();
             if (entry.second.protocolVersion < minProtocol || !entry.second.IsEnabled()) continue;
 
@@ -896,7 +896,7 @@ bool ZelnodeMan::GetCurrentZelnode(Zelnode& winner, int nNodeTier, int mod, int6
         return found;
     } else if (nNodeTier == Zelnode::NIMBUS) {
         bool found = false;
-        for (auto& entry : mapSuperZelnodes) {
+        for (auto& entry : mapNIMBUSZelnodes) {
             entry.second.Check();
             if (entry.second.protocolVersion < minProtocol || !entry.second.IsEnabled()) continue;
 
@@ -945,21 +945,21 @@ int ZelnodeMan::GetZelnodeRank(const CTxIn& vin, int64_t nBlockHeight, int minPr
     uint256 hash = uint256();
     if (!GetBlockHash(hash, nBlockHeight)) return -1;
 
-    bool isBasic = false;
-    bool isSuper = false;
+    bool isCUMULUS = false;
+    bool isNIMBUS = false;
     bool isSTRATUS = false;
 
-    if (mapBasicZelnodes.count(vin))
-        isBasic = true;
-    else if (mapSuperZelnodes.count(vin))
-        isSuper = true;
+    if (mapCUMULUSZelnodes.count(vin))
+        isCUMULUS = true;
+    else if (mapNIMBUSZelnodes.count(vin))
+        isNIMBUS = true;
     else if (mapSTRATUSZelnodes.count(vin))
         isSTRATUS = true;
 
-    if (!isBasic && !isSuper && !isSTRATUS)
+    if (!isCUMULUS && !isNIMBUS && !isSTRATUS)
         return -1;
 
-    for (auto& entry : isBasic ? mapBasicZelnodes : isSuper ? mapSuperZelnodes : mapSTRATUSZelnodes) {
+    for (auto& entry : isCUMULUS ? mapCUMULUSZelnodes : isNIMBUS ? mapNIMBUSZelnodes : mapSTRATUSZelnodes) {
         if (entry.second.protocolVersion < minProtocol) {
             LogPrint("zelnode","Skipping Zelnode with obsolete version %d\n", entry.second.protocolVersion);
             continue;                                                       // Skip obsolete versions
@@ -1001,18 +1001,18 @@ std::vector<pair<int, Zelnode> > ZelnodeMan::GetZelnodeRanks(int nNodeTier, int6
     std::vector<pair<int64_t, Zelnode> > vecZelnodeScores;
     std::vector<pair<int, Zelnode> > vecZelnodeRanks;
 
-    bool getBasic = false;
-    bool getSuper = false;
+    bool getCUMULUS = false;
+    bool getNIMBUS = false;
     bool getSTRATUS = false;
 
     if (nNodeTier == Zelnode::CUMULUS)
-        getBasic = true;
+        getCUMULUS = true;
     else if (nNodeTier == Zelnode::NIMBUS) {
-        getSuper = true;
+        getNIMBUS = true;
     } else if ((nNodeTier == Zelnode::STRATUS))
         getSTRATUS = true;
 
-    if (!getBasic && !getSuper && !getSTRATUS)
+    if (!getCUMULUS && !getNIMBUS && !getSTRATUS)
         return vecZelnodeRanks;
 
     //make sure we know about this blockG
@@ -1020,7 +1020,7 @@ std::vector<pair<int, Zelnode> > ZelnodeMan::GetZelnodeRanks(int nNodeTier, int6
     if (!GetBlockHash(hash, nBlockHeight)) return vecZelnodeRanks;
 
     // scan for winner
-    for (auto& entry : getBasic ? mapBasicZelnodes : getSuper ? mapSuperZelnodes : mapSTRATUSZelnodes) {
+    for (auto& entry : getCUMULUS ? mapCUMULUSZelnodes : getNIMBUS ? mapNIMBUSZelnodes : mapSTRATUSZelnodes) {
         entry.second.Check();
 
         if (entry.second.protocolVersion < minProtocol) continue;
@@ -1212,14 +1212,14 @@ void ZelnodeMan::Remove(CTxIn vin)
 {
     LOCK(cs);
 
-    if (mapBasicZelnodes.count(vin)) {
-        LogPrint("zelnode", "%s: Removing Basic Zelnode %s - %i now\n", __func__, mapBasicZelnodes.at(vin).vin.prevout.hash.ToString(), size() - 1);
-        mapBasicZelnodes.erase(vin);
+    if (mapCUMULUSZelnodes.count(vin)) {
+        LogPrint("zelnode", "%s: Removing CUMULUS Zelnode %s - %i now\n", __func__, mapCUMULUSZelnodes.at(vin).vin.prevout.hash.ToString(), size() - 1);
+        mapCUMULUSZelnodes.erase(vin);
     }
 
-    if (mapSuperZelnodes.count(vin)) {
-        LogPrint("zelnode", "%s: Removing Super Zelnode %s - %i now\n", __func__, mapSuperZelnodes.at(vin).vin.prevout.hash.ToString(), size() - 1);
-        mapSuperZelnodes.erase(vin);
+    if (mapNIMBUSZelnodes.count(vin)) {
+        LogPrint("zelnode", "%s: Removing NIMBUS Zelnode %s - %i now\n", __func__, mapNIMBUSZelnodes.at(vin).vin.prevout.hash.ToString(), size() - 1);
+        mapNIMBUSZelnodes.erase(vin);
     }
 
     if (mapSTRATUSZelnodes.count(vin)) {
@@ -1248,7 +1248,7 @@ void ZelnodeMan::UpdateZelnodeList(ZelnodeBroadcast znb)
 std::string ZelnodeMan::ToString() const
 {
     std::ostringstream info;
-    int size = mapBasicZelnodes.size() + mapSuperZelnodes.size() + mapSTRATUSZelnodes.size();
+    int size = mapCUMULUSZelnodes.size() + mapNIMBUSZelnodes.size() + mapSTRATUSZelnodes.size();
 
     info << "Zelnodes: " << size << ", peers who asked us for Zelnodes list: " << (int)mAskedUsForZelnodeList.size() << ", peers we asked for Zelnode list: " << (int)mWeAskedForZelnodeList.size() << ", entries in Zelnode list we asked for: " << (int)mWeAskedForZelnodeListEntry.size() << ", nDsqCount: " << (int)nDsqCount;
 

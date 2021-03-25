@@ -287,12 +287,12 @@ public:
         return activeState == ZELNODE_ENABLED;
     }
 
-    bool IsBasic()
+    bool isCUMULUS()
     {
         return tier == CUMULUS;
     }
 
-    bool IsSuper()
+    bool isNIMBUS()
     {
         return tier == NIMBUS;
     }
@@ -464,12 +464,12 @@ public:
         return nType == ZELNODE_NO_TYPE;
     }
 
-    bool IsBasic()
+    bool isCUMULUS()
     {
         return nTier == CUMULUS;
     }
 
-    bool IsSuper()
+    bool isNIMBUS()
     {
         return nTier == NIMBUS;
     }

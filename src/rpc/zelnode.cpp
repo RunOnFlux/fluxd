@@ -998,8 +998,8 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
             nHeight = pindex->nHeight;
         }
 
-        std::vector<pair<int, Zelnode> > vBasicZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::CUMULUS, nHeight);
-        for (PAIRTYPE(int, Zelnode) &s : vBasicZelnodeRanks) {
+        std::vector<pair<int, Zelnode> > vCUMULUSZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::CUMULUS, nHeight);
+        for (PAIRTYPE(int, Zelnode) &s : vCUMULUSZelnodeRanks) {
             UniValue obj(UniValue::VOBJ);
             std::string strVin = s.second.vin.prevout.ToString();
             std::string strTxHash = s.second.vin.prevout.hash.ToString();
@@ -1039,8 +1039,8 @@ UniValue listzelnodes(const UniValue& params, bool fHelp)
             }
         }
 
-        std::vector<pair<int, Zelnode> > vSuperZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::NIMBUS, nHeight);
-        for (PAIRTYPE(int, Zelnode) &s : vSuperZelnodeRanks) {
+        std::vector<pair<int, Zelnode> > vNIMBUSZelnodeRanks = zelnodeman.GetZelnodeRanks(Zelnode::NIMBUS, nHeight);
+        for (PAIRTYPE(int, Zelnode) &s : vNIMBUSZelnodeRanks) {
             UniValue obj(UniValue::VOBJ);
             std::string strVin = s.second.vin.prevout.ToString();
             std::string strTxHash = s.second.vin.prevout.hash.ToString();
@@ -1516,7 +1516,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
         obj.push_back(Pair("pubkey", EncodeDestination(basicWinner.pubKeyCollateralAddress.GetID())));
         obj.push_back(Pair("lastseen", (basicWinner.lastPing == ZelnodePing()) ? basicWinner.sigTime : (int64_t)basicWinner.lastPing.sigTime));
         obj.push_back(Pair("activeseconds", (basicWinner.lastPing == ZelnodePing()) ? 0 : (int64_t)(basicWinner.lastPing.sigTime - basicWinner.sigTime)));
-        ret.push_back(Pair("Basic Winner", obj));
+        ret.push_back(Pair("CUMULUS Winner", obj));
     }
     if (zelnodeman.GetCurrentZelnode(superWinner, Zelnode::NIMBUS, 1)) {
         UniValue obj(UniValue::VOBJ);
@@ -1526,7 +1526,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
         obj.push_back(Pair("pubkey", EncodeDestination(superWinner.pubKeyCollateralAddress.GetID())));
         obj.push_back(Pair("lastseen", (superWinner.lastPing == ZelnodePing()) ? superWinner.sigTime : (int64_t)superWinner.lastPing.sigTime));
         obj.push_back(Pair("activeseconds", (superWinner.lastPing == ZelnodePing()) ? 0 : (int64_t)(superWinner.lastPing.sigTime - superWinner.sigTime)));
-        ret.push_back(Pair("Super Winner", obj));
+        ret.push_back(Pair("NIMBUS Winner", obj));
     }
     if (zelnodeman.GetCurrentZelnode(bamfWinner, Zelnode::STRATUS, 1)) {
         UniValue obj(UniValue::VOBJ);
@@ -1567,19 +1567,19 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
 
     if (IsDZelnodeActive())
     {
-        int nBasic = g_zelnodeCache.mapZelnodeList.at(CUMULUS).listConfirmedZelnodes.size();
-        int nSuper = g_zelnodeCache.mapZelnodeList.at(NIMBUS).listConfirmedZelnodes.size();
+        int nCUMULUS = g_zelnodeCache.mapZelnodeList.at(CUMULUS).listConfirmedZelnodes.size();
+        int nNIMBUS = g_zelnodeCache.mapZelnodeList.at(NIMBUS).listConfirmedZelnodes.size();
         int nSTRATUS = g_zelnodeCache.mapZelnodeList.at(STRATUS).listConfirmedZelnodes.size();
 
         int nTotal = g_zelnodeCache.mapConfirmedZelnodeData.size();
 
         obj.push_back(Pair("total", nTotal));
         obj.push_back(Pair("stable", nTotal));
-        obj.push_back(Pair("basic-enabled", nBasic));
-        obj.push_back(Pair("super-enabled", nSuper));
+        obj.push_back(Pair("basic-enabled", nCUMULUS));
+        obj.push_back(Pair("super-enabled", nNIMBUS));
         obj.push_back(Pair("bamf-enabled", nSTRATUS));
-        obj.push_back(Pair("cumulus-enabled", nBasic));
-        obj.push_back(Pair("nimbus-enabled", nSuper));
+        obj.push_back(Pair("cumulus-enabled", nCUMULUS));
+        obj.push_back(Pair("nimbus-enabled", nNIMBUS));
         obj.push_back(Pair("stratus-enabled", nSTRATUS));
 
         int ipv4 = 0, ipv6 = 0, onion = 0;
@@ -1592,13 +1592,13 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
         return obj;
     }
 
-    int nBasicCount = 0;
-    int nSuperCount = 0;
+    int nCUMULUSCount = 0;
+    int nNIMBUSCount = 0;
     int nSTRATUSCount = 0;
     int ipv4 = 0, ipv6 = 0, onion = 0;
 
     if (chainActive.Tip())
-        zelnodeman.GetNextZelnodeInQueueForPayment(chainActive.Tip()->nHeight, true, nBasicCount, nSuperCount, nSTRATUSCount);
+        zelnodeman.GetNextZelnodeInQueueForPayment(chainActive.Tip()->nHeight, true, nCUMULUSCount, nNIMBUSCount, nSTRATUSCount);
 
     int basicCount = zelnodeman.CountEnabled(-1, Zelnode::CUMULUS);
     int superCount = zelnodeman.CountEnabled(-1, Zelnode::NIMBUS);
@@ -1614,11 +1614,11 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
     obj.push_back(Pair("cumulus-enabled", basicCount));
     obj.push_back(Pair("nimbus-enabled", superCount));
     obj.push_back(Pair("stratus-enabled", bamfCount));
-    obj.push_back(Pair("basic-inqueue", nBasicCount));
-    obj.push_back(Pair("super-inqueue", nSuperCount));
+    obj.push_back(Pair("basic-inqueue", nCUMULUSCount));
+    obj.push_back(Pair("super-inqueue", nNIMBUSCount));
     obj.push_back(Pair("bamf-inqueue", nSTRATUSCount));
-    obj.push_back(Pair("cumulus-inqueue", nBasicCount));
-    obj.push_back(Pair("nimbus-inqueue", nSuperCount));
+    obj.push_back(Pair("cumulus-inqueue", nCUMULUSCount));
+    obj.push_back(Pair("nimbus-inqueue", nNIMBUSCount));
     obj.push_back(Pair("stratus-inqueue", nSTRATUSCount));
     obj.push_back(Pair("ipv4", ipv4));
     obj.push_back(Pair("ipv6", ipv6));
@@ -1773,27 +1773,27 @@ UniValue getzelnodescores (const UniValue& params, bool fHelp)
     }
     UniValue obj(UniValue::VOBJ);
 
-    std::vector<Zelnode> vBasicZelnodes = zelnodeman.GetFullZelnodeVector(Zelnode::CUMULUS);
-    std::vector<Zelnode> vSuperZelnodes = zelnodeman.GetFullZelnodeVector(Zelnode::NIMBUS);
+    std::vector<Zelnode> vCUMULUSZelnodes = zelnodeman.GetFullZelnodeVector(Zelnode::CUMULUS);
+    std::vector<Zelnode> vNIMBUSZelnodes = zelnodeman.GetFullZelnodeVector(Zelnode::NIMBUS);
     std::vector<Zelnode> vSTRATUSZelnodes = zelnodeman.GetFullZelnodeVector(Zelnode::STRATUS);
     for (int nHeight = chainActive.Tip()->nHeight - nLast; nHeight < chainActive.Tip()->nHeight + 20; nHeight++) {
         uint256 nHigh = uint256();
-        Zelnode* pBestBasicZelnode = NULL;
-        Zelnode* pBestSuperZelnode = NULL;
+        Zelnode* pBestCUMULUSZelnode = NULL;
+        Zelnode* pBestNIMBUSZelnode = NULL;
         Zelnode* pBestSTRATUSZelnode = NULL;
-        for (Zelnode& zn : vBasicZelnodes) {
+        for (Zelnode& zn : vCUMULUSZelnodes) {
                         uint256 n = zn.CalculateScore(1, nHeight - 100);
                         if (n > nHigh) {
                             nHigh = n;
-                            pBestBasicZelnode = &zn;
+                            pBestCUMULUSZelnode = &zn;
                         }
                     }
         nHigh = uint256();
-        for (Zelnode& zn : vSuperZelnodes) {
+        for (Zelnode& zn : vNIMBUSZelnodes) {
             uint256 n = zn.CalculateScore(1, nHeight - 100);
             if (n > nHigh) {
                 nHigh = n;
-                pBestSuperZelnode = &zn;
+                pBestNIMBUSZelnode = &zn;
             }
         }
         nHigh = uint256();
@@ -1804,10 +1804,10 @@ UniValue getzelnodescores (const UniValue& params, bool fHelp)
                 pBestSTRATUSZelnode = &zn;
             }
         }
-        if (pBestBasicZelnode)
-            obj.push_back(Pair(strprintf("Basic: %d", nHeight), pBestBasicZelnode->vin.prevout.hash.ToString().c_str()));
-        if (pBestSuperZelnode)
-            obj.push_back(Pair(strprintf("Super: %d", nHeight), pBestSuperZelnode->vin.prevout.hash.ToString().c_str()));
+        if (pBestCUMULUSZelnode)
+            obj.push_back(Pair(strprintf("CUMULUS: %d", nHeight), pBestCUMULUSZelnode->vin.prevout.hash.ToString().c_str()));
+        if (pBestNIMBUSZelnode)
+            obj.push_back(Pair(strprintf("NIMBUS: %d", nHeight), pBestNIMBUSZelnode->vin.prevout.hash.ToString().c_str()));
         if (pBestSTRATUSZelnode)
             obj.push_back(Pair(strprintf("STRATUS: %d", nHeight), pBestSTRATUSZelnode->vin.prevout.hash.ToString().c_str()));
     }
