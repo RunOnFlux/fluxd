@@ -1051,11 +1051,13 @@ bool ContextualCheckTransaction(
 
         // If flux rebrand is active, we no longer want to allow coins to go into the privacy pool
         // To stop this, we can just check the size of the tx.vShieldedOutput and tx.vJoinSplit.empty() making sure
-        // they are empty
+        // they are empty and if the vin has any size disallow this type of transaction
         if (fluxRebrandActive) {
-            if (!tx.vJoinSplit.empty() || !tx.vShieldedOutput.empty()) {
-                return state.DoS(10, error("CheckTransaction(): vJoinSplit or vShieldedOutput not empty"),
-                                 REJECT_INVALID, "bad-txns-fluxrebrand-vprivacy-not-empty");
+            if(tx.vin.size()) {
+                if (!tx.vJoinSplit.empty() || !tx.vShieldedOutput.empty()) {
+                    return state.DoS(10, error("CheckTransaction(): vJoinSplit or vShieldedOutput not empty"),
+                                     REJECT_INVALID, "bad-txns-fluxrebrand-vprivacy-not-empty");
+                }
             }
         }
     }
