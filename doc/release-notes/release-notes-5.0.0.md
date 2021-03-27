@@ -1,7 +1,7 @@
 Changelog
 =========
 
-Tadeas Kmenta (10):
+Tadeas Kmenta (11):
       add network upgrade info
       consistent rename
       fix upgrade tests
@@ -12,8 +12,6 @@ Tadeas Kmenta (10):
       readjust for release script
       make-release.py: Versioning changes for 5.0.0.
       make-release.py: Updated manpages for 5.0.0.
-
-Tadeas Kmenta (1):
       Travis setup (#126)
 
 Jeremy "Blondfrogs" Anderson (11):
