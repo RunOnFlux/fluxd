@@ -923,6 +923,63 @@ bool ContextualCheckTransaction(
     bool isSprout = !saplingActive;
 
     bool kamataActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_KAMATA);
+    bool fluxRebrandActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_FLUX);
+
+    if (tx.IsCoinBase()) {
+        // Check for exchange address funding
+        CAmount nExchangeAmount = GetExchangeFundAmount(nHeight, chainparams.GetConsensus());
+        CAmount nFoundationAmount = GetFoundationFundAmount(nHeight, chainparams.GetConsensus());
+        if (nExchangeAmount > 0) {
+            bool fFoundExchangeFund = false;
+            for (const auto& out : tx.vout) {
+                if (out.scriptPubKey == GetScriptForDestination(DecodeDestination(Params().GetExchangeFundingAddress()))) {
+                    if (out.nValue == nExchangeAmount) {
+                        fFoundExchangeFund = true;
+                        break;
+                    }
+                }
+            }
+            if (!fFoundExchangeFund) {
+                return state.DoS(dosLevel, error("ContextualCheckTransaction(): exchange funding not correct in coinbase"),
+                                 REJECT_INVALID, "tx-coinbase-missing-exchange-funding");
+            }
+        }
+
+        // Check for foundation address funding
+        if (nFoundationAmount > 0) {
+            bool fFoundFoundationFund = false;
+            for (const auto& out : tx.vout) {
+                if (out.scriptPubKey == GetScriptForDestination(DecodeDestination(Params().GetFoundationFundingAddress()))) {
+                    if (out.nValue == nFoundationAmount) {
+                        fFoundFoundationFund = true;
+                        break;
+                    }
+                }
+            }
+            if (!fFoundFoundationFund) {
+                return state.DoS(dosLevel, error("ContextualCheckTransaction(): foundation funding not correct in coinbase"),
+                                 REJECT_INVALID, "tx-coinbase-missing-foundation-funding");
+            }
+        }
+
+        // Check for swap pool funding
+        if (IsSwapPoolInterval(nHeight)) {
+            CAmount nSwapPoolAmount = Params().GetSwapPoolAmount();
+            bool fFoundSwapPoolFund = false;
+            for (const auto& out : tx.vout) {
+                if (out.scriptPubKey == GetScriptForDestination(DecodeDestination(Params().GetSwapPoolAddress()))) {
+                    if (out.nValue == nSwapPoolAmount) {
+                        fFoundSwapPoolFund = true;
+                        break;
+                    }
+                }
+            }
+            if (!fFoundSwapPoolFund) {
+                return state.DoS(dosLevel, error("ContextualCheckTransaction(): swap pool funding not correct in coinbase"),
+                                 REJECT_INVALID, "tx-coinbase-missing-swappool-funding");
+            }
+        }
+    }
 
     // If Sprout rules apply, reject transactions which are intended for Overwinter and beyond
     if (isSprout && tx.fOverwintered) {
@@ -990,6 +1047,18 @@ bool ContextualCheckTransaction(
             if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_TX_SIZE_BEFORE_SAPLING)
                 return state.DoS(100, error("ContextualCheckTransaction(): size limits failed"),
                                  REJECT_INVALID, "bad-txns-oversize");
+        }
+
+        // If flux rebrand is active, we no longer want to allow coins to go into the privacy pool
+        // To stop this, we can just check the size of the tx.vShieldedOutput and tx.vJoinSplit.empty() making sure
+        // they are empty and if the vin has any size disallow this type of transaction
+        if (fluxRebrandActive) {
+            if(tx.vin.size()) {
+                if (!tx.vJoinSplit.empty() || !tx.vShieldedOutput.empty()) {
+                    return state.DoS(10, error("CheckTransaction(): vJoinSplit or vShieldedOutput not empty"),
+                                     REJECT_INVALID, "bad-txns-fluxrebrand-vprivacy-not-empty");
+                }
+            }
         }
     }
 
@@ -1170,7 +1239,7 @@ bool ContextualCheckTransaction(
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed";
                 }
 
-                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx)) {
+                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx, data)) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon";
                 }
@@ -1271,6 +1340,7 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
         if (tx.vout.empty() && tx.vJoinSplit.empty() && tx.vShieldedOutput.empty())
             return state.DoS(10, error("CheckTransaction(): vout empty"),
                              REJECT_INVALID, "bad-txns-vout-empty");
+
     }
 
     if (tx.IsZelnodeTx() && (!tx.vout.empty() || !tx.vJoinSplit.empty() || !tx.vShieldedOutput.empty()
@@ -1297,7 +1367,7 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
         }
 
         if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
-            if (tx.benchmarkTier < BASIC || tx.benchmarkTier > BAMF) {
+            if (tx.benchmarkTier < CUMULUS || tx.benchmarkTier > STRATUS) {
                 return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, invalid benchmarking tier"),
                                  REJECT_INVALID, "bad-txns-zelnode-tx-invalid-benchmark-tier");
             }
@@ -2259,29 +2329,77 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
     return nSubsidy;
 }
 
-CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier) // TODO tie in consensusParams
-{
-    // At some point we might change the zelnode reward based on the height of the chain.
-    // When this happens, we can use the nHeight variable to make other value calculations.
+CAmount GetExchangeFundAmount(int nHeight, const Consensus::Params& consensusParams) {
+    CAmount nExchangeFundAmount = Params().GetExchangeFundingAmount();
+    CAmount nExchangeFundHeight = Params().GetExchangeFundingHeight();
 
-//    std::cout << "Testing Zelnode Subsidy" << std::endl;
-    CAmount tb = blockValue * 0.0375;
-    CAmount ts = blockValue * 0.0625;
-    CAmount tba = blockValue * 0.15;
-
-    CAmount total = tb + ts + tba;
-//    std::cout << "Got total of: " << total << std::endl;
-
-
-    if (nNodeTier == Zelnode::BASIC) {
-        return blockValue * 0.0375;
-    } else if (nNodeTier == Zelnode::SUPER) {
-        return blockValue * 0.0625;
-    } else if (nNodeTier == Zelnode::BAMF) {
-        return blockValue * 0.15;
+    if (nHeight == nExchangeFundHeight) {
+        return nExchangeFundAmount;
     }
 
     return 0;
+}
+
+CAmount GetFoundationFundAmount(int nHeight, const Consensus::Params& consensusParams) {
+    CAmount nFoundationFundAmount = Params().GetFoundationFundingAmount();
+    CAmount nFoundationFundHeight = Params().GetFoundationFundingHeight();
+
+    if (nHeight == nFoundationFundHeight) {
+        return nFoundationFundAmount;
+    }
+
+    return 0;
+}
+
+CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier) // TODO tie in consensusParams
+{
+    float fMultiple = 1.0;
+    bool fluxRebrandActive = NetworkUpgradeActive(nHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
+    if (fluxRebrandActive) {
+        fMultiple = 2.0;
+    }
+
+//    std::cout << "Testing Zelnode Subsidy" << std::endl;
+//    CAmount tb = blockValue * (0.0375 * fMultiple);
+//    CAmount ts = blockValue * (0.0625 * fMultiple);
+//    CAmount tba = blockValue * (0.15 * fMultiple);
+//
+//    CAmount total = tb + ts + tba;
+//    std::cout << "Got total of: " << total << std::endl;
+
+
+    if (nNodeTier == Zelnode::CUMULUS) {
+        return blockValue * (0.0375 * fMultiple);
+    } else if (nNodeTier == Zelnode::NIMBUS) {
+        return blockValue * (0.0625 * fMultiple);
+    } else if (nNodeTier == Zelnode::STRATUS) {
+        return blockValue * (0.15 * fMultiple);
+    }
+
+    return 0;
+}
+
+bool IsSwapPoolInterval(const int64_t nHeight) {
+    const int64_t nStartHeight = Params().GetSwapPoolStartHeight();
+    const int nInterval = Params().GetSwapPoolInterval();
+    const int nMaxTimes = Params().GetSwapPoolMaxTimes();
+
+
+    if (nHeight < nStartHeight)
+        return false;
+
+    if (nHeight > nStartHeight + (nInterval * nMaxTimes) ){
+        return false;
+    }
+
+    for (int i = 0; i < nMaxTimes; i++) {
+        if (nHeight == nStartHeight + (nInterval * i) ) {
+            return true;
+        }
+    }
+
+    return false;
+
 }
 
 bool IsInitialBlockDownload(const CChainParams& chainParams)
@@ -2526,6 +2644,10 @@ int GetSpendHeight(const CCoinsViewCache& inputs)
 namespace Consensus {
 bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, const Consensus::Params& consensusParams)
 {
+
+        bool fluxRebrandActive = NetworkUpgradeActive(nSpendHeight, consensusParams, Consensus::UPGRADE_FLUX);
+
+
         // This doesn't trigger the DoS code on purpose; if it did, it would make it easier
         // for an attacker to attempt to split the network.
         if (!inputs.HaveInputs(tx))
@@ -2551,14 +2673,16 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
                         REJECT_INVALID, "bad-txns-premature-spend-of-coinbase");
                 }
 
-                // Ensure that coinbases cannot be spent to transparent outputs
-                // Disabled on regtest
-                if (fCoinbaseEnforcedProtectionEnabled &&
-                    consensusParams.fCoinbaseMustBeProtected &&
-                    !tx.vout.empty()) {
-                    return state.Invalid(
-                        error("CheckInputs(): tried to spend coinbase with transparent outputs"),
-                        REJECT_INVALID, "bad-txns-coinbase-spend-has-transparent-outputs");
+                if (!fluxRebrandActive) {
+                    // Ensure that coinbases cannot be spent to transparent outputs
+                    // Disabled on regtest
+                    if (fCoinbaseEnforcedProtectionEnabled &&
+                        consensusParams.fCoinbaseMustBeProtected &&
+                        !tx.vout.empty()) {
+                        return state.Invalid(
+                                error("CheckInputs(): tried to spend coinbase with transparent outputs"),
+                                REJECT_INVALID, "bad-txns-coinbase-spend-has-transparent-outputs");
+                    }
                 }
             }
 
@@ -3386,7 +3510,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     LogPrint("bench", "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(), 0.001 * (nTime1 - nTimeStart), 0.001 * (nTime1 - nTimeStart) / block.vtx.size(), nInputs <= 1 ? 0 : 0.001 * (nTime1 - nTimeStart) / (nInputs-1), nTimeConnect * 0.000001);
 
     CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
-    if (pindex->nHeight > 2 && block.vtx[0].GetValueOut() > blockReward)
+    CAmount exchangeFund = GetExchangeFundAmount(pindex->nHeight, chainparams.GetConsensus());
+    CAmount foundationFund = GetFoundationFundAmount(pindex->nHeight, chainparams.GetConsensus());
+    CAmount swapPoolFund = IsSwapPoolInterval(pindex->nHeight) ? chainparams.GetSwapPoolAmount() : 0;
+    if (pindex->nHeight > 2 && block.vtx[0].GetValueOut() > blockReward + exchangeFund + swapPoolFund + foundationFund)
         return state.DoS(100,
                          error("ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)",
                                block.vtx[0].GetValueOut(), blockReward),
@@ -3743,7 +3870,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     if(nZelnodeLastManaged == 0){
         nZelnodeLastManaged = pindexNew->nHeight;
     }
-    
+
     // Get the current commitment tree
     SproutMerkleTree oldSproutTree;
     SaplingMerkleTree oldSaplingTree;
@@ -3785,16 +3912,16 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload(chainparams));
 
 
-    if (g_zelnodeCache.mapZelnodeList.at(BASIC).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(BASIC).listConfirmedZelnodes.size()) {
+    if (g_zelnodeCache.mapZelnodeList.at(CUMULUS).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(CUMULUS).listConfirmedZelnodes.size()) {
         error("Basic set map, doesn't have the same size as the listconfirmed zelnodes");
     }
 
-    if (g_zelnodeCache.mapZelnodeList.at(SUPER).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(SUPER).listConfirmedZelnodes.size()) {
+    if (g_zelnodeCache.mapZelnodeList.at(NIMBUS).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(NIMBUS).listConfirmedZelnodes.size()) {
         error("Super set map, doesn't have the same size as the listconfirmed zelnodes");
     }
 
-    if (g_zelnodeCache.mapZelnodeList.at(BAMF).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(BAMF).listConfirmedZelnodes.size()) {
-        error("BAMF set map, doesn't have the same size as the listconfirmed zelnodes");
+    if (g_zelnodeCache.mapZelnodeList.at(STRATUS).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(STRATUS).listConfirmedZelnodes.size()) {
+        error("STRATUS set map, doesn't have the same size as the listconfirmed zelnodes");
     }
 
     // Remove transactions that expire at new block height from mempool
@@ -3819,7 +3946,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     if (fZelnode && pindexNew->nHeight - nZelnodeLastManaged >= numberOfBlocksBeforeNextCheck) {
         nZelnodeLastManaged = pindexNew->nHeight;
         //getrand(1,4) is used to get a number between 1 and 4 with same probability, this is used to prevent zelnode grouping transactions
-        numberOfBlocksBeforeNextCheck = getrand(1,4);
+        numberOfBlocksBeforeNextCheck = getrand(1,6);
         activeZelnode.ManageDeterministricZelnode();
     }
 

@@ -248,57 +248,57 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees, std::ma
     CBlockIndex* pindexPrev = chainActive.Tip();
     if (!pindexPrev) return;
 
-    bool hasBasicPayment = true;
-    bool hasSuperPayment = true;
-    bool hasBAMFPayment = true;
+    bool hasCUMULUSPayment = true;
+    bool hasNIMBUSPayment = true;
+    bool hasSTRATUSPayment = true;
 
-    CScript basicPayee;
-    CScript superPayee;
-    CScript BAMFPayee;
+    CScript CUMULUSPayee;
+    CScript NIMBUSPayee;
+    CScript STRATUSPayee;
 
     int nTotalPayouts = 3; // Total number of zelnode payments there could be
 
     //spork
-    if (!zelnodePayments.GetBlockBasicPayee(pindexPrev->nHeight + 1, basicPayee)) {
+    if (!zelnodePayments.GetBlockCUMULUSPayee(pindexPrev->nHeight + 1, CUMULUSPayee)) {
         //no zelnode detected
-        Zelnode winningBasicNode;
-        if (zelnodeman.GetCurrentZelnode(winningBasicNode, Zelnode::BASIC, 1)) {
-            basicPayee = GetScriptForDestination(winningBasicNode.pubKeyCollateralAddress.GetID());
+        Zelnode winningCUMULUSNode;
+        if (zelnodeman.GetCurrentZelnode(winningCUMULUSNode, Zelnode::CUMULUS, 1)) {
+            CUMULUSPayee = GetScriptForDestination(winningCUMULUSNode.pubKeyCollateralAddress.GetID());
         } else {
-            LogPrint("zelnode","CreateNewBlock: Failed to detect Basic zelnode to pay\n");
-            hasBasicPayment = false;
+            LogPrint("zelnode","CreateNewBlock: Failed to detect CUMULUS zelnode to pay\n");
+            hasCUMULUSPayment = false;
             nTotalPayouts--;
         }
     }
 
-    if (!zelnodePayments.GetBlockSuperPayee(pindexPrev->nHeight + 1, superPayee)) {
+    if (!zelnodePayments.GetBlockNIMBUSPayee(pindexPrev->nHeight + 1, NIMBUSPayee)) {
         //no zelnode detected
-        Zelnode winningSuperNode;
-        if (zelnodeman.GetCurrentZelnode(winningSuperNode, Zelnode::SUPER, 1)) {
-            superPayee = GetScriptForDestination(winningSuperNode.pubKeyCollateralAddress.GetID());
+        Zelnode winningNIMBUSNode;
+        if (zelnodeman.GetCurrentZelnode(winningNIMBUSNode, Zelnode::NIMBUS, 1)) {
+            NIMBUSPayee = GetScriptForDestination(winningNIMBUSNode.pubKeyCollateralAddress.GetID());
         } else {
-            LogPrint("zelnode","CreateNewBlock: Failed to detect Super zelnode to pay\n");
-            hasSuperPayment = false;
+            LogPrint("zelnode","CreateNewBlock: Failed to detect NIMBUS zelnode to pay\n");
+            hasNIMBUSPayment = false;
             nTotalPayouts--;
         }
     }
 
-    if (!zelnodePayments.GetBlockBAMFPayee(pindexPrev->nHeight + 1, BAMFPayee)) {
+    if (!zelnodePayments.GetBlockSTRATUSPayee(pindexPrev->nHeight + 1, STRATUSPayee)) {
         //no zelnode detected
-        Zelnode winningBAMFNode;
-        if (zelnodeman.GetCurrentZelnode(winningBAMFNode, Zelnode::BAMF, 1)) {
-            BAMFPayee = GetScriptForDestination(winningBAMFNode.pubKeyCollateralAddress.GetID());
+        Zelnode winningSTRATUSNode;
+        if (zelnodeman.GetCurrentZelnode(winningSTRATUSNode, Zelnode::STRATUS, 1)) {
+            STRATUSPayee = GetScriptForDestination(winningSTRATUSNode.pubKeyCollateralAddress.GetID());
         } else {
-            LogPrint("zelnode","CreateNewBlock: Failed to detect BAMF zelnode to pay\n");
-            hasBAMFPayment = false;
+            LogPrint("zelnode","CreateNewBlock: Failed to detect STRATUS zelnode to pay\n");
+            hasSTRATUSPayment = false;
             nTotalPayouts--;
         }
     }
 
     CAmount blockValue = GetBlockSubsidy(pindexPrev->nHeight + 1, Params().GetConsensus());
-    CAmount basicZelnodePayment = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, Zelnode::BASIC);
-    CAmount superZelnodePayment = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, Zelnode::SUPER);
-    CAmount BAMFZelnodePayment = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, Zelnode::BAMF);
+    CAmount CUMULUSZelnodePayment = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, Zelnode::CUMULUS);
+    CAmount NIMBUSZelnodePayment = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, Zelnode::NIMBUS);
+    CAmount STRATUSZelnodePayment = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, Zelnode::STRATUS);
 
     if (nTotalPayouts > 0) {
         txNew.vout.resize(nTotalPayouts + 1);
@@ -306,49 +306,49 @@ void Payments::FillBlockPayee(CMutableTransaction& txNew, int64_t nFees, std::ma
 
     CAmount nMinerReward = blockValue;
     int currentIndex = 1;
-    if (hasBasicPayment) {
-        txNew.vout[currentIndex].scriptPubKey = basicPayee;
-        txNew.vout[currentIndex].nValue = basicZelnodePayment;
-        nMinerReward -= basicZelnodePayment;
+    if (hasCUMULUSPayment) {
+        txNew.vout[currentIndex].scriptPubKey = CUMULUSPayee;
+        txNew.vout[currentIndex].nValue = CUMULUSZelnodePayment;
+        nMinerReward -= CUMULUSZelnodePayment;
         currentIndex++;
 
         if (payments)
-            payments->insert(std::make_pair(Zelnode::BASIC, std::make_pair(basicPayee, basicZelnodePayment)));
+            payments->insert(std::make_pair(Zelnode::CUMULUS, std::make_pair(CUMULUSPayee, CUMULUSZelnodePayment)));
     }
 
-    if (hasSuperPayment) {
-        txNew.vout[currentIndex].scriptPubKey = superPayee;
-        txNew.vout[currentIndex].nValue = superZelnodePayment;
-        nMinerReward -= superZelnodePayment;
+    if (hasNIMBUSPayment) {
+        txNew.vout[currentIndex].scriptPubKey = NIMBUSPayee;
+        txNew.vout[currentIndex].nValue = NIMBUSZelnodePayment;
+        nMinerReward -= NIMBUSZelnodePayment;
         currentIndex++;
 
         if (payments)
-            payments->insert(std::make_pair(Zelnode::SUPER, std::make_pair(superPayee, superZelnodePayment)));
+            payments->insert(std::make_pair(Zelnode::NIMBUS, std::make_pair(NIMBUSPayee, NIMBUSZelnodePayment)));
     }
 
-    if (hasBAMFPayment) {
-        txNew.vout[currentIndex].scriptPubKey = BAMFPayee;
-        txNew.vout[currentIndex].nValue = BAMFZelnodePayment;
-        nMinerReward -= BAMFZelnodePayment;
+    if (hasSTRATUSPayment) {
+        txNew.vout[currentIndex].scriptPubKey = STRATUSPayee;
+        txNew.vout[currentIndex].nValue = STRATUSZelnodePayment;
+        nMinerReward -= STRATUSZelnodePayment;
 
         if (payments)
-            payments->insert(std::make_pair(Zelnode::BAMF, std::make_pair(BAMFPayee, BAMFZelnodePayment)));
+            payments->insert(std::make_pair(Zelnode::STRATUS, std::make_pair(STRATUSPayee, STRATUSZelnodePayment)));
     }
 
     txNew.vout[0].nValue = nMinerReward;
 
-    CTxDestination basicaddress1;
-    ExtractDestination(basicPayee, basicaddress1);
+    CTxDestination CUMULUSaddress1;
+    ExtractDestination(CUMULUSPayee, CUMULUSaddress1);
 
-    CTxDestination superaddress1;
-    ExtractDestination(superPayee, superaddress1);
+    CTxDestination NIMBUSaddress1;
+    ExtractDestination(NIMBUSPayee, NIMBUSaddress1);
 
-    CTxDestination BAMFaddress1;
-    ExtractDestination(BAMFPayee, BAMFaddress1);
+    CTxDestination STRATUSaddress1;
+    ExtractDestination(STRATUSPayee, STRATUSaddress1);
 
-    LogPrint("zelnode","Zelnode Basic payment of %s to %s\n", FormatMoney(basicZelnodePayment).c_str(), EncodeDestination(basicaddress1).c_str());
-    LogPrint("zelnode","Zelnode Super payment of %s to %s\n", FormatMoney(superZelnodePayment).c_str(), EncodeDestination(superaddress1).c_str());
-    LogPrint("zelnode","Zelnode BAMF payment of %s to %s\n", FormatMoney(BAMFZelnodePayment).c_str(), EncodeDestination(BAMFaddress1).c_str());
+    LogPrint("zelnode","Zelnode CUMULUS payment of %s to %s\n", FormatMoney(CUMULUSZelnodePayment).c_str(), EncodeDestination(CUMULUSaddress1).c_str());
+    LogPrint("zelnode","Zelnode NIMBUS payment of %s to %s\n", FormatMoney(NIMBUSZelnodePayment).c_str(), EncodeDestination(NIMBUSaddress1).c_str());
+    LogPrint("zelnode","Zelnode STRATUS payment of %s to %s\n", FormatMoney(STRATUSZelnodePayment).c_str(), EncodeDestination(STRATUSaddress1).c_str());
 }
 
 
@@ -458,28 +458,28 @@ bool PaymentWinner::Sign(CKey& keyZelnode, CPubKey& pubKeyZelnode)
     return true;
 }
 
-bool Payments::GetBlockBasicPayee(int nBlockHeight, CScript& payee)
+bool Payments::GetBlockCUMULUSPayee(int nBlockHeight, CScript& payee)
 {
     if (mapZelnodeBlocks.count(nBlockHeight)) {
-        return mapZelnodeBlocks[nBlockHeight].GetBasicPayee(payee);
+        return mapZelnodeBlocks[nBlockHeight].getCUMULUSPayee(payee);
     }
 
     return false;
 }
 
-bool Payments::GetBlockSuperPayee(int nBlockHeight, CScript& payee)
+bool Payments::GetBlockNIMBUSPayee(int nBlockHeight, CScript& payee)
 {
     if (mapZelnodeBlocks.count(nBlockHeight)) {
-        return mapZelnodeBlocks[nBlockHeight].GetSuperPayee(payee);
+        return mapZelnodeBlocks[nBlockHeight].getNIMBUSPayee(payee);
     }
 
     return false;
 }
 
-bool Payments::GetBlockBAMFPayee(int nBlockHeight, CScript& payee)
+bool Payments::GetBlockSTRATUSPayee(int nBlockHeight, CScript& payee)
 {
     if (mapZelnodeBlocks.count(nBlockHeight)) {
-        return mapZelnodeBlocks[nBlockHeight].GetBAMFPayee(payee);
+        return mapZelnodeBlocks[nBlockHeight].GetSTRATUSPayee(payee);
     }
 
     return false;
@@ -505,20 +505,20 @@ bool Payments::IsScheduled(Zelnode& zelnode, int nNotBlockHeight)
     for (int64_t h = nHeight; h <= nHeight + 8; h++) {
         if (h == nNotBlockHeight) continue;
         if (mapZelnodeBlocks.count(h)) {
-            if (zelnode.IsBasic()) {
-                if (mapZelnodeBlocks[h].GetBasicPayee(payee)) {
+            if (zelnode.isCUMULUS()) {
+                if (mapZelnodeBlocks[h].getCUMULUSPayee(payee)) {
                     if (mnpayee == payee) {
                         return true;
                     }
                 }
-            } else if (zelnode.IsSuper()) {
-                if (mapZelnodeBlocks[h].GetSuperPayee(payee)) {
+            } else if (zelnode.isNIMBUS()) {
+                if (mapZelnodeBlocks[h].getNIMBUSPayee(payee)) {
                     if (mnpayee == payee) {
                         return true;
                     }
                 }
-            } else if (zelnode.IsBAMF()) {
-                if (mapZelnodeBlocks[h].GetBAMFPayee(payee)) {
+            } else if (zelnode.IsSTRATUS()) {
+                if (mapZelnodeBlocks[h].GetSTRATUSPayee(payee)) {
                     if (mnpayee == payee) {
                         return true;
                     }
@@ -537,7 +537,7 @@ bool Payments::AddWinningZelnode(PaymentWinner& winnerIn, int nNodeTier)
         return false;
     }
 
-    if (nNodeTier != Zelnode::BASIC && nNodeTier != Zelnode::SUPER && nNodeTier != Zelnode::BAMF)
+    if (nNodeTier != Zelnode::CUMULUS && nNodeTier != Zelnode::NIMBUS && nNodeTier != Zelnode::STRATUS)
         return false;
 
     {
@@ -566,169 +566,169 @@ bool ZelnodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
 
     bool fKamiookaUpgradeActive = NetworkUpgradeActive(chainActive.Height(), Params().GetConsensus(), Consensus::UPGRADE_KAMIOOKA);
 
-    int nMaxBasicSignatures = 0;
-    int nMaxSuperSignatures = 0;
-    int nMaxBAMFSignatures = 0;
+    int nMaxCUMULUSSignatures = 0;
+    int nMaxNIMBUSSignatures = 0;
+    int nMaxSTRATUSSignatures = 0;
 
-    std::string strBasicPayeesPossible = "";
-    std::string strSuperPayeesPossible = "";
-    std::string strBAMFPayeesPossible = "";
+    std::string strCUMULUSPayeesPossible = "";
+    std::string strNIMBUSPayeesPossible = "";
+    std::string strSTRATUSPayeesPossible = "";
 
-    bool fBasicSigCountFound = false;
-    bool fSuperSigCountFound = false;
-    bool fBAMFSigCountFound = false;
+    bool fCUMULUSSigCountFound = false;
+    bool fNIMBUSSigCountFound = false;
+    bool fSTRATUSSigCountFound = false;
 
-    ZelnodePayee selectedBasicPayee;
-    ZelnodePayee selectedSuperPayee;
-    ZelnodePayee selectedBAMFPayee;
+    ZelnodePayee selectedCUMULUSPayee;
+    ZelnodePayee selectedNIMBUSPayee;
+    ZelnodePayee selectedSTRATUSPayee;
 
     CAmount nReward = GetBlockSubsidy(nBlockHeight, Params().GetConsensus());
-    CAmount requiredBasicZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::BASIC);
-    CAmount requiredSuperZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::SUPER);
-    CAmount requiredBAMFZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::BAMF);
+    CAmount requiredCUMULUSZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::CUMULUS);
+    CAmount requiredNIMBUSZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::NIMBUS);
+    CAmount requiredSTRATUSZelnodePayment = GetZelnodeSubsidy(nBlockHeight, nReward, Zelnode::STRATUS);
 
     // Get the required amount of signatures based on if the upgrade is active or not
     int nSignaturesRequired = fKamiookaUpgradeActive ? ZNPAYMENTS_SIGNATURES_REQUIRED_AFTER_UPGRADE : ZNPAYMENTS_SIGNATURES_REQUIRED;
 
-    for (ZelnodePayee& payee : vecBasicPayments)
-        if (payee.nVotes >= nMaxBasicSignatures) {
-            nMaxBasicSignatures = payee.nVotes;
-            selectedBasicPayee = payee;
+    for (ZelnodePayee& payee : vecCUMULUSPayments)
+        if (payee.nVotes >= nMaxCUMULUSSignatures) {
+            nMaxCUMULUSSignatures = payee.nVotes;
+            selectedCUMULUSPayee = payee;
         }
 
-    for (ZelnodePayee& payee : vecSuperPayments)
-        if (payee.nVotes >= nMaxSuperSignatures) {
-            nMaxSuperSignatures = payee.nVotes;
-            selectedSuperPayee = payee;
+    for (ZelnodePayee& payee : vecNIMBUSPayments)
+        if (payee.nVotes >= nMaxNIMBUSSignatures) {
+            nMaxNIMBUSSignatures = payee.nVotes;
+            selectedNIMBUSPayee = payee;
         }
 
-    for (ZelnodePayee& payee : vecBAMFPayments)
-        if (payee.nVotes >= nMaxBAMFSignatures) {
-            nMaxBAMFSignatures = payee.nVotes;
-            selectedBAMFPayee = payee;
+    for (ZelnodePayee& payee : vecSTRATUSPayments)
+        if (payee.nVotes >= nMaxSTRATUSSignatures) {
+            nMaxSTRATUSSignatures = payee.nVotes;
+            selectedSTRATUSPayee = payee;
         }
 
     if (fKamiookaUpgradeActive) {
-        fBasicSigCountFound = nMaxBasicSignatures >= nSignaturesRequired;
-        fSuperSigCountFound = nMaxSuperSignatures >= nSignaturesRequired;
-        fBAMFSigCountFound = nMaxBAMFSignatures >= nSignaturesRequired;
+        fCUMULUSSigCountFound = nMaxCUMULUSSignatures >= nSignaturesRequired;
+        fNIMBUSSigCountFound = nMaxNIMBUSSignatures >= nSignaturesRequired;
+        fSTRATUSSigCountFound = nMaxSTRATUSSignatures >= nSignaturesRequired;
     }
 
     if (fKamiookaUpgradeActive) {
         // If we don't have at least 6 signatures on each payee tier, follow the longest chain.
-        if (!fBasicSigCountFound && !fSuperSigCountFound && !fBAMFSigCountFound)
+        if (!fCUMULUSSigCountFound && !fNIMBUSSigCountFound && !fSTRATUSSigCountFound)
             return true;
     }
 
     if (!fKamiookaUpgradeActive) {
         // if we don't have at least 16 signatures on a payee, approve whichever is the longest chain
-        if (nMaxBasicSignatures < nSignaturesRequired || nMaxSuperSignatures < nSignaturesRequired || nMaxBAMFSignatures < nSignaturesRequired)
+        if (nMaxCUMULUSSignatures < nSignaturesRequired || nMaxNIMBUSSignatures < nSignaturesRequired || nMaxSTRATUSSignatures < nSignaturesRequired)
             return true;
     }
 
-    bool fFoundBasic = false;
-    if(!fKamiookaUpgradeActive || fBasicSigCountFound) {
+    bool fFoundCUMULUS = false;
+    if(!fKamiookaUpgradeActive || fCUMULUSSigCountFound) {
         for (CTxOut out : txNew.vout) {
-            if (selectedBasicPayee.scriptPubKey == out.scriptPubKey) {
-                if (out.nValue == requiredBasicZelnodePayment)
-                    fFoundBasic = true;
+            if (selectedCUMULUSPayee.scriptPubKey == out.scriptPubKey) {
+                if (out.nValue == requiredCUMULUSZelnodePayment)
+                    fFoundCUMULUS = true;
                 else
-                    LogPrint("zelnode", "Basic Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n",
-                             FormatMoney(out.nValue).c_str(), FormatMoney(requiredBasicZelnodePayment).c_str());
+                    LogPrint("zelnode", "CUMULUS Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n",
+                             FormatMoney(out.nValue).c_str(), FormatMoney(requiredCUMULUSZelnodePayment).c_str());
             }
         }
 
-        if (selectedBasicPayee.nVotes >= nSignaturesRequired) {
-            if (!fFoundBasic) {
+        if (selectedCUMULUSPayee.nVotes >= nSignaturesRequired) {
+            if (!fFoundCUMULUS) {
                 CTxDestination address1;
-                ExtractDestination(selectedBasicPayee.scriptPubKey, address1);
+                ExtractDestination(selectedCUMULUSPayee.scriptPubKey, address1);
 
-                if (strBasicPayeesPossible == "") {
-                    strBasicPayeesPossible += EncodeDestination(address1);
+                if (strCUMULUSPayeesPossible == "") {
+                    strCUMULUSPayeesPossible += EncodeDestination(address1);
                 } else {
-                    strBasicPayeesPossible += "," + EncodeDestination(address1);
+                    strCUMULUSPayeesPossible += "," + EncodeDestination(address1);
                 }
             }
         }
     }
 
-    bool fFoundSuper = false;
-    if(!fKamiookaUpgradeActive || fSuperSigCountFound) {
+    bool fFoundNIMBUS = false;
+    if(!fKamiookaUpgradeActive || fNIMBUSSigCountFound) {
         for (CTxOut out : txNew.vout) {
-            if (selectedSuperPayee.scriptPubKey == out.scriptPubKey) {
-                if (out.nValue == requiredSuperZelnodePayment)
-                    fFoundSuper = true;
+            if (selectedNIMBUSPayee.scriptPubKey == out.scriptPubKey) {
+                if (out.nValue == requiredNIMBUSZelnodePayment)
+                    fFoundNIMBUS = true;
                 else
-                    LogPrint("zelnode", "Super Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n",
-                             FormatMoney(out.nValue).c_str(), FormatMoney(requiredSuperZelnodePayment).c_str());
+                    LogPrint("zelnode", "NIMBUS Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n",
+                             FormatMoney(out.nValue).c_str(), FormatMoney(requiredNIMBUSZelnodePayment).c_str());
             }
         }
 
-        if (selectedSuperPayee.nVotes >= nSignaturesRequired) {
-            if (!fFoundSuper) {
+        if (selectedNIMBUSPayee.nVotes >= nSignaturesRequired) {
+            if (!fFoundNIMBUS) {
 
                 CTxDestination address1;
-                ExtractDestination(selectedSuperPayee.scriptPubKey, address1);
+                ExtractDestination(selectedNIMBUSPayee.scriptPubKey, address1);
 
-                if (strSuperPayeesPossible == "") {
-                    strSuperPayeesPossible += EncodeDestination(address1);
+                if (strNIMBUSPayeesPossible == "") {
+                    strNIMBUSPayeesPossible += EncodeDestination(address1);
                 } else {
-                    strSuperPayeesPossible += "," + EncodeDestination(address1);
+                    strNIMBUSPayeesPossible += "," + EncodeDestination(address1);
                 }
             }
         }
     }
 
-    bool fFoundBAMF = false;
-    if(!fKamiookaUpgradeActive || fBAMFSigCountFound) {
+    bool fFoundSTRATUS = false;
+    if(!fKamiookaUpgradeActive || fSTRATUSSigCountFound) {
         for (CTxOut out : txNew.vout) {
-            if (selectedBAMFPayee.scriptPubKey == out.scriptPubKey) {
-                if (out.nValue == requiredBAMFZelnodePayment)
-                    fFoundBAMF = true;
+            if (selectedSTRATUSPayee.scriptPubKey == out.scriptPubKey) {
+                if (out.nValue == requiredSTRATUSZelnodePayment)
+                    fFoundSTRATUS = true;
                 else
-                    LogPrint("zelnode", "BAMF Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n",
-                             FormatMoney(out.nValue).c_str(), FormatMoney(requiredBAMFZelnodePayment).c_str());
+                    LogPrint("zelnode", "STRATUS Zelnode payment is not the correct amount. Paid=%s Shouldbe=%s\n",
+                             FormatMoney(out.nValue).c_str(), FormatMoney(requiredSTRATUSZelnodePayment).c_str());
             }
         }
 
-        if (selectedBAMFPayee.nVotes >= nSignaturesRequired) {
-            if (fFoundBAMF && fFoundSuper && fFoundBAMF) {
+        if (selectedSTRATUSPayee.nVotes >= nSignaturesRequired) {
+            if (fFoundSTRATUS && fFoundNIMBUS && fFoundSTRATUS) {
                 if (!fKamiookaUpgradeActive)
                     return true;
             }
 
             CTxDestination address1;
-            ExtractDestination(selectedBAMFPayee.scriptPubKey, address1);
+            ExtractDestination(selectedSTRATUSPayee.scriptPubKey, address1);
 
-            if (strBAMFPayeesPossible == "") {
-                strBAMFPayeesPossible += EncodeDestination(address1);
+            if (strSTRATUSPayeesPossible == "") {
+                strSTRATUSPayeesPossible += EncodeDestination(address1);
             } else {
-                strBAMFPayeesPossible += "," + EncodeDestination(address1);
+                strSTRATUSPayeesPossible += "," + EncodeDestination(address1);
             }
         }
     }
 
     if (fKamiookaUpgradeActive) {
         bool fFail = false;
-        if (fBasicSigCountFound && !fFoundBasic) {
-            LogPrint("zelnode","%s- Missing required Basic payment of %s to %s\n", __func__, FormatMoney(requiredBasicZelnodePayment).c_str(), strBasicPayeesPossible.c_str());
+        if (fCUMULUSSigCountFound && !fFoundCUMULUS) {
+            LogPrint("zelnode","%s- Missing required Cumulus payment of %s to %s\n", __func__, FormatMoney(requiredCUMULUSZelnodePayment).c_str(), strCUMULUSPayeesPossible.c_str());
             fFail = true;
         }
-        if (fSuperSigCountFound && !fFoundSuper) {
-            LogPrint("zelnode","%s- Missing required Super payment of %s to %s\n", __func__, FormatMoney(requiredSuperZelnodePayment).c_str(), strSuperPayeesPossible.c_str());
+        if (fNIMBUSSigCountFound && !fFoundNIMBUS) {
+            LogPrint("zelnode","%s- Missing required Nimbus payment of %s to %s\n", __func__, FormatMoney(requiredNIMBUSZelnodePayment).c_str(), strNIMBUSPayeesPossible.c_str());
             fFail = true;
         }
-        if (fBAMFSigCountFound && !fFoundBAMF) {
-            LogPrint("zelnode","%s- Missing required BAMF payment of %s to %s\n", __func__, FormatMoney(requiredBAMFZelnodePayment).c_str(), strBAMFPayeesPossible.c_str());
+        if (fSTRATUSSigCountFound && !fFoundSTRATUS) {
+            LogPrint("zelnode","%s- Missing required Stratus payment of %s to %s\n", __func__, FormatMoney(requiredSTRATUSZelnodePayment).c_str(), strSTRATUSPayeesPossible.c_str());
             fFail = true;
         }
         return !fFail;
     }
 
     // TODO, once upgrade is complete remove
-    if (!fFoundBasic) LogPrint("zelnode","%s- Missing required Basic payment of %s to %s\n", __func__, FormatMoney(requiredBasicZelnodePayment).c_str(), strBasicPayeesPossible.c_str());
-    if (!fFoundSuper) LogPrint("zelnode","%s- Missing required Super payment of %s to %s\n", __func__, FormatMoney(requiredSuperZelnodePayment).c_str(), strSuperPayeesPossible.c_str());
-    if (!fFoundBAMF) LogPrint("zelnode","%s- Missing required BAMF payment of %s to %s\n", __func__, FormatMoney(requiredBAMFZelnodePayment).c_str(), strBAMFPayeesPossible.c_str());
+    if (!fFoundCUMULUS) LogPrint("zelnode","%s- Missing required CUMULUS payment of %s to %s\n", __func__, FormatMoney(requiredCUMULUSZelnodePayment).c_str(), strCUMULUSPayeesPossible.c_str());
+    if (!fFoundNIMBUS) LogPrint("zelnode","%s- Missing required NIMBUS payment of %s to %s\n", __func__, FormatMoney(requiredNIMBUSZelnodePayment).c_str(), strNIMBUSPayeesPossible.c_str());
+    if (!fFoundSTRATUS) LogPrint("zelnode","%s- Missing required STRATUS payment of %s to %s\n", __func__, FormatMoney(requiredSTRATUSZelnodePayment).c_str(), strSTRATUSPayeesPossible.c_str());
 
     return false;
 }
@@ -739,36 +739,36 @@ std::string ZelnodeBlockPayees::GetRequiredPaymentsString()
 
     std::string ret = "Unknown";
 
-    for (ZelnodePayee& payee : vecBasicPayments) {
+    for (ZelnodePayee& payee : vecCUMULUSPayments) {
         CTxDestination address1;
         ExtractDestination(payee.scriptPubKey, address1);
 
         if (ret != "Unknown") {
-            ret += ",Basic|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
+            ret += ",CUMULUS|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         } else {
-            ret = "Basic|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
+            ret = "CUMULUS|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         }
     }
 
-    for (ZelnodePayee& payee : vecSuperPayments) {
+    for (ZelnodePayee& payee : vecNIMBUSPayments) {
         CTxDestination address1;
         ExtractDestination(payee.scriptPubKey, address1);
 
         if (ret != "Unknown") {
-            ret += ",Super|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
+            ret += ",NIMBUS|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         } else {
-            ret = "Super|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
+            ret = "NIMBUS|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         }
     }
 
-    for (ZelnodePayee& payee : vecBAMFPayments) {
+    for (ZelnodePayee& payee : vecSTRATUSPayments) {
         CTxDestination address1;
         ExtractDestination(payee.scriptPubKey, address1);
 
         if (ret != "Unknown") {
-            ret += ",BAMF|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
+            ret += ",STRATUS|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         } else {
-            ret = "BAMF|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
+            ret = "STRATUS|" + EncodeDestination(address1) + ":" + std::to_string(payee.nVotes);
         }
     }
 
@@ -857,7 +857,7 @@ bool PaymentWinner::IsValid(CNode* pnode, std::string& strError)
         return false;
     }
 
-    if (tier < Zelnode::NONE || tier > Zelnode::BAMF) {
+    if (tier < Zelnode::NONE || tier > Zelnode::STRATUS) {
         strError = strprintf("Zelnode winner tier is %s", TierToString(tier));
         LogPrint("zelnode","%s - %s\n", __func__, strError);
         return false;
@@ -905,13 +905,13 @@ bool Payments::ProcessBlock(int nBlockHeight)
     LogPrint("zelnode","%s Start nHeight %d - vin %s. \n", __func__, nBlockHeight, activeZelnode.vin.prevout.hash.ToString());
 
     // pay to the oldest MN that still had no payment but its input is old enough and it was active long enough
-    int nBasicCount = 0;
-    int nSuperCount = 0;
-    int nBAMFCount = 0;
+    int nCUMULUSCount = 0;
+    int nNIMBUSCount = 0;
+    int nSTRATUSCount = 0;
 
 
     auto activeNode = zelnodeman.Find(activeZelnode.pubKeyZelnode);
-    vector<Zelnode*> vpzn = zelnodeman.GetNextZelnodeInQueueForPayment(nBlockHeight, true, nBasicCount, nSuperCount, nBAMFCount);
+    vector<Zelnode*> vpzn = zelnodeman.GetNextZelnodeInQueueForPayment(nBlockHeight, true, nCUMULUSCount, nNIMBUSCount, nSTRATUSCount);
 
     for (Zelnode * pzn : vpzn) {
         PaymentWinner newWinner(activeZelnode.vin);

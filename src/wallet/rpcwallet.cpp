@@ -3943,6 +3943,13 @@ UniValue z_setmigration(const UniValue& params, bool fHelp) {
             "1. enabled  (boolean, required) 'true' or 'false' to enable or disable respectively.\n"
         );
     LOCK(pwalletMain->cs_wallet);
+
+    bool fluxRebrandActive = NetworkUpgradeActive(chainActive.Height(), Params().GetConsensus(), Consensus::UPGRADE_FLUX);
+
+    if (fluxRebrandActive) {
+        throw JSONRPCError(RPC_MISC_ERROR, "Flux fork active: z_setmigration has been deprecated.");
+    }
+
     bool setTo = params[0].get_bool();
     if (setTo) {
         if (GetArg("-migrationdestaddress", "").empty())
@@ -4112,6 +4119,14 @@ UniValue z_shieldcoinbase(const UniValue& params, bool fHelp)
         );
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
+
+    bool fluxRebrandActive = NetworkUpgradeActive(chainActive.Height(), Params().GetConsensus(), Consensus::UPGRADE_FLUX);
+
+    if (fluxRebrandActive) {
+        throw JSONRPCError(RPC_MISC_ERROR, "Flux fork active. z_shieldcoinbase has been deprecated.\n"
+                                           "You do not need to use this funcation anymore to spend coinbase values.\n"
+                                           "You can send coinbase using sendtoaddress or sendmany rpc calls");
+    }
 
     // Validate the from address
     auto fromaddress = params[0].get_str();

@@ -93,6 +93,11 @@ bool AppInit(int argc, char* argv[])
 
     try
     {
+        if (GetBoolArg("-migratetoflux", false) && !IsArgSet("-datadir")) {
+            // rename directory and config file, do it before it gets accessed
+            RenameDirectoriesFromZelcashToFlux();
+        }
+
         if (!boost::filesystem::is_directory(GetDataDir(false)))
         {
             fprintf(stderr, "Error: Specified data directory \"%s\" does not exist.\n", mapArgs["-datadir"].c_str());
