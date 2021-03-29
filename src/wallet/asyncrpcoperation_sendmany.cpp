@@ -215,7 +215,8 @@ bool AsyncRPCOperation_sendmany::main_impl() {
                 throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds, no UTXOs found for taddr from address.");
             }
         } else {
-            bool b = find_utxos(false);
+            bool fluxRebrandActive = NetworkUpgradeActive(chainActive.Height(), Params().GetConsensus(), Consensus::UPGRADE_FLUX);
+            bool b = find_utxos(fluxRebrandActive);
             if (!b) {
                 if (isMultipleZaddrOutput) {
                     throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Could not find any non-coinbase UTXOs to spend. Coinbase UTXOs can only be sent to a single zaddr recipient.");
