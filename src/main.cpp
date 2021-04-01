@@ -4037,29 +4037,6 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
     const CBlockIndex *pindexOldTip = chainActive.Tip();
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
 
-    // - On ChainDB initialization, pindexOldTip will be null, so there are no removable blocks.
-    // - If pindexMostWork is in a chain that doesn't have the same genesis block as our chain,
-    //   then pindexFork will be null, and we would need to remove the entire chain including
-    //   our genesis block. In practice this (probably) won't happen because of checks elsewhere.
-    auto reorgLength = pindexOldTip ? pindexOldTip->nHeight - (pindexFork ? pindexFork->nHeight : -1) : 0;
-    static_assert(MAX_REORG_LENGTH > 0, "We must be able to reorg some distance");
-    if (reorgLength > MAX_REORG_LENGTH) {
-        auto msg = strprintf(_(
-            "A block chain reorganization has been detected that would roll back %d blocks! "
-            "This is larger than the maximum of %d blocks, and so the node is not following this reorganisation."
-            ), reorgLength, MAX_REORG_LENGTH) + "\n\n" +
-            _("Reorganization details") + ":\n" +
-            "- " + strprintf(_("Current tip: %s, height %d, work %s"),
-                pindexOldTip->phashBlock->GetHex(), pindexOldTip->nHeight, pindexOldTip->nChainWork.GetHex()) + "\n" +
-            "- " + strprintf(_("New tip:     %s, height %d, work %s"),
-                pindexMostWork->phashBlock->GetHex(), pindexMostWork->nHeight, pindexMostWork->nChainWork.GetHex()) + "\n" +
-            "- " + strprintf(_("Fork point:  %s, height %d"),
-                pindexFork->phashBlock->GetHex(), pindexFork->nHeight);
-        LogPrintf("*** %s\n", msg);
-        uiInterface.ThreadSafeMessageBox(msg, "", CClientUIInterface::MSG_ERROR);
-        return false;
-    }
-
     // Disconnect active blocks which are no longer in the best chain.
     bool fBlocksDisconnected = false;
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
@@ -4659,7 +4636,16 @@ bool ContextualCheckBlockHeader(
 
     assert(pindexPrev);
 
-    long int nHeight = pindexPrev->nHeight+1;
+    const int nHeight = pindexPrev->nHeight + 1;
+
+    //If this is a reorg, check that it is not too deep
+    int nMaxReorgDepth = MAX_REORG_LENGTH;
+    bool fGreaterThanMaxReorg = (chainActive.Height() - (nHeight - 1)) >= nMaxReorgDepth;
+    if (fGreaterThanMaxReorg) {
+            return state.DoS(10,
+                             error("forked chain older than max reorganization depth"),
+                             REJECT_INVALID, "bad-fork-prior-to-maxreorgdepth");
+    }
 
     //Check EH solution size matches an acceptable N,K
     size_t nSolSize = block.nSolution.size();
@@ -6065,7 +6051,8 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
                         // best equivalent proof of work) than the best header chain we know about.
                         send = mi->second->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
                             (pindexBestHeader->GetBlockTime() - mi->second->GetBlockTime() < nOneMonth) &&
-                            (GetBlockProofEquivalentTime(*pindexBestHeader, *mi->second, *pindexBestHeader, consensusParams) < nOneMonth);
+                            (GetBlockProofEquivalentTime(*pindexBestHeader, *mi->second, *pindexBestHeader, consensusParams) < nOneMonth) && (chainActive.Height() - (mi->second->nHeight-1) <
+                                MAX_REORG_LENGTH);
                         if (!send) {
                             LogPrintf("%s: ignoring request from peer=%i for old block that isn't in the main chain\n", __func__, pfrom->GetId());
                         }
