@@ -29,21 +29,9 @@ std::string strTestnetSring = "-testnet ";
 
 bool FindBenchmarkPath(std::string& path, const std::string filename)
 {
+
     filesys::path pathObj(path + "/" + filename);
     if (filesys::exists(pathObj) && filesys::is_regular_file(pathObj)) {
-        return true;
-    }
-
-    char const* home = getenv("HOME");
-    path = strprintf("%s", home);
-    filesys::path pathObj2(path + "/" + filename);
-    if (filesys::exists(pathObj2) && filesys::is_regular_file(pathObj2)) {
-        return true;
-    }
-
-    path = "./src";
-    filesys::path pathObj3(path + "/" + filename);
-    if (filesys::exists(pathObj3) && filesys::is_regular_file(pathObj3)) {
         return true;
     }
 
@@ -53,13 +41,31 @@ bool FindBenchmarkPath(std::string& path, const std::string filename)
 std::string GetBenchCliPath()
 {
     // The space at the end is so parameters can be added easily
-    return strBenchmarkCliPathing + "/zelbench-cli ";
+
+    if (FindBenchmarkPath(strBenchmarkPathing, "fluxbench-cli")) {
+        return strBenchmarkCliPathing + "/fluxbench-cli ";
+    }
+
+
+    if (FindBenchmarkPath(strBenchmarkPathing, "zelbench-cli")) {
+        return strBenchmarkCliPathing + "/zelbench-cli ";
+    }
+
 }
 
 std::string GetBenchDaemonPath()
 {
     // The space at the end is so parameters can be added easily
-    return strBenchmarkCliPathing + "/zelbenchd ";
+
+    if (FindBenchmarkPath(strBenchmarkPathing, "fluxbenchd")) {
+       return strBenchmarkCliPathing + "/fluxbenchd ";
+    }
+
+
+    if (FindBenchmarkPath(strBenchmarkPathing, "zelbenchd")) {
+        return strBenchmarkCliPathing + "/zelbenchd ";
+    }
+
 }
 
 
