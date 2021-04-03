@@ -1979,17 +1979,33 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
     }
 
-    if (fZelnode) {
-        if (!FindBenchmarkPath(strBenchmarkPathing, "zelbenchd")) {
-            return InitError("Failed to find daemon application");
-        } else {
-            LogPrintf("Found zelbenchd in: %s\n", strBenchmarkPathing);
-        }
+     if (fZelnode) {
 
-        if (!FindBenchmarkPath(strBenchmarkCliPathing, "zelbench-cli")) {
-            return InitError("Failed to find cli application");
+        if (FindBenchmarkPath(strBenchmarkPathing, "fluxbenchd")) {
+            LogPrintf("Found fluxbenchd in: %s\n", strBenchmarkPathing);
+
         } else {
-            LogPrintf("Found zelbench-cli in: %s\n", strBenchmarkCliPathing);
+
+              if (FindBenchmarkPath(strBenchmarkPathing, "zelbenchd")) {
+                  LogPrintf("Found zelbenchd in: %s\n", strBenchmarkPathing);
+              } else {
+                 return InitError("Failed to find daemon application");
+              }
+
+              if (FindBenchmarkPath(strBenchmarkCliPathing, "zelbench-cli")) {
+                  LogPrintf("Found zelbench-cli in: %s\n", strBenchmarkPathing);
+              } else {
+               return InitError("Failed to find cli application");
+              }
+       }
+
+        if (FindBenchmarkPath(strBenchmarkPathing, "fluxbenchd")) {
+
+            if (FindBenchmarkPath(strBenchmarkCliPathing, "fluxbench-cli")) {
+                LogPrintf("Found fluxbench-cli in: %s\n", strBenchmarkCliPathing);
+            } else {
+                return InitError("Failed to find cli application");
+            }
         }
     }
 
