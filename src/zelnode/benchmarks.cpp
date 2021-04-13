@@ -11,6 +11,10 @@
 #include <core_io.h>
 #include "zelnode/zelnode.h"
 
+#include <libgen.h>         // dirname
+#include <unistd.h>         // readlink
+#include <linux/limits.h>   // PATH_MAX
+
 #include <boost/filesystem.hpp>
 
 namespace filesys = boost::filesystem;
@@ -27,39 +31,55 @@ std::string strBenchmarkCliPathing = "/usr/local/bin"; // Default path
 
 std::string strTestnetSring = "-testnet ";
 
-bool FindBenchmarkPath(std::string& path, const std::string filename)
+std::string getExePath()
 {
-    filesys::path pathObj(path + "/" + filename);
+  char result[ PATH_MAX ];
+  ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
+
+  const char *path;
+
+  if (count != -1) {
+      path = dirname(result);
+      return std::string(path);
+  }
+
+   return "";
+}
+
+bool FindBenchmarkPath(std::string filename)
+{
+    strBenchmarkCliPathing = getExePath();
+    filesys::path pathObj(strBenchmarkCliPathing + "/" + filename);
     if (filesys::exists(pathObj) && filesys::is_regular_file(pathObj)) {
         return true;
     }
-
-    char const* home = getenv("HOME");
-    path = strprintf("%s", home);
-    filesys::path pathObj2(path + "/" + filename);
-    if (filesys::exists(pathObj2) && filesys::is_regular_file(pathObj2)) {
-        return true;
-    }
-
-    path = "./src";
-    filesys::path pathObj3(path + "/" + filename);
-    if (filesys::exists(pathObj3) && filesys::is_regular_file(pathObj3)) {
-        return true;
-    }
-
     return false;
 }
 
 std::string GetBenchCliPath()
 {
     // The space at the end is so parameters can be added easily
-    return strBenchmarkCliPathing + "/zelbench-cli ";
+    if (FindBenchmarkPath("fluxbench-cli")) {
+        return strBenchmarkCliPathing + "/fluxbench-cli ";
+    }
+
+    if (FindBenchmarkPath("zelbench-cli")) {
+        return strBenchmarkCliPathing + "/zelbench-cli ";
+    }
+
 }
 
 std::string GetBenchDaemonPath()
 {
     // The space at the end is so parameters can be added easily
-    return strBenchmarkCliPathing + "/zelbenchd ";
+    if (FindBenchmarkPath("fluxbenchd")) {
+       return strBenchmarkCliPathing + "/fluxbenchd ";
+    }
+
+    if (FindBenchmarkPath("zelbenchd")) {
+        return strBenchmarkCliPathing + "/zelbenchd ";
+    }
+
 }
 
 
