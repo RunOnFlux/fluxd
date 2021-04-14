@@ -731,7 +731,7 @@ static void ZC_LoadParams(
         uiInterface.ThreadSafeMessageBox(strprintf(
             _("Cannot find the Zelcash network parameters in the following directory:\n"
               "%s\n"
-              "Please run 'zelcash-fetch-params' or './zcutil/fetch-params.sh' and then restart."),
+              "Please run 'flux-fetch-params' or './zcutil/fetch-params.sh' and then restart."),
                 ZC_GetParamsDir()),
             "", CClientUIInterface::MSG_ERROR);
         StartShutdown();
@@ -876,7 +876,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     fLogIPs = GetBoolArg("-logips", false);
 
     LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-    LogPrintf("Zelcash version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
+    LogPrintf("Flux version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
 
     // when specifying an explicit binding address, you want to listen on it
     // even when -connect or -proxy is specified
@@ -1188,7 +1188,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Sanity check
     if (!InitSanityCheck())
-        return InitError(_("Initialization sanity check failed. Zelcash is shutting down."));
+        return InitError(_("Initialization sanity check failed. Flux is shutting down."));
 
     std::string strDataDir = GetDataDir().string();
 #ifdef ENABLE_WALLET
@@ -1204,9 +1204,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     try {
         static boost::interprocess::file_lock lock(pathLockFile.string().c_str());
         if (!lock.try_lock())
-            return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zelcash is probably already running."), strDataDir));
+            return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Flux is probably already running."), strDataDir));
     } catch(const boost::interprocess::interprocess_exception& e) {
-        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zelcash is probably already running.") + " %s.", strDataDir, e.what()));
+        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Flux is probably already running.") + " %s.", strDataDir, e.what()));
     }
 
 #ifndef WIN32
@@ -1687,10 +1687,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 InitWarning(msg);
             }
             else if (nLoadWalletRet == DB_TOO_NEW)
-                strErrors << _("Error loading wallet.dat: Wallet requires newer version of Zelcash") << "\n";
+                strErrors << _("Error loading wallet.dat: Wallet requires newer version of Flux") << "\n";
             else if (nLoadWalletRet == DB_NEED_REWRITE)
             {
-                strErrors << _("Wallet needed to be rewritten: restart Zelcash to complete") << "\n";
+                strErrors << _("Wallet needed to be rewritten: restart Flux to complete") << "\n";
                 LogPrintf("%s", strErrors.str());
                 return InitError(strErrors.str());
             }
@@ -1809,10 +1809,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 #ifdef ENABLE_MINING
  #ifndef ENABLE_WALLET
     if (GetBoolArg("-minetolocalwallet", false)) {
-        return InitError(_("Zelcash was not built with wallet support. Set -minetolocalwallet=0 to use -mineraddress, or rebuild Zelcash with wallet support."));
+        return InitError(_("Flux was not built with wallet support. Set -minetolocalwallet=0 to use -mineraddress, or rebuild Zelcash with wallet support."));
     }
     if (GetArg("-mineraddress", "").empty() && GetBoolArg("-gen", false)) {
-        return InitError(_("Zelcash was not built with wallet support. Set -mineraddress, or rebuild Zelcash with wallet support."));
+        return InitError(_("Flux was not built with wallet support. Set -mineraddress, or rebuild Zelcash with wallet support."));
     }
  #endif // !ENABLE_WALLET
 
@@ -1888,12 +1888,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // ********************************************************* Step 11: setup zelnode
 
-    uiInterface.InitMessage(_("Loading zelnode cache..."));
+    uiInterface.InitMessage(_("Loading fluxnode cache..."));
 
     ZelnodeDB zndb;
     ZelnodeDB::ReadResult readResult = zndb.Read(zelnodeman);
     if (readResult == ZelnodeDB::FileError)
-        LogPrintf("Missing zelnode cache file - zncache.dat, will try to recreate\n");
+        LogPrintf("Missing fluxnode cache file - zncache.dat, will try to recreate\n");
     else if (readResult != ZelnodeDB::Ok) {
         LogPrintf("Error reading zncache.dat: ");
         if (readResult == ZelnodeDB::IncorrectFormat)
@@ -1902,13 +1902,13 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             LogPrintf("file format is unknown or invalid, please fix it manually\n");
     }
 
-    uiInterface.InitMessage(_("Loading zelnode payment cache..."));
+    uiInterface.InitMessage(_("Loading fluxnode payment cache..."));
 
     PaymentDB znpayments;
     PaymentDB::ReadResult readResult3 = znpayments.Read(zelnodePayments);
 
     if (readResult3 == PaymentDB::FileError)
-        LogPrintf("Missing zelnode payment cache - znpayments.dat, will try to recreate\n");
+        LogPrintf("Missing fluxnode payment cache - znpayments.dat, will try to recreate\n");
     else if (readResult3 != PaymentDB::Ok) {
         LogPrintf("Error reading znpayments.dat: ");
         if (readResult3 == PaymentDB::IncorrectFormat)
@@ -1920,12 +1920,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     fZelnode = GetBoolArg("-zelnode", false);
 
     if ((fZelnode || zelnodeConfig.getCount() > -1) && fTxIndex == false) {
-        return InitError("Enabling Zelnode support requires turning on transaction indexing."
+        return InitError("Enabling Fluxnode support requires turning on transaction indexing."
                          "Please add txindex=1 to your configuration and start with -reindex");
     }
 
     if (fZelnode) {
-        LogPrintf("IS ZELNODE\n");
+        LogPrintf("IS FLUXNODE\n");
         strZelnodeAddr = GetArg("-zelnodeaddr", "");
 
         LogPrintf(" addr %s\n", strZelnodeAddr.c_str());
@@ -1969,7 +1969,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     if (GetBoolArg("-znconflock", true) && pwalletMain) {
         LOCK(pwalletMain->cs_wallet);
-        LogPrintf("Locking Zelnodes:\n");
+        LogPrintf("Locking Fluxnodes:\n");
         uint256 znTxHash;
         for (ZelnodeConfig::ZelnodeEntry zne : zelnodeConfig.getEntries()) {
             LogPrintf("  %s %s\n", zne.getTxHash(), zne.getOutputIndex());
@@ -2015,7 +2015,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         // Make sure that zelbenchd is running and stop zelcash if it isn't
         if (!IsZelBenchdRunning()) {
-            return InitError("Failed to start zelbenchd application");
+            return InitError("Failed to start benchmark application");
         }
     }
 
