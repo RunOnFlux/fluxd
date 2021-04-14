@@ -163,7 +163,7 @@ void StartZelBenchd()
     RunCommand(GetBenchDaemonPath() + testnet + "&");
     MilliSleep(4000);
     fZelStartedBench = true;
-    LogPrintf("ZelBenchd Started\n");
+    LogPrintf("Benchmark Started\n");
 }
 
 
@@ -187,7 +187,7 @@ std::string GetBenchmarks()
         return strBenchmarkStatus;
     }
 
-    return "ZelBenchd not running";
+    return "Benchmark not running";
 }
 
 std::string GetZelBenchdStatus()
@@ -202,7 +202,7 @@ std::string GetZelBenchdStatus()
         return strBenchmarkStatus;
     }
 
-    return "ZelBenchd not running";
+    return "Benchmark not running";
 }
 
 bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedTx, std::string& error)
@@ -238,7 +238,7 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
         }
 
         if (!DecodeHexTx(signedTx, response)) {
-            error = "Failed to decode zelnode broadcast";
+            error = "Failed to decode fluxnode broadcast";
             return false;
         }
 
@@ -250,7 +250,7 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
         return true;
     }
 
-    error = "ZelBenchd isn't running";
+    error = "Benchmark isn't running";
     return false;
 }
 
