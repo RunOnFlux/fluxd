@@ -48,7 +48,7 @@
 using namespace std;
 
 #if defined(NDEBUG)
-# error "Zelcash cannot be compiled without assertions."
+# error "Flux cannot be compiled without assertions."
 #endif
 
 #include "librustzcash.h"
@@ -114,7 +114,7 @@ static void CheckBlockIndex(const Consensus::Params& consensusParams);
 /** Constant stuff for coinbase transactions we create: */
 CScript COINBASE_FLAGS;
 
-const string strMessageMagic = "Zelcash Signed Message:\n";
+const string strMessageMagic = "Flux Signed Message:\n";
 
 // Internal stuff
 namespace {
@@ -990,7 +990,7 @@ bool ContextualCheckTransaction(
 
     if (tx.IsZelnodeTx()) {
         if (!kamataActive) {
-            return state.DoS(dosLevel, error("ContextualCheckTransaction(): zelnodes tx seen before active"),
+            return state.DoS(dosLevel, error("ContextualCheckTransaction(): fluxnodes tx seen before active"),
                              REJECT_INVALID, "tx-zelnodes-not-active");
         }
     }
@@ -1155,12 +1155,12 @@ bool ContextualCheckTransaction(
             std::string strFailMessage;
             if (!g_zelnodeCache.CheckNewStartTx(tx.collateralOut)) {
                 fFailure = true;
-                strFailMessage = "zelnode-tx-already-in-chain-or-waiting-for-dos-unban";
+                strFailMessage = "fluxnode-tx-already-in-chain-or-waiting-for-dos-unban";
             }
 
             if (!fFailure && g_zelnodeCache.CheckIfConfirmed(tx.collateralOut)) {
                 fFailure = true;
-                strFailMessage = "zelnode-tx-already-in-confirm-chain";
+                strFailMessage = "fluxnode-tx-already-in-confirm-chain";
             }
 
             if (!fFailure) {
@@ -1170,18 +1170,18 @@ bool ContextualCheckTransaction(
                 CCoins coins;
                 if (!pcoinsTip->GetCoins(outPoint.hash, coins)) {
                     fFailure = true;
-                    strFailMessage = "zelnode-tx-coins-not-found";
+                    strFailMessage = "fluxnode-tx-coins-not-found";
                 }
 
                 CTxDestination destination;
                 if (!fFailure && !ExtractDestination(coins.vout[outPoint.n].scriptPubKey, destination)) {
                     fFailure = true;
-                    strFailMessage = "zelnode-tx-failed-to-extract-destination";
+                    strFailMessage = "fluxnode-tx-failed-to-extract-destination";
                 }
 
                 if (!fFailure && EncodeDestination(destination) != EncodeDestination(userpubkey.GetID())) {
                     fFailure = true;
-                    strFailMessage = "zelnode-tx-destinations-didn't-match";
+                    strFailMessage = "fluxnode-tx-destinations-didn't-match";
                 }
             }
 
@@ -1193,7 +1193,7 @@ bool ContextualCheckTransaction(
             std::string strFailMessage;
             if (g_zelnodeCache.GetZelnodeData(tx.collateralOut).nTier > tx.benchmarkTier) {
                 fFailure = true;
-                strFailMessage = "zelnode-tx-benchmark-tier-to-low-for-collateral";
+                strFailMessage = "fluxnode-tx-benchmark-tier-to-low-for-collateral";
             }
 
             if (fFailure && !fFromAccept) {
@@ -1216,7 +1216,7 @@ bool ContextualCheckTransaction(
                 }
             } else {
                 if (!fFromAccept) {
-                    return error("%s - Zelnode data not found. Not from accept", __func__);
+                    return error("%s - Fluxnode data not found. Not from accept", __func__);
                 }
             }
 
@@ -1225,7 +1225,7 @@ bool ContextualCheckTransaction(
                 std::string strFailMessage;
                 if (!g_zelnodeCache.CheckIfStarted(tx.collateralOut)) {
                     fFailure = true;
-                    strFailMessage = "zelnode-tx-invalid-confirm-outpoint-not-started";
+                    strFailMessage = "fluxnode-tx-invalid-confirm-outpoint-not-started";
                 }
 
                 if (fFailure && !fFromAccept) {
@@ -1236,27 +1236,27 @@ bool ContextualCheckTransaction(
                 std::string strFailMessage;
                 if (!g_zelnodeCache.CheckIfConfirmed(tx.collateralOut)) {
                     fFailure = true;
-                    strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed";
+                    strFailMessage = "fluxnode-tx-invalid-update-confirm-outpoint-not-confirmed";
                 }
 
                 if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx, data)) {
                     fFailure = true;
-                    strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon";
+                    strFailMessage = "fluxnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon";
                 }
 
                 if (!fFailure && g_zelnodeCache.GetZelnodeData(tx.collateralOut).nTier > tx.benchmarkTier) {
                     fFailure = true;
-                    strFailMessage = "zelnode-tx-benchmark-tier-to-low-for-collateral";
+                    strFailMessage = "fluxnode-tx-benchmark-tier-to-low-for-collateral";
                 }
 
                 if (fFailure && !fFromAccept) {
                     return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage);
                 }
             } else {
-                return state.DoS(100, error("zelnode-tx-malicious-update-type"), REJECT_INVALID, "zelnode-tx-malicious-update-type");
+                return state.DoS(100, error("fluxnode-tx-malicious-update-type"), REJECT_INVALID, "zelnode-tx-malicious-update-type");
             }
         } else {
-            return state.DoS(100, error("zelnode-tx-malicious-type"), REJECT_INVALID, "zelnode-tx-malicious-type");
+            return state.DoS(100, error("fluxnode-tx-malicious-type"), REJECT_INVALID, "zelnode-tx-malicious-type");
         }
     }
     return true;
@@ -1345,41 +1345,41 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
 
     if (tx.IsZelnodeTx() && (!tx.vout.empty() || !tx.vJoinSplit.empty() || !tx.vShieldedOutput.empty()
         || !tx.vin.empty() || !tx.vShieldedSpend.empty())) {
-        return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, with none empty vectors"),
-                         REJECT_INVALID, "bad-txns-zelnode-tx-not-empty");
+        return state.DoS(10, error("CheckTransaction(): Is Fluxnode Tx, with none empty vectors"),
+                         REJECT_INVALID, "bad-txns-fluxnode-tx-not-empty");
     }
 
     if (tx.IsZelnodeTx()) {
         // Check type of zelnode tx
         if (tx.nType != ZELNODE_START_TX_TYPE && tx.nType != ZELNODE_CONFIRM_TX_TYPE)
-            return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, bad type"),
-                             REJECT_INVALID, "bad-txns-zelnode-tx-invalid-type");
+            return state.DoS(10, error("CheckTransaction(): Is Fluxnode Tx, bad type"),
+                             REJECT_INVALID, "bad-txns-fluxnode-tx-invalid-type");
 
         // Check Input is not null
         if (tx.collateralOut.IsNull()) {
-            return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, with null collateralOut prevout"),
-                             REJECT_INVALID, "bad-txns-zelnode-tx-null-prevout");
+            return state.DoS(10, error("CheckTransaction(): Is Fluxnode Tx, with null collateralOut prevout"),
+                             REJECT_INVALID, "bad-txns-fluxnode-tx-null-prevout");
         }
 
         if (!CheckZelnodeTxSignatures(tx)) {
-            return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, invalid signatures"),
-                             REJECT_INVALID, "bad-txns-zelnode-tx-invalid-signature");
+            return state.DoS(10, error("CheckTransaction(): Is Fluxnode Tx, invalid signatures"),
+                             REJECT_INVALID, "bad-txns-fluxnode-tx-invalid-signature");
         }
 
         if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
             if (tx.benchmarkTier < CUMULUS || tx.benchmarkTier > STRATUS) {
-                return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, invalid benchmarking tier"),
-                                 REJECT_INVALID, "bad-txns-zelnode-tx-invalid-benchmark-tier");
+                return state.DoS(10, error("CheckTransaction(): Is Fluxnode Tx, invalid benchmarking tier"),
+                                 REJECT_INVALID, "bad-txns-fluxnode-tx-invalid-benchmark-tier");
             }
 
             if (tx.ip.size() > 40) {
-                return state.DoS(100,error("CheckTransaction(): Is Zelnode Tx, ip address to large"),
-                        REJECT_INVALID, "bad-txns-zelnode-tx-ip-address-to-large");
+                return state.DoS(100,error("CheckTransaction(): Is Fluxnode Tx, ip address to large"),
+                        REJECT_INVALID, "bad-txns-fluxnode-tx-ip-address-to-large");
             }
 
             if (tx.nUpdateType != ZelnodeUpdateType::INITIAL_CONFIRM && tx.nUpdateType != ZelnodeUpdateType::UPDATE_CONFIRM) {
-                return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, invalid update type"),
-                                 REJECT_INVALID, "bad-txns-zelnode-tx-invalid-update-type");
+                return state.DoS(10, error("CheckTransaction(): Is Fluxnode Tx, invalid update type"),
+                                 REJECT_INVALID, "bad-txns-fluxnode-tx-invalid-update-type");
             }
         }
     }
@@ -1669,16 +1669,16 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
     if (tx.IsZelnodeTx()) {
         if (pool.mapZelnodeTxMempool.count(tx.collateralOut)) {
-            return state.DoS(0, false, REJECT_DUPLICATE, "zelnode-tx-outpoint-already-in-mempool");
+            return state.DoS(0, false, REJECT_DUPLICATE, "fluxnode-tx-outpoint-already-in-mempool");
         }
 
         if (GetAdjustedTime() - tx.sigTime > ZELNODE_MAX_SIG_TIME) {
-            return state.DoS(0, false, REJECT_DUPLICATE, "zelnode-tx-sig-to-old");
+            return state.DoS(0, false, REJECT_DUPLICATE, "fluxnode-tx-sig-to-old");
         }
 
         if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
             if (GetAdjustedTime() - tx.benchmarkSigTime > ZELNODE_MAX_SIG_TIME) {
-                return state.DoS(0, false, REJECT_DUPLICATE, "zelnode-tx-bench-sig-to-old");
+                return state.DoS(0, false, REJECT_DUPLICATE, "fluxnode-tx-bench-sig-to-old");
             }
         }
     }
@@ -1728,12 +1728,12 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                 // Check to make sure the input is not spent and meets the criteria of a zelnode input
                 int nTier;
                 if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier)) {
-                    return state.DoS(10, error("bad-txns-zelnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-zelnode-inputs-invalid-spent-or-bad-value");
+                    return state.DoS(10, error("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-fluxnode-inputs-invalid-spent-or-bad-value");
                 }
             } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
                 int nTier;
                 if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier)) {
-                    return state.DoS(10, error("bad-txns-zelnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-zelnode-inputs-invalid-spent-or-bad-value");
+                    return state.DoS(10, error("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-fluxnode-inputs-invalid-spent-or-bad-value");
                 }
             }
         }
@@ -1892,7 +1892,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             }
 
             if (tx.IsZelnodeTx()) {
-                LogPrintf("%s: Adding zelnode transaction to mempool: %s hash: %s\n", __func__, tx.collateralOut.ToString(), tx.GetHash().GetHex());
+                LogPrintf("%s: Adding fluxnode transaction to mempool: %s hash: %s\n", __func__, tx.collateralOut.ToString(), tx.GetHash().GetHex());
                 pool.mapZelnodeTxMempool.insert(std::make_pair(tx.collateralOut, tx.GetHash()));
                 pool.mapSeenZelnodeTx.insert(std::make_pair(tx.GetHash(), GetTime()));
 
@@ -2913,13 +2913,13 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
 
     CZelnodeTxBlockUndo zelnodeBlockUndo;
     if (!pZelnodeDB->ReadBlockUndoZelnodeData(block.GetHash(), zelnodeBlockUndo)) {
-        error("DisconnectBlock(): block zelnodetx undo data inconsistent");
+        error("DisconnectBlock(): block fluxnodetx undo data inconsistent");
         return DISCONNECT_FAILED;
     }
 
 
     if (!p_zelnodeCache) {
-        error("DisconnectBlock(): p_zelnodeCache is null");
+        error("DisconnectBlock(): p_fluxnodeCache is null");
         return DISCONNECT_FAILED;
     }
 
@@ -3337,14 +3337,14 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             if (tx.IsZelnodeTx()) {
                 int nTier = 0;
                 if (!view.CheckZelnodeTxInput(tx, pindex->nHeight, nTier))
-                    return state.DoS(100, error("ConnectBlock(): zelnode tx inputs missing/spent"),
-                                     REJECT_INVALID, "bad-txns-zelnode-tx-inputs-missingorspent");
+                    return state.DoS(100, error("ConnectBlock(): fluxnode tx inputs missing/spent"),
+                                     REJECT_INVALID, "bad-txns-fluxnode-tx-inputs-missingorspent");
 
                 if (tx.nType == ZELNODE_START_TX_TYPE) {
                     if (p_zelnodeCache) {
                         if (!g_zelnodeCache.CheckNewStartTx(tx.collateralOut)) {
-                            return state.DoS(100, error("ConnectBlock(): zelnode tx, failed CheckNewStartTx call"),
-                                             REJECT_INVALID, "bad-txns-zelnode-tx-check-new-start");
+                            return state.DoS(100, error("ConnectBlock(): fluxnode tx, failed CheckNewStartTx call"),
+                                             REJECT_INVALID, "bad-txns-fluxnode-tx-check-new-start");
                         }
 
                         // Add new Zelnode Start Tx into local cache
@@ -3360,8 +3360,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                             p_zelnodeCache->AddUpdateConfirm(tx, pindex->nHeight);
                             auto global_data = g_zelnodeCache.GetZelnodeData(tx.collateralOut);
                             if (global_data.IsNull())
-                                return state.DoS(100, error("ConnectBlock(): zelnode tx, failed finding data to creating undo data"),
-                                                 REJECT_INVALID, "bad-txns-zelnode-global-data-not-found");
+                                return state.DoS(100, error("ConnectBlock(): fluxnode tx, failed finding data to creating undo data"),
+                                                 REJECT_INVALID, "bad-txns-fluxnode-global-data-not-found");
                             zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.insert(std::make_pair(tx.collateralOut, global_data.nLastConfirmedBlockHeight));
                         }
                     }
@@ -3548,7 +3548,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             zelnodeTxBlockUndo.mapLastPaidHeights.size())
         {
             if (!pZelnodeDB->WriteBlockUndoZelnodeData(block.GetHash(), zelnodeTxBlockUndo))
-                return AbortNode(state, "Failed to write zelnodetx undo data");
+                return AbortNode(state, "Failed to write fluxnodetx undo data");
         }
 
         // Now that all consensus rules have been validated, set nCachedBranchId.
@@ -3913,15 +3913,15 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
 
     if (g_zelnodeCache.mapZelnodeList.at(CUMULUS).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(CUMULUS).listConfirmedZelnodes.size()) {
-        error("Basic set map, doesn't have the same size as the listconfirmed zelnodes");
+        error("Basic set map, doesn't have the same size as the listconfirmed fluxnodes");
     }
 
     if (g_zelnodeCache.mapZelnodeList.at(NIMBUS).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(NIMBUS).listConfirmedZelnodes.size()) {
-        error("Super set map, doesn't have the same size as the listconfirmed zelnodes");
+        error("Super set map, doesn't have the same size as the listconfirmed fluxnodes");
     }
 
     if (g_zelnodeCache.mapZelnodeList.at(STRATUS).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(STRATUS).listConfirmedZelnodes.size()) {
-        error("STRATUS set map, doesn't have the same size as the listconfirmed zelnodes");
+        error("STRATUS set map, doesn't have the same size as the listconfirmed fluxnodes");
     }
 
     // Remove transactions that expire at new block height from mempool
@@ -4574,8 +4574,8 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
 
         if (block.vtx[i].IsZelnodeTx()) {
             if (setZelnodeTxOuts.count(block.vtx[i].collateralOut))
-                return state.DoS(100, error("CheckBlock(): more than one zelnodetx with same outpoint"),
-                                 REJECT_INVALID, "bad-zelnode-tx-multiple");
+                return state.DoS(100, error("CheckBlock(): more than one fluxnodetx with same outpoint"),
+                                 REJECT_INVALID, "bad-fluxnode-tx-multiple");
             setZelnodeTxOuts.insert(block.vtx[i].collateralOut);
         }
     }
@@ -4598,12 +4598,12 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
         if (nHeight < chainparams.StartZelnodePayments()) {
             if (nHeight != 0 && !IsInitialBlockDownload(chainparams)) {
                 if (!IsBlockPayeeValid(block, nHeight)) {
-                    LogPrint("zelnode", "%s : Couldn't find zelnode payment", __func__);
+                    LogPrint("zelnode", "%s : Couldn't find fluxnode payment", __func__);
                     return state.DoS(0, false, REJECT_INVALID, "bad-cb-payee");
                 }
             } else {
                 if (fDebug)
-                    LogPrintf("%s : Zelnode payment check skipped on sync - skipping IsBlockPayeeValid()\n", __func__);
+                    LogPrintf("%s : Fluxnode payment check skipped on sync - skipping IsBlockPayeeValid()\n", __func__);
             }
         }
     }
