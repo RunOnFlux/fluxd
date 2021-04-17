@@ -172,22 +172,22 @@ void ActiveZelnode::ManageDeterministricZelnode()
         if (mempool.mapZelnodeTxMempool.count(activeZelnode.deterministicOutPoint)) {
             if (pwalletMain)
                 pwalletMain->ResendWalletTransactions(GetAdjustedTime());
-            LogPrintf("Zelnode found in start tracker. Skipping confirm transaction creation, because transaction already in mempool %s\n", activeZelnode.deterministicOutPoint.ToString());
+            LogPrintf("Fluxnode found in start tracker. Skipping confirm transaction creation, because transaction already in mempool %s\n", activeZelnode.deterministicOutPoint.ToString());
             return;
         }
 
         // If we don't have one in our mempool. That means it is time to confirm the zelnode
         if (nHeight - nLastTriedToConfirm > 3) { // Only try this every couple blocks
             activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::INITIAL_CONFIRM);
-            LogPrintf("Zelnode found in start tracker. Creating Initial Confirm Transactions %s\n", activeZelnode.deterministicOutPoint.ToString());
+            LogPrintf("Fluxnode found in start tracker. Creating Initial Confirm Transactions %s\n", activeZelnode.deterministicOutPoint.ToString());
         } else {
             return;
         }
     } else if (g_zelnodeCache.CheckIfNeedsNextConfirm(activeZelnode.deterministicOutPoint)) {
         activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::UPDATE_CONFIRM);
-        LogPrintf("Time to Confirm Zelnode reached, Creating Update Confirm Transaction on height: %s for outpoint: %s\n", nHeight, activeZelnode.deterministicOutPoint.ToString());
+        LogPrintf("Time to Confirm Fluxnode reached, Creating Update Confirm Transaction on height: %s for outpoint: %s\n", nHeight, activeZelnode.deterministicOutPoint.ToString());
     } else {
-        LogPrintf("Zelnode found nothing to do on height: %s for outpoint: %s\n", nHeight, activeZelnode.deterministicOutPoint.ToString());
+        LogPrintf("Fluxnode found nothing to do on height: %s for outpoint: %s\n", nHeight, activeZelnode.deterministicOutPoint.ToString());
         return;
     }
 
@@ -200,11 +200,11 @@ void ActiveZelnode::ManageDeterministricZelnode()
             pwalletMain->CommitTransaction(walletTx, reservekey);
             nLastTriedToConfirm = nHeight;
         } else {
-            error("Failed to sign benchmarking for zelnode confirm transaction for outpoint %s, Error message: %s", activeZelnode.deterministicOutPoint.ToString(), errorMessage);
+            error("Failed to sign benchmarking for fluxnode confirm transaction for outpoint %s, Error message: %s", activeZelnode.deterministicOutPoint.ToString(), errorMessage);
             return;
         }
     } else {
-        error("Failed to sign zelnode for confirm transaction for outpoint %s, Error message: %s", activeZelnode.deterministicOutPoint.ToString(), errorMessage);
+        error("Failed to sign fluxnode for confirm transaction for outpoint %s, Error message: %s", activeZelnode.deterministicOutPoint.ToString(), errorMessage);
         return;
     }
 }
@@ -215,13 +215,13 @@ std::string ActiveZelnode::GetStatus()
         case ACTIVE_ZELNODE_INITIAL:
             return "Node just started, not yet activated";
         case ACTIVE_ZELNODE_SYNC_IN_PROCESS:
-            return "Sync in progress. Must wait until sync is complete to start Zelnode";
+            return "Sync in progress. Must wait until sync is complete to start Fluxnode";
         case ACTIVE_ZELNODE_INPUT_TOO_NEW:
-            return strprintf("Zelnode input must have at least %d confirmations", ZELNODE_MIN_CONFIRMATIONS);
+            return strprintf("Fluxnode input must have at least %d confirmations", ZELNODE_MIN_CONFIRMATIONS);
         case ACTIVE_ZELNODE_NOT_CAPABLE:
-            return "Not capable zelnode: " + notCapableReason;
+            return "Not capable fluxnode: " + notCapableReason;
         case ACTIVE_ZELNODE_STARTED:
-            return "Zelnode successfully started";
+            return "Fluxnode successfully started";
         default:
             return "unknown";
     }
@@ -230,7 +230,7 @@ std::string ActiveZelnode::GetStatus()
 bool ActiveZelnode::SendZelnodePing(std::string& errorMessage)
 {
     if (status != ACTIVE_ZELNODE_STARTED) {
-        errorMessage = "Zelnode is not in a running status";
+        errorMessage = "Fluxnode is not in a running status";
         return false;
     }
 
@@ -242,11 +242,11 @@ bool ActiveZelnode::SendZelnodePing(std::string& errorMessage)
         return false;
     }
 
-    LogPrintf("%s - Relay Zelnode Ping vin = %s\n", __func__, vin.ToString());
+    LogPrintf("%s - Relay Fluxnode Ping vin = %s\n", __func__, vin.ToString());
 
     ZelnodePing znp(vin);
     if (!znp.Sign(keyZelnode, pubKeyZelnode)) {
-        errorMessage = "Couldn't sign Zelnode Ping";
+        errorMessage = "Couldn't sign Fluxnode Ping";
         return false;
     }
 
@@ -254,7 +254,7 @@ bool ActiveZelnode::SendZelnodePing(std::string& errorMessage)
     Zelnode* pzn = zelnodeman.Find(vin);
     if (pzn != NULL) {
         if (pzn->IsPingedWithin(ZELNODE_PING_SECONDS, znp.sigTime)) {
-            errorMessage = "Too early to send Zelnode Ping";
+            errorMessage = "Too early to send Fluxnode Ping";
             return false;
         }
 
@@ -271,7 +271,7 @@ bool ActiveZelnode::SendZelnodePing(std::string& errorMessage)
         return true;
     } else {
         // Seems like we are trying to send a ping while the Zelnode is not registered in the network
-        errorMessage = "Obfuscation Zelnode List doesn't include our Zelnode, shutting down Zelnode pinging service! " + vin.ToString();
+        errorMessage = "Obfuscation Fluxnode List doesn't include our Fluxnode, shutting down Fluxnode pinging service! " + vin.ToString();
         status = ACTIVE_ZELNODE_NOT_CAPABLE;
         notCapableReason = errorMessage;
         return false;
@@ -288,20 +288,20 @@ bool ActiveZelnode::CreateBroadcast(std::string strService, std::string strKeyZe
 
     //need correct blocks to send ping
     if (!fOffline && !zelnodeSync.IsBlockchainSynced()) {
-        errorMessage = "Sync in progress. Must wait until sync is complete to start Zelnode";
+        errorMessage = "Sync in progress. Must wait until sync is complete to start Fluxnode";
         LogPrintf("%s - %s\n", __func__, errorMessage);
         return false;
     }
 
     if (!obfuScationSigner.SetKey(strKeyZelnode, errorMessage, keyZelnode, pubKeyZelnode)) {
-        errorMessage = strprintf("Can't find keys for zelnode %s - %s", strService, errorMessage);
+        errorMessage = strprintf("Can't find keys for fluxnode %s - %s", strService, errorMessage);
         LogPrintf("%s - %s\n", __func__, errorMessage);
         return false;
     }
 
     std::string strErrorMessage;
     if (!GetZelNodeVin(vin, pubKeyCollateralAddress, keyCollateralAddress, strTxHash, strOutputIndex, strErrorMessage)) {
-        errorMessage = strprintf("Could not allocate vin %s:%s for zelnode %s", strTxHash, strOutputIndex,
+        errorMessage = strprintf("Could not allocate vin %s:%s for fluxnode %s", strTxHash, strOutputIndex,
                                  strService);
         LogPrintf("%s - %s\n", __func__, errorMessage);
         return false;
@@ -412,8 +412,8 @@ bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, 
     }
 
     if (selectedOutput->nDepth < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC) {
-        errorMessage = strprintf("Zelnode hasn't met confirmation requirement (remaining confirmations required: %d)\n", ZELNODE_MIN_CONFIRMATION_DETERMINISTIC - selectedOutput->nDepth);
-        LogPrintf("%s - zelnode hasn't met confirmation requirement (remaining confirmations required: %d)\n", __func__, ZELNODE_MIN_CONFIRMATION_DETERMINISTIC - selectedOutput->nDepth);
+        errorMessage = strprintf("Fluxnode hasn't met confirmation requirement (remaining confirmations required: %d)\n", ZELNODE_MIN_CONFIRMATION_DETERMINISTIC - selectedOutput->nDepth);
+        LogPrintf("%s - fluxnode hasn't met confirmation requirement (remaining confirmations required: %d)\n", __func__, ZELNODE_MIN_CONFIRMATION_DETERMINISTIC - selectedOutput->nDepth);
         return false;
     }
 
@@ -566,8 +566,8 @@ bool ActiveZelnode::SignDeterministicStartTx(CMutableTransaction& mutableTransac
     CPubKey pubKeyAddressNew;
     CKey keyAddressNew;
     if (!pwalletMain->GetZelnodeVinAndKeys(txin, pubKeyAddressNew, keyAddressNew, mutableTransaction.collateralIn.hash.GetHex(), std::to_string(mutableTransaction.collateralIn.n))) {
-        errorMessage = strprintf("Could not allocate txin %s:%s for zelnode %s", mutableTransaction.collateralIn.hash.GetHex(), std::to_string(mutableTransaction.collateralIn.n), mutableTransaction.ip);
-        LogPrintf("zelnode","%s -- %s\n", __func__, errorMessage);
+        errorMessage = strprintf("Could not allocate txin %s:%s for fluxnode %s", mutableTransaction.collateralIn.hash.GetHex(), std::to_string(mutableTransaction.collateralIn.n), mutableTransaction.ip);
+        LogPrintf("fluxnode","%s -- %s\n", __func__, errorMessage);
         return false;
     }
 
@@ -581,10 +581,10 @@ bool ActiveZelnode::SignDeterministicStartTx(CMutableTransaction& mutableTransac
         std::string strMessage = mutableTransaction.GetHash().GetHex();
 
         if (!obfuScationSigner.SignMessage(strMessage, errorMessage, mutableTransaction.sig, keyAddressNew))
-            return error("%s - Error: Sign Zelnode for start transaction %s", __func__, errorMessage);
+            return error("%s - Error: Sign Fluxnode for start transaction %s", __func__, errorMessage);
 
         if (!obfuScationSigner.VerifyMessage(mutableTransaction.collateralPubkey, mutableTransaction.sig, strMessage, errorMessage))
-            return error("%s - Error: Verify Zelnode for start transaction: %s", __func__, errorMessage);
+            return error("%s - Error: Verify Fluxnode for start transaction: %s", __func__, errorMessage);
 
         return true;
     }
@@ -604,7 +604,7 @@ bool ActiveZelnode::SignDeterministicConfirmTx(CMutableTransaction& mutableTrans
     auto data = g_zelnodeCache.GetZelnodeData(mutableTransaction.collateralIn);
 
     if (data.IsNull()) {
-        errorMessage = "zelnode-data-is-null";
+        errorMessage = "fluxnode-data-is-null";
         return error("%s : %s", __func__, errorMessage);
     }
 
@@ -628,10 +628,10 @@ bool ActiveZelnode::SignDeterministicConfirmTx(CMutableTransaction& mutableTrans
     }
 
     if (!obfuScationSigner.SignMessage(strMessage, errorMessage, mutableTransaction.sig, keyZelnode))
-        return error("%s - Error: Signing Zelnode %s", __func__, errorMessage);
+        return error("%s - Error: Signing Fluxnode %s", __func__, errorMessage);
 
     if (!obfuScationSigner.VerifyMessage(pubKeyZelnode, mutableTransaction.sig, strMessage, errorMessage))
-        return error("%s - Error: Verify Zelnode sig %s", __func__, errorMessage);
+        return error("%s - Error: Verify Fluxnode sig %s", __func__, errorMessage);
 
     return true;
 }
@@ -651,14 +651,14 @@ bool ActiveZelnode::BuildDeterministicStartTx(std::string strKeyZelnode, std::st
     CKey keyZelnode;
 
     if (!obfuScationSigner.SetKey(strKeyZelnode, errorMessage, keyZelnode, pubKeyZelnode)) {
-        errorMessage = strprintf("Can't find keys for zelnode - %s", errorMessage);
+        errorMessage = strprintf("Can't find keys for fluxnode - %s", errorMessage);
         LogPrintf("%s - %s\n", __func__, errorMessage);
         return false;
     }
 
     if (!GetZelNodeVin(vin, pubKeyCollateralAddress, keyCollateralAddress, strTxHash, strOutputIndex, errorMessage)) {
         if (errorMessage.empty())
-            errorMessage = strprintf("Could not allocate vin %s:%s for zelnode", strTxHash, strOutputIndex);
+            errorMessage = strprintf("Could not allocate vin %s:%s for fluxnode", strTxHash, strOutputIndex);
         LogPrintf("%s - %s\n", __func__, errorMessage);
         return false;
     }
@@ -695,7 +695,7 @@ bool ActiveZelnode::CheckDefaultPort(std::string strService, std::string& strErr
     int nDefaultPort = Params().GetDefaultPort();
 
     if (service.GetPort() != nDefaultPort) {
-        strErrorRet = strprintf("Invalid port %u for zelnode %s, only %d is supported on %s-net.",
+        strErrorRet = strprintf("Invalid port %u for fluxnode %s, only %d is supported on %s-net.",
                                 service.GetPort(), strService, nDefaultPort, Params().NetworkIDString());
         LogPrint("zelnode", "%s -- %s - %s\n", __func__, strContext, strErrorRet);
         return false;
