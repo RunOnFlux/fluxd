@@ -22,7 +22,7 @@ public:
     bool fVersionValid;
 };
 
-bool FindBenchmarkPath(std::string& path, const std::string filename);
+bool FindBenchmarkPath(std::string filename);
 std::string GetBenchCliPath();
 std::string GetBenchDaemonPath();
 
