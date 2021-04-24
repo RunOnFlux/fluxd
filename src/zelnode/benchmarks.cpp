@@ -27,10 +27,7 @@ namespace filesys = boost::filesystem;
 
 Benchmarks benchmarks;
 bool fZelStartedBench = false;
-//std::string strBenchmarkPathing = "/usr/local/bin"; // Default path
-//std::string strBenchmarkCliPathing = "/usr/local/bin"; // Default path
 std::string strPath = "";
-//std::string strPath = "/usr/local/bin"; // Default path
 
 std::string strTestnetSring = "-testnet ";
 
