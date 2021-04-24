@@ -27,12 +27,14 @@ namespace filesys = boost::filesystem;
 
 Benchmarks benchmarks;
 bool fZelStartedBench = false;
-std::string strBenchmarkPathing = "/usr/local/bin"; // Default path
-std::string strBenchmarkCliPathing = "/usr/local/bin"; // Default path
+//std::string strBenchmarkPathing = "/usr/local/bin"; // Default path
+//std::string strBenchmarkCliPathing = "/usr/local/bin"; // Default path
+std::string strPath = GetSelfPath();
+//std::string strPath = "/usr/local/bin"; // Default path
 
 std::string strTestnetSring = "-testnet ";
 
-std::string getExePath()
+std::string GetSelfPath()
 {
   char result[ PATH_MAX ];
   ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
@@ -47,10 +49,10 @@ std::string getExePath()
    return "";
 }
 
-bool FindBenchmarkPath(std::string filename)
+bool FindBenchmarkPath(std::string filename, std::string file_path )
 {
-    strBenchmarkCliPathing = getExePath();
-    filesys::path pathObj(strBenchmarkCliPathing + "/" + filename);
+   
+    filesys::path pathObj(file_path + "/" + filename);
     if (filesys::exists(pathObj) && filesys::is_regular_file(pathObj)) {
         return true;
     }
@@ -59,13 +61,13 @@ bool FindBenchmarkPath(std::string filename)
 
 std::string GetBenchCliPath()
 {
-    // The space at the end is so parameters can be added easily
+   
     if (FindBenchmarkPath("fluxbench-cli")) {
-        return strBenchmarkCliPathing + "/fluxbench-cli ";
+        return strPath + "/fluxbench-cli ";
     }
 
     if (FindBenchmarkPath("zelbench-cli")) {
-        return strBenchmarkCliPathing + "/zelbench-cli ";
+        return strPath + "/zelbench-cli ";
     }
 
 }
@@ -74,11 +76,11 @@ std::string GetBenchDaemonPath()
 {
     // The space at the end is so parameters can be added easily
     if (FindBenchmarkPath("fluxbenchd")) {
-       return strBenchmarkCliPathing + "/fluxbenchd ";
+       return strPath + "/fluxbenchd ";
     }
 
     if (FindBenchmarkPath("zelbenchd")) {
-        return strBenchmarkCliPathing + "/zelbenchd ";
+        return strPath + "/zelbenchd ";
     }
 
 }
