@@ -66,7 +66,7 @@ std::string GetBenchCliPath()
         return strPath + "/fluxbench-cli ";
     }
 
-    if (FindBenchmarkPath("zelbench-cli", strPath))) {
+    if (FindBenchmarkPath("zelbench-cli", strPath)) {
         return strPath + "/zelbench-cli ";
     }
 
