@@ -1925,7 +1925,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     if (fZelnode) {
-        LogPrintf("IS ZELNODE\n");
+        LogPrintf("IS FLUXNODE\n");
         strZelnodeAddr = GetArg("-zelnodeaddr", "");
 
         LogPrintf(" addr %s\n", strZelnodeAddr.c_str());
@@ -1969,7 +1969,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     if (GetBoolArg("-znconflock", true) && pwalletMain) {
         LOCK(pwalletMain->cs_wallet);
-        LogPrintf("Locking Zelnodes:\n");
+        LogPrintf("Locking Fluxnodes:\n");
         uint256 znTxHash;
         for (ZelnodeConfig::ZelnodeEntry zne : zelnodeConfig.getEntries()) {
             LogPrintf("  %s %s\n", zne.getTxHash(), zne.getOutputIndex());
