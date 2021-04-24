@@ -11,8 +11,6 @@ class Benchmarks;
 class CTransaction;
 extern Benchmarks benchmarks;
 extern bool fZelStartedBench;
-//extern std::string strBenchmarkPathing;
-//extern std::string strBenchmarkCliPathing;
 extern std::string strPath;
 
 class Benchmarks {
