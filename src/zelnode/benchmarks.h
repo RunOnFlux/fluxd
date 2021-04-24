@@ -13,6 +13,7 @@ extern Benchmarks benchmarks;
 extern bool fZelStartedBench;
 extern std::string strBenchmarkPathing;
 extern std::string strBenchmarkCliPathing;
+extern std::string strPath;
 
 class Benchmarks {
 public:
@@ -25,6 +26,7 @@ public:
 bool FindBenchmarkPath(std::string filename);
 std::string GetBenchCliPath();
 std::string GetBenchDaemonPath();
+std::string GetSelfPath();
 
 bool IsZelBenchdRunning();
 void StartZelBenchd();
