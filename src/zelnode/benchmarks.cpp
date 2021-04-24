@@ -29,7 +29,7 @@ Benchmarks benchmarks;
 bool fZelStartedBench = false;
 //std::string strBenchmarkPathing = "/usr/local/bin"; // Default path
 //std::string strBenchmarkCliPathing = "/usr/local/bin"; // Default path
-//std::string strPath = GetSelfPath();
+std::string strPath = "";
 //std::string strPath = "/usr/local/bin"; // Default path
 
 std::string strTestnetSring = "-testnet ";
@@ -62,7 +62,7 @@ bool FindBenchmarkPath(std::string filename, std::string file_path )
 std::string GetBenchCliPath()
 {
    
-    if (FindBenchmarkPath("fluxbench-cli")) {
+    if (FindBenchmarkPath("fluxbench-cli", strPath)) {
         return strPath + "/fluxbench-cli ";
     }
 
@@ -75,11 +75,11 @@ std::string GetBenchCliPath()
 std::string GetBenchDaemonPath()
 {
     // The space at the end is so parameters can be added easily
-    if (FindBenchmarkPath("fluxbenchd")) {
+    if (FindBenchmarkPath("fluxbenchd", strPath)) {
        return strPath + "/fluxbenchd ";
     }
 
-    if (FindBenchmarkPath("zelbenchd")) {
+    if (FindBenchmarkPath("zelbenchd", strPath)) {
         return strPath + "/zelbenchd ";
     }
 
