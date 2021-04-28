@@ -151,7 +151,7 @@ UniValue blockToDeltasJSON(const CBlock& block, const CBlockIndex* blockindex)
         entry.push_back(Pair("index", (int)i));
 
         UniValue inputs(UniValue::VARR);
-        if (!tx.IsCoinBase() && !tx.IsZelnodeTx()) {
+        if (!tx.IsCoinBase()) {
             for (size_t j = 0; j < tx.vin.size(); j++) {
                 const CTxIn input = tx.vin[j];
                 UniValue delta(UniValue::VOBJ);
