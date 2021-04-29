@@ -3117,11 +3117,8 @@ void PartitionCheck(bool (*initialDownloadCheck)(const CChainParams&),
                     CCriticalSection& cs, const CBlockIndex *const &bestHeader,
                     int64_t nPowTargetSpacing)
 {
+    strMiscWarning = "";
     if (bestHeader == NULL || initialDownloadCheck(Params())) return;
-
-    static int64_t lastAlertTime = 0;
-    int64_t now = GetAdjustedTime();
-    if (lastAlertTime > now-60*60*24) return; // Alert at most once per day
 
     const int SPAN_HOURS=4;
     const int SPAN_SECONDS=SPAN_HOURS*60*60;
@@ -3167,7 +3164,6 @@ void PartitionCheck(bool (*initialDownloadCheck)(const CChainParams&),
     {
         strMiscWarning = strWarning;
         CAlert::Notify(strWarning, true);
-        lastAlertTime = now;
     }
 }
 
