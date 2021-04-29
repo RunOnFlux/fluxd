@@ -1925,7 +1925,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     if (fZelnode) {
-        LogPrintf("IS ZELNODE\n");
+        LogPrintf("IS FLUXNODE\n");
         strZelnodeAddr = GetArg("-zelnodeaddr", "");
 
         LogPrintf(" addr %s\n", strZelnodeAddr.c_str());
@@ -1969,7 +1969,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     if (GetBoolArg("-znconflock", true) && pwalletMain) {
         LOCK(pwalletMain->cs_wallet);
-        LogPrintf("Locking Zelnodes:\n");
+        LogPrintf("Locking Fluxnodes:\n");
         uint256 znTxHash;
         for (ZelnodeConfig::ZelnodeEntry zne : zelnodeConfig.getEntries()) {
             LogPrintf("  %s %s\n", zne.getTxHash(), zne.getOutputIndex());
@@ -1980,17 +1980,35 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     if (fZelnode) {
-        if (!FindBenchmarkPath(strBenchmarkPathing, "zelbenchd")) {
-            return InitError("Failed to find daemon application");
-        } else {
-            LogPrintf("Found zelbenchd in: %s\n", strBenchmarkPathing);
-        }
+        
+        strPath = GetSelfPath();
+        LogPrintf("Path: %s\n",strPath);
+       
+         if (FindBenchmarkPath("fluxbenchd",strPath)) {
 
-        if (!FindBenchmarkPath(strBenchmarkCliPathing, "zelbench-cli")) {
-            return InitError("Failed to find cli application");
+            LogPrintf("Found fluxbenchd in %s\n",strPath);
+
+            if (FindBenchmarkPath("fluxbench-cli",strPath)) {
+                 LogPrintf("Found fluxbench-cli in %s\n",strPath);
+            } else {
+                 return InitError("Failed to find benchmark cli application");
+            }
+
         } else {
-            LogPrintf("Found zelbench-cli in: %s\n", strBenchmarkCliPathing);
+
+             if (FindBenchmarkPath("zelbenchd", strPath)) {
+                  LogPrintf("Found zelbenchd in %s\n",strPath);
+             } else {
+                 return InitError("Failed to find benchmark application");
+             }
+
+             if (FindBenchmarkPath("zelbench-cli", strPath)) {
+                  LogPrintf("Found zelbench-cli in %s\n",strPath);
+             } else {
+                 return InitError("Failed to find benchmark cli application");
+             }
         }
+        
     }
 
     if (fZelnode) {
@@ -2001,7 +2019,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         // Make sure that zelbenchd is running and stop zelcash if it isn't
         if (!IsZelBenchdRunning()) {
-            return InitError("Failed to start zelbenchd application");
+            return InitError("Failed to start benchmark application");
         }
     }
 
