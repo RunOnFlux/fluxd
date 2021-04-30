@@ -1028,8 +1028,9 @@ bool ZelnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const Ze
         nCurrentHeight = chainActive.Height();
 
     COutPoint out = p_transaction.collateralOut;
-    if (!p_transaction.IsZelnodeTx())
+    if (!p_transaction.IsZelnodeTx()) {
         return false;
+    }
 
     // This function should only be called on UPDATE_CONFIRM tx types
     if (p_transaction.nUpdateType != ZelnodeUpdateType::UPDATE_CONFIRM) {
@@ -1038,8 +1039,9 @@ bool ZelnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const Ze
 
     LOCK(cs);
     // Check the confirm set before contining
-    if (!CheckListSet(out))
+    if (!CheckListSet(out)) {
         return false;
+    }
 
     // Check the mapConfirmedZelnodeData
     if (!mapConfirmedZelnodeData.count(out)) {
@@ -1433,8 +1435,25 @@ void ZelnodeCache::AddBackUndoData(const CZelnodeTxBlockUndo& p_undoData)
             mapConfirmedZelnodeData[item.first].nLastConfirmedBlockHeight = item.second;
         } else {
             if (!fIsVerifying)
-                error("%s : This should never happen. When undo an update confirm. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
+                error("%s : This should never happen. When undo an update confirm nLastConfirmedBlockHeight . ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
                   __func__, item.first.hash.GetHex());
+        }
+    }
+
+    // Undo the Confirm Update trasnaction back to the old ipAddresses
+    for (const auto& item : p_undoData.mapLastIpAddress) {
+        LOCK(g_zelnodeCache.cs);
+        // Because we might have already retrieved the zelnode global data above when adding back the nLastConfirmedBlockHeight
+        // We don't want to override the nLastConfirmedBlockHeight change above
+        if (mapConfirmedZelnodeData.count(item.first)) {
+            mapConfirmedZelnodeData[item.first].ip = item.second;
+        } else if (g_zelnodeCache.mapConfirmedZelnodeData.count(item.first)) {
+            mapConfirmedZelnodeData[item.first] = g_zelnodeCache.mapConfirmedZelnodeData.at(item.first);
+            mapConfirmedZelnodeData[item.first].ip = item.second;
+        } else {
+            if (!fIsVerifying)
+                error("%s : This should never happen. When undo an update confirm ip address. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
+                      __func__, item.first.hash.GetHex());
         }
     }
 
@@ -1503,6 +1522,7 @@ bool ZelnodeCache::Flush()
     //! If we are undo a block, and we undid a block that confirmed an Update transaction. We need to undo the update, which just updated the nLastConfirmBlockHeight
     for (const auto& item : mapConfirmedZelnodeData) {
         g_zelnodeCache.mapConfirmedZelnodeData[item.first].nLastConfirmedBlockHeight = item.second.nLastConfirmedBlockHeight;
+        g_zelnodeCache.mapConfirmedZelnodeData[item.first].ip = item.second.ip;
         g_zelnodeCache.setDirtyOutPoint.insert(item.first);
     }
 
@@ -1553,6 +1573,7 @@ bool ZelnodeCache::Flush()
             data.nStatus = ZELNODE_TX_CONFIRMED;
             data.nConfirmedBlockHeight = setAddToConfirmHeight;
             data.nLastConfirmedBlockHeight = setAddToConfirmHeight;
+
             data.nLastPaidHeight = 0;
             data.ip = item.second;
 

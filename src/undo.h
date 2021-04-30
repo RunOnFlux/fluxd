@@ -79,6 +79,21 @@ public:
     }
 };
 
+template <typename Stream, typename Operation>
+void ReadWriteExtraZelnodeUndoBlockData(Stream &s, Operation ser_action, std::map<COutPoint, std::string> &mapLastIpAddress)
+{
+    if (ser_action.ForRead())
+    {
+        if (!s.empty()) {
+            READWRITE(mapLastIpAddress);
+        }
+    }
+    else
+    {
+        READWRITE(mapLastIpAddress);
+    }
+};
+
 class CZelnodeTxBlockUndo
 {
 public:
@@ -86,6 +101,7 @@ public:
     std::vector<ZelnodeCacheData> vecExpiredConfirmedData;
     std::map<COutPoint, int> mapUpdateLastConfirmHeight;
     std::map<COutPoint, int> mapLastPaidHeights;
+    std::map<COutPoint, std::string> mapLastIpAddress;
 
     ADD_SERIALIZE_METHODS;
 
@@ -95,6 +111,7 @@ public:
         READWRITE(vecExpiredConfirmedData);
         READWRITE(mapUpdateLastConfirmHeight);
         READWRITE(mapLastPaidHeights);
+        ReadWriteExtraZelnodeUndoBlockData(s, ser_action, mapLastIpAddress);
     }
 };
 

@@ -231,7 +231,7 @@ bool CheckEquihashSolution(const CBlockHeader *pblock, const Consensus::Params& 
         default: return error("CheckEquihashSolution: Unsupported solution size of %d", nSolSize);
     }
 
-    LogPrint("pow", "selected n,k : %d, %d \n", n,k);
+//    LogPrint("pow", "selected n,k : %d, %d \n", n,k);
 
     //need to put block height param switching code here
 
