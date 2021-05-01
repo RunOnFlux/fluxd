@@ -9,6 +9,11 @@
 #include <univalue/include/univalue.h>
 #include <rpc/protocol.h>
 #include <core_io.h>
+
+#include <libgen.h>         // dirname
+#include <unistd.h>         // readlink
+#include <linux/limits.h>   // PATH_MAX
+
 #include "zelnode/zelnode.h"
 
 #include <boost/filesystem.hpp>
@@ -22,44 +27,59 @@ namespace filesys = boost::filesystem;
 
 Benchmarks benchmarks;
 bool fZelStartedBench = false;
-std::string strBenchmarkPathing = "/usr/local/bin"; // Default path
-std::string strBenchmarkCliPathing = "/usr/local/bin"; // Default path
+std::string strPath = "";
 
 std::string strTestnetSring = "-testnet ";
 
-bool FindBenchmarkPath(std::string& path, const std::string filename)
+std::string GetSelfPath()
 {
-    filesys::path pathObj(path + "/" + filename);
+  char result[ PATH_MAX ];
+  ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
+
+  const char *path;
+
+  if (count != -1) {
+      path = dirname(result);
+      return std::string(path);
+  }
+
+   return "";
+}
+
+bool FindBenchmarkPath(std::string filename, std::string file_path )
+{
+   
+    filesys::path pathObj(file_path + "/" + filename);
     if (filesys::exists(pathObj) && filesys::is_regular_file(pathObj)) {
         return true;
     }
-
-    char const* home = getenv("HOME");
-    path = strprintf("%s", home);
-    filesys::path pathObj2(path + "/" + filename);
-    if (filesys::exists(pathObj2) && filesys::is_regular_file(pathObj2)) {
-        return true;
-    }
-
-    path = "./src";
-    filesys::path pathObj3(path + "/" + filename);
-    if (filesys::exists(pathObj3) && filesys::is_regular_file(pathObj3)) {
-        return true;
-    }
-
     return false;
 }
 
 std::string GetBenchCliPath()
 {
-    // The space at the end is so parameters can be added easily
-    return strBenchmarkCliPathing + "/zelbench-cli ";
+   
+    if (FindBenchmarkPath("fluxbench-cli", strPath)) {
+        return strPath + "/fluxbench-cli ";
+    }
+
+    if (FindBenchmarkPath("zelbench-cli", strPath)) {
+        return strPath + "/zelbench-cli ";
+    }
+
 }
 
 std::string GetBenchDaemonPath()
 {
     // The space at the end is so parameters can be added easily
-    return strBenchmarkCliPathing + "/zelbenchd ";
+    if (FindBenchmarkPath("fluxbenchd", strPath)) {
+       return strPath + "/fluxbenchd ";
+    }
+
+    if (FindBenchmarkPath("zelbenchd", strPath)) {
+        return strPath + "/zelbenchd ";
+    }
+
 }
 
 
@@ -143,7 +163,7 @@ void StartZelBenchd()
     RunCommand(GetBenchDaemonPath() + testnet + "&");
     MilliSleep(4000);
     fZelStartedBench = true;
-    LogPrintf("ZelBenchd Started\n");
+    LogPrintf("Benchmark Started\n");
 }
 
 
@@ -167,7 +187,7 @@ std::string GetBenchmarks()
         return strBenchmarkStatus;
     }
 
-    return "ZelBenchd not running";
+    return "Benchmark not running";
 }
 
 std::string GetZelBenchdStatus()
@@ -182,7 +202,7 @@ std::string GetZelBenchdStatus()
         return strBenchmarkStatus;
     }
 
-    return "ZelBenchd not running";
+    return "Benchmark not running";
 }
 
 bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedTx, std::string& error)
@@ -218,7 +238,7 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
         }
 
         if (!DecodeHexTx(signedTx, response)) {
-            error = "Failed to decode zelnode broadcast";
+            error = "Failed to decode fluxnode broadcast";
             return false;
         }
 
@@ -230,7 +250,7 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
         return true;
     }
 
-    error = "ZelBenchd isn't running";
+    error = "Benchd isn't running";
     return false;
 }
 

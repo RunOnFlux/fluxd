@@ -116,6 +116,7 @@ CScript COINBASE_FLAGS;
 
 const string strMessageMagic = "Zelcash Signed Message:\n";
 
+
 // Internal stuff
 namespace {
 
@@ -3095,11 +3096,8 @@ void PartitionCheck(bool (*initialDownloadCheck)(const CChainParams&),
                     CCriticalSection& cs, const CBlockIndex *const &bestHeader,
                     int64_t nPowTargetSpacing)
 {
+    strMiscWarning = "";
     if (bestHeader == NULL || initialDownloadCheck(Params())) return;
-
-    static int64_t lastAlertTime = 0;
-    int64_t now = GetAdjustedTime();
-    if (lastAlertTime > now-60*60*24) return; // Alert at most once per day
 
     const int SPAN_HOURS=4;
     const int SPAN_SECONDS=SPAN_HOURS*60*60;
@@ -3145,7 +3143,6 @@ void PartitionCheck(bool (*initialDownloadCheck)(const CChainParams&),
     {
         strMiscWarning = strWarning;
         CAlert::Notify(strWarning, true);
-        lastAlertTime = now;
     }
 }
 
@@ -3336,11 +3333,16 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                     } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
                         if (p_zelnodeCache) {
                             p_zelnodeCache->AddUpdateConfirm(tx, pindex->nHeight);
-                            auto global_data = g_zelnodeCache.GetZelnodeData(tx.collateralOut);
-                            if (global_data.IsNull())
-                                return state.DoS(100, error("ConnectBlock(): zelnode tx, failed finding data to creating undo data"),
+                            ZelnodeCacheData global_data = g_zelnodeCache.GetZelnodeData(tx.collateralOut);
+                            if (global_data.IsNull()) {
+                                return state.DoS(100,
+                                                 error("ConnectBlock(): zelnode tx, failed finding data to creating undo data"),
                                                  REJECT_INVALID, "bad-txns-zelnode-global-data-not-found");
+                            }
+
+                            // Add the lastConfirmed and lastIpAddress into the undoblock data
                             zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.insert(std::make_pair(tx.collateralOut, global_data.nLastConfirmedBlockHeight));
+                            zelnodeTxBlockUndo.mapLastIpAddress.insert(std::make_pair(tx.collateralOut, global_data.ip));
                         }
                     }
                 }
