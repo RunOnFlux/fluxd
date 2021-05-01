@@ -132,7 +132,7 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 835554;  // Around 10th April 2021
-        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].hashActivationBlock =
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].hashActivationBlock =
                 uint256S("000000ce99aa6765bdaae673cdf41f661ff20a116eb6f2fe0843488d8061f193");
 
         consensus.nZawyLWMAAveragingWindow = 60;
