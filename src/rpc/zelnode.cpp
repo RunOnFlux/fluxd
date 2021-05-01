@@ -629,6 +629,10 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("viewdeterministiczelnodelist", ""));
 
+    if (IsInitialBlockDownload(Params())) {
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Wait until chain is synced closer to tip");
+    }
+
     std::string strFilter = "";
 
     if (params.size() == 1) strFilter = params[0].get_str();
