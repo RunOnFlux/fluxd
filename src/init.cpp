@@ -1924,6 +1924,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                          "Please add txindex=1 to your configuration and start with -reindex");
     }
 
+    #if !defined(__linux)
+        if (fZelnode) {
+            return InitError("Zelnode can be run only on Linux");
+        }
+    #endif
+
     if (fZelnode) {
         LogPrintf("IS FLUXNODE\n");
         strZelnodeAddr = GetArg("-zelnodeaddr", "");
