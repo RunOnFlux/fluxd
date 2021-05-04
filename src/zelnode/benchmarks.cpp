@@ -4,19 +4,21 @@
 
 #include <util.h>
 #include <utiltime.h>
-#include "benchmarks.h"
 #include <regex>
 #include <univalue/include/univalue.h>
 #include <rpc/protocol.h>
 #include <core_io.h>
-
-#include <libgen.h>         // dirname
-#include <unistd.h>         // readlink
-#include <linux/limits.h>   // PATH_MAX
+#include <boost/filesystem.hpp>
 
 #include "zelnode/zelnode.h"
+#include "benchmarks.h"
 
-#include <boost/filesystem.hpp>
+#if defined(__linux)
+#  include <libgen.h>         // dirname
+#  include <unistd.h>         // readlink
+#  include <linux/limits.h>   // PATH_MAX
+#endif
+
 
 namespace filesys = boost::filesystem;
 
@@ -33,17 +35,21 @@ std::string strTestnetSring = "-testnet ";
 
 std::string GetSelfPath()
 {
-  char result[ PATH_MAX ];
-  ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
+    #if defined(__linux)
+        char result[ PATH_MAX ];
+        ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
 
-  const char *path;
+        const char *path;
 
-  if (count != -1) {
-      path = dirname(result);
-      return std::string(path);
-  }
+        if (count != -1) {
+            path = dirname(result);
+            return std::string(path);
+        }
 
-   return "";
+        return "";
+    #endif
+
+    return "";
 }
 
 bool FindBenchmarkPath(std::string filename, std::string file_path )
@@ -253,6 +259,3 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
     error = "Benchd isn't running";
     return false;
 }
-
-
-
