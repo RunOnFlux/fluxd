@@ -73,6 +73,8 @@ std::string GetBenchCliPath()
         return strPath + "/zelbench-cli ";
     }
 
+    return strPath + "/fluxbench-cli ";
+
 }
 
 std::string GetBenchDaemonPath()
@@ -85,6 +87,8 @@ std::string GetBenchDaemonPath()
     if (FindBenchmarkPath("zelbenchd", strPath)) {
         return strPath + "/zelbenchd ";
     }
+
+    return strPath + "/fluxbenchd ";
 
 }
 
