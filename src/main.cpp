@@ -1240,7 +1240,7 @@ bool ContextualCheckTransaction(
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed";
                 }
 
-                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx, data)) {
+                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx)) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon";
                 }
@@ -1626,6 +1626,18 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             LogPrint("mempool", "Dropping txid %s : recently seen", tx.GetHash().ToString());
             return false;
         }
+
+        // Some transactions come in right after a block is mined that confirms them
+        // Instead of DOSing our peers for sending us what they think are valid transactions do this check first
+        if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
+            {
+                LOCK(g_zelnodeCache.cs);
+                if (!g_zelnodeCache.CheckConfirmationHeights(nextBlockHeight - 1, tx.collateralOut, tx.ip)) {
+                    LogPrint("mempool", "Dropping confirmation zelnode txid %s : failed CheckConfirmationHeights check", tx.GetHash().ToString());
+                    return false;
+                }
+            }
+        }
     }
 
     auto verifier = libzelcash::ProofVerifier::Strict();
@@ -1669,8 +1681,26 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         return false;
 
     if (tx.IsZelnodeTx()) {
+        // If we already have a tx for this collateralOut
+        // Get the transaction in the mempool, and replace it with the new one if the sigTime is greater
+        // then the current sigTime
         if (pool.mapZelnodeTxMempool.count(tx.collateralOut)) {
-            return state.DoS(0, false, REJECT_DUPLICATE, "zelnode-tx-outpoint-already-in-mempool");
+            uint256 poolTxHash = pool.mapZelnodeTxMempool.at(tx.collateralOut);
+            CTransaction poolTx;
+
+            if (pool.lookup(poolTxHash, poolTx)) {
+                if (tx.sigTime > poolTx.sigTime) {
+                    LogPrintf("Removing zelnode transaction, because it is getting replaced by newer transaction. old: %s, new: %s, collateral: %s\n", poolTx.GetHash().GetHex(), tx.GetHash().GetHex(), tx.collateralOut.ToFullString());
+                    std::list<CTransaction> removed;
+                    mempool.remove(poolTx, removed, false);
+                } else {
+                    return state.DoS(0, false, REJECT_DUPLICATE, "zelnode-tx-outpoint-sigTime-older-cant-replace");
+                }
+            } else {
+                pool.mapZelnodeTxMempool.erase(tx.collateralOut);
+                pool.mapSeenZelnodeTx.erase(poolTxHash);
+                error("AcceptToMemoryPool: Zelnodetx in mapZelnodeTxMempool, but not in the mempool. txhash: %s, collateral: %s", poolTxHash.GetHex(), tx.collateralOut.ToFullString());
+            }
         }
 
         if (GetAdjustedTime() - tx.sigTime > ZELNODE_MAX_SIG_TIME) {
@@ -1894,9 +1924,10 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
             if (tx.IsZelnodeTx()) {
                 LogPrintf("%s: Adding zelnode transaction to mempool: %s hash: %s\n", __func__, tx.collateralOut.ToString(), tx.GetHash().GetHex());
-                pool.mapZelnodeTxMempool.insert(std::make_pair(tx.collateralOut, tx.GetHash()));
-                pool.mapSeenZelnodeTx.insert(std::make_pair(tx.GetHash(), GetTime()));
+                pool.mapZelnodeTxMempool[tx.collateralOut] = tx.GetHash();
+                pool.mapSeenZelnodeTx[tx.GetHash()] = GetTime();
 
+                // Go through all the current seen zelnode tx, and expire them after 1800 seconds if they are still in the mempool
                 std::set<uint256> toRemove;
                 auto time = GetTime();
                 for (const auto& item : pool.mapSeenZelnodeTx) {
@@ -1905,8 +1936,19 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                     }
                 }
 
+                // Actually remove them from the mempool if they are expired
                 for (const auto& item : toRemove) {
+                    // Remove from seen list
                     pool.mapSeenZelnodeTx.erase(item);
+
+                    // If it is in the mempool, remove from mempool
+                    if (pool.exists(item)) {
+                        CTransaction poolTx;
+                        if (pool.lookup(item, poolTx)) {
+                            std::list<CTransaction> removedList;
+                            pool.remove(poolTx, removedList, false);
+                        }
+                    }
                 }
             }
 

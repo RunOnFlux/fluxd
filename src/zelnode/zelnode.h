@@ -701,7 +701,7 @@ public:
     void CheckForUndoExpiredStartTx(const int& p_nHeight);
     bool CheckIfStarted(const COutPoint& out);
     bool CheckIfConfirmed(const COutPoint& out);
-    bool CheckUpdateHeight(const CTransaction& p_transaction, const ZelnodeCacheData& data, const int p_nHeight = 0);
+    bool CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight = 0);
 
     bool CheckZelnodePayout(const CTransaction& coinbase, const int p_Height, ZelnodeCache* p_zelnodeCache = nullptr);
 
@@ -722,6 +722,8 @@ public:
     void DumpZelnodeCache();
 
     void CountNetworks(int& ipv4, int& ipv6, int& onion);
+
+    bool CheckConfirmationHeights(const int nHeight, const COutPoint& out, const std::string& ip);
 };
 
 int GetZelnodeExpirationCount(const int& p_nHeight);
