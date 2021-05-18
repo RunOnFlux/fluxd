@@ -1571,11 +1571,14 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
 
     if (IsDZelnodeActive())
     {
-        int nCUMULUS = g_zelnodeCache.mapZelnodeList.at(CUMULUS).listConfirmedZelnodes.size();
-        int nNIMBUS = g_zelnodeCache.mapZelnodeList.at(NIMBUS).listConfirmedZelnodes.size();
-        int nSTRATUS = g_zelnodeCache.mapZelnodeList.at(STRATUS).listConfirmedZelnodes.size();
+        int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0, nCUMULUS = 0, nNIMBUS = 0, nSTRATUS = 0;
+        {
+            LOCK(g_zelnodeCache.cs);
 
-        int nTotal = g_zelnodeCache.mapConfirmedZelnodeData.size();
+            g_zelnodeCache.CountNetworks(ipv4, ipv6, onion, nCUMULUS, nNIMBUS, nSTRATUS);
+
+            nTotal = g_zelnodeCache.mapConfirmedZelnodeData.size();
+        }
 
         obj.push_back(Pair("total", nTotal));
         obj.push_back(Pair("stable", nTotal));
@@ -1585,9 +1588,6 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
         obj.push_back(Pair("cumulus-enabled", nCUMULUS));
         obj.push_back(Pair("nimbus-enabled", nNIMBUS));
         obj.push_back(Pair("stratus-enabled", nSTRATUS));
-
-        int ipv4 = 0, ipv6 = 0, onion = 0;
-        g_zelnodeCache.CountNetworks(ipv4, ipv6, onion);
 
         obj.push_back(Pair("ipv4", ipv4));
         obj.push_back(Pair("ipv6", ipv6));

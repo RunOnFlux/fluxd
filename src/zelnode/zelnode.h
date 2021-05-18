@@ -721,7 +721,7 @@ public:
 
     void DumpZelnodeCache();
 
-    void CountNetworks(int& ipv4, int& ipv6, int& onion);
+    void CountNetworks(int& ipv4, int& ipv6, int& onion, int& nCUMULUS, int& nNIMBUS, int& nStratus);
 };
 
 int GetZelnodeExpirationCount(const int& p_nHeight);
