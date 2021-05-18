@@ -642,11 +642,11 @@ bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_H
     }
 
     if (coins->vout[prevout.n].nValue == 10000 * COIN)
-        nTier = Zelnode::CUMULUS;
+        nTier = CUMULUS;
     else if (coins->vout[prevout.n].nValue == 25000 * COIN)
-        nTier = Zelnode::NIMBUS;
+        nTier = NIMBUS;
     else if (coins->vout[prevout.n].nValue == 100000 * COIN)
-        nTier = Zelnode::STRATUS;
+        nTier = STRATUS;
 
     return nTier >= CUMULUS && nTier <= STRATUS;
 }

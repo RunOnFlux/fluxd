@@ -159,14 +159,7 @@ enum {
     MSG_BLOCK,
     // Nodes may always request a MSG_FILTERED_BLOCK in a getdata, however,
     // MSG_FILTERED_BLOCK should not appear in any invs except as a part of getdata.
-    MSG_FILTERED_BLOCK,
-    MSG_SPORK,
-    MSG_ZELNODE_WINNER,
-    MSG_ZELNODE_SCANNING_ERROR,
-    MSG_ZELNODE_QUORUM,
-    MSG_ZELNODE_ANNOUNCE,
-    MSG_ZELNODE_PING,
-    MSG_DSTX
+    MSG_FILTERED_BLOCK
 };
 
 #endif // BITCOIN_PROTOCOL_H

@@ -8,21 +8,14 @@
 #define OBFUSCATION_H
 
 #include "main.h"
-#include "zelnode/payments.h"
-#include "zelnode/zelnodesync.h"
-#include "zelnode/zelnodeman.h"
-#include "zelnode/obfuscationrelay.h"
 #include "sync.h"
+#include "key.h"
 
 class CTxIn;
 class CObfuScationSigner;
-class ActiveZelnode;
-
 
 extern CObfuScationSigner obfuScationSigner;
 extern std::string strZelnodePrivKey;
-extern COutPoint zelnodeOutPoint;
-extern ActiveZelnode activeZelnode;
 
 bool GetTestingCollateralScript(std::string strAddress, CScript& script);
 
@@ -42,7 +35,5 @@ public:
     /// Verify the message, returns true if succcessful
     bool VerifyMessage(const CPubKey& pubkey, const std::vector<unsigned char>& vchSig, const std::string& strMessage, std::string& errorMessage);
 };
-
-void ThreadCheckZelnodes();
 
 #endif

@@ -8,11 +8,12 @@
 #include "coincontrol.h"
 #include "init.h"
 #include "main.h"
-#include "zelnode/zelnodeman.h"
 #include "script/sign.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "key_io.h"
+#include "activezelnode.h"
+
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -26,10 +27,6 @@ using namespace boost;
 
 // A helper object for signing messages from Zelnodes
 CObfuScationSigner obfuScationSigner;
-// Keep track of the active Zelnode
-ActiveZelnode activeZelnode;
-
-COutPoint zelnodeOutPoint;
 
 bool GetTestingCollateralScript(std::string strAddress, CScript& script)
 {
@@ -54,25 +51,25 @@ bool CObfuScationSigner::IsVinAssociatedWithPubkey(CTxIn& vin, CPubKey& pubkey, 
         for (CTxOut out : txVin.vout) {
             if (out.nValue == ZELNODE_CUMULUS_COLLATERAL * COIN) {
                 if (out.scriptPubKey == payee2) {
-                    nNodeTier = Zelnode::CUMULUS;
+                    nNodeTier = CUMULUS;
                     return true;
                 }
             }
             else if (out.nValue == ZELNODE_NIMBUS_COLLATERAL * COIN) {
                 if (out.scriptPubKey == payee2) {
-                    nNodeTier = Zelnode::NIMBUS;
+                    nNodeTier = NIMBUS;
                     return true;
                 }
             }
             else if (out.nValue == ZELNODE_STRATUS_COLLATERAL * COIN) {
                 if (out.scriptPubKey == payee2) {
-                    nNodeTier = Zelnode::STRATUS;
+                    nNodeTier = STRATUS;
                     return true;
                 }
             }
         }
     }
-    nNodeTier = Zelnode::NONE;
+    nNodeTier = NONE;
     return false;
 }
 
@@ -132,38 +129,3 @@ bool CObfuScationSigner::VerifyMessage(const CPubKey& pubkey, const vector<unsig
     return (pubkey2.GetID() == pubkey.GetID());
 }
 
-
-
-
-//TODO: Rename/move to core
-void ThreadCheckZelnodes()
-{
-    // Make this thread recognisable as the wallet flushing thread
-    RenameThread("zelcash-zelnodescheck");
-    LogPrintf("Starting Check Zelnodes Thread\n");
-
-    unsigned int c = 0;
-
-    while (true) {
-        MilliSleep(1000);
-        //LogPrintf("ThreadCheckZelnodes::check timeout\n");
-
-        // try to sync from all available nodes, one step at a time
-        zelnodeSync.Process();
-
-        if (zelnodeSync.IsBlockchainSynced()) {
-            c++;
-
-            // check if we should activate or ping every few minutes,
-            // start right after sync is considered to be done
-            if (c % ZELNODE_PING_SECONDS == 1) activeZelnode.ManageStatus();
-
-            if (c % 60 == 0) {
-                zelnodeman.CheckAndRemove();
-                zelnodePayments.CleanPaymentList();
-            }
-
-            if(c % ZELNODES_DUMP_SECONDS == 0) DumpZelnodes();
-        }
-    }
-}

@@ -32,9 +32,10 @@
 
 #include <algorithm>
 #include <atomic>
-#include "zelnode/sporkdb.h"
 
 #include "zelnode/zelnodecachedb.h"
+#include "zelnode/obfuscation.h"
+#include "zelnode/activezelnode.h"
 
 #include <sstream>
 
@@ -591,7 +592,6 @@ CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& loc
 
 CCoinsViewCache *pcoinsTip = NULL;
 CBlockTreeDB *pblocktree = NULL;
-CSporkDB* pSporkDB = NULL;
 CDeterministicZelnodeDB* pZelnodeDB = NULL;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2411,11 +2411,11 @@ CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier)
 //    std::cout << "Got total of: " << total << std::endl;
 
 
-    if (nNodeTier == Zelnode::CUMULUS) {
+    if (nNodeTier == CUMULUS) {
         return blockValue * (0.0375 * fMultiple);
-    } else if (nNodeTier == Zelnode::NIMBUS) {
+    } else if (nNodeTier == NIMBUS) {
         return blockValue * (0.0625 * fMultiple);
-    } else if (nNodeTier == Zelnode::STRATUS) {
+    } else if (nNodeTier == STRATUS) {
         return blockValue * (0.15 * fMultiple);
     }
 
@@ -4614,20 +4614,6 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
             if (mi != mapBlockIndex.end() && (*mi).second)
                 nHeight = (*mi).second->nHeight + 1;
         }
-
-        // Because some peers could not have enough data to see that this block is invalid, don't ban them
-        // Because we might not have enough data to tell if the block is indeed valid, Issue an initial reject message
-        if (nHeight < chainparams.StartZelnodePayments()) {
-            if (nHeight != 0 && !IsInitialBlockDownload(chainparams)) {
-                if (!IsBlockPayeeValid(block, nHeight)) {
-                    LogPrint("zelnode", "%s : Couldn't find zelnode payment", __func__);
-                    return state.DoS(0, false, REJECT_INVALID, "bad-cb-payee");
-                }
-            } else {
-                if (fDebug)
-                    LogPrintf("%s : Zelnode payment check skipped on sync - skipping IsBlockPayeeValid()\n", __func__);
-            }
-        }
     }
 
     // Check transactions
@@ -4916,10 +4902,6 @@ bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, c
 
     if (!ActivateBestChain(state, chainparams, pblock))
         return error("%s: ActivateBestChain failed", __func__);
-
-    if (zelnodeSync.RequestedZelnodeAssets > ZELNODE_SYNC_LIST) {
-        zelnodePayments.ProcessBlock(GetHeight() + 10);
-    }
 
     return true;
 }
@@ -6017,22 +5999,6 @@ bool static AlreadyHave(const CInv& inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
         }
     case MSG_BLOCK:
         return mapBlockIndex.count(inv.hash);
-    case MSG_SPORK:
-        return mapSporks.count(inv.hash);
-    case MSG_ZELNODE_WINNER:
-        if (zelnodePayments.mapZelnodePayeeVotes.count(inv.hash)) {
-            zelnodeSync.AddedZelnodeWinner(inv.hash);
-            return true;
-        }
-        return false;
-    case MSG_ZELNODE_ANNOUNCE:
-        if (zelnodeman.mapSeenZelnodeBroadcast.count(inv.hash)) {
-            zelnodeSync.AddedZelnodeList(inv.hash);
-            return true;
-        }
-        return false;
-    case MSG_ZELNODE_PING:
-        return zelnodeman.mapSeenZelnodePing.count(inv.hash);
     }
     // Don't know what it is, just say we already got one
     return true;
@@ -6156,45 +6122,6 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
                             pfrom->PushMessage("tx", ss);
                             pushed = true;
                         }
-                    }
-                }
-
-                if (!pushed && inv.type == MSG_SPORK) {
-                    if (mapSporks.count(inv.hash)) {
-                        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-                        ss.reserve(1000);
-                        ss << mapSporks[inv.hash];
-                        pfrom->PushMessage("spork", ss);
-                        pushed = true;
-                    }
-                }
-                if (!pushed && inv.type == MSG_ZELNODE_WINNER) {
-                    if (zelnodePayments.mapZelnodePayeeVotes.count(inv.hash)) {
-                        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-                        ss.reserve(1000);
-                        ss << zelnodePayments.mapZelnodePayeeVotes[inv.hash];
-                        pfrom->PushMessage("znw", ss);
-                        pushed = true;
-                    }
-                }
-
-                if (!pushed && inv.type == MSG_ZELNODE_ANNOUNCE) {
-                    if (zelnodeman.mapSeenZelnodeBroadcast.count(inv.hash)) {
-                        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-                        ss.reserve(1000);
-                        ss << zelnodeman.mapSeenZelnodeBroadcast[inv.hash];
-                        pfrom->PushMessage("znb", ss);
-                        pushed = true;
-                    }
-                }
-
-                if (!pushed && inv.type == MSG_ZELNODE_PING) {
-                    if (zelnodeman.mapSeenZelnodePing.count(inv.hash)) {
-                        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-                        ss.reserve(1000);
-                        ss << zelnodeman.mapSeenZelnodePing[inv.hash];
-                        pfrom->PushMessage("znp", ss);
-                        pushed = true;
                     }
                 }
 
@@ -7123,14 +7050,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     }
 
     else {
-        // Check commands against the zelnode and spork messages
-        // TODO remove this after the DZelnode upgrade is stable
-        if (chainActive.Tip()->nHeight + 1 < Params().StartZelnodePayments()) {
-            zelnodeman.ProcessMessage(pfrom, strCommand, vRecv);
-            zelnodePayments.ProcessMessageZelnodePayments(pfrom, strCommand, vRecv);
-            zelnodeSync.ProcessMessage(pfrom, strCommand, vRecv);
-        }
-        zelnodeSync.ProcessMessage(pfrom, strCommand, vRecv);
+        // Unknown command
     }
 
 

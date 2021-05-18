@@ -22,7 +22,7 @@
 #include "txmempool.h"
 #include "util.h"
 #include "validationinterface.h"
-#include "zelnode/spork.h"
+#include "zelnode/zelnode.h"
 
 #include <stdint.h>
 
@@ -732,12 +732,12 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         std::string start = "basic";
         std::string start_rename = "cumulus";
 
-        if (payout.first == Zelnode::NIMBUS) {
+        if (payout.first == NIMBUS) {
             start = "super";
             start_rename = "nimbus";
         }
 
-        else if (payout.first == Zelnode::STRATUS) {
+        else if (payout.first == STRATUS) {
             start = "bamf";
             start_rename = "stratus";
         }

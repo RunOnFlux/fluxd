@@ -126,8 +126,6 @@ public:
 
 
     /** Zelnode Handling **/
-    std::string SporkKey() const { return strSporkKey; }
-    std::string ZelnodeTestingDummyAddress() const { return strZelnodeTestingDummyAddress; }
     int64_t StartZelnodePayments() const { return nStartZelnodePaymentsHeight; }
     CBaseChainParams::Network NetworkID() const { return networkID; }
     std::vector<std::pair<std::string, uint32_t> > BenchmarkingPublicKeys() const { return vecBenchmarkingPublicKeys; }
@@ -183,11 +181,8 @@ protected:
     bool fZIP209Enabled = false;
     
     /** Zelnode params **/
-    std::string strSporkKey;
-    std::string strZelnodeTestingDummyAddress;
     int64_t nStartZelnodePaymentsHeight;
     CBaseChainParams::Network networkID;
-    std::string strBenchmarkingPublicKey;
     std::vector< std::pair<std::string, uint32_t> > vecBenchmarkingPublicKeys;
 
     /** Flux params **/

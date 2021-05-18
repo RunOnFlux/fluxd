@@ -38,8 +38,11 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
-#include "zelnode/sporkdb.h"
 #include "zelnode/zelnodeconfig.h"
+#include "zelnode/zelnode.h"
+#include "zelnode/obfuscation.h"
+#include "zelnode/activezelnode.h"
+
 #ifdef ENABLE_WALLET
 #include "key_io.h"
 #include "wallet/wallet.h"
@@ -73,7 +76,6 @@
 #endif
 
 #include "librustzcash.h"
-#include "zelnode/sporkdb.h"
 
 using namespace std;
 
@@ -213,8 +215,6 @@ void Shutdown()
 #endif
     StopNode();
     StopTorControl();
-    DumpZelnodes();
-    DumpZelnodePayments();
 
     UnregisterNodeSignals(GetNodeSignals());
 
@@ -242,8 +242,6 @@ void Shutdown()
         pcoinsdbview = NULL;
         delete pblocktree;
         pblocktree = NULL;
-        delete pSporkDB;
-        pSporkDB = NULL;
         delete pZelnodeDB;
         pZelnodeDB = NULL;
     }
@@ -1236,12 +1234,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             threadGroup.create_thread(&ThreadScriptCheck);
     }
 
-    if (mapArgs.count("-sporkkey")) // spork priv key
-    {
-        if (!sporkManager.SetPrivKey(GetArg("-sporkkey", "")))
-            return InitError(_("Unable to sign spork message, wrong key?"));
-    }
-
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
     threadGroup.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
@@ -1509,11 +1501,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete pcoinsdbview;
                 delete pcoinscatcher;
                 delete pblocktree;
-                delete pSporkDB;
                 delete pZelnodeDB;
 
-                /** Zelnode Sporks */
-                pSporkDB = new CSporkDB(0, false, false);
+                /** Zelnode Database */
                 pZelnodeDB = new CDeterministicZelnodeDB(0, false, fReindex);
 
                 pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
@@ -1528,9 +1518,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                         CleanupBlockRevFiles();
                 }
 
-                uiInterface.InitMessage(_("Loading sporks..."));
-                LoadSporksFromDB();
-
                 uiInterface.InitMessage(_("Init zelnodecache"));
                 g_zelnodeCache.InitMapZelnodeList();
 
@@ -1538,9 +1525,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 pZelnodeDB->LoadZelnodeCacheData();
 
                 uiInterface.InitMessage(_("Sorting zelnode list"));
-                g_zelnodeCache.SortList(Zelnode::CUMULUS);
-                g_zelnodeCache.SortList(Zelnode::NIMBUS);
-                g_zelnodeCache.SortList(Zelnode::STRATUS);
+                g_zelnodeCache.SortList(CUMULUS);
+                g_zelnodeCache.SortList(NIMBUS);
+                g_zelnodeCache.SortList(STRATUS);
 
                 uiInterface.InitMessage(_("Loading block index..."));
                 if (!LoadBlockIndex()) {
@@ -1883,38 +1870,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         LogPrintf("Waiting for genesis block to be imported...\n");
         while (!fRequestShutdown && chainActive.Tip() == NULL)
             MilliSleep(10);
-    }
-
-
-    // ********************************************************* Step 11: setup zelnode
-
-    uiInterface.InitMessage(_("Loading zelnode cache..."));
-
-    ZelnodeDB zndb;
-    ZelnodeDB::ReadResult readResult = zndb.Read(zelnodeman);
-    if (readResult == ZelnodeDB::FileError)
-        LogPrintf("Missing zelnode cache file - zncache.dat, will try to recreate\n");
-    else if (readResult != ZelnodeDB::Ok) {
-        LogPrintf("Error reading zncache.dat: ");
-        if (readResult == ZelnodeDB::IncorrectFormat)
-            LogPrintf("magic is ok but data has invalid format, will try to recreate\n");
-        else
-            LogPrintf("file format is unknown or invalid, please fix it manually\n");
-    }
-
-    uiInterface.InitMessage(_("Loading zelnode payment cache..."));
-
-    PaymentDB znpayments;
-    PaymentDB::ReadResult readResult3 = znpayments.Read(zelnodePayments);
-
-    if (readResult3 == PaymentDB::FileError)
-        LogPrintf("Missing zelnode payment cache - znpayments.dat, will try to recreate\n");
-    else if (readResult3 != PaymentDB::Ok) {
-        LogPrintf("Error reading znpayments.dat: ");
-        if (readResult3 == PaymentDB::IncorrectFormat)
-            LogPrintf("magic is ok but data has invalid format, will try to recreate\n");
-        else
-            LogPrintf("file format is unknown or invalid, please fix it manually\n");
     }
 
     fZelnode = GetBoolArg("-zelnode", false);
