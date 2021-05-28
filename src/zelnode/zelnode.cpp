@@ -1934,8 +1934,8 @@ std::string ZelnodeLocationToString(int nLocation) {
     }
 }
 
-void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion) {
-    for (auto &entry : mapConfirmedZelnodeData) {
+void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion, int& nCUMULUS, int& nNIMBUS, int& nStratus) {
+    for (const auto& entry : mapConfirmedZelnodeData) {
         std::string strHost = entry.second.ip;
         CNetAddr node = CNetAddr(strHost, false);
         int nNetwork = node.GetNetwork();
@@ -1949,6 +1949,15 @@ void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion) {
             case 3 :
                 onion++;
                 break;
+        }
+
+        // Gather which location they are in
+        if (mapZelnodeList.at(CUMULUS).setConfirmedTxInList.count(entry.first)) {
+            nNIMBUS++;
+        } else if (mapZelnodeList.at(NIMBUS).setConfirmedTxInList.count(entry.first)) {
+            nCUMULUS++;
+        } else if (mapZelnodeList.at(STRATUS).setConfirmedTxInList.count(entry.first)) {
+            nStratus++;
         }
     }
 }
