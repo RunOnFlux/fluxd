@@ -121,7 +121,7 @@ UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("createconfirmationtransaction", "") + HelpExampleRpc("createconfirmationtransaction", ""));
 
-    if (!fZelnode) throw runtime_error("This is not a fluxnode");
+    if (!fZelnode) throw runtime_error("This is not a Flux Node");
 
     std::string errorMessage;
     CMutableTransaction mutTx;
@@ -1281,7 +1281,7 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getzelnodestatus", "") + HelpExampleRpc("getzelnodestatus", ""));
 
-    if (!fZelnode) throw runtime_error("This is not a zelnode");
+    if (!fZelnode) throw runtime_error("This is not a Flux Node");
 
     if (IsDZelnodeActive()) {
         int nLocation = ZELNODE_TX_ERROR;
@@ -2187,6 +2187,8 @@ UniValue relayzelnodebroadcast(const UniValue& params, bool fHelp)
 
 UniValue getbenchmarks(const UniValue& params, bool fHelp)
 {
+    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+
     if (fHelp || params.size() != 0)
         throw runtime_error(
                 "getbenchmarks\n"
@@ -2222,6 +2224,8 @@ UniValue getbenchmarks(const UniValue& params, bool fHelp)
 
 UniValue getbenchstatus(const UniValue& params, bool fHelp)
 {
+    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+
     if (fHelp || params.size() != 0)
         throw runtime_error(
                 "getbenchstatus\n"
@@ -2236,6 +2240,8 @@ UniValue getbenchstatus(const UniValue& params, bool fHelp)
 
 UniValue stopzelbenchd(const UniValue& params, bool fHelp)
 {
+    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+
     if (fHelp || params.size() != 0)
         throw runtime_error(
                 "stopzelbenchd\n"
@@ -2254,6 +2260,8 @@ UniValue stopzelbenchd(const UniValue& params, bool fHelp)
 
 UniValue startzelbenchd(const UniValue& params, bool fHelp)
 {
+    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+
     if (fHelp || params.size() != 0)
         throw runtime_error(
                 "startzelbenchd\n"
