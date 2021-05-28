@@ -721,7 +721,7 @@ public:
 
     void DumpZelnodeCache();
 
-    void CountNetworks(int& ipv4, int& ipv6, int& onion);
+    void CountNetworks(int& ipv4, int& ipv6, int& onion, int& nCUMULUS, int& nNIMBUS, int& nStratus);
 
     bool CheckConfirmationHeights(const int nHeight, const COutPoint& out, const std::string& ip);
 };

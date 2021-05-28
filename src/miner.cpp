@@ -231,13 +231,23 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                 }
 
                 if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
-                    auto data = g_zelnodeCache.GetZelnodeData(tx.collateralOut);
+                    int nNeedLocation = 0;
+                    auto data = g_zelnodeCache.GetZelnodeData(tx.collateralOut, &nNeedLocation);
 
                     if (data.IsNull()) {
                         LogPrintf("Remove zelnode transaction because its confirm isn't ready. %s\n", tx.GetHash().GetHex());
                         std::list<CTransaction> removed;
                         mempool.remove(tx, removed, false);
                         continue;
+                    }
+
+                    if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
+                         if (nNeedLocation != ZELNODE_TX_STARTED) {
+                             LogPrintf("Remove zelnode transaction because its not started %s\n", tx.GetHash().GetHex());
+                             std::list<CTransaction> removed;
+                             mempool.remove(tx, removed, false);
+                             continue;
+                         }
                     }
                 }
 

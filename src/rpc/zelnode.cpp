@@ -121,7 +121,7 @@ UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("createconfirmationtransaction", "") + HelpExampleRpc("createconfirmationtransaction", ""));
 
-    if (!fZelnode) throw runtime_error("This is not a fluxnode");
+    if (!fZelnode) throw runtime_error("This is not a Flux Node");
 
     std::string errorMessage;
     CMutableTransaction mutTx;
@@ -1281,7 +1281,7 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getzelnodestatus", "") + HelpExampleRpc("getzelnodestatus", ""));
 
-    if (!fZelnode) throw runtime_error("This is not a zelnode");
+    if (!fZelnode) throw runtime_error("This is not a Flux Node");
 
     if (IsDZelnodeActive()) {
         int nLocation = ZELNODE_TX_ERROR;
@@ -1571,11 +1571,14 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
 
     if (IsDZelnodeActive())
     {
-        int nCUMULUS = g_zelnodeCache.mapZelnodeList.at(CUMULUS).listConfirmedZelnodes.size();
-        int nNIMBUS = g_zelnodeCache.mapZelnodeList.at(NIMBUS).listConfirmedZelnodes.size();
-        int nSTRATUS = g_zelnodeCache.mapZelnodeList.at(STRATUS).listConfirmedZelnodes.size();
+        int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0, nCUMULUS = 0, nNIMBUS = 0, nSTRATUS = 0;
+        {
+            LOCK(g_zelnodeCache.cs);
 
-        int nTotal = g_zelnodeCache.mapConfirmedZelnodeData.size();
+            g_zelnodeCache.CountNetworks(ipv4, ipv6, onion, nCUMULUS, nNIMBUS, nSTRATUS);
+
+            nTotal = g_zelnodeCache.mapConfirmedZelnodeData.size();
+        }
 
         obj.push_back(Pair("total", nTotal));
         obj.push_back(Pair("stable", nTotal));
@@ -1585,9 +1588,6 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
         obj.push_back(Pair("cumulus-enabled", nCUMULUS));
         obj.push_back(Pair("nimbus-enabled", nNIMBUS));
         obj.push_back(Pair("stratus-enabled", nSTRATUS));
-
-        int ipv4 = 0, ipv6 = 0, onion = 0;
-        g_zelnodeCache.CountNetworks(ipv4, ipv6, onion);
 
         obj.push_back(Pair("ipv4", ipv4));
         obj.push_back(Pair("ipv6", ipv6));
@@ -2187,6 +2187,8 @@ UniValue relayzelnodebroadcast(const UniValue& params, bool fHelp)
 
 UniValue getbenchmarks(const UniValue& params, bool fHelp)
 {
+    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+
     if (fHelp || params.size() != 0)
         throw runtime_error(
                 "getbenchmarks\n"
@@ -2222,6 +2224,8 @@ UniValue getbenchmarks(const UniValue& params, bool fHelp)
 
 UniValue getbenchstatus(const UniValue& params, bool fHelp)
 {
+    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+
     if (fHelp || params.size() != 0)
         throw runtime_error(
                 "getbenchstatus\n"
@@ -2236,6 +2240,8 @@ UniValue getbenchstatus(const UniValue& params, bool fHelp)
 
 UniValue stopzelbenchd(const UniValue& params, bool fHelp)
 {
+    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+
     if (fHelp || params.size() != 0)
         throw runtime_error(
                 "stopzelbenchd\n"
@@ -2254,6 +2260,8 @@ UniValue stopzelbenchd(const UniValue& params, bool fHelp)
 
 UniValue startzelbenchd(const UniValue& params, bool fHelp)
 {
+    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+
     if (fHelp || params.size() != 0)
         throw runtime_error(
                 "startzelbenchd\n"
