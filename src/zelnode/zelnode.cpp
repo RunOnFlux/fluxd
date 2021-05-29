@@ -1019,7 +1019,7 @@ bool ZelnodeCache::CheckIfConfirmed(const COutPoint& out)
     return false;
 }
 
-bool ZelnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const ZelnodeCacheData& data, const int p_nHeight)
+bool ZelnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight)
 {
     int nCurrentHeight;
     if (p_nHeight)
@@ -1043,23 +1043,7 @@ bool ZelnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const Ze
         return false;
     }
 
-    // Check the mapConfirmedZelnodeData
-    if (!mapConfirmedZelnodeData.count(out)) {
-        return false;
-    }
-
-    bool fFluxActive = NetworkUpgradeActive(nCurrentHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
-    // Allow ip address changes at a different interval
-    if (fFluxActive) {
-        if (p_transaction.ip != data.ip) {
-            if (nCurrentHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight >= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE) {
-                return true;
-            }
-        }
-    }
-
-    // Check to make sure they don't confirm until it has been atleast 40 blocks from there last confirmation
-    if (nCurrentHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight <= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT) {
+    if (!CheckConfirmationHeights(nCurrentHeight, out, p_transaction.ip)) {
         return false;
     }
 
@@ -1126,9 +1110,41 @@ void ZelnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
         }
     }
 
-    LogPrintf("%s : Size of mapStartTxTracker: %s\n", __func__, g_zelnodeCache.mapStartTxTracker.size());
-    LogPrintf("%s : Size of mapStartTxDosTracker: %s\n", __func__, g_zelnodeCache.mapStartTxDosTracker.size());
-    LogPrintf("%s : Size of mapConfirmedZelnodeData: %s\n", __func__, g_zelnodeCache.mapConfirmedZelnodeData.size());
+    LogPrint("dzelnode", "%s : Size of mapStartTxTracker: %s\n", __func__, g_zelnodeCache.mapStartTxTracker.size());
+    LogPrint("dzelnode", "%s : Size of mapStartTxDosTracker: %s\n", __func__, g_zelnodeCache.mapStartTxDosTracker.size());
+    LogPrint("dzelnode","%s : Size of mapConfirmedZelnodeData: %s\n", __func__, g_zelnodeCache.mapConfirmedZelnodeData.size());
+}
+
+
+bool ZelnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COutPoint& out, const std::string& ip) {
+    if (!mapConfirmedZelnodeData.count(out)) {
+        return false;
+    }
+
+    auto data = g_zelnodeCache.GetZelnodeData(out);
+    if (data.IsNull()) {
+        return false;
+    }
+
+    bool fFluxActive = NetworkUpgradeActive(nCurrentHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
+    // Allow ip address changes at a different interval
+    if (fFluxActive) {
+        if (ip != data.ip) {
+            if (nCurrentHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight >= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE) {
+                return true;
+            }
+        }
+    }
+
+    if (nCurrentHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight <= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT) {
+        // TODO - Remove this error message after release + 1 month and we don't see any problems
+        error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
+              __LINE__,
+              out.ToFullString(), nCurrentHeight, mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight);
+        return false;
+    }
+
+    return true;
 }
 
 bool ZelnodeCache::InStartTracker(const COutPoint& out)
