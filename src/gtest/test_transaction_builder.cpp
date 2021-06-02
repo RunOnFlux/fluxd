@@ -93,7 +93,7 @@ TEST(TransactionBuilder, TransparentToSapling)
 
     // Create a shielding transaction from transparent to Sapling
     // 0.0005 t-ZEL in, 0.0004 z-ZEL out, 0.0001 t-ZEL fee
-    auto builder = TransactionBuilder(consensusParams, 1, expiryDelta, &keystore);
+    auto builder = TransactionBuilder(consensusParams, 1, &keystore);
     builder.AddTransparentInput(COutPoint(), scriptPubKey, 50000);
     builder.AddSaplingOutput(fvk_from.ovk, pk, 40000, {});
     auto tx = builder.Build().GetTxOrThrow();
@@ -125,7 +125,7 @@ TEST(TransactionBuilder, SaplingToSapling) {
     
     // Create a Sapling-only transaction
     // 0.0004 z-ZEL in, 0.00025 z-ZEL out, 0.0001 t-ZEL fee, 0.00005 z-ZEL change
-    auto builder = TransactionBuilder(consensusParams, 2, expiryDelta);
+    auto builder = TransactionBuilder(consensusParams, 2);
     builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
 
     // Check that trying to add a different anchor fails
@@ -166,7 +166,7 @@ TEST(TransactionBuilder, SaplingToSprout) {
     // - 0.0004 Sapling-ZEL in      - 0.00025 Sprout-ZEL out
     //                              - 0.00005 Sapling-ZEL change
     //                              - 0.0001 t-ZEL fee
-    auto builder = TransactionBuilder(consensusParams, 2, expiryDelta, nullptr, params);
+    auto builder = TransactionBuilder(consensusParams, 2, nullptr, params);
     builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
     builder.AddSproutOutput(sproutAddr, 25000);
     auto tx = builder.Build().GetTxOrThrow();
@@ -218,7 +218,7 @@ TEST(TransactionBuilder, SproutToSproutAndSapling) {
     //                              - 0.00005 Sprout-ZEL change
     //                              - 0.00005 Sapling-ZEL out
     //                              - 0.00005 t-ZEL fee
-    auto builder = TransactionBuilder(consensusParams, 2, expiryDelta, nullptr, params, &view);
+    auto builder = TransactionBuilder(consensusParams, 2, nullptr, params, &view);
     builder.SetFee(5000);
     builder.AddSproutInput(sproutSk, sproutNote, sproutWitness);
     builder.AddSproutOutput(sproutAddr, 6000);
@@ -255,7 +255,7 @@ TEST(TransactionBuilder, ThrowsOnSproutOutputWithoutParams)
     auto sk = libzelcash::SproutSpendingKey::random();
     auto addr = sk.address();
 
-    auto builder = TransactionBuilder(consensusParams, 1, expiryDelta);
+    auto builder = TransactionBuilder(consensusParams, 1);
     ASSERT_THROW(builder.AddSproutOutput(addr, 10), std::runtime_error);
 }
 
@@ -264,7 +264,7 @@ TEST(TransactionBuilder, ThrowsOnTransparentInputWithoutKeyStore)
     SelectParams(CBaseChainParams::REGTEST);
     auto consensusParams = Params().GetConsensus();
 
-    auto builder = TransactionBuilder(consensusParams, 1, expiryDelta);
+    auto builder = TransactionBuilder(consensusParams, 1);
     ASSERT_THROW(builder.AddTransparentInput(COutPoint(), CScript(), 1), std::runtime_error);
 }
 
@@ -275,7 +275,7 @@ TEST(TransactionBuilder, RejectsInvalidTransparentOutput)
 
     // Default CTxDestination type is an invalid address
     CTxDestination taddr;
-    auto builder = TransactionBuilder(consensusParams, 1, expiryDelta);
+    auto builder = TransactionBuilder(consensusParams, 1);
     ASSERT_THROW(builder.AddTransparentOutput(taddr, 50), UniValue);
 }
 
@@ -286,7 +286,7 @@ TEST(TransactionBuilder, RejectsInvalidTransparentChangeAddress)
 
     // Default CTxDestination type is an invalid address
     CTxDestination taddr;
-    auto builder = TransactionBuilder(consensusParams, 1, expiryDelta);
+    auto builder = TransactionBuilder(consensusParams, 1);
     ASSERT_THROW(builder.SendChangeTo(taddr), UniValue);
 }
 
@@ -311,13 +311,13 @@ TEST(TransactionBuilder, FailsWithNegativeChange)
 
     // Fail if there is only a Sapling output
     // 0.0005 z-ZEL out, 0.0001 t-ZEL fee
-    auto builder = TransactionBuilder(consensusParams, 1, expiryDelta);
+    auto builder = TransactionBuilder(consensusParams, 1);
     builder.AddSaplingOutput(fvk.ovk, pa, 50000, {});
     EXPECT_EQ("Change cannot be negative", builder.Build().GetError());
 
     // Fail if there is only a transparent output
     // 0.0005 t-ZEL out, 0.0001 t-ZEL fee
-    builder = TransactionBuilder(consensusParams, 1, expiryDelta, &keystore);
+    builder = TransactionBuilder(consensusParams, 1, &keystore);
     builder.AddTransparentOutput(taddr, 50000);
     EXPECT_EQ("Change cannot be negative", builder.Build().GetError());
 
@@ -359,14 +359,14 @@ TEST(TransactionBuilder, ChangeOutput)
 
     // No change address and no Sapling spends
     {
-        auto builder = TransactionBuilder(consensusParams, 1, expiryDelta, &keystore);
+        auto builder = TransactionBuilder(consensusParams, 1, &keystore);
         builder.AddTransparentInput(COutPoint(), scriptPubKey, 25000);
         EXPECT_EQ("Could not determine change address", builder.Build().GetError());
     }
 
     // Change to the same address as the first Sapling spend
     {
-        auto builder = TransactionBuilder(consensusParams, 1, expiryDelta, &keystore);
+        auto builder = TransactionBuilder(consensusParams, 1, &keystore);
         builder.AddTransparentInput(COutPoint(), scriptPubKey, 25000);
         builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
         auto tx = builder.Build().GetTxOrThrow();
@@ -381,7 +381,7 @@ TEST(TransactionBuilder, ChangeOutput)
 
     // Change to a Sapling address
     {
-        auto builder = TransactionBuilder(consensusParams, 1, expiryDelta, &keystore);
+        auto builder = TransactionBuilder(consensusParams, 1, &keystore);
         builder.AddTransparentInput(COutPoint(), scriptPubKey, 25000);
         builder.SendChangeTo(zChangeAddr, fvkOut.ovk);
         auto tx = builder.Build().GetTxOrThrow();
@@ -396,7 +396,7 @@ TEST(TransactionBuilder, ChangeOutput)
 
     // Change to a transparent address
     {
-        auto builder = TransactionBuilder(consensusParams, 1, expiryDelta, &keystore);
+        auto builder = TransactionBuilder(consensusParams, 1, &keystore);
         builder.AddTransparentInput(COutPoint(), scriptPubKey, 25000);
         builder.SendChangeTo(taddr);
         auto tx = builder.Build().GetTxOrThrow();
@@ -428,7 +428,7 @@ TEST(TransactionBuilder, SetFee)
 
     // Default fee
     {
-        auto builder = TransactionBuilder(consensusParams, 1, expiryDelta);
+        auto builder = TransactionBuilder(consensusParams, 1);
         builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
         builder.AddSaplingOutput(fvk.ovk, pa, 25000, {});
         auto tx = builder.Build().GetTxOrThrow();
@@ -443,7 +443,7 @@ TEST(TransactionBuilder, SetFee)
 
     // Configured fee
     {
-        auto builder = TransactionBuilder(consensusParams, 1, expiryDelta);
+        auto builder = TransactionBuilder(consensusParams, 1);
         builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
         builder.AddSaplingOutput(fvk.ovk, pa, 25000, {});
         builder.SetFee(20000);
@@ -472,7 +472,7 @@ TEST(TransactionBuilder, CheckSaplingTxVersion)
     auto pk = sk.default_address();
 
     // Cannot add Sapling outputs to a non-Sapling transaction
-    auto builder = TransactionBuilder(consensusParams, 1, expiryDelta);
+    auto builder = TransactionBuilder(consensusParams, 1);
     try {
         builder.AddSaplingOutput(uint256(), pk, 12345, {});
     } catch (std::runtime_error const & err) {

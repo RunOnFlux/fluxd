@@ -81,7 +81,7 @@ bool AsyncRPCOperation_saplingconsolidation::main_impl() {
 
     std::vector<SproutNoteEntry> sproutEntries;
     std::vector<SaplingNoteEntry> saplingEntries;
-    std::set<libzcash::SaplingPaymentAddress> addresses;
+    std::set<libzelcash::SaplingPaymentAddress> addresses;
     {
         LOCK2(cs_main, pwalletMain->cs_wallet);
         // We set minDepth to 11 to avoid unconfirmed notes and in anticipation of specifying
@@ -92,8 +92,8 @@ bool AsyncRPCOperation_saplingconsolidation::main_impl() {
             const vector<string>& v = mapMultiArgs["-consolidatesaplingaddress"];
             for(int i = 0; i < v.size(); i++) {
                 auto zAddress = DecodePaymentAddress(v[i]);
-                if (boost::get<libzcash::SaplingPaymentAddress>(&zAddress) != nullptr) {
-                    libzcash::SaplingPaymentAddress saplingAddress = boost::get<libzcash::SaplingPaymentAddress>(zAddress);
+                if (boost::get<libzelcash::SaplingPaymentAddress>(&zAddress) != nullptr) {
+                    libzelcash::SaplingPaymentAddress saplingAddress = boost::get<libzelcash::SaplingPaymentAddress>(zAddress);
                     addresses.insert(saplingAddress );
                 }
             }
@@ -108,7 +108,7 @@ bool AsyncRPCOperation_saplingconsolidation::main_impl() {
     CCoinsViewCache coinsView(pcoinsTip);
 
     for (auto addr : addresses) {
-        libzcash::SaplingExtendedSpendingKey extsk;
+        libzelcash::SaplingExtendedSpendingKey extsk;
         if (pwalletMain->GetSaplingExtendedSpendingKey(addr, extsk)) {
 
             std::vector<SaplingNoteEntry> fromNotes;
@@ -116,8 +116,8 @@ bool AsyncRPCOperation_saplingconsolidation::main_impl() {
             int maxQuantity = rand() % 35 + 10;
             for (const SaplingNoteEntry& saplingEntry : saplingEntries) {
 
-                libzcash::SaplingIncomingViewingKey ivk;
-                pwalletMain->GetSaplingIncomingViewingKey(boost::get<libzcash::SaplingPaymentAddress>(saplingEntry.address), ivk);
+                libzelcash::SaplingIncomingViewingKey ivk;
+                pwalletMain->GetSaplingIncomingViewingKey(boost::get<libzelcash::SaplingPaymentAddress>(saplingEntry.address), ivk);
 
                 //Select Notes from that same address we will be sending to.
                 if (ivk == extsk.expsk.full_viewing_key().in_viewing_key()) {
@@ -137,13 +137,13 @@ bool AsyncRPCOperation_saplingconsolidation::main_impl() {
               continue;
 
             amountConsolidated += amountToSend;
-            auto builder = TransactionBuilder(consensusParams, targetHeight_, pwalletMain, pzcashParams, &coinsView, &cs_main);
+            auto builder = TransactionBuilder(consensusParams, targetHeight_, pwalletMain, pzelcashParams, &coinsView, &cs_main);
             builder.SetExpiryHeight(targetHeight_ + CONSOLIDATION_EXPIRY_DELTA);
             LogPrint("zrpcunsafe", "%s: Beginning creating transaction with Sapling output amount=%s\n", getId(), FormatMoney(amountToSend - fConsolidationTxFee));
 
             // Select Sapling notes
             std::vector<SaplingOutPoint> ops;
-            std::vector<libzcash::SaplingNote> notes;
+            std::vector<libzelcash::SaplingNote> notes;
             for (auto fromNote : fromNotes) {
                 ops.push_back(fromNote.op);
                 notes.push_back(fromNote.note);

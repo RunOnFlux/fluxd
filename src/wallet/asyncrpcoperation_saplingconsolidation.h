@@ -1,8 +1,8 @@
 #include "amount.h"
 #include "asyncrpcoperation.h"
 #include "univalue.h"
-#include "zcash/Address.hpp"
-#include "zcash/zip32.h"
+#include "zelcash/Address.hpp"
+#include "zelcash/zip32.h"
 
 //Default fee used for consolidation transactions
 static const CAmount DEFAULT_CONSOLIDATION_FEE = 0;

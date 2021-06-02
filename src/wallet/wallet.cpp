@@ -657,9 +657,11 @@ void CWallet::AddPendingSaplingMigrationTx(const CTransaction& tx) {
 }
 
 void CWallet::RunSaplingConsolidation(int blockHeight) {
-    if (!Params().GetConsensus().NetworkUpgradeActive(blockHeight, Consensus::UPGRADE_SAPLING)) {
+
+    if (!NetworkUpgradeActive(blockHeight, Params().GetConsensus(), Consensus::UPGRADE_KAMATA)) {
         return;
     }
+
     LOCK(cs_wallet);
     if (!fSaplingConsolidationEnabled) {
         return;
@@ -1697,7 +1699,7 @@ void CWallet::UpdateSproutNullifierNoteMapWithTx(CWalletTx& wtx) {
             if (GetNoteDecryptor(nd.address, dec)) {
                 auto i = item.first.js;
                 auto hSig = wtx.vJoinSplit[i].h_sig(
-                    *pzcashParams, wtx.joinSplitPubKey);
+                    *pzelcashParams, wtx.joinSplitPubKey);
                 auto optNullifier = GetSproutNoteNullifier(
                     wtx.vJoinSplit[i],
                     item.second.address,
