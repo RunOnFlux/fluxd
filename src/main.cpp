@@ -1629,7 +1629,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
         // Some transactions come in right after a block is mined that confirms them
         // Instead of DOSing our peers for sending us what they think are valid transactions do this check first
-        if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
+        if (tx.nType == ZELNODE_CONFIRM_TX_TYPE && tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
             {
                 LOCK(g_zelnodeCache.cs);
                 if (!g_zelnodeCache.CheckConfirmationHeights(nextBlockHeight - 1, tx.collateralOut, tx.ip)) {
