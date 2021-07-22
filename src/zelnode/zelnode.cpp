@@ -1969,9 +1969,9 @@ void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion, int& nCUMULUS
 
         // Gather which location they are in
         if (mapZelnodeList.at(CUMULUS).setConfirmedTxInList.count(entry.first)) {
-            nNIMBUS++;
-        } else if (mapZelnodeList.at(NIMBUS).setConfirmedTxInList.count(entry.first)) {
             nCUMULUS++;
+        } else if (mapZelnodeList.at(NIMBUS).setConfirmedTxInList.count(entry.first)) {
+            nNIMBUS++;
         } else if (mapZelnodeList.at(STRATUS).setConfirmedTxInList.count(entry.first)) {
             nStratus++;
         }
