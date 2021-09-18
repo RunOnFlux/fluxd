@@ -25,6 +25,9 @@
 #include <consensus/validation.h>
 #include <undo.h>
 
+#define MICRO 0.000001
+#define MILLI 0.001
+
 UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
     if (fHelp || params.size() > 0)
         throw runtime_error(
@@ -39,6 +42,8 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
     {
         LOCK2(cs_main, g_zelnodeCache.cs);
 
+        int nCurrentHeight = chainActive.Height();
+
         g_zelnodeCache.SetNull();
         g_zelnodeCache.InitMapZelnodeList();
 
@@ -50,56 +55,162 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
 
         rescanIndex = chainActive[Params().GetConsensus().vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight - 10];
 
+        const int nTotalBlocks = nCurrentHeight - rescanIndex->nHeight;
+
+        int nPrintTrigger = 0;
+        int nPercent = 0;
+        std::set<COutPoint> setSpentOutPoints;
+        CZelnodeTxBlockUndo zelnodeTxBlockUndo;
+
+        // Main benchmarks
+        static int64_t nTimeLoadBlock = 0;
+        static int64_t nTimeAddPaidNode = 0;
+        static int64_t nTimeLoopTx = 0;
+        static int64_t nTimeUndoData = 0;
+        static int64_t nTimeWriteUndo = 0;
+        static int64_t nTimeFlush = 0;
+        static int64_t nTimeTotal = 0;
+        static int64_t nBlocksTotal = 0;
+
+        // Inner Tx loop benchmarks
+        static int64_t nLoopSpentOutputs = 0;
+        static int64_t nLoopFetchTx = 0;
+        static int64_t nAddStart = 0;
+        static int64_t nAddNewConfirm = 0;
+        static int64_t nAddUpdateConfirm = 0;
+
+
         while (rescanIndex) {
+            if (nPrintTrigger <= 0) {
+                nPercent = (nTotalBlocks - (nCurrentHeight - rescanIndex->nHeight)) * 100 / nTotalBlocks;
+                std::cout << "     " << _("Fluxnode blocks") << " | " << nCurrentHeight - rescanIndex->nHeight - nTotalBlocks << " / ~" << nTotalBlocks << " (" << nPercent << "%)" << std::endl;
+                LogPrintf("Fluxnode blocks %d / %d (%d percent)\n", (nTotalBlocks - (nCurrentHeight - rescanIndex->nHeight)), nTotalBlocks, nPercent);
+
+                LogPrint("bench", "Read block : [%.2fs (%.2fms/blk)]\n", nTimeLoadBlock * MICRO, nTimeLoadBlock * MILLI / nBlocksTotal);
+                LogPrint("bench", "dpaidNode : [%.2fs (%.2fms/blk)]\n", nTimeAddPaidNode * MICRO, nTimeAddPaidNode * MILLI / nBlocksTotal);
+                LogPrint("bench", "LoopTx : [%.2fs (%.2fms/blk)]\n", nTimeLoopTx * MICRO, nTimeLoopTx * MILLI / nBlocksTotal);
+                LogPrint("bench", "Undo : [%.2fs (%.2fms/blk)]\n", nTimeUndoData * MICRO, nTimeUndoData * MILLI / nBlocksTotal);
+                LogPrint("bench", "Write Undo : [%.2fs (%.2fms/blk)]\n", nTimeWriteUndo * MICRO, nTimeUndoData * MILLI  / nBlocksTotal);
+                LogPrint("bench", "Flush : [%.2fs (%.2fms/blk)]\n", nTimeFlush * MICRO, nTimeFlush * MILLI  / nBlocksTotal);
+
+                LogPrint("bench", "nLoopSpentOutputs : [%.2fs (%.2fms/blk)]\n", nLoopSpentOutputs * MICRO, nLoopSpentOutputs * MILLI  / nBlocksTotal);
+                LogPrint("bench", "nLoopFetchTx : [%.2fs (%.2fms/blk)]\n", nLoopFetchTx * MICRO, nLoopFetchTx * MILLI  / nBlocksTotal);
+                LogPrint("bench", "nAddStart : [%.2fs (%.2fms/blk)]\n", nAddStart * MICRO, nAddStart * MILLI  / nBlocksTotal);
+                LogPrint("bench", "nAddNewConfirm : [%.2fs (%.2fms/blk)]\n", nAddNewConfirm * MICRO, nAddNewConfirm * MILLI  / nBlocksTotal);
+                LogPrint("bench", "nAddUpdateConfirm : [%.2fs (%.2fms/blk)]\n", nAddUpdateConfirm * MICRO, nAddUpdateConfirm * MILLI  / nBlocksTotal);
+
+                nPrintTrigger = 10000;
+            }
+            nPrintTrigger--;
+
+            zelnodeTxBlockUndo.SetNull();
+            setSpentOutPoints.clear();
+
             ZelnodeCache zelnodeCache;
-            CZelnodeTxBlockUndo zelnodeTxBlockUndo;
-            std::set<COutPoint> setSpentOutPoints;
             CBlock block;
+
+            int64_t nTimeStart = GetTimeMicros();
             ReadBlockFromDisk(block, rescanIndex, Params().GetConsensus());
-            BOOST_FOREACH(CTransaction &tx, block.vtx) {
-                            if (!tx.IsCoinBase()) {
-                                for (const auto &input : tx.vin) {
-                                    setSpentOutPoints.insert(input.prevout);
-                                }
+            nBlocksTotal++;
+
+            int64_t nTime1 = GetTimeMicros(); nTimeLoadBlock += nTime1 - nTimeStart;
+
+            // Add paidnode info
+            if (rescanIndex->nHeight >= Params().StartZelnodePayments()) {
+                CTxDestination c_dest;
+                CTxDestination n_dest;
+                CTxDestination s_dest;
+                bool fCUMULUSFound = false;
+                bool fNIMBUSFound = false;
+                bool fSTRATUSFound = false;
+                COutPoint c_out;
+                COutPoint n_out;
+                COutPoint s_out;
+                // Get the addresses the should be paid
+                if (g_zelnodeCache.GetNextPayment(c_dest, CUMULUS, c_out)) {
+                    fCUMULUSFound = true;
+                }
+
+                // Get the addresses the should be paid
+                if (g_zelnodeCache.GetNextPayment(n_dest, NIMBUS, n_out)) {
+                    fNIMBUSFound = true;
+                }
+
+                // Get the addresses the should be paid
+                if (g_zelnodeCache.GetNextPayment(s_dest, STRATUS, s_out)) {
+                    fSTRATUSFound = true;
+                }
+
+                if (fCUMULUSFound)
+                    zelnodeCache.AddPaidNode(c_out, rescanIndex->nHeight);
+                if (fNIMBUSFound)
+                    zelnodeCache.AddPaidNode(n_out, rescanIndex->nHeight);
+                if (fSTRATUSFound)
+                    zelnodeCache.AddPaidNode(s_out, rescanIndex->nHeight);
+            }
+
+            int64_t nTime2 = GetTimeMicros(); nTimeAddPaidNode += nTime2 - nTime1;
+
+            for (const auto& tx : block.vtx) {
+
+                int64_t nLoopStart = GetTimeMicros();
+
+                if (!tx.IsCoinBase() && !tx.IsZelnodeTx()) {
+                    for (const auto &input : tx.vin) {
+                        setSpentOutPoints.insert(input.prevout);
+                    }
+                }
+
+                int64_t nLoop1 = GetTimeMicros(); nLoopSpentOutputs += nLoop1 - nLoopStart;
+
+                if (tx.IsZelnodeTx()) {
+                    int nTier = 0;
+                    CTransaction get_tx;
+                    uint256 block_hash;
+                    if (GetTransaction(tx.collateralOut.hash, get_tx, Params().GetConsensus(), block_hash,
+                                       true)) {
+                        if (get_tx.vout[tx.collateralOut.n].nValue == 10000 * COIN)
+                            nTier = Zelnode::CUMULUS;
+                        else if (get_tx.vout[tx.collateralOut.n].nValue == 25000 * COIN)
+                            nTier = Zelnode::NIMBUS;
+                        else if (get_tx.vout[tx.collateralOut.n].nValue == 100000 * COIN)
+                            nTier = Zelnode::STRATUS;
+
+                    } else {
+                        return error("Failed to find tx");
+                    }
+
+                    int64_t nLoop2 = GetTimeMicros(); nLoopFetchTx += nLoop2 - nLoop1;
+
+                    if (tx.nType == ZELNODE_START_TX_TYPE) {
+
+                        // Add new Zelnode Start Tx into local cache
+                        zelnodeCache.AddNewStart(tx, rescanIndex->nHeight, nTier);
+                        int64_t nLoop3 = GetTimeMicros(); nAddStart += nLoop3 - nLoop2;
+
+                    } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
+                        if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
+
+                            zelnodeCache.AddNewConfirm(tx, rescanIndex->nHeight);
+                            int64_t nLoop4 = GetTimeMicros(); nAddNewConfirm += nLoop4 - nLoop2;
+                        } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
+                            zelnodeCache.AddUpdateConfirm(tx, rescanIndex->nHeight);
+                            ZelnodeCacheData global_data = g_zelnodeCache.GetZelnodeData(tx.collateralOut);
+                            if (global_data.IsNull()) {
+                                return error("Failed to find global data on update confirm tx, %s",
+                                             tx.GetHash().GetHex());
                             }
-
-                            if (tx.IsZelnodeTx()) {
-                                int nTier = 0;
-                                CTransaction get_tx;
-                                uint256 block_hash;
-                                if (GetTransaction(tx.collateralOut.hash, get_tx, Params().GetConsensus(), block_hash,
-                                                   true)) {
-                                    if (get_tx.vout[tx.collateralOut.n].nValue == 10000 * COIN)
-                                        nTier = Zelnode::BASIC;
-                                    else if (get_tx.vout[tx.collateralOut.n].nValue == 25000 * COIN)
-                                        nTier = Zelnode::SUPER;
-                                    else if (get_tx.vout[tx.collateralOut.n].nValue == 100000 * COIN)
-                                        nTier = Zelnode::BAMF;
-
-                                } else {
-                                    return error("Failed to find tx");
-                                }
-
-                                if (tx.nType == ZELNODE_START_TX_TYPE) {
-                                    // Add new Zelnode Start Tx into local cache
-                                    zelnodeCache.AddNewStart(tx, rescanIndex->nHeight, nTier);
-                                } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
-                                    if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
-                                        zelnodeCache.AddNewConfirm(tx, rescanIndex->nHeight);
-
-                                    } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
-                                        zelnodeCache.AddUpdateConfirm(tx, rescanIndex->nHeight);
-                                        auto global_data = g_zelnodeCache.GetZelnodeData(tx.collateralOut);
-                                        if (global_data.IsNull())
-                                            return error("Failed to find global data on update confirm tx, %s",
-                                                         tx.GetHash().GetHex());
-                                        zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.insert(
-                                                std::make_pair(tx.collateralOut,
-                                                               global_data.nLastConfirmedBlockHeight));
-                                    }
-                                }
-                            }
+                            zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.insert(
+                                    std::make_pair(tx.collateralOut,
+                                                   global_data.nLastConfirmedBlockHeight));
+                            zelnodeTxBlockUndo.mapLastIpAddress.insert(std::make_pair(tx.collateralOut, global_data.ip));
+                            int64_t nLoop5 = GetTimeMicros(); nAddUpdateConfirm += nLoop5 - nLoop2;
                         }
+                    }
+                }
+            }
+
+            int64_t nTime3 = GetTimeMicros(); nTimeLoopTx += nTime3 - nTime2;
 
             // Update the temp cache with the set of started outpoints that have now expired from the dos list
             GetUndoDataForExpiredZelnodeDosScores(zelnodeTxBlockUndo, rescanIndex->nHeight);
@@ -115,6 +226,7 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
             // Check for Start tx that are going to expire
             zelnodeCache.CheckForExpiredStartTx(rescanIndex->nHeight);
 
+            int64_t nTime4 = GetTimeMicros(); nTimeUndoData += nTime4 - nTime3;
 
             if (zelnodeTxBlockUndo.vecExpiredDosData.size() ||
                 zelnodeTxBlockUndo.vecExpiredConfirmedData.size() ||
@@ -124,8 +236,11 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
                     return error("Failed to write zelnodetx undo data");
             }
 
+            int64_t nTime5 = GetTimeMicros(); nTimeWriteUndo += nTime5 - nTime4;
 
             assert(zelnodeCache.Flush());
+
+            int64_t nTime6 = GetTimeMicros(); nTimeFlush += nTime6 - nTime5;
 
             rescanIndex = chainActive.Next(rescanIndex);
         }
@@ -2414,7 +2529,7 @@ static const CRPCCommand commands[] =
                 { "zelnode",    "createzelnodebroadcast", &createzelnodebroadcast, false  },
                 { "zelnode",    "relayzelnodebroadcast",  &relayzelnodebroadcast,  false  },
                 { "zelnode",    "decodezelnodebroadcast", &decodezelnodebroadcast, false  },
-                { "zelnode",    "rebuildzelnodedb",       &rebuildzelnodedb,       false  },
+                { "hidden",    "rebuildzelnodedb",       &rebuildzelnodedb,       false  },
 
                 {"zelnode",     "startdeterministiczelnode", &startdeterministiczelnode, false },
                 {"zelnode",     "viewdeterministiczelnodelist", &viewdeterministiczelnodelist, false },

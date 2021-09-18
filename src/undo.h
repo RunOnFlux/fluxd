@@ -103,6 +103,18 @@ public:
     std::map<COutPoint, int> mapLastPaidHeights;
     std::map<COutPoint, std::string> mapLastIpAddress;
 
+    void SetNull() {
+        vecExpiredDosData.clear();
+        vecExpiredConfirmedData.clear();
+        mapUpdateLastConfirmHeight.clear();
+        mapLastPaidHeights.clear();
+        mapLastIpAddress.clear();
+    }
+
+    CZelnodeTxBlockUndo(){
+        SetNull();
+    }
+
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
