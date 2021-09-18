@@ -1635,7 +1635,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         if (tx.nType == ZELNODE_CONFIRM_TX_TYPE && tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
             {
                 LOCK(g_zelnodeCache.cs);
-                if (!g_zelnodeCache.CheckConfirmationHeights(nextBlockHeight - 1, tx.collateralOut, tx.ip)) {
+                if (!g_zelnodeCache.CheckConfirmationHeights(nextBlockHeight, tx.collateralOut, tx.ip)) {
                     LogPrint("mempool", "Dropping confirmation zelnode txid %s : failed CheckConfirmationHeights check\n", tx.GetHash().ToString());
                     return false;
                 }
