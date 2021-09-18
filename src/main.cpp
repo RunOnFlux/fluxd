@@ -1240,7 +1240,9 @@ bool ContextualCheckTransaction(
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed";
                 }
 
-                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx)) {
+                // Check the update height, but make sure we only pass in the height if this check is coming from an AcceptBlock call
+                // If it is coming from an AcceptBlock call pass in the height of the block otherwise use the default 0
+                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx, fFromAccept ? nHeight : 0)) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon";
                 }
@@ -1633,7 +1635,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             {
                 LOCK(g_zelnodeCache.cs);
                 if (!g_zelnodeCache.CheckConfirmationHeights(nextBlockHeight - 1, tx.collateralOut, tx.ip)) {
-                    LogPrint("mempool", "Dropping confirmation zelnode txid %s : failed CheckConfirmationHeights check", tx.GetHash().ToString());
+                    LogPrint("mempool", "Dropping confirmation zelnode txid %s : failed CheckConfirmationHeights check\n", tx.GetHash().ToString());
                     return false;
                 }
             }
