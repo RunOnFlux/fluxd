@@ -1079,7 +1079,11 @@ void ZelnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
             if (setAddToConfirm.count(item))
                 continue;
 
+            if (!g_zelnodeCache.mapStartTxTracker.count(item)) {
+                error("%s - %d , Found map:at error", __func__, __LINE__);
+            }
             ZelnodeCacheData data = g_zelnodeCache.mapStartTxTracker.at(item);
+
             data.nStatus = ZELNODE_TX_DOS_PROTECTION;
             mapStartTxDosTracker[item] = data;
 
@@ -1130,17 +1134,17 @@ bool ZelnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COut
     // Allow ip address changes at a different interval
     if (fFluxActive) {
         if (ip != data.ip) {
-            if (nCurrentHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight >= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE) {
+            if (nCurrentHeight - data.nLastConfirmedBlockHeight >= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE) {
                 return true;
             }
         }
     }
 
-    if (nCurrentHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight <= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT) {
+    if (nCurrentHeight - data.nLastConfirmedBlockHeight <= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT) {
         // TODO - Remove this error message after release + 1 month and we don't see any problems
         error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
               __LINE__,
-              out.ToFullString(), nCurrentHeight, mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight);
+              out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
         return false;
     }
 
@@ -1583,6 +1587,9 @@ bool ZelnodeCache::Flush()
 
             // Remove from Start Tracking
             g_zelnodeCache.mapStartTxTracker.erase(item.first);
+            if (!g_zelnodeCache.mapStartTxHeights.count(data.nAddedBlockHeight)) {
+                error("%s - %d , Found map:at error", __func__, __LINE__);
+            }
             g_zelnodeCache.mapStartTxHeights.at(data.nAddedBlockHeight).erase(item.first);
 
             // Update the data (STARTED --> CONFIRM)
@@ -1599,6 +1606,9 @@ bool ZelnodeCache::Flush()
             // Because we don't automatically remove nodes that have expired from the list, to help not sort it as often
             // If this node is already in the list. We wont add it let. We need to wait for the node to be removed from the list.
             // Then we can add it to the list
+            if (!g_zelnodeCache.mapZelnodeList.count(data.nTier)) {
+                error("%s - %d , Found map:at error", __func__, __LINE__);
+            }
             if (g_zelnodeCache.mapZelnodeList.at(data.nTier).setConfirmedTxInList.count(data.collateralIn)) {
                 setRemoveFromList.insert(data.collateralIn);
                 if (data.nTier == CUMULUS) {
@@ -1702,6 +1712,9 @@ bool ZelnodeCache::Flush()
             g_zelnodeCache.mapConfirmedZelnodeData.at(item.second.second).nLastPaidHeight = item.second.first;
             g_zelnodeCache.setDirtyOutPoint.insert(item.second.second);
 
+            if (!g_zelnodeCache.mapZelnodeList.count(item.first)) {
+                error("%s - %d , Found map:at error", __func__, __LINE__);
+            }
             if (g_zelnodeCache.mapZelnodeList.at(item.first).setConfirmedTxInList.count(item.second.second)) {
                 if (g_zelnodeCache.mapZelnodeList.at(item.first).listConfirmedZelnodes.front().out == item.second.second) {
                     g_zelnodeCache.mapZelnodeList.at(item.first).listConfirmedZelnodes.pop_front();
@@ -1727,6 +1740,9 @@ bool ZelnodeCache::Flush()
             int nTier = g_zelnodeCache.mapConfirmedZelnodeData.at(item.first).nTier;
 
             bool fFoundIt = false;
+            if (!g_zelnodeCache.mapZelnodeList.count(nTier)) {
+                error("%s - %d , Found map:at error", __func__, __LINE__);
+            }
             if (g_zelnodeCache.mapZelnodeList.at(nTier).setConfirmedTxInList.count(item.first)) {
 
                 auto it = g_zelnodeCache.mapZelnodeList.at(nTier).listConfirmedZelnodes.end();
