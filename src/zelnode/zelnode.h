@@ -75,7 +75,8 @@ enum Tier {
     NONE = 0,
     CUMULUS = 1,
     NIMBUS = 2,
-    STRATUS = 3
+    STRATUS = 3,
+    LAST // All newly added Tier must be added above LAST
 };
 
 std::string ZelnodeLocationToString(int nLocation);
@@ -86,6 +87,7 @@ void GetUndoDataForExpiredConfirmZelnodes(CZelnodeTxBlockUndo& p_zelnodeTxUudoDa
 void GetUndoDataForPaidZelnodes(CZelnodeTxBlockUndo& zelnodeTxBlockUndo, ZelnodeCache& p_localCache);
 
 class ZelnodeCacheData {
+
 public:
     // Zelnode Tx data
     int8_t nType;
@@ -120,28 +122,29 @@ public:
         return nType == ZELNODE_NO_TYPE;
     }
 
-    bool isCUMULUS()
+    bool isCumulus()
     {
         return nTier == CUMULUS;
     }
 
-    bool isNIMBUS()
+    bool isNimbus()
     {
         return nTier == NIMBUS;
     }
 
-    bool IsSTRATUS()
+    bool isStratus()
     {
         return nTier == STRATUS;
     }
 
-    std::string Tier()
+    std::string TierToString()
     {
         std::string strStatus = "NONE";
-
         if (nTier == CUMULUS) strStatus = "CUMULUS";
-        if (nTier == NIMBUS) strStatus = "NIMBUS";
-        if (nTier == STRATUS) strStatus = "STRATUS";
+        else if (nTier == NIMBUS) strStatus = "NIMBUS";
+        else if (nTier == STRATUS) strStatus = "STRATUS";
+        else if (nTier == NONE) strStatus = "None";
+        else strStatus = "UNKNOWN TIER (" + std::to_string(nTier) + ")";
 
         return strStatus;
     }
@@ -294,16 +297,17 @@ public:
     // Global tracking of Confirmed Zelnodes
     std::map<COutPoint, ZelnodeCacheData> mapConfirmedZelnodeData;
 
-    std::map<int, ZelnodeList> mapZelnodeList;
+    std::map<Tier, ZelnodeList> mapZelnodeList;
 
     ZelnodeCache(){
         SetNull();
     }
 
     void InitMapZelnodeList() {
-        mapZelnodeList.insert(std::make_pair(CUMULUS, ZelnodeList()));
-        mapZelnodeList.insert(std::make_pair(NIMBUS, ZelnodeList()));
-        mapZelnodeList.insert(std::make_pair(STRATUS, ZelnodeList()));
+        for (int currentTier = CUMULUS; currentTier != LAST; currentTier++ )
+        {
+            mapZelnodeList.insert(std::make_pair((Tier)currentTier, ZelnodeList()));
+        }
     }
 
     void SetNull() {
@@ -373,7 +377,7 @@ public:
     bool CheckListHas(const ZelnodeCacheData& p_zelnodeData);
     void InsertIntoList(const ZelnodeCacheData& p_zelnodeData);
     void EraseFromListSet(const COutPoint& p_OutPoint);
-    void EraseFromList(const std::set<COutPoint>& setToRemove, const int nTier);
+    void EraseFromList(const std::set<COutPoint>& setToRemove, const Tier nTier);
 
     void DumpZelnodeCache();
 
