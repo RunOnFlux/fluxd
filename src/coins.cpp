@@ -640,7 +640,7 @@ bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_H
     if (p_Height - coins->nHeight < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC) {
         return false;
     }
-
+    InitializeCoinTierAmounts();
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
         if (coins->vout[prevout.n].nValue == vCoinTierAmounts[currentTier]) {
             nTier = currentTier;
