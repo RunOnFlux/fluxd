@@ -912,12 +912,9 @@ void ZelnodeCache::SortList(const int& nTier)
 // Needs to be protected by locking cs before calling
 bool ZelnodeCache::CheckListHas(const ZelnodeCacheData& p_zelnodeData)
 {
-    if (p_zelnodeData.nTier == CUMULUS)
-        return mapZelnodeList.at(CUMULUS).setConfirmedTxInList.count(p_zelnodeData.collateralIn);
-    else if (p_zelnodeData.nTier == NIMBUS)
-        return mapZelnodeList.at(NIMBUS).setConfirmedTxInList.count(p_zelnodeData.collateralIn);
-    else if (p_zelnodeData.nTier == STRATUS)
-        return mapZelnodeList.at(STRATUS).setConfirmedTxInList.count(p_zelnodeData.collateralIn);
+    if (IsValidTier(p_zelnodeData.nTier)) {
+        return mapZelnodeList.at((Tier) p_zelnodeData.nTier).setConfirmedTxInList.count(p_zelnodeData.collateralIn);
+    }
 
     return false;
 }
@@ -925,12 +922,10 @@ bool ZelnodeCache::CheckListHas(const ZelnodeCacheData& p_zelnodeData)
 // Needs to be protected by locking cs before calling
 bool ZelnodeCache::CheckListSet(const COutPoint& p_OutPoint)
 {
-    if (mapZelnodeList.at(CUMULUS).setConfirmedTxInList.count(p_OutPoint)) {
-        return true;
-    } else if (mapZelnodeList.at(NIMBUS).setConfirmedTxInList.count(p_OutPoint)) {
-        return true;
-    } else if (mapZelnodeList.at(STRATUS).setConfirmedTxInList.count(p_OutPoint)) {
-        return true;
+    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+        if (mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.count(p_OutPoint)) {
+            return true;
+        }
     }
 
     return false;
@@ -938,29 +933,21 @@ bool ZelnodeCache::CheckListSet(const COutPoint& p_OutPoint)
 
 void ZelnodeCache::InsertIntoList(const ZelnodeCacheData& p_zelnodeData)
 {
-    ZelnodeListData listData(p_zelnodeData);
-    if (p_zelnodeData.nTier == CUMULUS) {
-        mapZelnodeList.at(CUMULUS).setConfirmedTxInList.insert(p_zelnodeData.collateralIn);
-        mapZelnodeList.at(CUMULUS).listConfirmedZelnodes.emplace_front(listData);
-    }
-    else if (p_zelnodeData.nTier == NIMBUS) {
-        mapZelnodeList.at(NIMBUS).setConfirmedTxInList.insert(p_zelnodeData.collateralIn);
-        mapZelnodeList.at(NIMBUS).listConfirmedZelnodes.emplace_front(listData);
-    }
-    else if (p_zelnodeData.nTier == STRATUS) {
-        mapZelnodeList.at(STRATUS).setConfirmedTxInList.insert(p_zelnodeData.collateralIn);
-        mapZelnodeList.at(STRATUS).listConfirmedZelnodes.emplace_front(listData);
+    if (IsValidTier(p_zelnodeData.nTier)) {
+        ZelnodeListData listData(p_zelnodeData);
+        mapZelnodeList.at((Tier) p_zelnodeData.nTier).setConfirmedTxInList.insert(p_zelnodeData.collateralIn);
+        mapZelnodeList.at((Tier) p_zelnodeData.nTier).listConfirmedZelnodes.emplace_front(listData);
     }
 }
 
 void ZelnodeCache::EraseFromListSet(const COutPoint& p_OutPoint)
 {
-    if (mapZelnodeList.at(CUMULUS).setConfirmedTxInList.count(p_OutPoint))
-        mapZelnodeList.at(CUMULUS).setConfirmedTxInList.erase(p_OutPoint);
-    else if (mapZelnodeList.at(NIMBUS).setConfirmedTxInList.count(p_OutPoint))
-        mapZelnodeList.at(NIMBUS).setConfirmedTxInList.erase(p_OutPoint);
-    else if (mapZelnodeList.at(STRATUS).setConfirmedTxInList.count(p_OutPoint))
-        mapZelnodeList.at(STRATUS).setConfirmedTxInList.erase(p_OutPoint);
+    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+        if (mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.count(p_OutPoint)) {
+            mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.erase(p_OutPoint);
+            return;
+        }
+    }
 }
 
 void ZelnodeCache::EraseFromList(const std::set<COutPoint>& setToRemove, const Tier nTier)
@@ -1028,7 +1015,7 @@ std::string ZelnodeLocationToString(int nLocation) {
     }
 }
 
-void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion, int& nCUMULUS, int& nNIMBUS, int& nStratus) {
+void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<int>& vNodeCount) {
     for (const auto& entry : mapConfirmedZelnodeData) {
         std::string strHost = entry.second.ip;
         CNetAddr node = CNetAddr(strHost, false);
@@ -1045,13 +1032,11 @@ void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion, int& nCUMULUS
                 break;
         }
 
-        // Gather which location they are in
-        if (mapZelnodeList.at(CUMULUS).setConfirmedTxInList.count(entry.first)) {
-            nCUMULUS++;
-        } else if (mapZelnodeList.at(NIMBUS).setConfirmedTxInList.count(entry.first)) {
-            nNIMBUS++;
-        } else if (mapZelnodeList.at(STRATUS).setConfirmedTxInList.count(entry.first)) {
-            nStratus++;
+        for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+            if (mapZelnodeList.at((Tier)currentTier).setConfirmedTxInList.count(entry.first)) {
+                vNodeCount[currentTier-1]++;
+                break;
+            }
         }
     }
 }
@@ -1127,5 +1112,10 @@ bool GetTierFromAmount(const CAmount& nAmount, int& nTier)
 bool IsValidTier(const int& nTier)
 {
     return nTier > NONE && nTier < LAST;
+}
+
+int GetNumberOfTiers()
+{
+    return LAST - 1;
 }
 /** Zelnode Tier code end **/

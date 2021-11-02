@@ -1368,7 +1368,7 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
         }
 
         if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
-            if (tx.benchmarkTier < CUMULUS || tx.benchmarkTier > STRATUS) {
+            if (!IsValidTier(tx.benchmarkTier)) {
                 return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, invalid benchmarking tier"),
                                  REJECT_INVALID, "bad-txns-zelnode-tx-invalid-benchmark-tier");
             }
@@ -2411,6 +2411,11 @@ CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier)
 //    std::cout << "Got total of: " << total << std::endl;
 
 
+
+    /** This is one of the sections where we will be keeping the nNodeTier checks
+     * We are keeping it because it is very important that these numbers are verified and don't
+     * accidently get changes when adding new tiers.
+     */
     if (nNodeTier == CUMULUS) {
         return blockValue * (0.0375 * fMultiple);
     } else if (nNodeTier == NIMBUS) {
@@ -3934,16 +3939,10 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload(chainparams));
 
 
-    if (g_zelnodeCache.mapZelnodeList.at(CUMULUS).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(CUMULUS).listConfirmedZelnodes.size()) {
-        error("Basic set map, doesn't have the same size as the listconfirmed zelnodes");
-    }
-
-    if (g_zelnodeCache.mapZelnodeList.at(NIMBUS).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(NIMBUS).listConfirmedZelnodes.size()) {
-        error("Super set map, doesn't have the same size as the listconfirmed zelnodes");
-    }
-
-    if (g_zelnodeCache.mapZelnodeList.at(STRATUS).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(STRATUS).listConfirmedZelnodes.size()) {
-        error("STRATUS set map, doesn't have the same size as the listconfirmed zelnodes");
+    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+        if (g_zelnodeCache.mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at((Tier) currentTier).listConfirmedZelnodes.size()) {
+            error("%s set map, doesn't have the same size as the listconfirmed zelnodes", TierToString(currentTier));
+        }
     }
 
     // Remove transactions that expire at new block height from mempool

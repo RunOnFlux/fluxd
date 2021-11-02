@@ -15,11 +15,6 @@
 #include "timedata.h"
 #include "util.h"
 
-/// Deterministic Zelnode consensus
-#define ZELNODE_CUMULUS_COLLATERAL 10000
-#define ZELNODE_NIMBUS_COLLATERAL 25000
-#define ZELNODE_STRATUS_COLLATERAL 100000
-
 // How old the output must be for zelnodes collateral to be considered valid
 #define ZELNODE_MIN_CONFIRMATION_DETERMINISTIC 100
 
@@ -87,6 +82,7 @@ extern std::vector<CAmount> vTierAmounts;
 void InitializeTierAmounts();
 bool GetTierFromAmount(const CAmount& nAmount, int& nTier);
 bool IsValidTier(const int& nTier);
+int GetNumberOfTiers();
 /** Zelnode Tier code end **/
 
 
@@ -151,6 +147,8 @@ public:
     bool isValidTier() {
         return nTier > NONE && nTier < LAST;
     }
+
+
 
     std::string TierToString()
     {
@@ -396,7 +394,7 @@ public:
 
     void DumpZelnodeCache();
 
-    void CountNetworks(int& ipv4, int& ipv6, int& onion, int& nCUMULUS, int& nNIMBUS, int& nStratus);
+    void CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<int>& vNodeCount);
 
     bool CheckConfirmationHeights(const int nHeight, const COutPoint& out, const std::string& ip);
 };

@@ -985,56 +985,26 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("zelnodecurrentwinner", "") + HelpExampleRpc("zelnodecurrentwinner", ""));
 
-
-
     if (IsDZelnodeActive()) {
-        CTxDestination dest_basic;
-        COutPoint outpoint_basic;
         UniValue ret(UniValue::VOBJ);
-        if (g_zelnodeCache.GetNextPayment(dest_basic, CUMULUS, outpoint_basic)) {
-            UniValue obj(UniValue::VOBJ);
-            auto data = g_zelnodeCache.GetZelnodeData(outpoint_basic);
-            obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
-            obj.push_back(std::make_pair("ip", data.ip));
-            obj.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
-            obj.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
-            obj.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
-            obj.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
-            obj.push_back(std::make_pair("tier", TierToString(data.nTier)));
-            obj.push_back(std::make_pair("payment_address", EncodeDestination(dest_basic)));
-            ret.push_back(std::make_pair("CUMULUS Winner", obj));
-        }
 
-        CTxDestination dest_super;
-        COutPoint outpoint_super;
-        if (g_zelnodeCache.GetNextPayment(dest_super, NIMBUS, outpoint_super)) {
-            UniValue obj(UniValue::VOBJ);
-            auto data = g_zelnodeCache.GetZelnodeData(outpoint_super);
-            obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
-            obj.push_back(std::make_pair("ip", data.ip));
-            obj.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
-            obj.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
-            obj.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
-            obj.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
-            obj.push_back(std::make_pair("tier", TierToString(data.nTier)));
-            obj.push_back(std::make_pair("payment_address", EncodeDestination(dest_super)));
-            ret.push_back(std::make_pair("NIMBUS Winner", obj));
-        }
-
-        CTxDestination dest_bamf;
-        COutPoint outpoint_bamf;
-        if (g_zelnodeCache.GetNextPayment(dest_bamf, STRATUS, outpoint_bamf)) {
-            UniValue obj(UniValue::VOBJ);
-            auto data = g_zelnodeCache.GetZelnodeData(outpoint_bamf);
-            obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
-            obj.push_back(std::make_pair("ip", data.ip));
-            obj.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
-            obj.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
-            obj.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
-            obj.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
-            obj.push_back(std::make_pair("tier", TierToString(data.nTier)));
-            obj.push_back(std::make_pair("payment_address", EncodeDestination(dest_bamf)));
-            ret.push_back(std::make_pair("STRATUS Winner", obj));
+        for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+            CTxDestination dest;
+            COutPoint outpoint;
+            string strWinner = TierToString(currentTier) + " Winner";
+            if (g_zelnodeCache.GetNextPayment(dest, currentTier, outpoint)) {
+                UniValue obj(UniValue::VOBJ);
+                auto data = g_zelnodeCache.GetZelnodeData(outpoint);
+                obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+                obj.push_back(std::make_pair("ip", data.ip));
+                obj.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+                obj.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+                obj.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+                obj.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+                obj.push_back(std::make_pair("tier", TierToString(data.nTier)));
+                obj.push_back(std::make_pair("payment_address", EncodeDestination(dest)));
+                ret.push_back(std::make_pair(strWinner, obj));
+            }
         }
 
         return ret;
@@ -1065,23 +1035,38 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
 
     if (IsDZelnodeActive())
     {
-        int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0, nCUMULUS = 0, nNIMBUS = 0, nSTRATUS = 0;
+        int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0;
+        std::vector<int> vNodeCount(GetNumberOfTiers());
         {
             LOCK(g_zelnodeCache.cs);
 
-            g_zelnodeCache.CountNetworks(ipv4, ipv6, onion, nCUMULUS, nNIMBUS, nSTRATUS);
+            g_zelnodeCache.CountNetworks(ipv4, ipv6, onion, vNodeCount);
 
             nTotal = g_zelnodeCache.mapConfirmedZelnodeData.size();
         }
 
         obj.push_back(Pair("total", nTotal));
         obj.push_back(Pair("stable", nTotal));
-        obj.push_back(Pair("basic-enabled", nCUMULUS));
-        obj.push_back(Pair("super-enabled", nNIMBUS));
-        obj.push_back(Pair("bamf-enabled", nSTRATUS));
-        obj.push_back(Pair("cumulus-enabled", nCUMULUS));
-        obj.push_back(Pair("nimbus-enabled", nNIMBUS));
-        obj.push_back(Pair("stratus-enabled", nSTRATUS));
+
+        std::map<int,pair<string,string> > words;
+        words.insert(make_pair(0, make_pair("basic-enabled", "cumulus-enabled")));
+        words.insert(make_pair(1, make_pair("super-enabled", "nimbus-enabled")));
+        words.insert(make_pair(2, make_pair("bamf-enabled", "stratus-enabled")));
+        for (int i = 0; i < vNodeCount.size(); i++) {
+            if (words.count(i)) {
+                obj.push_back(Pair(words.at(i).first, vNodeCount[i]));
+            } else {
+                obj.push_back(Pair("unnamed-enabled", vNodeCount[i]));
+            }
+        }
+
+        for (int i = 0; i < vNodeCount.size(); i++) {
+            if (words.count(i)) {
+                obj.push_back(Pair(words.at(i).second, vNodeCount[i]));
+            } else {
+                obj.push_back(Pair("unnamed-enabled", vNodeCount[i]));
+            }
+        }
 
         obj.push_back(Pair("ipv4", ipv4));
         obj.push_back(Pair("ipv6", ipv6));
