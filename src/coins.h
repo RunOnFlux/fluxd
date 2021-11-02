@@ -587,4 +587,14 @@ private:
     );
 };
 
+
+/** Coins Tier code
+ * Any changes to this code needs to be also made to the code in main.h and main.cpp
+ * We are unable to use the same code because of build/linking restrictions
+ */
+extern std::vector<CAmount> vCoinTierAmounts;
+void InitializeCoinTierAmounts();
+bool GetCoinTierFromAmount(const CAmount& nAmount, int& nTier);
+/** Coins Tier code end **/
+
 #endif // BITCOIN_COINS_H

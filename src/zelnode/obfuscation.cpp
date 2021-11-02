@@ -49,23 +49,8 @@ bool CObfuScationSigner::IsVinAssociatedWithPubkey(CTxIn& vin, CPubKey& pubkey, 
     uint256 hash;
     if (GetTransaction(vin.prevout.hash, txVin, Params().GetConsensus(), hash, true)) {
         for (CTxOut out : txVin.vout) {
-            if (out.nValue == ZELNODE_CUMULUS_COLLATERAL * COIN) {
-                if (out.scriptPubKey == payee2) {
-                    nNodeTier = CUMULUS;
-                    return true;
-                }
-            }
-            else if (out.nValue == ZELNODE_NIMBUS_COLLATERAL * COIN) {
-                if (out.scriptPubKey == payee2) {
-                    nNodeTier = NIMBUS;
-                    return true;
-                }
-            }
-            else if (out.nValue == ZELNODE_STRATUS_COLLATERAL * COIN) {
-                if (out.scriptPubKey == payee2) {
-                    nNodeTier = STRATUS;
-                    return true;
-                }
+            if (GetTierFromAmount(out.nValue, nNodeTier)) {
+                return true;
             }
         }
     }

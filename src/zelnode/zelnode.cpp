@@ -904,12 +904,9 @@ bool ZelnodeCache::LoadData(ZelnodeCacheData& data)
 // Needs to be protected by locking cs before calling
 void ZelnodeCache::SortList(const int& nTier)
 {
-    if (nTier == CUMULUS)
-        mapZelnodeList.at(CUMULUS).listConfirmedZelnodes.sort();
-    else if (nTier == NIMBUS)
-        mapZelnodeList.at(NIMBUS).listConfirmedZelnodes.sort();
-    else if (nTier == STRATUS)
-        mapZelnodeList.at(STRATUS).listConfirmedZelnodes.sort();
+    if (nTier > NONE && nTier < LAST)
+        mapZelnodeList.at((Tier)nTier).listConfirmedZelnodes.sort();
+
 }
 
 // Needs to be protected by locking cs before calling
@@ -1063,7 +1060,6 @@ int GetZelnodeExpirationCount(const int& p_nHeight)
 {
     // Get the status on if Zelnode params1 is activated
     bool fFluxActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
-
     if (fFluxActive) {
         return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_PARAMS_1;
     } else {
@@ -1094,3 +1090,42 @@ std::string GetZelnodeBenchmarkPublicKey(const CTransaction& tx)
     // Only reason this should happen is if there is a problem with the chainparams
     return vectorPublicKeys[0].first;
 }
+
+/** Zelnode Tier code
+ * Any changes to this code needs to be also made to the code in coins.h and coins.cpp
+ * We are unable to use the same code because of build/linking restrictions
+ */
+std::vector<CAmount> vTierAmounts;
+void InitializeTierAmounts() {
+    static bool fInit = false;
+
+    if (fInit)
+        return;
+
+    vTierAmounts.clear();
+    vTierAmounts.push_back(0); // NONE
+    vTierAmounts.push_back(10000 * COIN); // CUMULUS
+    vTierAmounts.push_back(25000 * COIN); // NIMBUS
+    vTierAmounts.push_back(100000 * COIN); // STRATUS
+    vTierAmounts.push_back(0); // LAST
+    fInit = true;
+}
+
+bool GetTierFromAmount(const CAmount& nAmount, int& nTier)
+{
+    InitializeTierAmounts();
+    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+        if (nAmount == vTierAmounts[currentTier]) {
+            nTier = currentTier;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool IsValidTier(const int& nTier)
+{
+    return nTier > NONE && nTier < LAST;
+}
+/** Zelnode Tier code end **/

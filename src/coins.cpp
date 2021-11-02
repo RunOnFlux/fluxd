@@ -641,14 +641,17 @@ bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_H
         return false;
     }
 
-    if (coins->vout[prevout.n].nValue == 10000 * COIN)
-        nTier = CUMULUS;
-    else if (coins->vout[prevout.n].nValue == 25000 * COIN)
-        nTier = NIMBUS;
-    else if (coins->vout[prevout.n].nValue == 100000 * COIN)
-        nTier = STRATUS;
+    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+        if (coins->vout[prevout.n].nValue == vCoinTierAmounts[currentTier]) {
+            nTier = currentTier;
+            return true;
+        }
+    }
 
-    return nTier >= CUMULUS && nTier <= STRATUS;
+    // Get the tier from the amount if possible
+    GetCoinTierFromAmount(coins->vout[prevout.n].nValue, nTier);
+
+    return nTier > NONE && nTier < LAST;
 }
 
 double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight) const
@@ -698,3 +701,38 @@ CCoinsModifier::~CCoinsModifier()
         cache.cachedCoinsUsage += it->second.coins.DynamicMemoryUsage();
     }
 }
+
+/** Coins Tier code
+ * Any changes to this code needs to be also made to the code in main.h and main.cpp
+ * We are unable to use the same code because of build/linking restrictions
+ */
+std::vector<CAmount> vCoinTierAmounts;
+void InitializeCoinTierAmounts() {
+    static bool fInit = false;
+
+    if (fInit)
+        return;
+
+    vCoinTierAmounts.clear();
+    vCoinTierAmounts.push_back(0); // NONE
+    vCoinTierAmounts.push_back(10000 * COIN); // CUMULUS
+    vCoinTierAmounts.push_back(25000 * COIN); // NIMBUS
+    vCoinTierAmounts.push_back(100000 * COIN); // STRATUS
+    vCoinTierAmounts.push_back(0); // LAST
+    fInit = true;
+}
+
+bool GetCoinTierFromAmount(const CAmount& nAmount, int& nTier)
+{
+    InitializeCoinTierAmounts();
+    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+        if (nAmount == vCoinTierAmounts[currentTier]) {
+            nTier = currentTier;
+            return true;
+        }
+    }
+
+    return false;
+}
+/** Coins Tier code end **/
+

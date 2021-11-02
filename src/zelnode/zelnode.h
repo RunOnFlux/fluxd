@@ -76,8 +76,19 @@ enum Tier {
     CUMULUS = 1,
     NIMBUS = 2,
     STRATUS = 3,
-    LAST // All newly added Tier must be added above LAST
+    LAST = 4 // All newly added Tier must be added above LAST, and change the assigned values so they are in order
 };
+
+/** Zelnode Tier code
+ * Any changes to this code needs to be also made to the code in coins.h and coins.cpp
+ * We are unable to use the same code because of build/linking restrictions
+ */
+extern std::vector<CAmount> vTierAmounts;
+void InitializeTierAmounts();
+bool GetTierFromAmount(const CAmount& nAmount, int& nTier);
+bool IsValidTier(const int& nTier);
+/** Zelnode Tier code end **/
+
 
 std::string ZelnodeLocationToString(int nLocation);
 
@@ -135,6 +146,10 @@ public:
     bool isStratus()
     {
         return nTier == STRATUS;
+    }
+
+    bool isValidTier() {
+        return nTier > NONE && nTier < LAST;
     }
 
     std::string TierToString()

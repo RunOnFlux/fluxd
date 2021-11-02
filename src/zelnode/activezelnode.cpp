@@ -202,18 +202,16 @@ vector<std::pair<COutput, CAmount>> ActiveZelnode::SelectCoinsZelnode()
             pwalletMain->LockCoin(outpoint);
     }
 
+
+    // Build list of valid amounts
+    set<CAmount> validZelnodeCollaterals;
+    for (int validTier = CUMULUS; validTier != LAST; validTier++)
+        validZelnodeCollaterals.insert(vTierAmounts[validTier]);
+
     // Filter
     for (const COutput& out : vCoins) {
-        if (out.tx->vout[out.i].nValue == ZELNODE_CUMULUS_COLLATERAL * COIN) { //exactly
-            filteredCoins.push_back(std::make_pair(out, ZELNODE_CUMULUS_COLLATERAL * COIN));
-        }
-
-        else if (out.tx->vout[out.i].nValue == ZELNODE_NIMBUS_COLLATERAL * COIN) { //exactly
-            filteredCoins.push_back(std::make_pair(out, ZELNODE_NIMBUS_COLLATERAL * COIN));
-        }
-
-        else if (out.tx->vout[out.i].nValue == ZELNODE_STRATUS_COLLATERAL * COIN) { //exactly
-            filteredCoins.push_back(std::make_pair(out, ZELNODE_STRATUS_COLLATERAL * COIN));
+        if (validZelnodeCollaterals.count(out.tx->vout[out.i].nValue)) {
+            filteredCoins.push_back(std::make_pair(out, out.tx->vout[out.i].nValue));
         }
     }
     return filteredCoins;
