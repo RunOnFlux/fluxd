@@ -1368,7 +1368,7 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
         }
 
         if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
-            if (!IsValidTier(tx.benchmarkTier)) {
+            if (!IsTierValid(tx.benchmarkTier)) {
                 return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, invalid benchmarking tier"),
                                  REJECT_INVALID, "bad-txns-zelnode-tx-invalid-benchmark-tier");
             }
@@ -2394,7 +2394,7 @@ CAmount GetFoundationFundAmount(int nHeight, const Consensus::Params& consensusP
     return 0;
 }
 
-CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier) // TODO tie in consensusParams
+CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier)
 {
     float fMultiple = 1.0;
     bool fluxRebrandActive = NetworkUpgradeActive(nHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
@@ -2403,28 +2403,19 @@ CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier)
     }
 
 //    std::cout << "Testing Zelnode Subsidy" << std::endl;
-//    CAmount tb = blockValue * (0.0375 * fMultiple);
-//    CAmount ts = blockValue * (0.0625 * fMultiple);
-//    CAmount tba = blockValue * (0.15 * fMultiple);
+//    CAmount tb = blockValue * (V1_ZELNODE_PERCENT_CUMULUS * fMultiple);
+//    CAmount ts = blockValue * (V1_ZELNODE_PERCENT_NIMBUS * fMultiple);
+//    CAmount tba = blockValue * (V1_ZELNODE_PERCENT_STRATUS * fMultiple);
 //
 //    CAmount total = tb + ts + tba;
 //    std::cout << "Got total of: " << total << std::endl;
 
+     float percentage = ZELNODE_PERCENT_NULL;
+     if (GetTierPercentage(nNodeTier, percentage)) {
+         return blockValue * (percentage * fMultiple);
+     }
 
-
-    /** This is one of the sections where we will be keeping the nNodeTier checks
-     * We are keeping it because it is very important that these numbers are verified and don't
-     * accidently get changes when adding new tiers.
-     */
-    if (nNodeTier == CUMULUS) {
-        return blockValue * (0.0375 * fMultiple);
-    } else if (nNodeTier == NIMBUS) {
-        return blockValue * (0.0625 * fMultiple);
-    } else if (nNodeTier == STRATUS) {
-        return blockValue * (0.15 * fMultiple);
-    }
-
-    return 0;
+     return 0;
 }
 
 bool IsSwapPoolInterval(const int64_t nHeight) {

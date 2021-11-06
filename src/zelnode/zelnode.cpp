@@ -904,15 +904,16 @@ bool ZelnodeCache::LoadData(ZelnodeCacheData& data)
 // Needs to be protected by locking cs before calling
 void ZelnodeCache::SortList(const int& nTier)
 {
-    if (nTier > NONE && nTier < LAST)
-        mapZelnodeList.at((Tier)nTier).listConfirmedZelnodes.sort();
+    if (IsTierValid(nTier)) {
+        mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.sort();
+    }
 
 }
 
 // Needs to be protected by locking cs before calling
 bool ZelnodeCache::CheckListHas(const ZelnodeCacheData& p_zelnodeData)
 {
-    if (IsValidTier(p_zelnodeData.nTier)) {
+    if (IsTierValid(p_zelnodeData.nTier)) {
         return mapZelnodeList.at((Tier) p_zelnodeData.nTier).setConfirmedTxInList.count(p_zelnodeData.collateralIn);
     }
 
@@ -933,7 +934,7 @@ bool ZelnodeCache::CheckListSet(const COutPoint& p_OutPoint)
 
 void ZelnodeCache::InsertIntoList(const ZelnodeCacheData& p_zelnodeData)
 {
-    if (IsValidTier(p_zelnodeData.nTier)) {
+    if (IsTierValid(p_zelnodeData.nTier)) {
         ZelnodeListData listData(p_zelnodeData);
         mapZelnodeList.at((Tier) p_zelnodeData.nTier).setConfirmedTxInList.insert(p_zelnodeData.collateralIn);
         mapZelnodeList.at((Tier) p_zelnodeData.nTier).listConfirmedZelnodes.emplace_front(listData);
@@ -1081,6 +1082,7 @@ std::string GetZelnodeBenchmarkPublicKey(const CTransaction& tx)
  * We are unable to use the same code because of build/linking restrictions
  */
 std::vector<CAmount> vTierAmounts;
+std::map<int, float> mapTierPercentages;
 void InitializeTierAmounts() {
     static bool fInit = false;
 
@@ -1089,16 +1091,30 @@ void InitializeTierAmounts() {
 
     vTierAmounts.clear();
     vTierAmounts.push_back(0); // NONE
-    vTierAmounts.push_back(10000 * COIN); // CUMULUS
-    vTierAmounts.push_back(25000 * COIN); // NIMBUS
-    vTierAmounts.push_back(100000 * COIN); // STRATUS
+    vTierAmounts.push_back(V1_ZELNODE_COLLAT_CUMULUS * COIN); // CUMULUS
+    vTierAmounts.push_back(V1_ZELNODE_COLLAT_NIMBUS * COIN); // NIMBUS
+    vTierAmounts.push_back(V1_ZELNODE_COLLAT_STRATUS * COIN); // STRATUS
     vTierAmounts.push_back(0); // LAST
+
+    mapTierPercentages[CUMULUS] = V1_ZELNODE_PERCENT_CUMULUS;
+    mapTierPercentages[NIMBUS] = V1_ZELNODE_PERCENT_NIMBUS;
+    mapTierPercentages[STRATUS] = V1_ZELNODE_PERCENT_STRATUS;
+
     fInit = true;
+}
+
+bool GetTierPercentage(const int& nTier, float& p_float)
+{
+    if (mapTierPercentages.count(nTier)) {
+        p_float = mapTierPercentages.at(nTier);
+        return true;
+    }
+
+    return false;
 }
 
 bool GetTierFromAmount(const CAmount& nAmount, int& nTier)
 {
-    InitializeTierAmounts();
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
         if (nAmount == vTierAmounts[currentTier]) {
             nTier = currentTier;
@@ -1109,7 +1125,7 @@ bool GetTierFromAmount(const CAmount& nAmount, int& nTier)
     return false;
 }
 
-bool IsValidTier(const int& nTier)
+bool IsTierValid(const int& nTier)
 {
     return nTier > NONE && nTier < LAST;
 }

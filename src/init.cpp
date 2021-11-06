@@ -1521,6 +1521,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 uiInterface.InitMessage(_("Init zelnodecache"));
                 g_zelnodeCache.InitMapZelnodeList();
 
+                uiInterface.InitMessage(_("Init Tier Amounts Vectors"));
+                InitializeCoinTierAmounts();
+                InitializeTierAmounts();
+
                 uiInterface.InitMessage(_("Loading zelnodecache..."));
                 pZelnodeDB->LoadZelnodeCacheData();
 

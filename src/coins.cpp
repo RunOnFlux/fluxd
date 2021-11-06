@@ -640,7 +640,7 @@ bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_H
     if (p_Height - coins->nHeight < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC) {
         return false;
     }
-    InitializeCoinTierAmounts();
+
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
         if (coins->vout[prevout.n].nValue == vCoinTierAmounts[currentTier]) {
             nTier = currentTier;
@@ -651,7 +651,7 @@ bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_H
     // Get the tier from the amount if possible
     GetCoinTierFromAmount(coins->vout[prevout.n].nValue, nTier);
 
-    return nTier > NONE && nTier < LAST;
+    return IsCoinTierValid(nTier);
 }
 
 double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight) const
@@ -703,10 +703,11 @@ CCoinsModifier::~CCoinsModifier()
 }
 
 /** Coins Tier code
- * Any changes to this code needs to be also made to the code in main.h and main.cpp
+ * Any changes to this code needs to be also made to the code in zelnode.h and zelnode.cpp
  * We are unable to use the same code because of build/linking restrictions
  */
 std::vector<CAmount> vCoinTierAmounts;
+std::map<int, float> mapCoinTierPercentages;
 void InitializeCoinTierAmounts() {
     static bool fInit = false;
 
@@ -715,16 +716,20 @@ void InitializeCoinTierAmounts() {
 
     vCoinTierAmounts.clear();
     vCoinTierAmounts.push_back(0); // NONE
-    vCoinTierAmounts.push_back(10000 * COIN); // CUMULUS
-    vCoinTierAmounts.push_back(25000 * COIN); // NIMBUS
-    vCoinTierAmounts.push_back(100000 * COIN); // STRATUS
+    vCoinTierAmounts.push_back(V1_ZELNODE_COLLAT_CUMULUS * COIN); // CUMULUS
+    vCoinTierAmounts.push_back(V1_ZELNODE_COLLAT_NIMBUS * COIN); // NIMBUS
+    vCoinTierAmounts.push_back(V1_ZELNODE_COLLAT_STRATUS * COIN); // STRATUS
     vCoinTierAmounts.push_back(0); // LAST
+
+    mapCoinTierPercentages[CUMULUS] = V1_ZELNODE_PERCENT_CUMULUS;
+    mapCoinTierPercentages[NIMBUS] = V1_ZELNODE_PERCENT_NIMBUS;
+    mapCoinTierPercentages[STRATUS] = V1_ZELNODE_PERCENT_STRATUS;
+
     fInit = true;
 }
 
 bool GetCoinTierFromAmount(const CAmount& nAmount, int& nTier)
 {
-    InitializeCoinTierAmounts();
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
         if (nAmount == vCoinTierAmounts[currentTier]) {
             nTier = currentTier;
@@ -733,6 +738,21 @@ bool GetCoinTierFromAmount(const CAmount& nAmount, int& nTier)
     }
 
     return false;
+}
+
+bool GetCoinTierPercentage(const int& nTier, float& p_float)
+{
+    if (mapCoinTierPercentages.count(nTier)) {
+        p_float = mapCoinTierPercentages.at(nTier);
+        return true;
+    }
+
+    return false;
+}
+
+bool IsCoinTierValid(const int& nTier)
+{
+    return nTier > NONE && nTier < LAST;
 }
 /** Coins Tier code end **/
 

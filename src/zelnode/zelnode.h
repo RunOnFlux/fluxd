@@ -36,6 +36,25 @@
 // Max signature time that we accept into the mempool
 #define ZELNODE_MAX_SIG_TIME 3600
 
+/** Zelnode Collateral Amounts
+ * This will be the place that will hold all zelnode collateral amounts
+ * As we make changes to the node structure, this is where the new amount should be placed
+ * Use the naming mechanism as we make changes V1 -> V2 -> V3 -> V4
+ */
+#define V1_ZELNODE_COLLAT_CUMULUS 10000
+#define V1_ZELNODE_COLLAT_NIMBUS 25000
+#define V1_ZELNODE_COLLAT_STRATUS 100000
+
+/** Zelnode Payout Percentages
+ * This will be the place that will hold all Zelnode Payout Percentages
+ * As we make changes to the node structure, this is where the new percentages should be placed
+ * Use the naming mechanism as we make changes V1 -> V2 -> V3 -> V4
+ */
+#define ZELNODE_PERCENT_NULL 0.00
+#define V1_ZELNODE_PERCENT_CUMULUS 0.0375
+#define V1_ZELNODE_PERCENT_NIMBUS 0.0625
+#define V1_ZELNODE_PERCENT_STRATUS 0.15
+
 class ZelnodeCache;
 class CZelnodeTxBlockUndo;
 class ActiveZelnode;
@@ -79,10 +98,12 @@ enum Tier {
  * We are unable to use the same code because of build/linking restrictions
  */
 extern std::vector<CAmount> vTierAmounts;
+extern std::map<int, float> mapTierPercentages;
 void InitializeTierAmounts();
 bool GetTierFromAmount(const CAmount& nAmount, int& nTier);
-bool IsValidTier(const int& nTier);
+bool IsTierValid(const int& nTier);
 int GetNumberOfTiers();
+bool GetTierPercentage(const int& nTier, float& p_float);
 /** Zelnode Tier code end **/
 
 
@@ -144,7 +165,7 @@ public:
         return nTier == STRATUS;
     }
 
-    bool isValidTier() {
+    bool isTierValid() {
         return nTier > NONE && nTier < LAST;
     }
 
