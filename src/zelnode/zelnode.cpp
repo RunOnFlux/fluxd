@@ -1082,7 +1082,7 @@ std::string GetZelnodeBenchmarkPublicKey(const CTransaction& tx)
  * We are unable to use the same code because of build/linking restrictions
  */
 std::vector<CAmount> vTierAmounts;
-std::map<int, float> mapTierPercentages;
+std::map<int, double> mapTierPercentages;
 void InitializeTierAmounts() {
     static bool fInit = false;
 
@@ -1103,10 +1103,10 @@ void InitializeTierAmounts() {
     fInit = true;
 }
 
-bool GetTierPercentage(const int& nTier, float& p_float)
+bool GetTierPercentage(const int& nTier, double& p_double)
 {
     if (mapTierPercentages.count(nTier)) {
-        p_float = mapTierPercentages.at(nTier);
+        p_double = mapTierPercentages.at(nTier);
         return true;
     }
 

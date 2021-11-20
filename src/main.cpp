@@ -2410,7 +2410,7 @@ CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier)
 //    CAmount total = tb + ts + tba;
 //    std::cout << "Got total of: " << total << std::endl;
 
-     float percentage = ZELNODE_PERCENT_NULL;
+     double percentage = ZELNODE_PERCENT_NULL;
      if (GetTierPercentage(nNodeTier, percentage)) {
          return blockValue * (percentage * fMultiple);
      }
@@ -4652,7 +4652,7 @@ bool ContextualCheckBlockHeader(
     int listlength=validEHparameterList(ehparams,nHeight,chainParams);
     int solutionInvalid=1;
         for(int i=0; i<listlength; i++){
-        LogPrint("pow", "ContextCheckBlockHeader index %d n:%d k:%d Solsize: %d \n",i, ehparams[i].n, ehparams[i].k , ehparams[i].nSolSize);
+//        LogPrint("pow", "ContextCheckBlockHeader index %d n:%d k:%d Solsize: %d \n",i, ehparams[i].n, ehparams[i].k , ehparams[i].nSolSize);
         if(ehparams[i].nSolSize==nSolSize)
             solutionInvalid=0;
     }

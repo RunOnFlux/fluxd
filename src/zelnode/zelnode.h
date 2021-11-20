@@ -98,12 +98,12 @@ enum Tier {
  * We are unable to use the same code because of build/linking restrictions
  */
 extern std::vector<CAmount> vTierAmounts;
-extern std::map<int, float> mapTierPercentages;
+extern std::map<int, double> mapTierPercentages;
 void InitializeTierAmounts();
 bool GetTierFromAmount(const CAmount& nAmount, int& nTier);
 bool IsTierValid(const int& nTier);
 int GetNumberOfTiers();
-bool GetTierPercentage(const int& nTier, float& p_float);
+bool GetTierPercentage(const int& nTier, double& p_double);
 /** Zelnode Tier code end **/
 
 

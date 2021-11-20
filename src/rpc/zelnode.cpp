@@ -167,11 +167,11 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
                     if (GetTransaction(tx.collateralOut.hash, get_tx, Params().GetConsensus(), block_hash,
                                        true)) {
                         if (get_tx.vout[tx.collateralOut.n].nValue == 10000 * COIN)
-                            nTier = Zelnode::CUMULUS;
+                            nTier = CUMULUS;
                         else if (get_tx.vout[tx.collateralOut.n].nValue == 25000 * COIN)
-                            nTier = Zelnode::NIMBUS;
+                            nTier = NIMBUS;
                         else if (get_tx.vout[tx.collateralOut.n].nValue == 100000 * COIN)
-                            nTier = Zelnode::STRATUS;
+                            nTier = STRATUS;
 
                     } else {
                         return error("Failed to find tx");
