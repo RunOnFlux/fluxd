@@ -918,6 +918,7 @@ bool ContextualCheckTransaction(
         const int nHeight,
         const int dosLevel,
         bool fFromAccept,
+        bool fFromMempool,
         bool (*isInitBlockDownload)(const CChainParams&))
 {
     bool saplingActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA);
@@ -1240,7 +1241,9 @@ bool ContextualCheckTransaction(
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed";
                 }
 
-                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx)) {
+                // Check the update height, but make sure we only pass in the height if this check is coming from an AcceptBlock call
+                // If it is coming from an AcceptBlock call pass in the height of the block otherwise use the default 0
+                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx, fFromAccept || fFromMempool ? nHeight : 0)) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon";
                 }
@@ -1632,8 +1635,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         if (tx.nType == ZELNODE_CONFIRM_TX_TYPE && tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
             {
                 LOCK(g_zelnodeCache.cs);
-                if (!g_zelnodeCache.CheckConfirmationHeights(nextBlockHeight - 1, tx.collateralOut, tx.ip)) {
-                    LogPrint("mempool", "Dropping confirmation zelnode txid %s : failed CheckConfirmationHeights check", tx.GetHash().ToString());
+                if (!g_zelnodeCache.CheckConfirmationHeights(nextBlockHeight, tx.collateralOut, tx.ip)) {
+                    LogPrint("mempool", "Dropping confirmation zelnode txid %s : failed CheckConfirmationHeights check\n", tx.GetHash().ToString());
                     return false;
                 }
             }
@@ -1646,7 +1649,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
     // DoS level set to 10 to be more forgiving.
     // Check transaction contextually against the set of consensus rules which apply in the next block to be mined.
-    if (!ContextualCheckTransaction(tx, state, Params(), nextBlockHeight, 10, false)) {
+    if (!ContextualCheckTransaction(tx, state, Params(), nextBlockHeight, 10, false, true)) {
         return error("AcceptToMemoryPool: ContextualCheckTransaction failed");
     }
 
