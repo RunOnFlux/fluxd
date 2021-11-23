@@ -476,8 +476,9 @@ void FillBlockPayeeWithDeterministicPayouts(CMutableTransaction& txNew, CAmount 
         ZelnodePayoutInfo info;
         if (g_zelnodeCache.GetNextPayment(info.dest, currentTier, info.outpoint)) {
             info.amount = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, currentTier);
-        } else {
             info.foundpayout = true;
+        } else {
+            info.foundpayout = false;
             nTotalPayouts--;
         }
         mapZelnodePayouts.insert(std::make_pair((Tier)currentTier, info));
