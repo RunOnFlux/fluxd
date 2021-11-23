@@ -262,7 +262,7 @@ class CTestNetParams : public CChainParams {
 public:
     CTestNetParams() {
         strNetworkID = "test";
-        strCurrencyUnits = "TESTZEL";
+        strCurrencyUnits = "TESTFLUX";
         bip44CoinType = 1;
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 1;
@@ -302,7 +302,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 350;
 
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
-        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 4000; // Around March 30 2021
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 420; // Around March 30 2021
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
@@ -310,7 +310,7 @@ public:
 
         eh_epoch_1 = eh48_5;
         eh_epoch_2 = eh48_5;
-        eh_epoch_3 = eh48_5;
+        eh_epoch_3 = zelHash;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -334,7 +334,7 @@ public:
 
         vFixedSeeds.clear();
         vSeeds.clear();
-        vSeeds.push_back(CDNSSeedData("zel-testnet-seed.asoftwaresolution.com", "zel-testnet-seed.asoftwaresolution.com")); // Blondfrogs
+        vSeeds.push_back(CDNSSeedData("flux-testnet-seed.asoftwaresolution.com", "flux-testnet-seed.asoftwaresolution.com")); // Blondfrogs
         vSeeds.push_back(CDNSSeedData("test.vps.zel.network", "test.dnsseed.zel.network")); // Zel
         vSeeds.push_back(CDNSSeedData("test.vps.runonflux.io", "test.dnsseed.runonflux.io")); // Flux
         // guarantees the first 2 characters, when base58 encoded, are "tm"
