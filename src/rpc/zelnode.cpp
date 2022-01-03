@@ -144,7 +144,7 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
                     if (GetTransaction(tx.collateralOut.hash, get_tx, Params().GetConsensus(), block_hash,
                                        true)) {
 
-                        if (!GetTierFromAmount(get_tx.vout[tx.collateralOut.n].nValue, nTier)) {
+                        if (!GetCoinTierFromAmount(rescanIndex->nHeight, get_tx.vout[tx.collateralOut.n].nValue, nTier)) {
                             return error("Failed to get tier from amount. This shouldn't happen tx = %s", tx.collateralOut.ToFullString());
                         }
 

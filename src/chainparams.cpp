@@ -254,6 +254,13 @@ public:
         nSwapPoolInterval = 21600; // Avg Block per day (720) *  - Trying to get to around once a month
         nSwapPoolMaxTimes = 10;
 
+        nBeginCumulusTransition = 999999999;
+        nEndCumulusTransition = 999999999;
+        nBeginNimbusTransition = 999999999;
+        nEndNimbusTransition = 999999999;
+        nBeginStratusTransition = 999999999;
+        nEndStratusTransition = 999999999;
+
         // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
         // in #2795.
@@ -410,6 +417,14 @@ public:
         nSwapPoolInterval = 100;
         nSwapPoolMaxTimes = 10;
 
+        nBeginCumulusTransition = 9999999999;
+        nEndCumulusTransition = 9999999999;
+        nBeginNimbusTransition = 9999999999;
+        nEndNimbusTransition = 9999999999;
+        nBeginStratusTransition = 9999999999;
+        nEndStratusTransition = 9999999999;
+
+
     // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
         // in #2795.
@@ -559,6 +574,13 @@ public:
         nSwapPoolAmount = 2100000 * COIN;
         nSwapPoolInterval = 10;
         nSwapPoolMaxTimes = 5;
+
+        nBeginCumulusTransition = 9999999999;
+        nEndCumulusTransition = 9999999999;
+        nBeginNimbusTransition = 9999999999;
+        nEndNimbusTransition = 9999999999;
+        nBeginStratusTransition = 9999999999;
+        nEndStratusTransition = 9999999999;
     }
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)

@@ -641,15 +641,10 @@ bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_H
         return false;
     }
 
-    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-        if (coins->vout[prevout.n].nValue == vCoinTierAmounts[currentTier]) {
-            nTier = currentTier;
-            return true;
-        }
-    }
-
     // Get the tier from the amount if possible
-    GetCoinTierFromAmount(coins->vout[prevout.n].nValue, nTier);
+    if (!GetCoinTierFromAmount(p_Height, coins->vout[prevout.n].nValue, nTier)) {
+        return false;
+    }
 
     return IsCoinTierValid(nTier);
 }
@@ -706,20 +701,12 @@ CCoinsModifier::~CCoinsModifier()
  * Any changes to this code needs to be also made to the code in zelnode.h and zelnode.cpp
  * We are unable to use the same code because of build/linking restrictions
  */
-std::vector<CAmount> vCoinTierAmounts;
-std::map<int, float> mapCoinTierPercentages;
+std::map<int, double> mapCoinTierPercentages;
 void InitializeCoinTierAmounts() {
     static bool fInit = false;
 
     if (fInit)
         return;
-
-    vCoinTierAmounts.clear();
-    vCoinTierAmounts.push_back(0); // NONE
-    vCoinTierAmounts.push_back(V1_ZELNODE_COLLAT_CUMULUS * COIN); // CUMULUS
-    vCoinTierAmounts.push_back(V1_ZELNODE_COLLAT_NIMBUS * COIN); // NIMBUS
-    vCoinTierAmounts.push_back(V1_ZELNODE_COLLAT_STRATUS * COIN); // STRATUS
-    vCoinTierAmounts.push_back(0); // LAST
 
     mapCoinTierPercentages[CUMULUS] = V1_ZELNODE_PERCENT_CUMULUS;
     mapCoinTierPercentages[NIMBUS] = V1_ZELNODE_PERCENT_NIMBUS;
@@ -728,22 +715,67 @@ void InitializeCoinTierAmounts() {
     fInit = true;
 }
 
-bool GetCoinTierFromAmount(const CAmount& nAmount, int& nTier)
+bool GetCoinTierFromAmount(const int& p_Height, const CAmount& nAmount, int& nTier)
 {
+    std::map<CAmount, Tier> mapTempCoinTierAmounts;
+
+    // Get correct collat amounts for all tiers
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-        if (nAmount == vCoinTierAmounts[currentTier]) {
-            nTier = currentTier;
-            return true;
+        const std::set<CAmount> setAmounts = GetCoinAmountsByTier(p_Height, currentTier);
+        for (const CAmount& amount : setAmounts) {
+            mapTempCoinTierAmounts[amount] = (Tier)currentTier;
         }
+    }
+
+    if (mapTempCoinTierAmounts.count(nAmount)) {
+        nTier = mapTempCoinTierAmounts.at(nAmount);
+        return true;
     }
 
     return false;
 }
 
-bool GetCoinTierPercentage(const int& nTier, float& p_float)
+std::set<CAmount> GetCoinAmountsByTier(const int& p_Height, const int& nTier)
+{
+    std::set<CAmount> setAmounts;
+
+    if (nTier == STRATUS) {
+        if (p_Height < Params().GetStratusStartTransitionHeight()) {
+            setAmounts.insert(V1_ZELNODE_COLLAT_STRATUS * COIN);
+        } else if (p_Height >= Params().GetStratusStartTransitionHeight() &&
+                   p_Height < Params().GetStratusEndTransitionHeight()) {
+            setAmounts.insert(V1_ZELNODE_COLLAT_STRATUS * COIN);
+            setAmounts.insert(V2_ZELNODE_COLLAT_STRATUS * COIN);
+        } else {
+            setAmounts.insert(V2_ZELNODE_COLLAT_STRATUS * COIN);
+        }
+    } else if (nTier == NIMBUS) {
+        if (p_Height < Params().GetNimbusStartTransitionHeight()) {
+            setAmounts.insert(V1_ZELNODE_COLLAT_NIMBUS * COIN);
+        } else if (p_Height >= Params().GetNimbusStartTransitionHeight() && p_Height < Params().GetNimbusEndTransitionHeight()) {
+            setAmounts.insert(V1_ZELNODE_COLLAT_NIMBUS * COIN);
+            setAmounts.insert(V2_ZELNODE_COLLAT_NIMBUS * COIN);
+        } else {
+            setAmounts.insert(V2_ZELNODE_COLLAT_NIMBUS * COIN);
+        }
+    } else if (nTier == CUMULUS) {
+        if (p_Height < Params().GetCumulusStartTransitionHeight()) {
+            setAmounts.insert(V1_ZELNODE_COLLAT_CUMULUS * COIN);
+        } else if (p_Height >= Params().GetCumulusStartTransitionHeight() && p_Height < Params().GetCumulusEndTransitionHeight()) {
+            setAmounts.insert(V1_ZELNODE_COLLAT_CUMULUS * COIN);
+            setAmounts.insert(V2_ZELNODE_COLLAT_CUMULUS * COIN);
+        } else {
+            setAmounts.insert(V2_ZELNODE_COLLAT_CUMULUS * COIN);
+        }
+    }
+
+    return setAmounts;
+}
+
+bool GetCoinTierPercentage(const int& nTier, double& p_double)
 {
     if (mapCoinTierPercentages.count(nTier)) {
-        p_float = mapCoinTierPercentages.at(nTier);
+        p_double = mapCoinTierPercentages.at(nTier);
         return true;
     }
 

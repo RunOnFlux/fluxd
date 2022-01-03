@@ -89,9 +89,9 @@ enum WalletFeature
 
 enum AvailableCoinsType {
     ALL_COINS = 1,
-    ONLY_10000 = 2,   // find zelnode outputs including locked ones (use with caution) for 10000
-    ONLY_25000 = 3,   // find zelnode outputs including locked ones (use with caution) for 25000
-    ONLY_100000 = 4,  // find zelnode outputs including locked ones (use with caution) for 100000
+    ONLY_CUMULUS = 2,   // find zelnode outputs including locked ones (use with caution) for 10000
+    ONLY_NIMBUS = 3,   // find zelnode outputs including locked ones (use with caution) for 25000
+    ONLY_STRATUS = 4,  // find zelnode outputs including locked ones (use with caution) for 100000
     ALL_ZELNODE = 5
 };
 

@@ -45,6 +45,11 @@
 #define V1_ZELNODE_COLLAT_NIMBUS 25000
 #define V1_ZELNODE_COLLAT_STRATUS 100000
 
+#define V2_ZELNODE_COLLAT_CUMULUS 1000
+#define V2_ZELNODE_COLLAT_NIMBUS 12500
+#define V2_ZELNODE_COLLAT_STRATUS 40000
+
+
 /** Zelnode Payout Percentages
  * This will be the place that will hold all Zelnode Payout Percentages
  * As we make changes to the node structure, this is where the new percentages should be placed
@@ -93,17 +98,12 @@ enum Tier {
     LAST = 4 // All newly added Tier must be added above LAST, and change the assigned values so they are in order
 };
 
-/** Zelnode Tier code
+/** Zelnode Tier code start
  * Any changes to this code needs to be also made to the code in coins.h and coins.cpp
  * We are unable to use the same code because of build/linking restrictions
  */
-extern std::vector<CAmount> vTierAmounts;
-extern std::map<int, double> mapTierPercentages;
-void InitializeTierAmounts();
-bool GetTierFromAmount(const CAmount& nAmount, int& nTier);
 bool IsTierValid(const int& nTier);
 int GetNumberOfTiers();
-bool GetTierPercentage(const int& nTier, double& p_double);
 /** Zelnode Tier code end **/
 
 

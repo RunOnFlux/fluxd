@@ -40,24 +40,6 @@ bool GetTestingCollateralScript(std::string strAddress, CScript& script)
     return true;
 }
 
-bool CObfuScationSigner::IsVinAssociatedWithPubkey(CTxIn& vin, CPubKey& pubkey, int& nNodeTier)
-{
-    CScript payee2;
-    payee2 = GetScriptForDestination(pubkey.GetID());
-
-    CTransaction txVin;
-    uint256 hash;
-    if (GetTransaction(vin.prevout.hash, txVin, Params().GetConsensus(), hash, true)) {
-        for (CTxOut out : txVin.vout) {
-            if (GetTierFromAmount(out.nValue, nNodeTier)) {
-                return true;
-            }
-        }
-    }
-    nNodeTier = NONE;
-    return false;
-}
-
 bool CObfuScationSigner::SetKey(std::string strSecret, std::string& errorMessage, CKey& key, CPubKey& pubkey)
 {
     key = DecodeSecret(strSecret);
@@ -68,17 +50,6 @@ bool CObfuScationSigner::SetKey(std::string strSecret, std::string& errorMessage
     }
 
     pubkey = key.GetPubKey();
-    return true;
-}
-
-bool CObfuScationSigner::GetKeysFromSecret(std::string strSecret, CKey& keyRet, CPubKey& pubkeyRet)
-{
-    keyRet = DecodeSecret(strSecret);
-
-    if (!keyRet.IsValid()) {
-        return error("Failed to get private key from secret");
-    }
-    pubkeyRet = keyRet.GetPubKey();
     return true;
 }
 

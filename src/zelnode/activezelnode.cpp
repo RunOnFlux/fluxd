@@ -202,11 +202,18 @@ vector<std::pair<COutput, CAmount>> ActiveZelnode::SelectCoinsZelnode()
             pwalletMain->LockCoin(outpoint);
     }
 
+    int nCurrentHeight = 0;
+    {
+        LOCK(cs_main);
+        nCurrentHeight = chainActive.Height();
+    }
 
     // Build list of valid amounts
     set<CAmount> validZelnodeCollaterals;
-    for (int validTier = CUMULUS; validTier != LAST; validTier++)
-        validZelnodeCollaterals.insert(vTierAmounts[validTier]);
+    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+        set<CAmount> setTierAmounts = GetCoinAmountsByTier(nCurrentHeight, currentTier);
+        validZelnodeCollaterals.insert(setTierAmounts.begin(), setTierAmounts.end());
+    }
 
     // Filter
     for (const COutput& out : vCoins) {

@@ -2421,7 +2421,7 @@ CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier)
 //    std::cout << "Got total of: " << total << std::endl;
 
      double percentage = ZELNODE_PERCENT_NULL;
-     if (GetTierPercentage(nNodeTier, percentage)) {
+     if (GetCoinTierPercentage(nNodeTier, percentage)) {
          return blockValue * (percentage * fMultiple);
      }
 

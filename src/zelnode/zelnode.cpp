@@ -1128,54 +1128,8 @@ std::string GetZelnodeBenchmarkPublicKey(const CTransaction& tx)
     return vectorPublicKeys[0].first;
 }
 
-/** Zelnode Tier code
- * Any changes to this code needs to be also made to the code in coins.h and coins.cpp
- * We are unable to use the same code because of build/linking restrictions
+/** Zelnode Tier functions
  */
-std::vector<CAmount> vTierAmounts;
-std::map<int, double> mapTierPercentages;
-void InitializeTierAmounts() {
-    static bool fInit = false;
-
-    if (fInit)
-        return;
-
-    vTierAmounts.clear();
-    vTierAmounts.push_back(0); // NONE
-    vTierAmounts.push_back(V1_ZELNODE_COLLAT_CUMULUS * COIN); // CUMULUS
-    vTierAmounts.push_back(V1_ZELNODE_COLLAT_NIMBUS * COIN); // NIMBUS
-    vTierAmounts.push_back(V1_ZELNODE_COLLAT_STRATUS * COIN); // STRATUS
-    vTierAmounts.push_back(0); // LAST
-
-    mapTierPercentages[CUMULUS] = V1_ZELNODE_PERCENT_CUMULUS;
-    mapTierPercentages[NIMBUS] = V1_ZELNODE_PERCENT_NIMBUS;
-    mapTierPercentages[STRATUS] = V1_ZELNODE_PERCENT_STRATUS;
-
-    fInit = true;
-}
-
-bool GetTierPercentage(const int& nTier, double& p_double)
-{
-    if (mapTierPercentages.count(nTier)) {
-        p_double = mapTierPercentages.at(nTier);
-        return true;
-    }
-
-    return false;
-}
-
-bool GetTierFromAmount(const CAmount& nAmount, int& nTier)
-{
-    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-        if (nAmount == vTierAmounts[currentTier]) {
-            nTier = currentTier;
-            return true;
-        }
-    }
-
-    return false;
-}
-
 bool IsTierValid(const int& nTier)
 {
     return nTier > NONE && nTier < LAST;
