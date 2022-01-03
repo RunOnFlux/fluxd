@@ -368,7 +368,8 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
             if (tx.IsZelnodeTx()) {
                 int nTier;
-                if (!view.CheckZelnodeTxInput(tx, pindexPrev->nHeight + 1, nTier))
+                CAmount nCollateralAmount;
+                if (!view.CheckZelnodeTxInput(tx, pindexPrev->nHeight + 1, nTier, nCollateralAmount))
                     continue;
             }
 

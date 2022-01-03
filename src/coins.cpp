@@ -624,7 +624,7 @@ bool CCoinsViewCache::HaveInputs(const CTransaction& tx) const
     return true;
 }
 
-bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier) const
+bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier, CAmount& nCollateralAmount) const
 {
     if (!tx.IsZelnodeTx()) {
         return false;
@@ -645,6 +645,8 @@ bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_H
     if (!GetCoinTierFromAmount(p_Height, coins->vout[prevout.n].nValue, nTier)) {
         return false;
     }
+
+    nCollateralAmount = coins->vout[prevout.n].nValue;
 
     return IsCoinTierValid(nTier);
 }

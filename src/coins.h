@@ -540,7 +540,7 @@ public:
     bool HaveInputs(const CTransaction& tx) const;
 
     //! Check whether the prevout is present in the UTXO set represented by this view
-    bool CheckZelnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier) const;
+    bool CheckZelnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier, CAmount& nCollateralAmount) const;
 
     //! Check whether all joinsplit and sapling spend requirements (anchors/nullifiers) are satisfied
     bool HaveShieldedRequirements(const CTransaction& tx) const;

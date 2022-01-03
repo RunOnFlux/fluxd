@@ -157,7 +157,7 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
                     if (tx.nType == ZELNODE_START_TX_TYPE) {
 
                         // Add new Zelnode Start Tx into local cache
-                        zelnodeCache.AddNewStart(tx, rescanIndex->nHeight, nTier);
+                        zelnodeCache.AddNewStart(tx, rescanIndex->nHeight, nTier, get_tx.vout[tx.collateralOut.n].nValue);
                         int64_t nLoop3 = GetTimeMicros(); nAddStart += nLoop3 - nLoop2;
 
                     } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {

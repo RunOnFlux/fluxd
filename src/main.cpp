@@ -1768,12 +1768,14 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             if (tx.nType == ZELNODE_START_TX_TYPE) {
                 // Check to make sure the input is not spent and meets the criteria of a zelnode input
                 int nTier;
-                if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier)) {
+                CAmount nCollateralAmount;
+                if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier, nCollateralAmount)) {
                     return state.DoS(10, error("bad-txns-zelnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-zelnode-inputs-invalid-spent-or-bad-value");
                 }
             } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
                 int nTier;
-                if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier)) {
+                CAmount nCollateralAmount;
+                if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier, nCollateralAmount)) {
                     return state.DoS(10, error("bad-txns-zelnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-zelnode-inputs-invalid-spent-or-bad-value");
                 }
             }
@@ -3365,7 +3367,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
             if (tx.IsZelnodeTx()) {
                 int nTier = 0;
-                if (!view.CheckZelnodeTxInput(tx, pindex->nHeight, nTier))
+                CAmount nCollateralAmount;
+                if (!view.CheckZelnodeTxInput(tx, pindex->nHeight, nTier, nCollateralAmount))
                     return state.DoS(100, error("ConnectBlock(): zelnode tx inputs missing/spent"),
                                      REJECT_INVALID, "bad-txns-zelnode-tx-inputs-missingorspent");
 
@@ -3377,7 +3380,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                         }
 
                         // Add new Zelnode Start Tx into local cache
-                        p_zelnodeCache->AddNewStart(tx, pindex->nHeight, nTier);
+                        p_zelnodeCache->AddNewStart(tx, pindex->nHeight, nTier, nCollateralAmount);
                     }
                 } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
                     if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {

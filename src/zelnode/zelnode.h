@@ -131,6 +131,8 @@ public:
 
     int8_t nStatus;
 
+    CAmount nCollateral;
+
     void SetNull() {
         nType = ZELNODE_NO_TYPE;
         nAddedBlockHeight = 0;
@@ -140,6 +142,7 @@ public:
         ip = "";
         nTier = 0;
         nStatus =  ZELNODE_TX_ERROR;
+        nCollateral = 0;
     }
 
     ZelnodeCacheData() {
@@ -210,6 +213,9 @@ public:
         READWRITE(ip);
         READWRITE(nTier);
         READWRITE(nStatus);
+        if (nType & ZELNODE_HAS_COLLATERAL) {
+            READWRITE(nCollateral);
+        }
     }
 };
 
@@ -369,7 +375,7 @@ public:
         mapPaidNodes.clear();
     }
 
-    void AddNewStart(const CTransaction& p_transaction, const int p_nHeight, int nTier = 0);
+    void AddNewStart(const CTransaction& p_transaction, const int p_nHeight, int nTier = 0, const CAmount nCollateral = 0);
     void UndoNewStart(const CTransaction& p_transaction, const int p_nHeight);
 
     void AddNewConfirm(const CTransaction& p_transaction, const int p_nHeight);
