@@ -298,7 +298,7 @@ void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction>& rem
         }
 
         if (origTx.IsZelnodeTx()) {
-            LogPrintf("%s: Remove zelnode tx from mempool %s\n", __func__, origTx.GetHash().GetHex());
+            LogPrint("zelnode", "%s: Remove zelnode tx from mempool %s\n", __func__, origTx.GetHash().GetHex());
             mapZelnodeTxMempool.erase(origTx.collateralOut);
         }
     }

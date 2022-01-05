@@ -1926,7 +1926,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             }
 
             if (tx.IsZelnodeTx()) {
-                LogPrintf("%s: Adding zelnode transaction to mempool: %s hash: %s\n", __func__, tx.collateralOut.ToString(), tx.GetHash().GetHex());
+                LogPrint("zelnode", "%s: Adding zelnode transaction to mempool: %s hash: %s\n", __func__, tx.collateralOut.ToString(), tx.GetHash().GetHex());
                 pool.mapZelnodeTxMempool[tx.collateralOut] = tx.GetHash();
                 pool.mapSeenZelnodeTx[tx.GetHash()] = GetTime();
 
