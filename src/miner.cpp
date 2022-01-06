@@ -13,6 +13,8 @@
 #include "consensus/consensus.h"
 #include "consensus/upgrades.h"
 #include "consensus/validation.h"
+#include "zelnode/zelnode.h"
+
 #ifdef ENABLE_MINING
 #include "crypto/equihash.h"
 #endif
@@ -38,8 +40,6 @@
 #include <functional>
 #endif
 #include <mutex>
-#include "zelnode/payments.h"
-#include "zelnode/spork.h"
 
 using namespace std;
 
@@ -457,8 +457,6 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         //Zelnode payments
         if (pindexPrev->nHeight + 1 >= chainparams.StartZelnodePayments()) {
             FillBlockPayeeWithDeterministicPayouts(txNew, nFees, zelnodePayouts);
-        } else {
-            FillBlockPayee(txNew, nFees, zelnodePayouts);
         }
 
         // Exchange Fund

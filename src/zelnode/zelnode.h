@@ -15,21 +15,6 @@
 #include "timedata.h"
 #include "util.h"
 
-#define ZELNODE_MIN_CONFIRMATIONS 15 // Zelnode collateral minimum confirmations
-#define ZELNODE_MIN_ZNP_SECONDS (10 * 60) // Zelnode minimum ping time
-#define ZELNODE_MIN_ZNB_SECONDS (5 * 60) // Zelnode minimum broadcast time
-#define ZELNODE_PING_SECONDS (5 * 60)
-#define ZELNODE_EXPIRATION_SECONDS (120 * 60)
-#define ZELNODE_REMOVAL_SECONDS (130 * 60)
-#define ZELNODE_CHECK_SECONDS 5
-#define ZELNODE_MIN_BENCHMARK_SECONDS (60 * 60) // Benchmark required new zelnode broadcast
-
-
-/// Deterministic Zelnode consensus
-#define ZELNODE_CUMULUS_COLLATERAL 10000
-#define ZELNODE_NIMBUS_COLLATERAL 25000
-#define ZELNODE_STRATUS_COLLATERAL 100000
-
 // How old the output must be for zelnodes collateral to be considered valid
 #define ZELNODE_MIN_CONFIRMATION_DETERMINISTIC 100
 
@@ -47,351 +32,36 @@
 #define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT 40
 #define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE 5
 
-
 /// Mempool only
 // Max signature time that we accept into the mempool
 #define ZELNODE_MAX_SIG_TIME 3600
 
-class Zelnode;
-class ZelnodeBroadcast;
-class ZelnodePing;
+/** Zelnode Collateral Amounts
+ * This will be the place that will hold all zelnode collateral amounts
+ * As we make changes to the node structure, this is where the new amount should be placed
+ * Use the naming mechanism as we make changes V1 -> V2 -> V3 -> V4
+ */
+#define V1_ZELNODE_COLLAT_CUMULUS 10000
+#define V1_ZELNODE_COLLAT_NIMBUS 25000
+#define V1_ZELNODE_COLLAT_STRATUS 100000
+
+/** Zelnode Payout Percentages
+ * This will be the place that will hold all Zelnode Payout Percentages
+ * As we make changes to the node structure, this is where the new percentages should be placed
+ * Use the naming mechanism as we make changes V1 -> V2 -> V3 -> V4
+ */
+#define ZELNODE_PERCENT_NULL 0.00
+#define V1_ZELNODE_PERCENT_CUMULUS 0.0375
+#define V1_ZELNODE_PERCENT_NIMBUS 0.0625
+#define V1_ZELNODE_PERCENT_STRATUS 0.15
+
 class ZelnodeCache;
 class CZelnodeTxBlockUndo;
+class ActiveZelnode;
 
-extern std::map<int64_t, uint256> mapCacheBlockHashes;
-bool GetBlockHash(uint256& hash, int nBlockHeight);
-
-// ZELNODE_START map
-extern std::map<COutPoint, uint256> mapZelnodeStarted;
 extern ZelnodeCache g_zelnodeCache;
-
-
-/** Note: The Zelnode Ping class, contains a different serial method for sending pings from zelnodes throughout the network */
-
-class ZelnodePing
-{
-public:
-    CTxIn vin;
-    uint256 blockHash;
-    int64_t sigTime; //znb message times
-    std::vector<unsigned char> vchSig;
-
-    ZelnodePing();
-    ZelnodePing(CTxIn& newVin);
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action)
-    {
-        READWRITE(vin);
-        READWRITE(blockHash);
-        READWRITE(sigTime);
-        READWRITE(vchSig);
-    }
-
-    bool CheckAndUpdate(int& nDos, bool fRequireEnabled = true, bool fCheckSigTimeOnly = false);
-    bool Sign(CKey& keyZelnode, CPubKey& pubKeyZelnode);
-    bool VerifySignature(CPubKey& pubKeyZelnode, int &nDos);
-    void Relay();
-
-    uint256 GetHash()
-    {
-        CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
-        ss << vin;
-        ss << sigTime;
-        return ss.GetHash();
-    }
-
-    void swap(ZelnodePing& first, ZelnodePing& second) // nothrow
-    {
-        // enable ADL (not necessary in our case, but good practice)
-        using std::swap;
-
-        // by swapping the members of two classes,
-        // the two classes are effectively swapped
-        swap(first.vin, second.vin);
-        swap(first.blockHash, second.blockHash);
-        swap(first.sigTime, second.sigTime);
-        swap(first.vchSig, second.vchSig);
-    }
-
-    ZelnodePing& operator=(ZelnodePing from)
-    {
-        swap(*this, from);
-        return *this;
-    }
-    friend bool operator==(const ZelnodePing& a, const ZelnodePing& b)
-    {
-        return a.vin == b.vin && a.blockHash == b.blockHash;
-    }
-    friend bool operator!=(const ZelnodePing& a, const ZelnodePing& b)
-    {
-        return !(a == b);
-    }
-};
-
-
-class Zelnode
-{
-
-private:
-    // critical section to protect the inner data structures
-    mutable CCriticalSection cs;
-    int64_t lastTimeChecked;
-
-public:
-    enum state {
-        ZELNODE_PRE_ENABLED,
-        ZELNODE_ENABLED,
-        ZELNODE_EXPIRED,
-        ZELNODE_REMOVE,
-        ZELNODE_VIN_SPENT
-    };
-
-    enum tier {
-        NONE = 0,
-        CUMULUS = 1,
-        NIMBUS = 2,
-        STRATUS = 3
-    };
-
-    CTxIn vin;
-    CService addr;
-    CPubKey pubKeyCollateralAddress;
-    CPubKey pubKeyZelnode;
-    std::vector<unsigned char> sig;
-    int activeState;
-    int tier;
-    int64_t sigTime; //znb message time
-    int cacheInputAge;
-    int cacheInputAgeBlock;
-    bool unitTest;
-    bool allowFreeTx;
-    int protocolVersion;
-    int nActiveState;
-    int64_t nLastDsq; //the dsq count from the last dsq broadcast of this node
-    int nScanningErrorCount;
-    int nLastScanningErrorBlockHeight;
-    ZelnodePing lastPing;
-
-    int64_t nLastDsee;  // temporary, do not save. Remove after migration to v12
-    int64_t nLastDseep; // temporary, do not save. Remove after migration to v12
-
-    Zelnode();
-    Zelnode(const Zelnode& other);
-    Zelnode(const ZelnodeBroadcast& znb);
-
-
-    void swap(Zelnode& first, Zelnode& second) // nothrow
-    {
-        // enable ADL (not necessary in our case, but good practice)
-        using std::swap;
-
-        // by swapping the members of two classes,
-        // the two classes are effectively swapped
-        swap(first.vin, second.vin);
-        swap(first.addr, second.addr);
-        swap(first.pubKeyCollateralAddress, second.pubKeyCollateralAddress);
-        swap(first.pubKeyZelnode, second.pubKeyZelnode);
-        swap(first.sig, second.sig);
-        swap(first.activeState, second.activeState);
-        swap(first.sigTime, second.sigTime);
-        swap(first.lastPing, second.lastPing);
-        swap(first.cacheInputAge, second.cacheInputAge);
-        swap(first.cacheInputAgeBlock, second.cacheInputAgeBlock);
-        swap(first.unitTest, second.unitTest);
-        swap(first.allowFreeTx, second.allowFreeTx);
-        swap(first.protocolVersion, second.protocolVersion);
-        swap(first.nLastDsq, second.nLastDsq);
-        swap(first.nScanningErrorCount, second.nScanningErrorCount);
-        swap(first.nLastScanningErrorBlockHeight, second.nLastScanningErrorBlockHeight);
-        swap(first.tier, second.tier);
-    }
-
-    Zelnode& operator=(Zelnode from)
-    {
-        swap(*this, from);
-        return *this;
-    }
-    friend bool operator==(const Zelnode& a, const Zelnode& b)
-    {
-        return a.vin == b.vin;
-    }
-    friend bool operator!=(const Zelnode& a, const Zelnode& b)
-    {
-        return !(a.vin == b.vin);
-    }
-
-    uint256 CalculateScore(int mod = 1, int64_t nBlockHeight = 0);
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action)
-    {
-        LOCK(cs);
-
-        READWRITE(vin);
-        READWRITE(addr);
-        READWRITE(pubKeyCollateralAddress);
-        READWRITE(pubKeyZelnode);
-        READWRITE(sig);
-        READWRITE(sigTime);
-        READWRITE(protocolVersion);
-        READWRITE(activeState);
-        READWRITE(lastPing);
-        READWRITE(cacheInputAge);
-        READWRITE(cacheInputAgeBlock);
-        READWRITE(unitTest);
-        READWRITE(allowFreeTx);
-        READWRITE(nLastDsq);
-        READWRITE(nScanningErrorCount);
-        READWRITE(nLastScanningErrorBlockHeight);
-        READWRITE(tier);
-    }
-
-    int64_t SecondsSincePayment();
-
-    bool UpdateFromNewBroadcast(ZelnodeBroadcast& znb);
-
-    inline uint64_t SliceHash(uint256& hash, int slice)
-    {
-        uint64_t n = 0;
-        memcpy(&n, &hash + slice * 64, 64);
-        return n;
-    }
-
-    void Check(bool forceCheck = false);
-
-    bool IsBroadcastedWithin(int seconds)
-    {
-        return (GetAdjustedTime() - sigTime) < seconds;
-    }
-
-    bool IsPingedWithin(int seconds, int64_t now = -1)
-    {
-        now == -1 ? now = GetAdjustedTime() : now;
-
-        return (lastPing == ZelnodePing()) ? false : now - lastPing.sigTime < seconds;
-    }
-
-    void Disable()
-    {
-        sigTime = 0;
-        lastPing = ZelnodePing();
-    }
-
-    bool IsEnabled()
-    {
-        return activeState == ZELNODE_ENABLED;
-    }
-
-    bool isCUMULUS()
-    {
-        return tier == CUMULUS;
-    }
-
-    bool isNIMBUS()
-    {
-        return tier == NIMBUS;
-    }
-
-    bool IsSTRATUS()
-    {
-        return tier == STRATUS;
-    }
-
-    int GetZelnodeInputAge()
-    {
-        if (chainActive.Tip() == NULL) return 0;
-
-        if (cacheInputAge == 0) {
-            cacheInputAge = GetInputAge(vin);
-            cacheInputAgeBlock = chainActive.Tip()->nHeight;
-        }
-
-        return cacheInputAge + (chainActive.Tip()->nHeight - cacheInputAgeBlock);
-    }
-
-    std::string GetStatus();
-
-    std::string Status()
-    {
-        std::string strStatus = "ACTIVE";
-
-        if (activeState == Zelnode::ZELNODE_ENABLED) strStatus = "ENABLED";
-        if (activeState == Zelnode::ZELNODE_PRE_ENABLED) strStatus = "PRE_ENABLED";
-        if (activeState == Zelnode::ZELNODE_EXPIRED) strStatus = "EXPIRED";
-        if (activeState == Zelnode::ZELNODE_VIN_SPENT) strStatus = "VIN_SPENT";
-        if (activeState == Zelnode::ZELNODE_REMOVE) strStatus = "REMOVE";
-
-        return strStatus;
-    }
-
-    std::string Tier()
-    {
-        std::string strStatus = "NONE";
-
-        if (tier == Zelnode::CUMULUS) strStatus = "CUMULUS";
-        if (tier == Zelnode::NIMBUS) strStatus = "NIMBUS";
-        if (tier == Zelnode::STRATUS) strStatus = "STRATUS";
-
-        return strStatus;
-    }
-
-    int64_t GetLastPaid();
-    bool IsValidNetAddr();
-};
-
-bool DecodeHexZelnodeBroadcast(ZelnodeBroadcast& zelnodeBroadcast, std::string strHexZelnodeBroadcast);
-
-/** Note: Zelnode Broadcast contains a different serialize method for the sending zelndoes through the network */
-
-class ZelnodeBroadcast : public Zelnode
-{
-public:
-    ZelnodeBroadcast();
-    ZelnodeBroadcast(CService newAddr, CTxIn newVin, CPubKey newPubkey, CPubKey newPubkey2, int protocolVersionIn);
-    ZelnodeBroadcast(const Zelnode& mn);
-
-    bool CheckAndUpdate(int& nDoS);
-    bool CheckInputsAndAdd(int& nDos);
-    bool Sign(CKey& keyCollateralAddress);
-    bool VerifySignature();
-    void Relay();
-    std::string GetStrMessage();
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action)
-    {
-        READWRITE(vin);
-        READWRITE(addr);
-        READWRITE(pubKeyCollateralAddress);
-        READWRITE(pubKeyZelnode);
-        READWRITE(sig);
-        READWRITE(sigTime);
-        READWRITE(protocolVersion);
-        READWRITE(lastPing);
-        READWRITE(nLastDsq);
-    }
-
-    uint256 GetHash()
-    {
-        CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
-        ss << sigTime;
-        ss << pubKeyCollateralAddress;
-
-        return ss.GetHash();
-    }
-
-    /// Create Zelnode broadcast, needs to be relayed manually after that
-    static bool Create(CTxIn vin, CService service, CKey keyCollateralAddressNew, CPubKey pubKeyCollateralAddressNew, CKey keyZelnodeNew, CPubKey pubKeyZelnodeNew, std::string& strErrorRet, ZelnodeBroadcast& znbRet);
-    static bool Create(std::string strService, std::string strKey, std::string strTxHash, std::string strOutputIndex, std::string& strErrorRet, ZelnodeBroadcast& znbRet, bool fOffline = false);
-    static bool CheckDefaultPort(std::string strService, std::string& strErrorRet, std::string strContext);
-};
+extern ActiveZelnode activeZelnode;
+extern COutPoint zelnodeOutPoint;
 
 /** REMOVE THE ABOVE CODE AFTER DETERMINISTIC ZELNODES IS ACTIVATED **/
 
@@ -419,8 +89,23 @@ enum Tier {
     NONE = 0,
     CUMULUS = 1,
     NIMBUS = 2,
-    STRATUS = 3
+    STRATUS = 3,
+    LAST = 4 // All newly added Tier must be added above LAST, and change the assigned values so they are in order
 };
+
+/** Zelnode Tier code
+ * Any changes to this code needs to be also made to the code in coins.h and coins.cpp
+ * We are unable to use the same code because of build/linking restrictions
+ */
+extern std::vector<CAmount> vTierAmounts;
+extern std::map<int, double> mapTierPercentages;
+void InitializeTierAmounts();
+bool GetTierFromAmount(const CAmount& nAmount, int& nTier);
+bool IsTierValid(const int& nTier);
+int GetNumberOfTiers();
+bool GetTierPercentage(const int& nTier, double& p_double);
+/** Zelnode Tier code end **/
+
 
 std::string ZelnodeLocationToString(int nLocation);
 
@@ -430,6 +115,7 @@ void GetUndoDataForExpiredConfirmZelnodes(CZelnodeTxBlockUndo& p_zelnodeTxUudoDa
 void GetUndoDataForPaidZelnodes(CZelnodeTxBlockUndo& zelnodeTxBlockUndo, ZelnodeCache& p_localCache);
 
 class ZelnodeCacheData {
+
 public:
     // Zelnode Tx data
     int8_t nType;
@@ -464,28 +150,35 @@ public:
         return nType == ZELNODE_NO_TYPE;
     }
 
-    bool isCUMULUS()
+    bool isCumulus()
     {
         return nTier == CUMULUS;
     }
 
-    bool isNIMBUS()
+    bool isNimbus()
     {
         return nTier == NIMBUS;
     }
 
-    bool IsSTRATUS()
+    bool isStratus()
     {
         return nTier == STRATUS;
     }
 
-    std::string Tier()
+    bool isTierValid() {
+        return nTier > NONE && nTier < LAST;
+    }
+
+
+
+    std::string TierToString()
     {
         std::string strStatus = "NONE";
-
-        if (nTier == Zelnode::CUMULUS) strStatus = "CUMULUS";
-        if (nTier == Zelnode::NIMBUS) strStatus = "NIMBUS";
-        if (nTier == Zelnode::STRATUS) strStatus = "STRATUS";
+        if (nTier == CUMULUS) strStatus = "CUMULUS";
+        else if (nTier == NIMBUS) strStatus = "NIMBUS";
+        else if (nTier == STRATUS) strStatus = "STRATUS";
+        else if (nTier == NONE) strStatus = "None";
+        else strStatus = "UNKNOWN TIER (" + std::to_string(nTier) + ")";
 
         return strStatus;
     }
@@ -638,16 +331,17 @@ public:
     // Global tracking of Confirmed Zelnodes
     std::map<COutPoint, ZelnodeCacheData> mapConfirmedZelnodeData;
 
-    std::map<int, ZelnodeList> mapZelnodeList;
+    std::map<Tier, ZelnodeList> mapZelnodeList;
 
     ZelnodeCache(){
         SetNull();
     }
 
     void InitMapZelnodeList() {
-        mapZelnodeList.insert(std::make_pair(Zelnode::CUMULUS, ZelnodeList()));
-        mapZelnodeList.insert(std::make_pair(Zelnode::NIMBUS, ZelnodeList()));
-        mapZelnodeList.insert(std::make_pair(Zelnode::STRATUS, ZelnodeList()));
+        for (int currentTier = CUMULUS; currentTier != LAST; currentTier++ )
+        {
+            mapZelnodeList.insert(std::make_pair((Tier)currentTier, ZelnodeList()));
+        }
     }
 
     void SetNull() {
@@ -717,11 +411,11 @@ public:
     bool CheckListHas(const ZelnodeCacheData& p_zelnodeData);
     void InsertIntoList(const ZelnodeCacheData& p_zelnodeData);
     void EraseFromListSet(const COutPoint& p_OutPoint);
-    void EraseFromList(const std::set<COutPoint>& setToRemove, const int nTier);
+    void EraseFromList(const std::set<COutPoint>& setToRemove, const Tier nTier);
 
     void DumpZelnodeCache();
 
-    void CountNetworks(int& ipv4, int& ipv6, int& onion, int& nCUMULUS, int& nNIMBUS, int& nStratus);
+    void CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<int>& vNodeCount);
 
     bool CheckConfirmationHeights(const int nHeight, const COutPoint& out, const std::string& ip);
 };

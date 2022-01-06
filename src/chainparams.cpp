@@ -202,9 +202,7 @@ public:
         fMineBlocksOnDemand = false;
         fTestnetToBeDeprecatedFieldRPC = false;
 
-        strSporkKey = "04f5382d5868ae49aedfd67efce7c0f56a66a9405a2cc13f8ef236aabb3f0f1d00031f9b9ca67edc93044918a1cf265655108bab531e94c7d48918e40a94a34f77";
         networkID = CBaseChainParams::Network::MAIN;
-        strZelnodeTestingDummyAddress= "t1Ub8iNuaoCAKTaiVyCh8d3iZ31QJFxnGzU";
 
         nStartZelnodePaymentsHeight = 560000; // Start paying deterministic zelnodes on height
 
@@ -264,7 +262,7 @@ class CTestNetParams : public CChainParams {
 public:
     CTestNetParams() {
         strNetworkID = "test";
-        strCurrencyUnits = "TESTZEL";
+        strCurrencyUnits = "TESTFLUX";
         bip44CoinType = 1;
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 1;
@@ -304,7 +302,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 350;
 
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
-        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 4000; // Around March 30 2021
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 420; // Around March 30 2021
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
@@ -312,7 +310,7 @@ public:
 
         eh_epoch_1 = eh48_5;
         eh_epoch_2 = eh48_5;
-        eh_epoch_3 = eh48_5;
+        eh_epoch_3 = zelHash;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -336,7 +334,7 @@ public:
 
         vFixedSeeds.clear();
         vSeeds.clear();
-        vSeeds.push_back(CDNSSeedData("zel-testnet-seed.asoftwaresolution.com", "zel-testnet-seed.asoftwaresolution.com")); // Blondfrogs
+        vSeeds.push_back(CDNSSeedData("flux-testnet-seed.asoftwaresolution.com", "flux-testnet-seed.asoftwaresolution.com")); // Blondfrogs
         vSeeds.push_back(CDNSSeedData("test.vps.zel.network", "test.dnsseed.zel.network")); // Zel
         vSeeds.push_back(CDNSSeedData("test.vps.runonflux.io", "test.dnsseed.runonflux.io")); // Flux
         // guarantees the first 2 characters, when base58 encoded, are "tm"
@@ -367,9 +365,7 @@ public:
         fRequireStandard = true;
         fMineBlocksOnDemand = false;
         fTestnetToBeDeprecatedFieldRPC = true;
-        strSporkKey = "0408c6a3a6cacb673fc38f27c75d79c865e1550441ea8b5295abf21116972379a1b49416da07b7d9b40fb9daf8124f309c608dfc79756a5d3c2a957435642f7f1a";
         networkID = CBaseChainParams::Network::TESTNET;
-        strZelnodeTestingDummyAddress= "tmXxZqbmvrxeSFQsXmm4N9CKyME767r47fS";
 
         nStartZelnodePaymentsHeight = 350;
 

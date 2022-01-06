@@ -221,14 +221,8 @@ BITCOIN_CORE_H = \
   zelnode/activezelnode.h \
   zelnode/benchmarks.h \
   zelnode/obfuscation.h \
-  zelnode/obfuscationrelay.h \
-  zelnode/payments.h \
-  zelnode/spork.h \
-  zelnode/sporkdb.h \
   zelnode/zelnode.h \
   zelnode/zelnodeconfig.h \
-  zelnode/zelnodeman.h \
-  zelnode/zelnodesync.h \
   zelnode/zelnodecachedb.h \
   zmq/zmqabstractnotifier.h \
   zmq/zmqconfig.h\
@@ -286,14 +280,8 @@ libbitcoin_server_a_SOURCES = \
   zelnode/activezelnode.cpp \
   zelnode/benchmarks.cpp \
   zelnode/obfuscation.cpp \
-  zelnode/obfuscationrelay.cpp \
-  zelnode/payments.cpp \
-  zelnode/spork.cpp \
-  zelnode/sporkdb.cpp \
   zelnode/zelnode.cpp \
   zelnode/zelnodeconfig.cpp \
-  zelnode/zelnodeman.cpp \
-  zelnode/zelnodesync.cpp \
   zelnode/zelnodecachedb.cpp \
   $(BITCOIN_CORE_H) \
   $(LIBZELCASH_H)

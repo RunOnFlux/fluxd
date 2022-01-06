@@ -16,12 +16,7 @@
 #include "sync.h"
 #include "wallet/wallet.h"
 
-
-
 #define ACTIVE_ZELNODE_INITIAL 0 // initial state
-#define ACTIVE_ZELNODE_SYNC_IN_PROCESS 1
-#define ACTIVE_ZELNODE_INPUT_TOO_NEW 2
-#define ACTIVE_ZELNODE_NOT_CAPABLE 3
 #define ACTIVE_ZELNODE_STARTED 4
 
 class ActiveZelnode
@@ -30,15 +25,12 @@ private:
     // critical section to protect the inner data structures
     mutable CCriticalSection cs;
 
-    /// Ping Zelnode
-    bool SendZelnodePing(std::string& errorMessage);
-
-    /// Create Zelnode broadcast, needs to be relayed manually after that
-    bool CreateBroadcast(CTxIn vin, CService service, CKey key, CPubKey pubKey, CKey keyZelnode, CPubKey pubKeyZelnode, std::string& errorMessage, ZelnodeBroadcast &znb, CMutableTransaction& mutTransaction);
-
-    /// Get 10000 ZEL input that can be used for the Zelnode
+    /// Get ZEL input that can be used for the Zelnode
     bool GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage);
     bool GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
+
+    /// Get 10000 ZEL input that can be used for the Zelnode
+    bool GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
 
 public:
     // Initialized by init.cpp
@@ -47,36 +39,21 @@ public:
 
     // Initialized while registering Zelnode
     CTxIn vin;
-    CService service;
 
+    // This is the zelnode OutPoint
     COutPoint deterministicOutPoint;
 
-    int status;
     std::string notCapableReason;
+
 
     ActiveZelnode()
     {
-        status = ACTIVE_ZELNODE_INITIAL;
+        notCapableReason = "";
     }
-
-    /// Manage status of main zelnode
-    void ManageStatus();
-    std::string GetStatus();
-
-    /// Create Zelnode broadcast, needs to be relayed manually after that
-    bool CreateBroadcast(std::string strService, std::string strKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, ZelnodeBroadcast &znb, CMutableTransaction& mutTransaction, bool fOffline = false);
-
-    /// Get 10000 ZEL input that can be used for the Zelnode
-    bool GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
-    vector<std::pair<COutput, CAmount>> SelectCoinsZelnode();
-
-    /// Enable cold wallet mode (run a Zelnode with no funds)
-    bool EnableHotColdZelnode(CTxIn& vin, CService& addr);
-    bool BuildZelnodeBroadcast(std::string& errorMessage);
-
 
     /** Deterministric Zelnode functions **/
 
+    vector<std::pair<COutput, CAmount>> SelectCoinsZelnode();
 
     //Manage my active deterministic zelnode
     void ManageDeterministricZelnode();

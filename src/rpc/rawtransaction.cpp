@@ -731,6 +731,33 @@ UniValue decoderawtransaction(const UniValue& params, bool fHelp)
     return result;
 }
 
+UniValue decoderawblock(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+                "decoderawblock \"hexstring\"\n"
+                "\nReturn a block.ToString() of raw block hex\n"
+
+                "\nArguments:\n"
+                "1. \"hex\"      (string, required) The block hex string\n"
+                "\nResult:\n"
+                "\nExamples:\n"
+                + HelpExampleCli("decoderawblock", "\"hexstring\"")
+                + HelpExampleRpc("decoderawblock", "\"hexstring\"")
+        );
+
+    LOCK(cs_main);
+    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR));
+
+    CBlock block;
+
+    if (!DecodeHexBlk(block, params[0].get_str()))
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
+
+
+    return block.ToString();
+}
+
 UniValue decodescript(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
@@ -1133,6 +1160,7 @@ static const CRPCCommand commands[] =
     { "rawtransactions",    "getrawtransaction",      &getrawtransaction,      true  },
     { "rawtransactions",    "createrawtransaction",   &createrawtransaction,   true  },
     { "rawtransactions",    "decoderawtransaction",   &decoderawtransaction,   true  },
+    { "rawtransactions",    "decoderawblock",         &decoderawblock,         true  },
     { "rawtransactions",    "decodescript",           &decodescript,           true  },
     { "rawtransactions",    "sendrawtransaction",     &sendrawtransaction,     false },
     { "rawtransactions",    "signrawtransaction",     &signrawtransaction,     false }, /* uses wallet if enabled */

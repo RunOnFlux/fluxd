@@ -32,9 +32,10 @@
 
 #include <algorithm>
 #include <atomic>
-#include "zelnode/sporkdb.h"
 
 #include "zelnode/zelnodecachedb.h"
+#include "zelnode/obfuscation.h"
+#include "zelnode/activezelnode.h"
 
 #include <sstream>
 
@@ -591,7 +592,6 @@ CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& loc
 
 CCoinsViewCache *pcoinsTip = NULL;
 CBlockTreeDB *pblocktree = NULL;
-CSporkDB* pSporkDB = NULL;
 CDeterministicZelnodeDB* pZelnodeDB = NULL;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -918,6 +918,7 @@ bool ContextualCheckTransaction(
         const int nHeight,
         const int dosLevel,
         bool fFromAccept,
+        bool fFromMempool,
         bool (*isInitBlockDownload)(const CChainParams&))
 {
     bool saplingActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA);
@@ -1240,7 +1241,9 @@ bool ContextualCheckTransaction(
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed";
                 }
 
-                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx)) {
+                // Check the update height, but make sure we only pass in the height if this check is coming from an AcceptBlock call
+                // If it is coming from an AcceptBlock call pass in the height of the block otherwise use the default 0
+                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx, fFromAccept || fFromMempool ? nHeight : 0)) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon";
                 }
@@ -1368,7 +1371,7 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
         }
 
         if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
-            if (tx.benchmarkTier < CUMULUS || tx.benchmarkTier > STRATUS) {
+            if (!IsTierValid(tx.benchmarkTier)) {
                 return state.DoS(10, error("CheckTransaction(): Is Zelnode Tx, invalid benchmarking tier"),
                                  REJECT_INVALID, "bad-txns-zelnode-tx-invalid-benchmark-tier");
             }
@@ -1632,8 +1635,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         if (tx.nType == ZELNODE_CONFIRM_TX_TYPE && tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
             {
                 LOCK(g_zelnodeCache.cs);
-                if (!g_zelnodeCache.CheckConfirmationHeights(nextBlockHeight - 1, tx.collateralOut, tx.ip)) {
-                    LogPrint("mempool", "Dropping confirmation zelnode txid %s : failed CheckConfirmationHeights check", tx.GetHash().ToString());
+                if (!g_zelnodeCache.CheckConfirmationHeights(nextBlockHeight, tx.collateralOut, tx.ip)) {
+                    LogPrint("mempool", "Dropping confirmation zelnode txid %s : failed CheckConfirmationHeights check\n", tx.GetHash().ToString());
                     return false;
                 }
             }
@@ -1646,7 +1649,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
     // DoS level set to 10 to be more forgiving.
     // Check transaction contextually against the set of consensus rules which apply in the next block to be mined.
-    if (!ContextualCheckTransaction(tx, state, Params(), nextBlockHeight, 10, false)) {
+    if (!ContextualCheckTransaction(tx, state, Params(), nextBlockHeight, 10, false, true)) {
         return error("AcceptToMemoryPool: ContextualCheckTransaction failed");
     }
 
@@ -1923,7 +1926,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             }
 
             if (tx.IsZelnodeTx()) {
-                LogPrintf("%s: Adding zelnode transaction to mempool: %s hash: %s\n", __func__, tx.collateralOut.ToString(), tx.GetHash().GetHex());
+                LogPrint("zelnode", "%s: Adding zelnode transaction to mempool: %s hash: %s\n", __func__, tx.collateralOut.ToString(), tx.GetHash().GetHex());
                 pool.mapZelnodeTxMempool[tx.collateralOut] = tx.GetHash();
                 pool.mapSeenZelnodeTx[tx.GetHash()] = GetTime();
 
@@ -2394,7 +2397,7 @@ CAmount GetFoundationFundAmount(int nHeight, const Consensus::Params& consensusP
     return 0;
 }
 
-CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier) // TODO tie in consensusParams
+CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier)
 {
     float fMultiple = 1.0;
     bool fluxRebrandActive = NetworkUpgradeActive(nHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
@@ -2403,23 +2406,19 @@ CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier)
     }
 
 //    std::cout << "Testing Zelnode Subsidy" << std::endl;
-//    CAmount tb = blockValue * (0.0375 * fMultiple);
-//    CAmount ts = blockValue * (0.0625 * fMultiple);
-//    CAmount tba = blockValue * (0.15 * fMultiple);
+//    CAmount tb = blockValue * (V1_ZELNODE_PERCENT_CUMULUS * fMultiple);
+//    CAmount ts = blockValue * (V1_ZELNODE_PERCENT_NIMBUS * fMultiple);
+//    CAmount tba = blockValue * (V1_ZELNODE_PERCENT_STRATUS * fMultiple);
 //
 //    CAmount total = tb + ts + tba;
 //    std::cout << "Got total of: " << total << std::endl;
 
+     double percentage = ZELNODE_PERCENT_NULL;
+     if (GetTierPercentage(nNodeTier, percentage)) {
+         return blockValue * (percentage * fMultiple);
+     }
 
-    if (nNodeTier == Zelnode::CUMULUS) {
-        return blockValue * (0.0375 * fMultiple);
-    } else if (nNodeTier == Zelnode::NIMBUS) {
-        return blockValue * (0.0625 * fMultiple);
-    } else if (nNodeTier == Zelnode::STRATUS) {
-        return blockValue * (0.15 * fMultiple);
-    }
-
-    return 0;
+     return 0;
 }
 
 bool IsSwapPoolInterval(const int64_t nHeight) {
@@ -3934,16 +3933,10 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload(chainparams));
 
 
-    if (g_zelnodeCache.mapZelnodeList.at(CUMULUS).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(CUMULUS).listConfirmedZelnodes.size()) {
-        error("Basic set map, doesn't have the same size as the listconfirmed zelnodes");
-    }
-
-    if (g_zelnodeCache.mapZelnodeList.at(NIMBUS).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(NIMBUS).listConfirmedZelnodes.size()) {
-        error("Super set map, doesn't have the same size as the listconfirmed zelnodes");
-    }
-
-    if (g_zelnodeCache.mapZelnodeList.at(STRATUS).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at(STRATUS).listConfirmedZelnodes.size()) {
-        error("STRATUS set map, doesn't have the same size as the listconfirmed zelnodes");
+    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+        if (g_zelnodeCache.mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at((Tier) currentTier).listConfirmedZelnodes.size()) {
+            error("%s set map, doesn't have the same size as the listconfirmed zelnodes", TierToString(currentTier));
+        }
     }
 
     // Remove transactions that expire at new block height from mempool
@@ -4614,20 +4607,6 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
             if (mi != mapBlockIndex.end() && (*mi).second)
                 nHeight = (*mi).second->nHeight + 1;
         }
-
-        // Because some peers could not have enough data to see that this block is invalid, don't ban them
-        // Because we might not have enough data to tell if the block is indeed valid, Issue an initial reject message
-        if (nHeight < chainparams.StartZelnodePayments()) {
-            if (nHeight != 0 && !IsInitialBlockDownload(chainparams)) {
-                if (!IsBlockPayeeValid(block, nHeight)) {
-                    LogPrint("zelnode", "%s : Couldn't find zelnode payment", __func__);
-                    return state.DoS(0, false, REJECT_INVALID, "bad-cb-payee");
-                }
-            } else {
-                if (fDebug)
-                    LogPrintf("%s : Zelnode payment check skipped on sync - skipping IsBlockPayeeValid()\n", __func__);
-            }
-        }
     }
 
     // Check transactions
@@ -4676,7 +4655,7 @@ bool ContextualCheckBlockHeader(
     int listlength=validEHparameterList(ehparams,nHeight,chainParams);
     int solutionInvalid=1;
         for(int i=0; i<listlength; i++){
-        LogPrint("pow", "ContextCheckBlockHeader index %d n:%d k:%d Solsize: %d \n",i, ehparams[i].n, ehparams[i].k , ehparams[i].nSolSize);
+//        LogPrint("pow", "ContextCheckBlockHeader index %d n:%d k:%d Solsize: %d \n",i, ehparams[i].n, ehparams[i].k , ehparams[i].nSolSize);
         if(ehparams[i].nSolSize==nSolSize)
             solutionInvalid=0;
     }
@@ -4916,10 +4895,6 @@ bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, c
 
     if (!ActivateBestChain(state, chainparams, pblock))
         return error("%s: ActivateBestChain failed", __func__);
-
-    if (zelnodeSync.RequestedZelnodeAssets > ZELNODE_SYNC_LIST) {
-        zelnodePayments.ProcessBlock(GetHeight() + 10);
-    }
 
     return true;
 }
@@ -6017,22 +5992,6 @@ bool static AlreadyHave(const CInv& inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
         }
     case MSG_BLOCK:
         return mapBlockIndex.count(inv.hash);
-    case MSG_SPORK:
-        return mapSporks.count(inv.hash);
-    case MSG_ZELNODE_WINNER:
-        if (zelnodePayments.mapZelnodePayeeVotes.count(inv.hash)) {
-            zelnodeSync.AddedZelnodeWinner(inv.hash);
-            return true;
-        }
-        return false;
-    case MSG_ZELNODE_ANNOUNCE:
-        if (zelnodeman.mapSeenZelnodeBroadcast.count(inv.hash)) {
-            zelnodeSync.AddedZelnodeList(inv.hash);
-            return true;
-        }
-        return false;
-    case MSG_ZELNODE_PING:
-        return zelnodeman.mapSeenZelnodePing.count(inv.hash);
     }
     // Don't know what it is, just say we already got one
     return true;
@@ -6156,45 +6115,6 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
                             pfrom->PushMessage("tx", ss);
                             pushed = true;
                         }
-                    }
-                }
-
-                if (!pushed && inv.type == MSG_SPORK) {
-                    if (mapSporks.count(inv.hash)) {
-                        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-                        ss.reserve(1000);
-                        ss << mapSporks[inv.hash];
-                        pfrom->PushMessage("spork", ss);
-                        pushed = true;
-                    }
-                }
-                if (!pushed && inv.type == MSG_ZELNODE_WINNER) {
-                    if (zelnodePayments.mapZelnodePayeeVotes.count(inv.hash)) {
-                        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-                        ss.reserve(1000);
-                        ss << zelnodePayments.mapZelnodePayeeVotes[inv.hash];
-                        pfrom->PushMessage("znw", ss);
-                        pushed = true;
-                    }
-                }
-
-                if (!pushed && inv.type == MSG_ZELNODE_ANNOUNCE) {
-                    if (zelnodeman.mapSeenZelnodeBroadcast.count(inv.hash)) {
-                        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-                        ss.reserve(1000);
-                        ss << zelnodeman.mapSeenZelnodeBroadcast[inv.hash];
-                        pfrom->PushMessage("znb", ss);
-                        pushed = true;
-                    }
-                }
-
-                if (!pushed && inv.type == MSG_ZELNODE_PING) {
-                    if (zelnodeman.mapSeenZelnodePing.count(inv.hash)) {
-                        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-                        ss.reserve(1000);
-                        ss << zelnodeman.mapSeenZelnodePing[inv.hash];
-                        pfrom->PushMessage("znp", ss);
-                        pushed = true;
                     }
                 }
 
@@ -7123,14 +7043,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     }
 
     else {
-        // Check commands against the zelnode and spork messages
-        // TODO remove this after the DZelnode upgrade is stable
-        if (chainActive.Tip()->nHeight + 1 < Params().StartZelnodePayments()) {
-            zelnodeman.ProcessMessage(pfrom, strCommand, vRecv);
-            zelnodePayments.ProcessMessageZelnodePayments(pfrom, strCommand, vRecv);
-            zelnodeSync.ProcessMessage(pfrom, strCommand, vRecv);
-        }
-        zelnodeSync.ProcessMessage(pfrom, strCommand, vRecv);
+        // Unknown command
     }
 
 

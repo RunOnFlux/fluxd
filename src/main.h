@@ -189,6 +189,8 @@ extern uint64_t nPruneTarget;
 /** Block files containing a block-height within MIN_BLOCKS_TO_KEEP of chainActive.Tip() will not be pruned. */
 static const unsigned int MIN_BLOCKS_TO_KEEP = 288;
 
+
+
 // Require that user allocate at least 550MB for block & undo files (blk???.dat and rev???.dat)
 // At 1MB per block, 288 blocks = 288MB.
 // Add 15% for Undo data = 331MB
@@ -357,6 +359,7 @@ bool ContextualCheckInputs(const CTransaction& tx, CValidationState &state, cons
 /** Check a transaction contextually against a set of consensus rules */
 bool ContextualCheckTransaction(const CTransaction& tx, CValidationState &state,
                                 const CChainParams& chainparams, int nHeight, int dosLevel, bool fFromAccept,
+                                bool fFromMempool = false,
                                 bool (*isInitBlockDownload)(const CChainParams&) = IsInitialBlockDownload);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
@@ -529,9 +532,6 @@ extern CCoinsViewCache *pcoinsTip;
 
 /** Global variable that points to the active block tree (protected by cs_main) */
 extern CBlockTreeDB *pblocktree;
-
-/** Global variable that points to the spork database (protected by cs_main) */
-extern CSporkDB* pSporkDB;
 
 /** Global variable that points to the zelnode database (protected by cs_main) */
 extern CDeterministicZelnodeDB* pZelnodeDB;
