@@ -1243,7 +1243,7 @@ bool ContextualCheckTransaction(
 
                 // Check the update height, but make sure we only pass in the height if this check is coming from an AcceptBlock call
                 // If it is coming from an AcceptBlock call pass in the height of the block otherwise use the default 0
-                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx, fFromAccept || fFromMempool ? nHeight : 0)) {
+                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx, nHeight)) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon";
                 }
