@@ -1693,7 +1693,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
             if (pool.lookup(poolTxHash, poolTx)) {
                 if (tx.sigTime > poolTx.sigTime) {
-                    LogPrintf("Removing zelnode transaction, because it is getting replaced by newer transaction. old: %s, new: %s, collateral: %s\n", poolTx.GetHash().GetHex(), tx.GetHash().GetHex(), tx.collateralOut.ToFullString());
+                    LogPrint("zelnode", "Removing zelnode transaction, because it is getting replaced by newer transaction. old: %s, new: %s, collateral: %s\n", poolTx.GetHash().GetHex(), tx.GetHash().GetHex(), tx.collateralOut.ToFullString());
                     std::list<CTransaction> removed;
                     mempool.remove(poolTx, removed, false);
                 } else {
