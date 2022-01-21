@@ -377,7 +377,7 @@ public:
     void AddExpiredDosTx(const CZelnodeTxBlockUndo& p_undoData, const int p_nHeight);
     void AddExpiredConfirmTx(const CZelnodeTxBlockUndo& p_undoData);
 
-    void AddPaidNode(const COutPoint& out, const int p_Height);
+    void AddPaidNode(const int& tier, const COutPoint& out, const int p_Height);
 
     void AddBackUndoData(const CZelnodeTxBlockUndo& p_undoData);
 

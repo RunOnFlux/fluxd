@@ -93,8 +93,9 @@ void GetUndoDataForExpiredZelnodeDosScores(CZelnodeTxBlockUndo& p_zelnodeTxUndoD
 
     if (g_zelnodeCache.mapStartTxDosHeights.count(nUndoHeight)) {
         for (const auto& item : g_zelnodeCache.mapStartTxDosHeights.at(nUndoHeight)) {
-            if (g_zelnodeCache.mapStartTxDosTracker.count(item))
+            if (g_zelnodeCache.mapStartTxDosTracker.count(item)) {
                 p_zelnodeTxUndoData.vecExpiredDosData.emplace_back(g_zelnodeCache.mapStartTxDosTracker.at(item));
+            }
         }
     }
 }
@@ -260,6 +261,10 @@ void ZelnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
             if (setAddToConfirm.count(item))
                 continue;
 
+            if (!g_zelnodeCache.mapStartTxTracker.count(item)) {
+                error("Map:at -> Map Start Tx Tracker doesn't have item: %s", item.ToFullString());
+            }
+
             ZelnodeCacheData data = g_zelnodeCache.mapStartTxTracker.at(item);
             data.nStatus = ZELNODE_TX_DOS_PROTECTION;
             mapStartTxDosTracker[item] = data;
@@ -283,8 +288,13 @@ void ZelnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
 
     if (g_zelnodeCache.mapStartTxDosHeights.count(removalHeight)) {
         for (const auto& item : g_zelnodeCache.mapStartTxDosHeights.at(removalHeight)) {
+
+            if (!g_zelnodeCache.mapStartTxDosTracker.count(item)) {
+                error("Map::at -> Map Start Tx Dos Tracker doesn't have item: %s", item.ToFullString());
+            }
+
             mapStartTxTracker.insert(std::make_pair(item, g_zelnodeCache.mapStartTxDosTracker.at(item)));
-            mapStartTxTracker.at(item).nStatus = ZELNODE_TX_STARTED;
+            mapStartTxTracker[item].nStatus = ZELNODE_TX_STARTED;
             mapStartTxHeights[removalHeight].insert(item);
 
             mapDoSToUndo[removalHeight].insert(item);
@@ -386,23 +396,27 @@ bool ZelnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPoi
     }
 
     LOCK(cs);
-    int setSize = mapZelnodeList.at((Tier)nTier).setConfirmedTxInList.size();
-    if (setSize) {
-        for (int i = 0; i < setSize; i++) {
-            if (mapZelnodeList.at((Tier)nTier).listConfirmedZelnodes.size()) {
-                p_zelnodeOut = mapZelnodeList.at((Tier)nTier).listConfirmedZelnodes.front().out;
-                if (mapConfirmedZelnodeData.count(p_zelnodeOut)) {
-                    dest = mapConfirmedZelnodeData.at(p_zelnodeOut).collateralPubkey.GetID();
-                    return true;
+    if (mapZelnodeList.count((Tier)nTier)) {
+        int setSize = mapZelnodeList.at((Tier) nTier).setConfirmedTxInList.size();
+        if (setSize) {
+            for (int i = 0; i < setSize; i++) {
+                if (mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.size()) {
+                    p_zelnodeOut = mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.front().out;
+                    if (mapConfirmedZelnodeData.count(p_zelnodeOut)) {
+                        dest = mapConfirmedZelnodeData.at(p_zelnodeOut).collateralPubkey.GetID();
+                        return true;
+                    } else {
+                        // The front of the list, wasn't in the confirmed zelnode data. These means it expired
+                        mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.pop_front();
+                        mapZelnodeList.at((Tier) nTier).setConfirmedTxInList.erase(p_zelnodeOut);
+                    }
                 } else {
-                    // The front of the list, wasn't in the confirmed zelnode data. These means it expired
-                    mapZelnodeList.at((Tier)nTier).listConfirmedZelnodes.pop_front();
-                    mapZelnodeList.at((Tier)nTier).setConfirmedTxInList.erase(p_zelnodeOut);
+                    return false;
                 }
-            } else {
-                return false;
             }
         }
+    } else {
+        error("Map::at -> mapZelnodeList didn't have tier=%d", nTier);
     }
 
     return false;
@@ -455,7 +469,7 @@ bool ZelnodeCache::CheckZelnodePayout(const CTransaction& coinbase, const int p_
             error("Invalid block zelnode payee list: Invalid %s payee. Should be paying : %s -> %u", TierToString(payout.first), EncodeDestination(payout.second.dest), payout.second.amount);
         } else {
             if (p_zelnodeCache) {
-                p_zelnodeCache->AddPaidNode(payout.second.outpoint, p_Height);
+                p_zelnodeCache->AddPaidNode(payout.first, payout.second.outpoint, p_Height);
             }
         }
     }
@@ -529,20 +543,17 @@ void ZelnodeCache::AddExpiredConfirmTx(const CZelnodeTxBlockUndo& p_undoData)
     }
 }
 
-void ZelnodeCache::AddPaidNode(const COutPoint& out, const int p_Height)
+void ZelnodeCache::AddPaidNode(const int& tier, const COutPoint& out, const int p_Height)
 {
-    // This is being called from ConnectBlock, from function CheckZelnodePayout
-    // the g_zelnodeCache cs has already been locked
-
-    if (g_zelnodeCache.mapConfirmedZelnodeData.count(out)) {
-        LOCK(cs); // Lock local cache
-        mapPaidNodes[g_zelnodeCache.mapConfirmedZelnodeData.at(out).nTier] = std::make_pair(p_Height, out);
-    }
+    LOCK(cs); // Lock local cache
+    mapPaidNodes[tier] = std::make_pair(p_Height, out);
 }
 
 void ZelnodeCache::AddBackUndoData(const CZelnodeTxBlockUndo& p_undoData)
 {
+    // Locking local cache (p_zelnodecache)
     LOCK(cs);
+
     std::set<COutPoint> setOutPoint;
     int nHeight = 0;
 
@@ -576,10 +587,10 @@ void ZelnodeCache::AddBackUndoData(const CZelnodeTxBlockUndo& p_undoData)
         // Because we might have already retrieved the zelnode global data above when adding back the nLastConfirmedBlockHeight
         // We don't want to override the nLastConfirmedBlockHeight change above
         if (mapConfirmedZelnodeData.count(item.first)) {
-            mapConfirmedZelnodeData[item.first].ip = item.second;
+            mapConfirmedZelnodeData.at(item.first).ip = item.second;
         } else if (g_zelnodeCache.mapConfirmedZelnodeData.count(item.first)) {
             mapConfirmedZelnodeData[item.first] = g_zelnodeCache.mapConfirmedZelnodeData.at(item.first);
-            mapConfirmedZelnodeData[item.first].ip = item.second;
+            mapConfirmedZelnodeData.at(item.first).ip = item.second;
         } else {
             if (!fIsVerifying)
                 error("%s : This should never happen. When undo an update confirm ip address. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
@@ -803,7 +814,7 @@ bool ZelnodeCache::Flush()
             g_zelnodeCache.mapConfirmedZelnodeData.at(item.second.second).nLastPaidHeight = item.second.first;
             g_zelnodeCache.setDirtyOutPoint.insert(item.second.second);
 
-            if (!g_zelnodeCache.mapZelnodeList.count((Tier)item.first)) {
+            if (!g_zelnodeCache.mapZelnodeList.count(currentTier)) {
                 error("%s - %d , Found map:at error", __func__, __LINE__);
             }
 
@@ -900,13 +911,17 @@ bool ZelnodeCache::LoadData(ZelnodeCacheData& data)
         if (!mapStartTxHeights.count(data.nAddedBlockHeight))
             mapStartTxHeights[data.nAddedBlockHeight] = std::set<COutPoint>();
 
-        mapStartTxHeights.at(data.nAddedBlockHeight).insert(data.collateralIn);
+        if (mapStartTxHeights.count(data.nAddedBlockHeight)) {
+            mapStartTxHeights.at(data.nAddedBlockHeight).insert(data.collateralIn);
+        }
     } else if (data.nStatus == ZELNODE_TX_DOS_PROTECTION) {
         mapStartTxDosTracker.insert(std::make_pair(data.collateralIn, data));
         if (!mapStartTxDosHeights.count(data.nAddedBlockHeight))
             mapStartTxDosHeights[data.nAddedBlockHeight] = std::set<COutPoint>();
 
-        mapStartTxDosHeights.at(data.nAddedBlockHeight).insert(data.collateralIn);
+        if (mapStartTxDosHeights.count(data.nAddedBlockHeight)) {
+            mapStartTxDosHeights.at(data.nAddedBlockHeight).insert(data.collateralIn);
+        }
     } else if (data.nStatus == ZELNODE_TX_CONFIRMED) {
         mapConfirmedZelnodeData.insert(std::make_pair(data.collateralIn, data));
         InsertIntoList(data);
@@ -919,7 +934,9 @@ bool ZelnodeCache::LoadData(ZelnodeCacheData& data)
 void ZelnodeCache::SortList(const int& nTier)
 {
     if (IsTierValid(nTier)) {
-        mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.sort();
+        if (mapZelnodeList.count((Tier) nTier)) {
+            mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.sort();
+        }
     }
 
 }
@@ -928,7 +945,9 @@ void ZelnodeCache::SortList(const int& nTier)
 bool ZelnodeCache::CheckListHas(const ZelnodeCacheData& p_zelnodeData)
 {
     if (IsTierValid(p_zelnodeData.nTier)) {
-        return mapZelnodeList.at((Tier) p_zelnodeData.nTier).setConfirmedTxInList.count(p_zelnodeData.collateralIn);
+        if (mapZelnodeList.count((Tier) p_zelnodeData.nTier)) {
+            return mapZelnodeList.at((Tier) p_zelnodeData.nTier).setConfirmedTxInList.count(p_zelnodeData.collateralIn);
+        }
     }
 
     return false;
@@ -938,8 +957,10 @@ bool ZelnodeCache::CheckListHas(const ZelnodeCacheData& p_zelnodeData)
 bool ZelnodeCache::CheckListSet(const COutPoint& p_OutPoint)
 {
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-        if (mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.count(p_OutPoint)) {
-            return true;
+        if (mapZelnodeList.count((Tier) currentTier)) {
+            if (mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.count(p_OutPoint)) {
+                return true;
+            }
         }
     }
 
@@ -950,35 +971,37 @@ void ZelnodeCache::InsertIntoList(const ZelnodeCacheData& p_zelnodeData)
 {
     if (IsTierValid(p_zelnodeData.nTier)) {
         ZelnodeListData listData(p_zelnodeData);
-        mapZelnodeList.at((Tier) p_zelnodeData.nTier).setConfirmedTxInList.insert(p_zelnodeData.collateralIn);
-        mapZelnodeList.at((Tier) p_zelnodeData.nTier).listConfirmedZelnodes.emplace_front(listData);
+        if (mapZelnodeList.count((Tier) p_zelnodeData.nTier)) {
+            mapZelnodeList.at((Tier) p_zelnodeData.nTier).setConfirmedTxInList.insert(p_zelnodeData.collateralIn);
+            mapZelnodeList.at((Tier) p_zelnodeData.nTier).listConfirmedZelnodes.emplace_front(listData);
+        }
     }
 }
 
 void ZelnodeCache::EraseFromListSet(const COutPoint& p_OutPoint)
 {
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-        if (mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.count(p_OutPoint)) {
-            mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.erase(p_OutPoint);
-            return;
+        if (mapZelnodeList.count((Tier) currentTier)) {
+            if (mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.count(p_OutPoint)) {
+                mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.erase(p_OutPoint);
+                return;
+            }
         }
     }
 }
 
 void ZelnodeCache::EraseFromList(const std::set<COutPoint>& setToRemove, const Tier nTier)
 {
-    std::list<ZelnodeListData>::iterator i = mapZelnodeList.at(nTier).listConfirmedZelnodes.begin();
-    while (i != mapZelnodeList.at(nTier).listConfirmedZelnodes.end())
-    {
-        bool isDataToRemove = setToRemove.count((*i).out);
-        if (isDataToRemove)
-        {
-            mapZelnodeList.at(nTier).setConfirmedTxInList.erase((*i).out);
-            mapZelnodeList.at(nTier).listConfirmedZelnodes.erase(i++);  // alternatively, i = items.erase(i);
-        }
-        else
-        {
-            ++i;
+    if (mapZelnodeList.count(nTier)) {
+        std::list<ZelnodeListData>::iterator i = mapZelnodeList.at(nTier).listConfirmedZelnodes.begin();
+        while (i != mapZelnodeList.at(nTier).listConfirmedZelnodes.end()) {
+            bool isDataToRemove = setToRemove.count((*i).out);
+            if (isDataToRemove) {
+                mapZelnodeList.at(nTier).setConfirmedTxInList.erase((*i).out);
+                mapZelnodeList.at(nTier).listConfirmedZelnodes.erase(i++);  // alternatively, i = items.erase(i);
+            } else {
+                ++i;
+            }
         }
     }
 }
@@ -1048,9 +1071,11 @@ void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<i
         }
 
         for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-            if (mapZelnodeList.at((Tier)currentTier).setConfirmedTxInList.count(entry.first)) {
-                vNodeCount[currentTier-1]++;
-                break;
+            if (mapZelnodeList.count((Tier) currentTier)) {
+                if (mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.count(entry.first)) {
+                    vNodeCount[currentTier - 1]++;
+                    break;
+                }
             }
         }
     }

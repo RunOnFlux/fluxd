@@ -3934,8 +3934,14 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
 
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-        if (g_zelnodeCache.mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.size() != g_zelnodeCache.mapZelnodeList.at((Tier) currentTier).listConfirmedZelnodes.size()) {
-            error("%s set map, doesn't have the same size as the listconfirmed zelnodes", TierToString(currentTier));
+        if (g_zelnodeCache.mapZelnodeList.count((Tier) currentTier)) {
+            if (g_zelnodeCache.mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.size() !=
+                g_zelnodeCache.mapZelnodeList.at((Tier) currentTier).listConfirmedZelnodes.size()) {
+                error("%s set map, doesn't have the same size as the listconfirmed zelnodes",
+                      TierToString(currentTier));
+            }
+        } else {
+            error("Map::At error -> %s, %d - Map zelnode list doesn't have tier", __func__, __LINE__);
         }
     }
 
