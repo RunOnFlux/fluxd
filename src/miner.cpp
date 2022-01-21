@@ -249,6 +249,18 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                              continue;
                          }
                     }
+
+                    if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
+                        {
+                            LOCK(g_zelnodeCache.cs);
+                            if (!g_zelnodeCache.CheckConfirmationHeights(nHeight, tx.collateralOut, tx.ip)) {
+                                LogPrintf("Remove zelnode transaction if failed CheckConfirmationHeights %s\n", tx.GetHash().GetHex());
+                                std::list<CTransaction> removed;
+                                mempool.remove(tx, removed, false);
+                                continue;
+                            }
+                        }
+                    }
                 }
 
 
