@@ -263,6 +263,14 @@ void ZelnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
 
             if (!g_zelnodeCache.mapStartTxTracker.count(item)) {
                 error("Map:at -> Map Start Tx Tracker doesn't have item: %s", item.ToFullString());
+
+                if (g_zelnodeCache.mapStartTxDosTracker.count(item)) {
+                    error("%s -> Map Start Tx Tracker doesn't have item - and it is already in the DOS list... skip this check: %s",__func__, item.ToFullString());
+                    continue;
+                } else {
+                    error("%s -> Map Start Tx Tracker doesn't have item - and mapStartTxDostracker didn't have item. What does this even mean!!!!!!!! %s",__func__, item.ToFullString());
+                    StartShutdown();
+                }
             }
 
             ZelnodeCacheData data = g_zelnodeCache.mapStartTxTracker.at(item);
