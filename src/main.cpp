@@ -3838,6 +3838,11 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
         }
     }
 
+    if (fDebug) {
+        // Logging zelnodecache start and dos information
+        g_zelnodeCache.LogDebugData(pindexDelete->nHeight, pindexDelete->GetBlockHash(), true);
+    }
+
     // Update chainActive and related variables.
     UpdateTip(pindexDelete->pprev, chainparams);
     // Get the current commitment tree
@@ -3947,6 +3952,11 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
     // Remove transactions that expire at new block height from mempool
     mempool.removeExpired(pindexNew->nHeight);
+
+    if (fDebug) {
+        // Logging zelnodecache start and dos information
+        g_zelnodeCache.LogDebugData(pindexNew->nHeight, pindexNew->GetBlockHash(), false);
+    }
 
     // Update chainActive & related variables.
     UpdateTip(pindexNew, chainparams);

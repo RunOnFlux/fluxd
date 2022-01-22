@@ -264,8 +264,10 @@ void ZelnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
             if (!g_zelnodeCache.mapStartTxTracker.count(item)) {
                 error("Map:at -> Map Start Tx Tracker doesn't have item: %s", item.ToFullString());
 
+                // This is a fix of an issue happening on chain: map::at. Still investigating why this is happening.
                 if (g_zelnodeCache.mapStartTxDosTracker.count(item)) {
                     error("%s -> Map Start Tx Tracker doesn't have item - and it is already in the DOS list... skip this check: %s",__func__, item.ToFullString());
+                    LogPrintf("%s -> Map::at error would of occured. pIndexHeight=%d, itemHeight=%d\n", __func__, p_nHeight, g_zelnodeCache.mapStartTxDosTracker.at(item).nAddedBlockHeight);
                     continue;
                 } else {
                     error("%s -> Map Start Tx Tracker doesn't have item - and mapStartTxDostracker didn't have item. What does this even mean!!!!!!!! %s",__func__, item.ToFullString());
@@ -299,6 +301,15 @@ void ZelnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
 
             if (!g_zelnodeCache.mapStartTxDosTracker.count(item)) {
                 error("Map::at -> Map Start Tx Dos Tracker doesn't have item: %s", item.ToFullString());
+
+                // This is a fix of an issue happening on chain: map::at. Still investigating why this is happening.
+                if (g_zelnodeCache.mapStartTxTracker.count(item)) {
+                    error("%s -> Map Start Tx Dos Tracker doesn't have item - and it is already in the START list... skip this check: %s",__func__, item.ToFullString());
+                    continue;
+                } else {
+                    error("%s -> Map Start Tx Dos Tracker doesn't have item - and mapStartTxTracker didn't have item. What does this even mean!!!!!!!! %s",__func__, item.ToFullString());
+                    StartShutdown();
+                }
             }
 
             mapStartTxTracker.insert(std::make_pair(item, g_zelnodeCache.mapStartTxDosTracker.at(item)));
@@ -618,9 +629,6 @@ void ZelnodeCache::AddBackUndoData(const CZelnodeTxBlockUndo& p_undoData)
 
 bool ZelnodeCache::Flush()
 {
-    std::set<COutPoint> fullList;
-    int height = 0;
-
     std::set<COutPoint> setRemoveFromList;
 
     std::vector<ZelnodeCacheData> vecNodesToAdd;
@@ -628,15 +636,14 @@ bool ZelnodeCache::Flush()
     LOCK2(cs, g_zelnodeCache.cs);
     //! Add new start transactions to the tracker
     for (auto item : mapStartTxTracker) {
-        height = item.second.nAddedBlockHeight;
         g_zelnodeCache.mapStartTxTracker.insert(std::make_pair(item.first, item.second));
-        fullList.insert(item.first);
+        if (!g_zelnodeCache.mapStartTxHeights.count(item.second.nAddedBlockHeight)) {
+            g_zelnodeCache.mapStartTxHeights.insert(make_pair(item.second.nAddedBlockHeight, std::set<COutPoint>()));
+        }
+        g_zelnodeCache.mapStartTxHeights.at(item.second.nAddedBlockHeight).insert(item.first);
 
         g_zelnodeCache.setDirtyOutPoint.insert(item.first);
     }
-
-    if (fullList.size())
-        g_zelnodeCache.mapStartTxHeights.insert(std::make_pair(height, fullList));
 
 
     //! If a start transaction isn't confirmed in time, the OutPoint is added to the dos tracker
@@ -662,8 +669,9 @@ bool ZelnodeCache::Flush()
 
     //! If we are undo a block, and we undid a block that had Start transaction in it
     for (const auto& item : mapDoSToUndo) {
-        for (const auto& out : item.second)
+        for (const auto& out : item.second) {
             g_zelnodeCache.mapStartTxDosTracker.erase(out);
+        }
 
         g_zelnodeCache.mapStartTxDosHeights.erase(item.first);
     }
@@ -697,8 +705,9 @@ bool ZelnodeCache::Flush()
         g_zelnodeCache.setDirtyOutPoint.insert(item);
     }
 
-    if (setUndoStartTxHeight > 0)
-        g_zelnodeCache.mapStartTxDosHeights.erase(setUndoStartTxHeight);
+    if (setUndoStartTxHeight > 0) {
+        g_zelnodeCache.mapStartTxHeights.erase(setUndoStartTxHeight);
+    }
 
     //! Add the data from Zelnodes that got confirmed this block
     for (const auto& item : setAddToConfirm) {
@@ -1180,5 +1189,46 @@ bool IsTierValid(const int& nTier)
 int GetNumberOfTiers()
 {
     return LAST - 1;
+}
+
+void ZelnodeCache::LogDebugData(const int& nHeight, const uint256& blockhash, bool fFromDisconnect)
+{
+    LOCK(cs);
+    std::string printme = "{ \n";
+    for (const auto &printitem: mapStartTxTracker) {
+        printme = printme + printitem.first.ToFullString() + "," + printitem.second.ToFullString() + ",\n";
+    }
+    printme = printme + "}";
+
+    std::string printme2 = "{ \n";
+    if (g_zelnodeCache.mapStartTxHeights.count(nHeight - ZELNODE_START_TX_EXPIRATION_HEIGHT)) {
+        for (const auto &printitem: g_zelnodeCache.mapStartTxHeights.at(nHeight - ZELNODE_START_TX_EXPIRATION_HEIGHT)) {
+            printme2 = printme2 + printitem.ToFullString() + ",\n";
+        }
+        printme2 = printme2 + "}";
+    }
+
+    std::string printme3 = "{ \n";
+    for (const auto &printitem: g_zelnodeCache.mapStartTxDosTracker) {
+        printme3 = printme3 + printitem.first.ToFullString() + "," + printitem.second.ToFullString() + ",\n";
+    }
+    printme3 = printme3 + "}";
+
+    std::string printme4 = "{ \n";
+    if (g_zelnodeCache.mapStartTxDosHeights.count(nHeight - ZELNODE_START_TX_EXPIRATION_HEIGHT)) {
+        for (const auto &printitem: g_zelnodeCache.mapStartTxDosHeights.at(nHeight - ZELNODE_START_TX_EXPIRATION_HEIGHT)) {
+            printme4 = printme4 + printitem.ToFullString() + ",\n";
+        }
+        printme4 = printme4 + "}";
+    }
+
+    if (fFromDisconnect) {
+        LogPrintf("Disconnecting - printing after block=%d, hash=%s\n, mapStart=%s\n\n mapStartTxheights=%s\n\n, mapStartTxDosTracker=%s\n\n, mapStartTxDosHeights=%s\n\n",
+                  nHeight, blockhash.GetHex(), printme, printme2, printme3, printme4);
+    } else {
+        LogPrintf("printing after block=%d, hash=%s\n, mapStart=%s\n\n mapStartTxheights=%s\n\n, mapStartTxDosTracker=%s\n\n, mapStartTxDosHeights=%s\n\n",
+                  nHeight, blockhash.GetHex(), printme, printme2, printme3, printme4);
+    }
+
 }
 /** Zelnode Tier code end **/
