@@ -447,7 +447,7 @@ void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx, unsigned i
         indexed_transaction_set::iterator i = mapTx.find(hash);
 
         if (tx.IsZelnodeTx()) {
-            if (mapZelnodeTxMempool.count(tx.collateralOut)){
+            if (mapZelnodeTxMempool.count(tx.collateralOut)) {
                 i = mapTx.find(mapZelnodeTxMempool.at(tx.collateralOut));
 
                 if (i != mapTx.end()) {

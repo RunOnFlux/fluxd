@@ -139,11 +139,11 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
                 }
 
                 if (fCUMULUSFound)
-                    zelnodeCache.AddPaidNode(c_out, rescanIndex->nHeight);
+                    zelnodeCache.AddPaidNode(CUMULUS, c_out, rescanIndex->nHeight);
                 if (fNIMBUSFound)
-                    zelnodeCache.AddPaidNode(n_out, rescanIndex->nHeight);
+                    zelnodeCache.AddPaidNode(NIMBUS, n_out, rescanIndex->nHeight);
                 if (fSTRATUSFound)
-                    zelnodeCache.AddPaidNode(s_out, rescanIndex->nHeight);
+                    zelnodeCache.AddPaidNode(STRATUS, s_out, rescanIndex->nHeight);
             }
 
             int64_t nTime2 = GetTimeMicros(); nTimeAddPaidNode += nTime2 - nTime1;
@@ -664,47 +664,53 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
 
 void GetDeterministicListData(UniValue& listData, const std::string& strFilter, const Tier tier) {
     int count = 0;
-    for (const auto& item : g_zelnodeCache.mapZelnodeList.at(tier).listConfirmedZelnodes) {
+    if (g_zelnodeCache.mapZelnodeList.count(tier)) {
+        for (const auto &item : g_zelnodeCache.mapZelnodeList.at(tier).listConfirmedZelnodes) {
 
-        auto data = g_zelnodeCache.GetZelnodeData(item.out);
+            auto data = g_zelnodeCache.GetZelnodeData(item.out);
 
-        UniValue info(UniValue::VOBJ);
+            UniValue info(UniValue::VOBJ);
 
-        if (!data.IsNull()) {
-            std::string strTxHash = data.collateralIn.GetTxHash();
+            if (!data.IsNull()) {
+                std::string strTxHash = data.collateralIn.GetTxHash();
 
-            if (strFilter != "" && strTxHash.find(strFilter) == string::npos && HexStr(data.pubKey).find(strFilter) &&
-                data.ip.find(strFilter) && EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
-                continue;
+                if (strFilter != "" && strTxHash.find(strFilter) == string::npos &&
+                    HexStr(data.pubKey).find(strFilter) &&
+                    data.ip.find(strFilter) &&
+                    EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
+                    continue;
 
-            std::string strHost = data.ip;
-            CNetAddr node = CNetAddr(strHost, false);
-            std::string strNetwork = GetNetworkName(node.GetNetwork());
+                std::string strHost = data.ip;
+                CNetAddr node = CNetAddr(strHost, false);
+                std::string strNetwork = GetNetworkName(node.GetNetwork());
 
-            info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
-            info.push_back(std::make_pair("txhash", strTxHash));
-            info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
-            info.push_back(std::make_pair("ip", data.ip));
-            info.push_back(std::make_pair("network", strNetwork));
-            info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
-            info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
-            info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
-            info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
-            info.push_back(std::make_pair("tier", data.TierToString()));
-            info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
-            info.push_back(std::make_pair("pubkey", HexStr(data.pubKey)));
-            if (chainActive.Height() >= data.nAddedBlockHeight)
-                info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
-            else
-                info.push_back(std::make_pair("activesince", 0));
-            if (chainActive.Height() >= data.nLastPaidHeight)
-                info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
-            else
-                info.push_back(std::make_pair("lastpaid", 0));
+                info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
+                info.push_back(std::make_pair("txhash", strTxHash));
+                info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
+                info.push_back(std::make_pair("ip", data.ip));
+                info.push_back(std::make_pair("network", strNetwork));
+                info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
+                info.push_back(std::make_pair("confirmed_height", data.nConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
+                info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
+                info.push_back(std::make_pair("tier", data.TierToString()));
+                info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+                info.push_back(std::make_pair("pubkey", HexStr(data.pubKey)));
+                if (chainActive.Height() >= data.nAddedBlockHeight)
+                    info.push_back(
+                            std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("activesince", 0));
+                if (chainActive.Height() >= data.nLastPaidHeight)
+                    info.push_back(
+                            std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+                else
+                    info.push_back(std::make_pair("lastpaid", 0));
 
-            info.push_back(std::make_pair("rank", count++));
+                info.push_back(std::make_pair("rank", count++));
 
-            listData.push_back(info);
+                listData.push_back(info);
+            }
         }
     }
 }
