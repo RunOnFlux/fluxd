@@ -1,8 +1,8 @@
 Zel Contributors
 ==================
 
-Jeremy "Blondfrogs" Anderson (96)
-Tadeas Kmenta (51)
+Jeremy "Blondfrogs" Anderson (101)
+Tadeas Kmenta (53)
 Miles Manley (18)
 Cabecinha84 (7)
 Jack Grigg (4)
