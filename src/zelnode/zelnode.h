@@ -169,9 +169,7 @@ public:
         return nTier > NONE && nTier < LAST;
     }
 
-
-
-    std::string TierToString()
+    std::string TierToString() const
     {
         std::string strStatus = "NONE";
         if (nTier == CUMULUS) strStatus = "CUMULUS";
@@ -181,6 +179,11 @@ public:
         else strStatus = "UNKNOWN TIER (" + std::to_string(nTier) + ")";
 
         return strStatus;
+    }
+
+    std::string ToFullString() const
+    {
+        return strprintf("ZelnodeCacheData Type(%d), %s, nAddedBlockHeight(%d), nConfirmedBlockHeight(%d), nLastConfirmedBlockHeight(%d), nLastPaidHeight(%d), %s", nType,  collateralIn.ToFullString(), nAddedBlockHeight, nConfirmedBlockHeight, nLastConfirmedBlockHeight, nLastPaidHeight, this->TierToString());
     }
 
     friend bool operator<(const ZelnodeCacheData& a, const ZelnodeCacheData& b)
@@ -402,6 +405,8 @@ public:
     //! Helper functions
     ZelnodeCacheData GetZelnodeData(const CTransaction& tx);
     ZelnodeCacheData GetZelnodeData(const COutPoint& out, int* fNeedLocation = nullptr);
+
+    void LogDebugData(const int& nHeight, const uint256& blockhash, bool fFromDisconnect = false);
 
     bool Flush();
     bool LoadData(ZelnodeCacheData& data);
