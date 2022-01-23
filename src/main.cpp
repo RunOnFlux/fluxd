@@ -1620,13 +1620,20 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     }
 
     if (pool.IsRecentlyEvicted(tx.GetHash())) {
-        LogPrint("mempool", "Dropping txid %s : recently evicted", tx.GetHash().ToString());
+        LogPrint("mempool", "Dropping txid %s : recently evicted\n", tx.GetHash().ToString());
         return false;
     }
 
+    // if seen in block drop tx
+    if (pool.IsRecentlySeenInBlock(tx.GetHash())) {
+        LogPrint("mempool", "Dropping txid %s : recently seen in block\n", tx.GetHash().ToString());
+        return false;
+    }
+
+
     if (tx.IsZelnodeTx()) {
         if (pool.mapSeenZelnodeTx.count(tx.GetHash())) {
-            LogPrint("mempool", "Dropping txid %s : recently seen", tx.GetHash().ToString());
+            LogPrint("mempool", "Dropping txid %s : recently seen\n", tx.GetHash().ToString());
             return false;
         }
 
@@ -3852,8 +3859,14 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
     assert(pcoinsTip->GetSaplingAnchorAt(pcoinsTip->GetBestAnchor(SAPLING), newSaplingTree));
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
+    bool check = true;
     BOOST_FOREACH(const CTransaction &tx, block.vtx) {
         SyncWithWallets(tx, NULL);
+
+        if (check && mempool.IsRecentlySeenInBlock(tx.GetHash())) {
+            check = false;
+            mempool.ClearRecentlySeenInBlock();
+        }
     }
     // Update cached incremental witnesses
     GetMainSignals().ChainTip(pindexDelete, &block, newSproutTree, newSaplingTree, false);
@@ -3968,6 +3981,9 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     // ... and about transactions that got confirmed:
     BOOST_FOREACH(const CTransaction &tx, pblock->vtx) {
         SyncWithWallets(tx, pblock);
+        if (tx.IsZelnodeTx()) {
+            mempool.AddRecentlySeenInBlock(tx.GetHash());
+        }
     }
     // Update cached incremental witnesses
     GetMainSignals().ChainTip(pindexNew, pblock, oldSproutTree, oldSaplingTree, true);

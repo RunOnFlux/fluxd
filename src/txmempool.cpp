@@ -855,6 +855,23 @@ bool CTxMemPool::IsRecentlyEvicted(const uint256& txId) {
     return recentlyEvicted->contains(txId);
 }
 
+void CTxMemPool::ClearRecentlySeenInBlock()
+{
+    LOCK(cs);
+    delete recentlySeenInBlock;
+    recentlySeenInBlock =  new RecentlyEvictedList(DEFAULT_MEMPOOL_EVICTION_MEMORY_MINUTES * 60 * 3);
+}
+
+bool CTxMemPool::IsRecentlySeenInBlock(const uint256& txId) {
+    LOCK(cs);
+    return recentlySeenInBlock->contains(txId);
+}
+
+void CTxMemPool::AddRecentlySeenInBlock(const uint256& txId) {
+    LOCK(cs);
+    recentlySeenInBlock->add(txId);
+}
+
 void CTxMemPool::EnsureSizeLimit() {
     AssertLockHeld(cs);
     boost::optional<uint256> maybeDropTxId;
