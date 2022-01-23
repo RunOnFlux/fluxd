@@ -261,18 +261,15 @@ void ZelnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
             if (setAddToConfirm.count(item))
                 continue;
 
+            // If the item isn't in the mapStartTxTracker. Logs the errors and shutdown for the safety of the node
             if (!g_zelnodeCache.mapStartTxTracker.count(item)) {
                 error("Map:at -> Map Start Tx Tracker doesn't have item: %s", item.ToFullString());
-
-                // This is a fix of an issue happening on chain: map::at. Still investigating why this is happening.
                 if (g_zelnodeCache.mapStartTxDosTracker.count(item)) {
-                    error("%s -> Map Start Tx Tracker doesn't have item - and it is already in the DOS list... skip this check: %s",__func__, item.ToFullString());
-                    LogPrintf("%s -> Map::at error would of occured. pIndexHeight=%d, itemHeight=%d\n", __func__, p_nHeight, g_zelnodeCache.mapStartTxDosTracker.at(item).nAddedBlockHeight);
-                    continue;
+                    error("Map::at error would of occured. pIndexHeight=%d, itemHeight=%d\n", p_nHeight, g_zelnodeCache.mapStartTxDosTracker.at(item).nAddedBlockHeight);
                 } else {
-                    error("%s -> Map Start Tx Tracker doesn't have item - and mapStartTxDostracker didn't have item. What does this even mean!!!!!!!! %s",__func__, item.ToFullString());
-                    StartShutdown();
+                    error("Map Start Tx Tracker doesn't have item - and mapStartTxDostracker didn't have item. %s", item.ToFullString());
                 }
+                StartShutdown();
             }
 
             ZelnodeCacheData data = g_zelnodeCache.mapStartTxTracker.at(item);
@@ -299,17 +296,15 @@ void ZelnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
     if (g_zelnodeCache.mapStartTxDosHeights.count(removalHeight)) {
         for (const auto& item : g_zelnodeCache.mapStartTxDosHeights.at(removalHeight)) {
 
+            // If the item isn't in the mapStartTxDosTracker. Logs the errors and shutdown for the safety of the node
             if (!g_zelnodeCache.mapStartTxDosTracker.count(item)) {
-                error("Map::at -> Map Start Tx Dos Tracker doesn't have item: %s", item.ToFullString());
-
-                // This is a fix of an issue happening on chain: map::at. Still investigating why this is happening.
+                error("Map:at -> Map Start Tx Dos Tracker doesn't have item: %s", item.ToFullString());
                 if (g_zelnodeCache.mapStartTxTracker.count(item)) {
-                    error("%s -> Map Start Tx Dos Tracker doesn't have item - and it is already in the START list... skip this check: %s",__func__, item.ToFullString());
-                    continue;
+                    error("Map::at error would of occured. pIndexHeight=%d, itemHeight=%d\n", p_nHeight, g_zelnodeCache.mapStartTxTracker.at(item).nAddedBlockHeight);
                 } else {
-                    error("%s -> Map Start Tx Dos Tracker doesn't have item - and mapStartTxTracker didn't have item. What does this even mean!!!!!!!! %s",__func__, item.ToFullString());
-                    StartShutdown();
+                    error("Map Start Dos Tx Tracker doesn't have item - and mapStartTxTracker didn't have item. %s", item.ToFullString());
                 }
+                StartShutdown();
             }
 
             mapStartTxTracker.insert(std::make_pair(item, g_zelnodeCache.mapStartTxDosTracker.at(item)));
