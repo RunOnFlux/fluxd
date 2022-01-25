@@ -70,6 +70,7 @@ CTxMemPool::~CTxMemPool()
 {
     delete minerPolicyEstimator;
     delete recentlyEvicted;
+    delete recentlySeenInBlock;
     delete weightedTxTree;
 }
 
