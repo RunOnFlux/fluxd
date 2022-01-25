@@ -3212,7 +3212,13 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             // This block is an ancestor of a checkpoint: disable script checks
             fExpensiveChecks = false;
         }
+
+        if (!Checkpoints::CheckBlockAgaintCheckpoint(chainparams.Checkpoints(), pindex->nHeight, block.GetHash())) {
+            error("Failed CheckBlockAgaintCheckpoint call - %d - %s", pindex->nHeight, block.GetHash().GetHex());
+            return false;
+        }
     }
+
 
     auto verifier = libzelcash::ProofVerifier::Strict();
     auto disabledVerifier = libzelcash::ProofVerifier::Disabled();
@@ -4715,8 +4721,14 @@ bool ContextualCheckBlockHeader(
     {
         // Don't accept any forks from the main chain prior to last checkpoint
         CBlockIndex* pcheckpoint = Checkpoints::GetLastCheckpoint(chainParams.Checkpoints());
-        if (pcheckpoint && nHeight < pcheckpoint->nHeight)
+        if (pcheckpoint && nHeight < pcheckpoint->nHeight) {
             return state.DoS(100, error("%s: forked chain older than last checkpoint (height %d)", __func__, nHeight));
+        }
+
+        if (!Checkpoints::CheckBlockAgaintCheckpoint(chainParams.Checkpoints(), nHeight, block.GetHash())) {
+            error("Failed CheckBlockAgaintCheckpoint call in func=%s - nheight=%d - blockhash=%s", __func__, nHeight, block.GetHash().GetHex());
+            return state.DoS(0, error("%s: tried to connect to known forked chain (height %d)", __func__, nHeight));
+        }
     }
 
     // Reject block.nVersion < 4 blocks
