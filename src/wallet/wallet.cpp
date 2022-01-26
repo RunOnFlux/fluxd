@@ -3038,6 +3038,15 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                 if (coinControl && coinControl->HasSelected() && !coinControl->fAllowOtherInputs && !coinControl->IsSelected((*it).first, i))
                     continue;
 
+                if (coinControl && coinControl->fFromOnlyIsSet) {
+                    CTxDestination voutdest;
+                    if (ExtractDestination(pcoin->vout[i].scriptPubKey, voutdest)) {
+                        if (coinControl->fromOnlyDest != voutdest) {
+                            continue;
+                        }
+                    }
+                }
+
                 vCoins.emplace_back(COutput(pcoin, i, nDepth, (mine & ISMINE_SPENDABLE) != ISMINE_NO));
             }
         }
