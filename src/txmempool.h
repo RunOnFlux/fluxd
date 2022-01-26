@@ -143,6 +143,9 @@ private:
     RecentlyEvictedList* recentlyEvicted = new RecentlyEvictedList(DEFAULT_MEMPOOL_EVICTION_MEMORY_MINUTES * 60);
     WeightedTxTree* weightedTxTree = new WeightedTxTree(DEFAULT_MEMPOOL_TOTAL_COST_LIMIT);
 
+    //List for seen in block txes
+    RecentlyEvictedList* recentlySeenInBlock = new RecentlyEvictedList(DEFAULT_MEMPOOL_EVICTION_MEMORY_MINUTES * 60 * 3);
+
     void checkNullifiers(ShieldedType type) const;
     
 public:
@@ -270,6 +273,12 @@ public:
     void SetMempoolCostLimit(int64_t totalCostLimit, int64_t evictionMemorySeconds);
     // Returns true if a transaction has been recently evicted
     bool IsRecentlyEvicted(const uint256& txId);
+    // Returns true if a transaction has been recently seen in a block (ZelnodeTx)
+    bool IsRecentlySeenInBlock(const uint256& txId);
+    // Add txid to recently seen list (ZelnodeTx)
+    void AddRecentlySeenInBlock(const uint256& txId);
+    // Clear the recently seen in block list (ZelnodeTx)
+    void ClearRecentlySeenInBlock();
     // If the mempool size limit is exceeded, this evicts transactions from the mempool until it is below capacity
     void EnsureSizeLimit();
 };

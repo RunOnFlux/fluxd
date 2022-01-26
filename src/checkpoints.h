@@ -27,6 +27,8 @@ CBlockIndex* GetLastCheckpoint(const CCheckpointData& data);
 
 double GuessVerificationProgress(const CCheckpointData& data, CBlockIndex* pindex, bool fSigchecks = true);
 
+bool CheckBlockAgaintCheckpoint(const CCheckpointData& data, const int& nHeight, const uint256& blockhash);
+
 } //namespace Checkpoints
 
 #endif // BITCOIN_CHECKPOINTS_H

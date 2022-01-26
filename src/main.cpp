@@ -1620,13 +1620,20 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     }
 
     if (pool.IsRecentlyEvicted(tx.GetHash())) {
-        LogPrint("mempool", "Dropping txid %s : recently evicted", tx.GetHash().ToString());
+        LogPrint("mempool", "Dropping txid %s : recently evicted\n", tx.GetHash().ToString());
         return false;
     }
 
+    // if seen in block drop tx
+    if (pool.IsRecentlySeenInBlock(tx.GetHash())) {
+        LogPrint("mempool", "Dropping txid %s : recently seen in block\n", tx.GetHash().ToString());
+        return false;
+    }
+
+
     if (tx.IsZelnodeTx()) {
         if (pool.mapSeenZelnodeTx.count(tx.GetHash())) {
-            LogPrint("mempool", "Dropping txid %s : recently seen", tx.GetHash().ToString());
+            LogPrint("mempool", "Dropping txid %s : recently seen\n", tx.GetHash().ToString());
             return false;
         }
 
@@ -3205,7 +3212,13 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             // This block is an ancestor of a checkpoint: disable script checks
             fExpensiveChecks = false;
         }
+
+        if (!Checkpoints::CheckBlockAgaintCheckpoint(chainparams.Checkpoints(), pindex->nHeight, block.GetHash())) {
+            error("Failed CheckBlockAgaintCheckpoint call - %d - %s", pindex->nHeight, block.GetHash().GetHex());
+            return false;
+        }
     }
+
 
     auto verifier = libzelcash::ProofVerifier::Strict();
     auto disabledVerifier = libzelcash::ProofVerifier::Disabled();
@@ -3852,8 +3865,14 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
     assert(pcoinsTip->GetSaplingAnchorAt(pcoinsTip->GetBestAnchor(SAPLING), newSaplingTree));
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
+    bool check = true;
     BOOST_FOREACH(const CTransaction &tx, block.vtx) {
         SyncWithWallets(tx, NULL);
+
+        if (check && mempool.IsRecentlySeenInBlock(tx.GetHash())) {
+            check = false;
+            mempool.ClearRecentlySeenInBlock();
+        }
     }
     // Update cached incremental witnesses
     GetMainSignals().ChainTip(pindexDelete, &block, newSproutTree, newSaplingTree, false);
@@ -3968,6 +3987,9 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     // ... and about transactions that got confirmed:
     BOOST_FOREACH(const CTransaction &tx, pblock->vtx) {
         SyncWithWallets(tx, pblock);
+        if (tx.IsZelnodeTx()) {
+            mempool.AddRecentlySeenInBlock(tx.GetHash());
+        }
     }
     // Update cached incremental witnesses
     GetMainSignals().ChainTip(pindexNew, pblock, oldSproutTree, oldSaplingTree, true);
@@ -4699,8 +4721,14 @@ bool ContextualCheckBlockHeader(
     {
         // Don't accept any forks from the main chain prior to last checkpoint
         CBlockIndex* pcheckpoint = Checkpoints::GetLastCheckpoint(chainParams.Checkpoints());
-        if (pcheckpoint && nHeight < pcheckpoint->nHeight)
+        if (pcheckpoint && nHeight < pcheckpoint->nHeight) {
             return state.DoS(100, error("%s: forked chain older than last checkpoint (height %d)", __func__, nHeight));
+        }
+
+        if (!Checkpoints::CheckBlockAgaintCheckpoint(chainParams.Checkpoints(), nHeight, block.GetHash())) {
+            error("Failed CheckBlockAgaintCheckpoint call in func=%s - nheight=%d - blockhash=%s", __func__, nHeight, block.GetHash().GetHex());
+            return state.DoS(0, error("%s: tried to connect to known forked chain (height %d)", __func__, nHeight));
+        }
     }
 
     // Reject block.nVersion < 4 blocks

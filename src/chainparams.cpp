@@ -221,11 +221,21 @@ public:
             (35000, uint256S("0x000000004646dd797644b9c67aff320961e95c311b4f26985424b720d09fcaa5"))
             (70000, uint256S("0x00000001edcf7768ed39fac55414e53a78d077b1b41fccdaf9307d7bc219626a"))
             (94071, uint256S("0x00000005ec83876bc5288badf0971ae83ac7c6a286851f7b22a75a03e73b401a")) //Halep won French Open 2018
-            (530000, uint256S("0x0000004b4459ec6904e8116d178c357b0f25a7d45c5c5836ce3714791f1ed124")),
-            1581212778,     // * UNIX timestamp of last checkpoint block
-            1429455,              // * total number of transactions between genesis and last checkpoint
+            (277649, uint256S("0x00000004a53f9271d05071a052b3738b46663f3335d14b6aea965a3cb70c0cc8")) // reindex - check
+            (400000, uint256S("0x000000390342f0e52443ad79b43e5d85b78bf519667aeb3aa980d76caeda0369"))
+            (530000, uint256S("0x0000004b4459ec6904e8116d178c357b0f25a7d45c5c5836ce3714791f1ed124"))
+            (600000, uint256S("0x000000dea4478401e6ab95f6d05ade810115411e95e75fab9fd94a44df4b1e1d"))
+            (700000, uint256S("0x0000000845ef03939225cc592773fd7aef54b5232fc42790c46ef6f11ee3e8d4"))
+            (800000, uint256S("0x000000451b73f495b2f6ad38bd89d15495551fc15c2078ad7af3d54d06422cc6"))
+            (900000, uint256S("0x000001e1ad2bb5e3cabb09559b6e65b871bf1d2a51bcc141ce45fc4cbd1d9cd8"))
+            (1000000, uint256S("0x0000001a80e7f30d21fb14116cd01d51e1fad8ac84cc960896f4691a57368a47"))
+            (1040000, uint256S("0x00000007f3b465bd4b0e161e43c05a3d946144330e33ea3a91cb952e6ef86b7d"))
+            (1040577, uint256S("0x000000071fe89682ac260bc0a49621344eb28ae01659c9e7ce86e3762e45f52d"))
+            (1042126, uint256S("0x0000000295e4663178fd9e533787e74206645910a2bfb61938db5f67796eaad0")),
+            1643039394,     // * UNIX timestamp of last checkpoint block
+            16728243,              // * total number of transactions between genesis and last checkpoint
                             //   (the tx=... number in the SetBestChain debug.log lines)
-            1941            // * estimated number of transactions per day
+            20065            // * estimated number of transactions per day
                             //   total number of tx / (checkpoint block height / (24 * 30))
         };
 

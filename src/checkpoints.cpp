@@ -78,4 +78,22 @@ namespace Checkpoints {
         return NULL;
     }
 
+    bool CheckBlockAgaintCheckpoint(const CCheckpointData& data, const int& nHeight, const uint256& blockhash)
+    {
+        const MapCheckpoints& checkpoints = data.mapCheckpoints;
+
+        if (checkpoints.count(nHeight)) {
+            if (blockhash == checkpoints.at(nHeight)) {
+                // return true if checkpoint nHeight is in map and the hashes match
+                return true;
+            } else {
+                // return false if checkpoint nHeight is in map, but the hashes don't match
+                return false;
+            }
+        }
+
+        // Return true if checkpoint nHeight not in map
+        return true;
+    }
+
 } // namespace Checkpoints
