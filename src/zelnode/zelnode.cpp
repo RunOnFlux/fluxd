@@ -128,12 +128,6 @@ void GetUndoDataForExpiredConfirmZelnodes(CZelnodeTxBlockUndo& p_zelnodeTxUndoDa
     }
 
     for (const auto& item : g_zelnodeCache.mapConfirmedZelnodeData) {
-        // The p_zelnodeTxUndoData has a map of all new confirms that have been updated this block. So if it is in there don't expire it. They made it barely in time
-        if (p_zelnodeTxUndoData.mapUpdateLastConfirmHeight.count(item.first))
-            continue;
-        if (item.second.nLastConfirmedBlockHeight < nHeightToExpire) {
-            p_zelnodeTxUndoData.vecExpiredConfirmedData.emplace_back(item.second);
-        }
 
         // TODO - We should be able to remove this from happening everyblock once the transitions are completed by atleast 24 hours.
         //  So, once the transitions are done. We should do a block height check and stop doing this check after a certain block height is hit on chain
@@ -143,7 +137,17 @@ void GetUndoDataForExpiredConfirmZelnodes(CZelnodeTxBlockUndo& p_zelnodeTxUndoDa
                 LogPrintf("%s : expiring output because collateral isn't valid output: %s, current collateral: %s, block height: %d\n",
                          __func__, item.second.collateralIn.ToFullString(), FormatMoney(item.second.nCollateral), p_nHeight);
                 p_zelnodeTxUndoData.vecExpiredConfirmedData.emplace_back(item.second);
+                continue;
             }
+        }
+
+        // The p_zelnodeTxUndoData has a map of all new confirms that have been updated this block. So if it is in there don't expire it. They made it barely in time
+        if (p_zelnodeTxUndoData.mapUpdateLastConfirmHeight.count(item.first)) {
+            continue;
+        }
+
+        if (item.second.nLastConfirmedBlockHeight < nHeightToExpire) {
+            p_zelnodeTxUndoData.vecExpiredConfirmedData.emplace_back(item.second);
         }
     }
 
