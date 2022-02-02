@@ -25,12 +25,15 @@
 #define ZELNODE_DOS_REMOVE_AMOUNT 180
 
 // How often a new confirmation transaction needs to be seen on chain to keep a node up and running
-#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT 60
-#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_PARAMS_1 80
+#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V1 60
+#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V2 80
+#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V3 160
 
 // Nodes are allowed to send a update confirm notification only after this many blocks past there last confirm
-#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT 40
-#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE 5
+#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1 40
+#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2 120
+#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 5
+
 
 /// Mempool only
 // Max signature time that we accept into the mempool
@@ -74,6 +77,7 @@ std::string TierToString(int tier);
 
 bool CheckZelnodeTxSignatures(const CTransaction& transaction);
 bool CheckBenchmarkSignature(const CTransaction& transaction);
+bool IsMigrationCollateralAmount(const CAmount& amount);
 
 // Locations
 enum {
@@ -394,7 +398,7 @@ public:
     bool InStartTracker(const COutPoint& out);
     bool InDoSTracker(const COutPoint& out);
     bool InConfirmTracker(const COutPoint& out);
-    bool CheckIfNeedsNextConfirm(const COutPoint& out);
+    bool CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_nHeight);
 
     bool GetNextPayment(CTxDestination& dest, int nTier, COutPoint& p_zelnodeOut);
 
@@ -427,6 +431,7 @@ public:
     void DumpZelnodeCache();
 
     void CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<int>& vNodeCount);
+    void CountMigration(int& nOldTotal, int& nNewTotal, std::vector<int>& vOldNodeCount, std::vector<int>& vNewNodeCount);
 
     bool CheckConfirmationHeights(const int nHeight, const COutPoint& out, const std::string& ip);
 };

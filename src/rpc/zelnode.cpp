@@ -677,6 +677,10 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
             else
                 info.push_back(std::make_pair("lastpaid", 0));
 
+            if (data.nCollateral > 0) {
+                info.push_back(std::make_pair("amount", FormatMoney(data.nCollateral)));
+            }
+
             info.push_back(std::make_pair("rank", count++));
 
             listData.push_back(info);
@@ -783,6 +787,10 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
             int nEligibleIn = ZELNODE_DOS_REMOVE_AMOUNT - (nCurrentHeight - data.nAddedBlockHeight);
             info.push_back(std::make_pair("eligible_in",  nEligibleIn));
 
+            if (data.nCollateral > 0) {
+                info.push_back(std::make_pair("amount", FormatMoney(data.nCollateral)));
+            }
+
             mapOrderedDosList[nEligibleIn].emplace_back(info);
         }
 
@@ -839,12 +847,14 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
 
-
-            // TODO, when merged with the code that increasese the start tx expiration to 80 -> ZELNODE_START_TX_EXPIRATION_HEIGHT
-            // TODO Grab the expiration height with the new function that was created that takes into account he block height :)
             int nCurrentHeight = chainActive.Height();
-            int nExpiresIn = ZELNODE_START_TX_EXPIRATION_HEIGHT - (nCurrentHeight - data.nAddedBlockHeight);
+            int nExpiresIn = GetZelnodeExpirationCount(nCurrentHeight) - (nCurrentHeight - data.nAddedBlockHeight);
+
             info.push_back(std::make_pair("expires_in",  nExpiresIn));
+
+            if (data.nCollateral > 0) {
+                info.push_back(std::make_pair("amount", FormatMoney(data.nCollateral)));
+            }
 
             mapOrderedStartList[nExpiresIn].emplace_back(info);
         }
@@ -932,6 +942,10 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
                 info.push_back(std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
             else
                 info.push_back(std::make_pair("lastpaid", 0));
+
+            if (data.nCollateral > 0) {
+                info.push_back(std::make_pair("amount", FormatMoney(data.nCollateral)));
+            }
         }
 
         return info;
@@ -1048,6 +1062,68 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
         obj.push_back(Pair("onion", onion));
 
         return obj;
+    }
+
+    return NullUniValue;
+}
+
+UniValue getmigrationcount (const UniValue& params, bool fHelp)
+{
+    if (fHelp || (params.size() > 0))
+        throw runtime_error(
+                "getmigrationcount\n"
+                "\nGet zelnode migration count values\n"
+
+                "\nResult:\n"
+                "{\n"
+                "  \"total-old\": n,        (numeric) Total zelnodes\n"
+                "  \"total-new\": n,        (numeric) Total zelnodes\n"
+                "}\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("getmigrationcount", "") + HelpExampleRpc("getmigrationcount", ""));
+
+    if (IsDZelnodeActive())
+    {
+        int nTotalOld = 0;
+        int nTotalNew = 0;
+        std::vector<int> vOldNodeCount(GetNumberOfTiers());
+        std::vector<int> vNewNodeCount(GetNumberOfTiers());
+        {
+            LOCK(g_zelnodeCache.cs);
+            g_zelnodeCache.CountMigration(nTotalOld, nTotalNew,vOldNodeCount, vNewNodeCount);
+        }
+
+        std::map<int,pair<string,string> > words;
+        words.insert(make_pair(0, make_pair("basic-enabled", "cumulus-enabled")));
+        words.insert(make_pair(1, make_pair("super-enabled", "nimbus-enabled")));
+        words.insert(make_pair(2, make_pair("bamf-enabled", "stratus-enabled")));
+
+        UniValue oldTierCount(UniValue::VOBJ);
+        oldTierCount.pushKV("total-old", nTotalOld);
+        for (int i = 0; i < vOldNodeCount.size(); i++) {
+            if (words.count(i)) {
+                oldTierCount.push_back(Pair(words.at(i).second + "-old", vOldNodeCount[i]));
+            } else {
+                oldTierCount.push_back(Pair("unnamed-enabled-old", vOldNodeCount[i]));
+            }
+        }
+
+        UniValue newTierCount(UniValue::VOBJ);
+        newTierCount.pushKV("total-new", nTotalNew);
+        for (int i = 0; i < vNewNodeCount.size(); i++) {
+            if (words.count(i)) {
+                newTierCount.push_back(Pair(words.at(i).second + "-new", vNewNodeCount[i]));
+            } else {
+                newTierCount.push_back(Pair("unnamed-enabled-new", vNewNodeCount[i]));
+            }
+        }
+
+        UniValue result(UniValue::VARR);
+
+        result.push_back(oldTierCount);
+        result.push_back(newTierCount);
+        return result;
     }
 
     return NullUniValue;
@@ -1246,6 +1322,7 @@ static const CRPCCommand commands[] =
                 { "zelnode",    "getdoslist",             &getdoslist,             false  },
                 { "zelnode",    "getstartlist",           &getstartlist,           false  },
                 { "zelnode",    "getzelnodecount",        &getzelnodecount,        false  },
+                { "zelnode",    "getmigrationcount",      &getmigrationcount,        false },
                 { "zelnode",    "zelnodecurrentwinner",   &zelnodecurrentwinner,   false  }, /* uses wallet if enabled */
                 { "zelnode",    "getzelnodestatus",       &getzelnodestatus,       false  },
                 { "zelnode",    "listzelnodeconf",        &listzelnodeconf,        false  },

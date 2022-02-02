@@ -35,6 +35,11 @@ std::string TierToString(int tier)
     return strStatus;
 }
 
+bool IsMigrationCollateralAmount(const CAmount& amount)
+{
+    return amount == V2_ZELNODE_COLLAT_CUMULUS * COIN || amount == V2_ZELNODE_COLLAT_NIMBUS * COIN || amount == V2_ZELNODE_COLLAT_STRATUS * COIN;
+}
+
 bool CheckZelnodeTxSignatures(const CTransaction&  transaction)
 {
     if (transaction.nType & ZELNODE_START_TX_TYPE) {
@@ -379,18 +384,28 @@ bool ZelnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COut
     // Allow ip address changes at a different interval
     if (fFluxActive) {
         if (ip != data.ip) {
-            if (nCurrentHeight - data.nLastConfirmedBlockHeight >= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE) {
+            if (nCurrentHeight - data.nLastConfirmedBlockHeight >= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1) {
                 return true;
             }
         }
     }
 
-    if (nCurrentHeight - data.nLastConfirmedBlockHeight <= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT) {
-        // TODO - Remove this error message after release + 1 month and we don't see any problems
-        error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
-              __LINE__,
-              out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
-        return false;
+    bool fHalvingActive = NetworkUpgradeActive(nCurrentHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
+    if (fHalvingActive) {
+        if (nCurrentHeight - data.nLastConfirmedBlockHeight <= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2) {
+            error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
+                  __LINE__,
+                  out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
+            return false;
+        }
+    } else {
+        if (nCurrentHeight - data.nLastConfirmedBlockHeight <= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1) {
+            // TODO - Remove this error message after release + 1 month and we don't see any problems
+            error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
+                  __LINE__,
+                  out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
+            return false;
+        }
     }
 
     return true;
@@ -414,11 +429,18 @@ bool ZelnodeCache::InConfirmTracker(const COutPoint& out)
     return mapConfirmedZelnodeData.count(out);
 }
 
-bool ZelnodeCache::CheckIfNeedsNextConfirm(const COutPoint& out)
+bool ZelnodeCache::CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_nHeight)
 {
     LOCK(cs);
+
+    bool fHalvingActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
+
     if (mapConfirmedZelnodeData.count(out)) {
-        return chainActive.Height() - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight > ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT;
+        if (fHalvingActive) {
+            return p_nHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight > ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2;
+        } else {
+            return p_nHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight > ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1;
+        }
     }
 
     return false;
@@ -1137,14 +1159,30 @@ void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<i
     }
 }
 
+void ZelnodeCache::CountMigration(int& nOldTotal, int& nNewTotal, std::vector<int>& vOldNodeCount, std::vector<int>& vNewNodeCount) {
+    for (const auto& entry : mapConfirmedZelnodeData) {
+        if (IsMigrationCollateralAmount(entry.second.nCollateral)) {
+            vNewNodeCount[entry.second.nTier - 1]++;
+            nNewTotal++;
+        } else {
+            vOldNodeCount[entry.second.nTier - 1]++;
+            nOldTotal++;
+        }
+    }
+}
+
 int GetZelnodeExpirationCount(const int& p_nHeight)
 {
     // Get the status on if Zelnode params1 is activated
     bool fFluxActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
-    if (fFluxActive) {
-        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_PARAMS_1;
+    bool fHalvingActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
+
+    if (fHalvingActive) {
+        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V3;
+    } else if (fFluxActive) {
+        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V2;
     } else {
-        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT;
+        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V1;
     }
 }
 
