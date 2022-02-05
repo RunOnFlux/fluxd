@@ -848,7 +848,7 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
             info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
 
             int nCurrentHeight = chainActive.Height();
-            int nExpiresIn = GetZelnodeExpirationCount(nCurrentHeight) - (nCurrentHeight - data.nAddedBlockHeight);
+            int nExpiresIn = ZELNODE_START_TX_EXPIRATION_HEIGHT - (nCurrentHeight - data.nAddedBlockHeight);
 
             info.push_back(std::make_pair("expires_in",  nExpiresIn));
 
