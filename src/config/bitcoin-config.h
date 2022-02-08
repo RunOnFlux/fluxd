@@ -24,7 +24,7 @@
 #define CLIENT_VERSION_REVISION 1
 
 /* Version is release */
-#define COPYRIGHT_YEAR 2019
+#define COPYRIGHT_YEAR 2022
 
 /* Define to 1 to enable mining functions */
 #define ENABLE_MINING 1

@@ -15,6 +15,7 @@
 #include "sync.h"
 #include "utilstrencodings.h"
 #include "utiltime.h"
+#include "clientversion.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -1000,8 +1001,13 @@ void SetThreadPriority(int nPriority)
 std::string PrivacyInfo()
 {
     return "\n" +
-           FormatParagraph(strprintf(_("In order to ensure you are adequately protecting your privacy when using Zelcash, please see <%s>."),
-                                     "https://z.cash/support/security/")) + "\n";
+           FormatParagraph(strprintf(_("In order to ensure you are adequately protecting your privacy when using Flux, please see <%s>."),
+                                     "https://github.com/RunOnFlux/fluxd/")) + "\n";
+}
+
+std::string VersionInfo()
+{
+    return "\n" + _("Software Version") + " v" + FormatVersion(CLIENT_VERSION) + "\n";
 }
 
 std::string LicenseInfo()
@@ -1009,7 +1015,7 @@ std::string LicenseInfo()
     return "\n" +
            FormatParagraph(strprintf(_("Copyright (C) 2009-%i The Bitcoin Core Developers"), COPYRIGHT_YEAR)) + "\n" +
            FormatParagraph(strprintf(_("Copyright (C) 2015-%i The Zcash Developers"), COPYRIGHT_YEAR)) + "\n" +
-	   FormatParagraph(strprintf(_("Copyright (C) 2018-%i The Zel Developers"), COPYRIGHT_YEAR)) + "\n" +	
+	   FormatParagraph(strprintf(_("Copyright (C) 2018-%i The Flux Developers"), COPYRIGHT_YEAR)) + "\n" +
            "\n" +
            FormatParagraph(_("This is experimental software.")) + "\n" +
            "\n" +

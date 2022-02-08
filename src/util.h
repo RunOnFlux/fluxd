@@ -158,6 +158,9 @@ std::string PrivacyInfo();
 /** Returns licensing information (for -version) */
 std::string LicenseInfo();
 
+/** Returns information related to software version */
+std::string VersionInfo();
+
 inline bool IsSwitchChar(char c)
 {
 #ifdef WIN32
