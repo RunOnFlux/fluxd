@@ -1175,13 +1175,18 @@ bool ContextualCheckTransaction(
                     strFailMessage = "zelnode-tx-coins-not-found";
                 }
 
+                if (!fFailure && !coins.IsAvailable(outPoint.n)) {
+                    fFailure = true;
+                    strFailMessage = "zelnode-tx-coins-not-available";
+                }
+
                 CTxDestination destination;
                 if (!fFailure && !ExtractDestination(coins.vout[outPoint.n].scriptPubKey, destination)) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-failed-to-extract-destination";
                 }
 
-                if (coins.vout[outPoint.n].scriptPubKey.IsPayToScriptHash()) {
+                if (!fFailure && coins.vout[outPoint.n].scriptPubKey.IsPayToScriptHash()) {
                     // Here we have a node of which the collatoral is stored in a multisig address.
                     // Only the flux foundation can do this. So lets use the chainparams public key to verify the signature
                     // This means that the userpubkey is unable to be the same as the destination

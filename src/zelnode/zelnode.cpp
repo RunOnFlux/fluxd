@@ -501,8 +501,14 @@ bool ZelnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPoi
                             }
 
                             CTxDestination destination;
-                            if (!ExtractDestination(coins.vout[p_zelnodeOut.n].scriptPubKey, destination)) {
-                                error("Failing to extract destination ----- %s - %d", __func__, __LINE__);
+                            if (coins.IsAvailable(p_zelnodeOut.n)) {
+                                if (!ExtractDestination(coins.vout[p_zelnodeOut.n].scriptPubKey, destination)) {
+                                    error("Failing to extract destination ----- %s - %d", __func__, __LINE__);
+                                    return false;
+                                }
+                            } else {
+                                // Coin is spent
+                                error("Coin not available ----- %s - %d", __func__, __LINE__);
                                 return false;
                             }
 
