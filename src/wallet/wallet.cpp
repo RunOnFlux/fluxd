@@ -3022,8 +3022,11 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                 if (IsSpent(wtxid, i))
                     continue;
 
-                if (mine == ISMINE_NO)
-                    continue;
+                if (mine == ISMINE_NO) {
+                    if (!pcoin->vout[i].scriptPubKey.IsPayToScriptHash()) {
+                        continue;
+                    }
+                }
 
                 if (IsLockedCoin((*it).first, i) && nCoinType != ONLY_CUMULUS && nCoinType != ONLY_NIMBUS && nCoinType != ONLY_STRATUS && nCoinType != ALL_ZELNODE )
                     continue;
@@ -4862,6 +4865,14 @@ bool CWallet::GetVinAndKeysFromOutput(COutput out, CTxIn& txinRet, CPubKey& pubK
 
     CTxDestination address1;
     ExtractDestination(pubScript, address1);
+
+    if (pubScript.IsPayToScriptHash()) {
+        if (!GetKeysForP2SHFluxNode(pubKeyRet, keyRet)) {
+            LogPrintf("%s-- Failed to get P2SH keys\n", __func__);
+            return false;
+        }
+        return true;
+    }
 
     CKeyID* keyID;
     keyID = boost::get<CKeyID>(&address1);

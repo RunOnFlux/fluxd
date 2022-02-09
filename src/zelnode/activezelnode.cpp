@@ -152,6 +152,14 @@ bool ActiveZelnode::GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, C
     CTxDestination address1;
     ExtractDestination(pubScript, address1);
 
+    if (pubScript.IsPayToScriptHash()) {
+        if (!GetKeysForP2SHFluxNode(pubkey, secretKey)) {
+            LogPrintf("%s-- Failed to get P2SH keys\n", __func__);
+            return false;
+        }
+        return true;
+    }
+
     CKeyID* keyid;
     keyid = boost::get<CKeyID>(&address1);
 

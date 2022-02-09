@@ -646,6 +646,14 @@ bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_H
         return false;
     }
 
+    if (IsAP2SHFluxNodePublicKey(tx.collateralPubkey)) {
+        bool fHalvingActive = NetworkUpgradeActive(p_Height, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
+        if (!fHalvingActive) {
+            error("Using P2SH collateral key before it is actives");
+            return false;
+        }
+    }
+
     nCollateralAmount = coins->vout[prevout.n].nValue;
 
     return IsCoinTierValid(nTier);
@@ -787,6 +795,22 @@ bool GetCoinTierPercentage(const int& nTier, double& p_double)
 bool IsCoinTierValid(const int& nTier)
 {
     return nTier > NONE && nTier < LAST;
+}
+
+bool IsAP2SHFluxNodePublicKey(const CPubKey& pubkey) {
+    // Get the public keys and timestamps from the chainparams
+    std::vector<std::pair<std::string, uint32_t> > vectorPublicKeys = Params().GetP2SHFluxnodePublicKeys();
+
+    for (int i = 0; i < vectorPublicKeys.size(); i++) {
+        std::string public_key = vectorPublicKeys[i].first;
+        CPubKey chainpubkey(ParseHex(public_key));
+
+        if (chainpubkey == pubkey) {
+            return true;
+        }
+    }
+
+    return false;
 }
 /** Coins Tier code end **/
 

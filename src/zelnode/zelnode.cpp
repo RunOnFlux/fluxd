@@ -49,8 +49,17 @@ bool CheckZelnodeTxSignatures(const CTransaction&  transaction)
 
         std::string strMessage = transaction.GetHash().GetHex();
 
-        if (!obfuScationSigner.VerifyMessage(transaction.collateralPubkey, transaction.sig, strMessage, errorMessage))
-            return error("%s - START Error: %s", __func__, errorMessage);
+        // If the transaction collateral pubkey matches the chainparams for paytoscripthash signing
+        // Verify the signature against it.
+        std::string public_key = GetP2SHFluxNodePublicKey(transaction);
+        CPubKey pubkey(ParseHex(public_key));
+        if (transaction.collateralPubkey == pubkey) {
+            if (!obfuScationSigner.VerifyMessage(transaction.collateralPubkey, transaction.sig, strMessage, errorMessage))
+                return error("%s - P2SH - START Error: %s", __func__, errorMessage);
+        } else {
+            if (!obfuScationSigner.VerifyMessage(transaction.collateralPubkey, transaction.sig, strMessage,errorMessage))
+                return error("%s - NORMAL START Error: %s", __func__, errorMessage);
+        }
 
         return true;
     } else if (transaction.nType & ZELNODE_CONFIRM_TX_TYPE) {
@@ -483,8 +492,26 @@ bool ZelnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPoi
                 if (mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.size()) {
                     p_zelnodeOut = mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.front().out;
                     if (mapConfirmedZelnodeData.count(p_zelnodeOut)) {
-                        dest = mapConfirmedZelnodeData.at(p_zelnodeOut).collateralPubkey.GetID();
-                        return true;
+                        if (IsAP2SHFluxNodePublicKey(mapConfirmedZelnodeData.at(p_zelnodeOut).collateralPubkey)) {
+                            // Get the scriptpubkey and build the destination from it
+                            CCoins coins;
+                            if (!pcoinsTip->GetCoins(p_zelnodeOut.hash, coins)) {
+                                error("Failing to retreive coins ----- %s - %d", __func__, __LINE__);
+                                return false;
+                            }
+
+                            CTxDestination destination;
+                            if (!ExtractDestination(coins.vout[p_zelnodeOut.n].scriptPubKey, destination)) {
+                                error("Failing to extract destination ----- %s - %d", __func__, __LINE__);
+                                return false;
+                            }
+
+                            dest = destination;
+                            return true;
+                        } else {
+                            dest = mapConfirmedZelnodeData.at(p_zelnodeOut).collateralPubkey.GetID();
+                            return true;
+                        }
                     } else {
                         // The front of the list, wasn't in the confirmed zelnode data. These means it expired
                         mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.pop_front();
@@ -1208,6 +1235,46 @@ std::string GetZelnodeBenchmarkPublicKey(const CTransaction& tx)
 
     // Only reason this should happen is if there is a problem with the chainparams
     return vectorPublicKeys[0].first;
+}
+
+std::string GetP2SHFluxNodePublicKey(const CTransaction& tx)
+{
+    // Get the public keys and timestamps from the chainparams
+    std::vector< std::pair<std::string, uint32_t> > vectorPublicKeys = Params().GetP2SHFluxnodePublicKeys();
+
+    // If only have one public key return it
+    if (vectorPublicKeys.size() == 1) {
+        return vectorPublicKeys[0].first;
+    }
+
+    // Get the last index in the array
+    int nLast = vectorPublicKeys.size() - 1;
+
+    // Loop backwards until we find the correct public key
+    for (int i = nLast; i >= 0; i--) {
+        if (tx.sigTime >= vectorPublicKeys[i].second) {
+            return vectorPublicKeys[i].first;
+        }
+    }
+
+    // Only reason this should happen is if there is a problem with the chainparams
+    return vectorPublicKeys[0].first;
+}
+
+bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet)
+{
+    std::string p2shprivkey = GetArg("-fluxnodep2shprivkey", "");
+    CKey key;
+    key = DecodeSecret(p2shprivkey);
+
+    if (!key.IsValid()) {
+        LogPrintf("%s -- Invalid P2SH priv key\n", __func__);
+        return false;
+    }
+
+    keyRet = key;
+    pubKeyRet = keyRet.GetPubKey();
+    return true;
 }
 
 /** Zelnode Tier functions

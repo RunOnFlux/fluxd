@@ -267,6 +267,10 @@ public:
         nBeginStratusTransition = 999999999;
         nEndStratusTransition = 999999999;
 
+        vecP2SHPublicKeys.resize(1);
+        vecP2SHPublicKeys[0] = std::make_pair("042d8ac337d0e5dc9ee0fdf4cb9c36970b10e59a6d50ce2c4dea5a18bc428707fdf1e4b7fe7743302af902d7002e0bd324cbd8030daa478677c6c8a3b807066909", 0);
+
+
         // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
         // in #2795.
@@ -435,6 +439,8 @@ public:
         nBeginStratusTransition = 26000;
         nEndStratusTransition = 32000;
 
+        vecP2SHPublicKeys.resize(1);
+        vecP2SHPublicKeys[0] = std::make_pair("04276f105ff36a670a56e75c2462cff05a4a7864756e6e1af01022e32752d6fe57b1e13cab4f2dbe3a6a51b4e0de83a5c4627345f5232151867850018c9a3c3a1d", 0);
 
     // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
@@ -598,6 +604,10 @@ public:
 
         nBeginStratusTransition = 999999999;
         nEndStratusTransition = 999999999;
+
+        vecP2SHPublicKeys.resize(1);
+        vecP2SHPublicKeys[0] = std::make_pair("04276f105ff36a670a56e75c2462cff05a4a7864756e6e1af01022e32752d6fe57b1e13cab4f2dbe3a6a51b4e0de83a5c4627345f5232151867850018c9a3c3a1d", 0);
+
     }
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)

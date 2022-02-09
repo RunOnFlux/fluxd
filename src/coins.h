@@ -597,6 +597,7 @@ void InitializeCoinTierAmounts();
 bool GetCoinTierFromAmount(const int& p_Height, const CAmount& nAmount, int& nTier);
 bool GetCoinTierPercentage(const int& nTier, double& p_float);
 bool IsCoinTierValid(const int& nTier);
+bool IsAP2SHFluxNodePublicKey(const CPubKey& pubkey);
 
 std::set<CAmount> GetCoinAmountsByTier(const int& p_Height, const int& nTier);
 /** Coins Tier code end **/

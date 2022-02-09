@@ -1181,9 +1181,22 @@ bool ContextualCheckTransaction(
                     strFailMessage = "zelnode-tx-failed-to-extract-destination";
                 }
 
-                if (!fFailure && EncodeDestination(destination) != EncodeDestination(userpubkey.GetID())) {
-                    fFailure = true;
-                    strFailMessage = "zelnode-tx-destinations-didn't-match";
+                if (coins.vout[outPoint.n].scriptPubKey.IsPayToScriptHash()) {
+                    // Here we have a node of which the collatoral is stored in a multisig address.
+                    // Only the flux foundation can do this. So lets use the chainparams public key to verify the signature
+                    // This means that the userpubkey is unable to be the same as the destination
+                    std::string public_key = GetP2SHFluxNodePublicKey(tx);
+                    CPubKey pubkey(ParseHex(public_key));
+
+                    if (tx.collateralPubkey != pubkey) {
+                        fFailure = true;
+                        strFailMessage = "zelnode-tx-p2sh-publickeys-didn't-match";
+                    }
+                } else {
+                    if (!fFailure && EncodeDestination(destination) != EncodeDestination(userpubkey.GetID())) {
+                        fFailure = true;
+                        strFailMessage = "zelnode-tx-destinations-didn't-match";
+                    }
                 }
             }
 

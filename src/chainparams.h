@@ -154,6 +154,9 @@ public:
     int GetStratusEndTransitionHeight() const { return nEndStratusTransition; }
 
 
+    std::vector<std::pair<std::string, uint32_t> > GetP2SHFluxnodePublicKeys() const { return vecP2SHPublicKeys; }
+
+
 protected:
     CChainParams() {}
 
@@ -217,6 +220,9 @@ protected:
     int64_t nEndNimbusTransition;
     int64_t nBeginStratusTransition;
     int64_t nEndStratusTransition;
+
+
+    std::vector< std::pair<std::string, uint32_t> > vecP2SHPublicKeys;
 };
 
 /**
