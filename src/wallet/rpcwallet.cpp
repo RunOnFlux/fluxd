@@ -419,6 +419,61 @@ static void SendMoney(const CTxDestination &address, CAmount nValue, bool fSubtr
         throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
 }
 
+static void ConsolidateMoney(CWalletTx& wtxNew, const int minimum_utxo_count)
+{
+    CCoinControl coinControl;
+    std::map<std::string, int> mapUTXOCount;
+    pwalletMain->GetUTXOCountByAddress(mapUTXOCount);
+
+    for (const auto& address: mapUTXOCount) {
+        if (address.second >= minimum_utxo_count) {
+            wtxNew.strFromAccount = address.first;
+            coinControl.fromOnlyDest = DecodeDestination(wtxNew.strFromAccount);
+            coinControl.fFromOnlyIsSet = true;
+            coinControl.destChange = DecodeDestination(wtxNew.strFromAccount);
+            break;
+        }
+    }
+
+    if (coinControl.fFromOnlyIsSet) {
+        CAmount curBalance;
+        bool fBypassLockedCoins = true;
+        pwalletMain->SelectUTXOByAddress(coinControl, curBalance, wtxNew.strFromAccount, fBypassLockedCoins);
+        CScript scriptPubKey = GetScriptForDestination(coinControl.fromOnlyDest);
+
+        if (coinControl.HasSelected()) {
+            // Create and send the transaction
+            CReserveKey reservekey(pwalletMain);
+            CAmount nFeeRequired;
+            std::string strError;
+            vector<CRecipient> vecSend;
+            int nChangePosRet = -1;
+            bool fSubtractFeeFromAmount = true;
+            CRecipient recipient = {scriptPubKey, curBalance, fSubtractFeeFromAmount};
+            vecSend.push_back(recipient);
+
+            if (!pwalletMain->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strError,
+                                                coinControl.fFromOnlyIsSet ? &coinControl : NULL)) {
+                if (!fSubtractFeeFromAmount && curBalance + nFeeRequired > pwalletMain->GetBalance())
+                    strError = strprintf(
+                            "Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!",
+                            FormatMoney(nFeeRequired));
+                throw JSONRPCError(RPC_WALLET_ERROR, strError);
+            }
+            if (!pwalletMain->CommitTransaction(wtxNew, reservekey))
+                throw JSONRPCError(RPC_WALLET_ERROR,
+                                   "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
+        } else {
+            throw JSONRPCError(RPC_MISC_ERROR,
+                               strprintf("Wallet is fully consolidated", minimum_utxo_count));
+        }
+    } else {
+        throw JSONRPCError(RPC_MISC_ERROR,
+                           strprintf("Wallet doesn't contain an address that has more than %d Unspent Transaction Outputs", minimum_utxo_count));
+
+    }
+}
+
 UniValue sendtoaddress(const UniValue& params, bool fHelp)
 {
     if (!EnsureWalletIsAvailable(fHelp))
@@ -476,6 +531,55 @@ UniValue sendtoaddress(const UniValue& params, bool fHelp)
     SendMoney(dest, nAmount, fSubtractFeeFromAmount, wtx);
 
     return wtx.GetHash().GetHex();
+}
+
+UniValue consolidateutxos(const UniValue& params, bool fHelp)
+{
+    if (!EnsureWalletIsAvailable(fHelp))
+        return NullUniValue;
+
+    if (fHelp || params.size() > 1)
+        throw runtime_error(
+                "consolidateutxos (utxo_count)\n"
+                "\nConsolidates the utxo set of your wallet one address at a time, if a certain address has more than 100 UTXO's they will be sent to the same address in a single utxo\n"
+                + HelpRequiringPassphrase() +
+                "\nArguments:\n"
+                "1. \"utxo_count\"  (number, optional, default=100) The number of utxo's that trigger a consolidation, maximum is 250\n"
+                "\nResult:\n"
+                "\"transactionid\"  (string) The transaction id.\n"
+                "\"consolidated\"  (number) The number of utxo consolidated.\n"
+                "\nExamples:\n"
+                + HelpExampleCli("consolidateutxos", "")
+                + HelpExampleCli("consolidateutxos", "100")
+                + HelpExampleCli("consolidateutxos", "")
+                + HelpExampleRpc("consolidateutxos", "100")
+        );
+
+    LOCK2(cs_main, pwalletMain->cs_wallet);
+    EnsureWalletIsUnlocked();
+
+    int minimum_count = 100;
+
+    if (params.size() > 0) {
+        minimum_count = params[0].get_int();
+        if (minimum_count <= 1) {
+            throw JSONRPCError(RPC_INVALID_PARAMS, "Minimum UTXO count must be greater than one");
+        }
+
+        if (minimum_count > 250) {
+            minimum_count = 250;
+        }
+    }
+
+    CWalletTx wtx;
+    ConsolidateMoney(wtx, minimum_count);
+
+    UniValue data(UniValue::VOBJ);
+
+    data.pushKV("transactionid", wtx.GetHash().GetHex());
+    data.pushKV("consolidated", wtx.vin.size());
+
+    return data;
 }
 
 UniValue listaddressgroupings(const UniValue& params, bool fHelp)
@@ -4836,6 +4940,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "rescanblockchain",         &rescanblockchain,         true  },
     { "wallet",             "sendfrom",                 &sendfrom,                 false },
     { "wallet",             "sendmany",                 &sendmany,                 false },
+    { "wallet",             "consolidateutxos",         &consolidateutxos,         false },
     { "wallet",             "sendtoaddress",            &sendtoaddress,            false },
     { "wallet",             "setaccount",               &setaccount,               true  },
     { "wallet",             "settxfee",                 &settxfee,                 true  },
