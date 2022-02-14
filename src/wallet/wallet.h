@@ -1143,6 +1143,8 @@ public:
     CAmount GetWatchOnlyBalance() const;
     CAmount GetUnconfirmedWatchOnlyBalance() const;
     CAmount GetImmatureWatchOnlyBalance() const;
+    void GetUTXOCountByAddress(std::map<std::string, int> & mapUTXOCount) const;
+    void SelectUTXOByAddress(CCoinControl& coincontrol, CAmount& nBalance, const std::string strFrom, const bool fBypassLocked) const;
     bool FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, int& nChangePosRet, std::string& strFailReason);
     bool CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosRet,
                            std::string& strFailReason, const CCoinControl *coinControl = NULL, bool sign = true);
