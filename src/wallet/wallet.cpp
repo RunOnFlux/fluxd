@@ -2869,7 +2869,7 @@ void CWallet::ResendWalletTransactions(int64_t nBestBlockTime)
  */
 
 
-CAmount CWallet::GetBalance() const
+CAmount CWallet::GetBalance(const std::string strFrom) const
 {
     CAmount nTotal = 0;
     {
@@ -2877,8 +2877,20 @@ CAmount CWallet::GetBalance() const
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx* pcoin = &(*it).second;
-            if (pcoin->IsTrusted())
-                nTotal += pcoin->GetAvailableCredit();
+            if (pcoin->IsTrusted()) {
+                if (!strFrom.empty()) {
+                    CTxDestination coindest;
+                    for (int i = 0; i < pcoin->vout.size(); i++) {
+                        if (ExtractDestination(pcoin->vout[i].scriptPubKey, coindest)) {
+                            if (coindest == DecodeDestination(strFrom)) {
+                                nTotal += pcoin->GetAvailableCredit(false, i);
+                            }
+                        }
+                    }
+                } else {
+                    nTotal += pcoin->GetAvailableCredit();
+                }
+            }
         }
     }
 
