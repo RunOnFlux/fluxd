@@ -648,8 +648,17 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
         if (!data.IsNull()) {
             std::string strTxHash = data.collateralIn.GetTxHash();
 
+
+            CTxDestination payment_destination;
+            if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+                GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
+            } else {
+                payment_destination = data.collateralPubkey.GetID();
+            }
+
+
             if (strFilter != "" && strTxHash.find(strFilter) == string::npos && HexStr(data.pubKey).find(strFilter) &&
-                data.ip.find(strFilter) && EncodeDestination(data.collateralPubkey.GetID()).find(strFilter) == string::npos)
+                data.ip.find(strFilter) && EncodeDestination(payment_destination).find(strFilter) == string::npos)
                 continue;
 
             std::string strHost = data.ip;
@@ -666,7 +675,7 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
             info.push_back(std::make_pair("last_confirmed_height", data.nLastConfirmedBlockHeight));
             info.push_back(std::make_pair("last_paid_height", data.nLastPaidHeight));
             info.push_back(std::make_pair("tier", data.TierToString()));
-            info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+            info.push_back(std::make_pair("payment_address", EncodeDestination(payment_destination)));
             info.push_back(std::make_pair("pubkey", HexStr(data.pubKey)));
             if (chainActive.Height() >= data.nAddedBlockHeight)
                 info.push_back(std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
@@ -777,11 +786,18 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
             // Get the data from the item in the map of dox tracking
             const ZelnodeCacheData data = item.second;
 
+            CTxDestination payment_destination;
+            if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+                GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
+            } else {
+                payment_destination = data.collateralPubkey.GetID();
+            }
+
             UniValue info(UniValue::VOBJ);
 
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
-            info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+            info.push_back(std::make_pair("payment_address", EncodeDestination(payment_destination)));
 
             int nCurrentHeight = chainActive.Height();
             int nEligibleIn = ZELNODE_DOS_REMOVE_AMOUNT - (nCurrentHeight - data.nAddedBlockHeight);
@@ -841,11 +857,18 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
             // Get the data from the item in the map of dox tracking
             const ZelnodeCacheData data = item.second;
 
+            CTxDestination payment_destination;
+            if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+                GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
+            } else {
+                payment_destination = data.collateralPubkey.GetID();
+            }
+
             UniValue info(UniValue::VOBJ);
 
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
-            info.push_back(std::make_pair("payment_address", EncodeDestination(data.collateralPubkey.GetID())));
+            info.push_back(std::make_pair("payment_address", EncodeDestination(payment_destination)));
 
             int nCurrentHeight = chainActive.Height();
             int nExpiresIn = ZELNODE_START_TX_EXPIRATION_HEIGHT - (nCurrentHeight - data.nAddedBlockHeight);

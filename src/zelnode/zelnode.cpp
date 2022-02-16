@@ -493,27 +493,24 @@ bool ZelnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPoi
                     p_zelnodeOut = mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.front().out;
                     if (mapConfirmedZelnodeData.count(p_zelnodeOut)) {
                         if (IsAP2SHFluxNodePublicKey(mapConfirmedZelnodeData.at(p_zelnodeOut).collateralPubkey)) {
-                            // Get the scriptpubkey and build the destination from it
-                            CCoins coins;
-                            if (!pcoinsTip->GetCoins(p_zelnodeOut.hash, coins)) {
-                                error("Failing to retreive coins ----- %s - %d", __func__, __LINE__);
-                                return false;
-                            }
-
-                            CTxDestination destination;
-                            if (coins.IsAvailable(p_zelnodeOut.n)) {
-                                if (!ExtractDestination(coins.vout[p_zelnodeOut.n].scriptPubKey, destination)) {
-                                    error("Failing to extract destination ----- %s - %d", __func__, __LINE__);
-                                    return false;
-                                }
+                            CTxDestination payment_destination;
+                            if (GetFluxNodeP2SHDestination(pcoinsTip, p_zelnodeOut, payment_destination)) {
+                                dest = payment_destination;
+                                return true;
                             } else {
-                                // Coin is spent
-                                error("Coin not available ----- %s - %d", __func__, __LINE__);
+                                /**
+                                 * This shouldn't ever happen. As the only scenario this fails at is if the coin is spent.
+                                 * If the coin is spent in the block previous to the block where this fluxnode is next
+                                 * on the list to get a payment. It will be removed from the confirmed list just as
+                                 * any other node would be. See -> func (GetUndoDataForExpiredConfirmZelnodes)
+                                 * If this coin is spent in the same block that it would receive a payout
+                                 * the coin would be found in the pcoinsTip Cache and the correct destination would be found
+                                 * Only after the block is connected would the pcoinTip cache be updated spending the coin"
+                                 * Making it so we could no longer find the coins scriptPubKey in func ( GetFluxNodeP2SHDestination )
+                              */
+                                error("Failed to get p2sh destination %s", p_zelnodeOut.ToFullString());
                                 return false;
                             }
-
-                            dest = destination;
-                            return true;
                         } else {
                             dest = mapConfirmedZelnodeData.at(p_zelnodeOut).collateralPubkey.GetID();
                             return true;
@@ -1243,7 +1240,7 @@ std::string GetZelnodeBenchmarkPublicKey(const CTransaction& tx)
     return vectorPublicKeys[0].first;
 }
 
-std::string GetP2SHFluxNodePublicKey(const CTransaction& tx)
+std::string GetP2SHFluxNodePublicKey(const uint32_t& nSigTime)
 {
     // Get the public keys and timestamps from the chainparams
     std::vector< std::pair<std::string, uint32_t> > vectorPublicKeys = Params().GetP2SHFluxnodePublicKeys();
@@ -1258,13 +1255,19 @@ std::string GetP2SHFluxNodePublicKey(const CTransaction& tx)
 
     // Loop backwards until we find the correct public key
     for (int i = nLast; i >= 0; i--) {
-        if (tx.sigTime >= vectorPublicKeys[i].second) {
+        if (nSigTime >= vectorPublicKeys[i].second) {
             return vectorPublicKeys[i].first;
         }
     }
 
     // Only reason this should happen is if there is a problem with the chainparams
     return vectorPublicKeys[0].first;
+}
+
+
+std::string GetP2SHFluxNodePublicKey(const CTransaction& tx)
+{
+    return GetP2SHFluxNodePublicKey(tx.sigTime);
 }
 
 bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet)

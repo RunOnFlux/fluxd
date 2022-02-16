@@ -812,5 +812,30 @@ bool IsAP2SHFluxNodePublicKey(const CPubKey& pubkey) {
 
     return false;
 }
+
+bool GetFluxNodeP2SHDestination(const CCoinsViewCache* coinsCache, const COutPoint& outpoint, CTxDestination& destination) {
+    // Get the scriptpubkey and build the destination from it
+    CCoins coins;
+
+    if (!coinsCache->GetCoins(outpoint.hash, coins)) {
+        error("Failing to retreive coins -- for outpoint %s --- %s - %d", outpoint.ToFullString(), __func__, __LINE__);
+        return false;
+    }
+
+    CTxDestination dest;
+    if (coins.IsAvailable(outpoint.n)) {
+        if (!ExtractDestination(coins.vout[outpoint.n].scriptPubKey, dest)) {
+            error("Failing to extract destination -- for outpoint %s --- %s - %d", outpoint.ToFullString(), __func__, __LINE__);
+            return false;
+        }
+    } else {
+        // Coin is spent
+        error("Coin not available -- for outpoint %s --- %s - %d", outpoint.ToFullString(), __func__, __LINE__);
+        return false;
+    }
+
+    destination = dest;
+    return true;
+}
 /** Coins Tier code end **/
 
