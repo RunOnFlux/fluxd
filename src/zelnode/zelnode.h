@@ -34,6 +34,11 @@
 #define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2 120
 #define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 5
 
+// Maximum ip address size in zelnode confirm transaction
+#define FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V1 40
+#define FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V2 60
+
+
 
 /// Mempool only
 // Max signature time that we accept into the mempool

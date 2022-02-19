@@ -1394,7 +1394,14 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
                                  REJECT_INVALID, "bad-txns-zelnode-tx-invalid-benchmark-tier");
             }
 
-            if (tx.ip.size() > 40) {
+            // Get the Maximum IP address size
+            int MAX_IP_ADDRESS_SIZE = FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V1;
+            if (tx.benchmarkSigTime >= 1647262800) { // This time stamp is the fluxnode halving benchmarking updated timestamp
+                MAX_IP_ADDRESS_SIZE = FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V2;
+            }
+
+            // Check the ip address size
+            if (tx.ip.size() > MAX_IP_ADDRESS_SIZE) {
                 return state.DoS(100,error("CheckTransaction(): Is Zelnode Tx, ip address to large"),
                         REJECT_INVALID, "bad-txns-zelnode-tx-ip-address-to-large");
             }
