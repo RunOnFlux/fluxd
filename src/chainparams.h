@@ -145,6 +145,18 @@ public:
     int64_t GetSwapPoolInterval() const { return nSwapPoolInterval; }
     int GetSwapPoolMaxTimes() const { return nSwapPoolMaxTimes; }
 
+
+    int GetCumulusStartTransitionHeight() const { return nBeginCumulusTransition; }
+    int GetCumulusEndTransitionHeight() const { return nEndCumulusTransition; }
+    int GetNimbusStartTransitionHeight() const { return nBeginNimbusTransition; }
+    int GetNimbusEndTransitionHeight() const { return nEndNimbusTransition; }
+    int GetStratusStartTransitionHeight() const { return nBeginStratusTransition; }
+    int GetStratusEndTransitionHeight() const { return nEndStratusTransition; }
+
+
+    std::vector<std::pair<std::string, uint32_t> > GetP2SHFluxnodePublicKeys() const { return vecP2SHPublicKeys; }
+
+
 protected:
     CChainParams() {}
 
@@ -199,6 +211,18 @@ protected:
     int64_t nSwapPoolStartHeight;
     int64_t nSwapPoolInterval;
     int64_t nSwapPoolMaxTimes;
+
+
+    /** Flux new fluxnode start block heights **/
+    int64_t nBeginCumulusTransition;
+    int64_t nEndCumulusTransition;
+    int64_t nBeginNimbusTransition;
+    int64_t nEndNimbusTransition;
+    int64_t nBeginStratusTransition;
+    int64_t nEndStratusTransition;
+
+
+    std::vector< std::pair<std::string, uint32_t> > vecP2SHPublicKeys;
 };
 
 /**

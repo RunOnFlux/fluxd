@@ -48,7 +48,7 @@ void ActiveZelnode::ManageDeterministricZelnode()
         } else {
             return;
         }
-    } else if (g_zelnodeCache.CheckIfNeedsNextConfirm(activeZelnode.deterministicOutPoint)) {
+    } else if (g_zelnodeCache.CheckIfNeedsNextConfirm(activeZelnode.deterministicOutPoint, nHeight)) {
         activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::UPDATE_CONFIRM);
         LogPrintf("Time to Confirm Zelnode reached, Creating Update Confirm Transaction on height: %s for outpoint: %s\n", nHeight, activeZelnode.deterministicOutPoint.ToString());
     } else {
@@ -152,6 +152,14 @@ bool ActiveZelnode::GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, C
     CTxDestination address1;
     ExtractDestination(pubScript, address1);
 
+    if (pubScript.IsPayToScriptHash()) {
+        if (!GetKeysForP2SHFluxNode(pubkey, secretKey)) {
+            LogPrintf("%s-- Failed to get P2SH keys\n", __func__);
+            return false;
+        }
+        return true;
+    }
+
     CKeyID* keyid;
     keyid = boost::get<CKeyID>(&address1);
 
@@ -202,11 +210,18 @@ vector<std::pair<COutput, CAmount>> ActiveZelnode::SelectCoinsZelnode()
             pwalletMain->LockCoin(outpoint);
     }
 
+    int nCurrentHeight = 0;
+    {
+        LOCK(cs_main);
+        nCurrentHeight = chainActive.Height();
+    }
 
     // Build list of valid amounts
     set<CAmount> validZelnodeCollaterals;
-    for (int validTier = CUMULUS; validTier != LAST; validTier++)
-        validZelnodeCollaterals.insert(vTierAmounts[validTier]);
+    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+        set<CAmount> setTierAmounts = GetCoinAmountsByTier(nCurrentHeight, currentTier);
+        validZelnodeCollaterals.insert(setTierAmounts.begin(), setTierAmounts.end());
+    }
 
     // Filter
     for (const COutput& out : vCoins) {

@@ -11,6 +11,7 @@
 #include "memusage.h"
 #include "serialize.h"
 #include "uint256.h"
+#include "script/standard.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -540,7 +541,7 @@ public:
     bool HaveInputs(const CTransaction& tx) const;
 
     //! Check whether the prevout is present in the UTXO set represented by this view
-    bool CheckZelnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier) const;
+    bool CheckZelnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier, CAmount& nCollateralAmount) const;
 
     //! Check whether all joinsplit and sapling spend requirements (anchors/nullifiers) are satisfied
     bool HaveShieldedRequirements(const CTransaction& tx) const;
@@ -592,12 +593,15 @@ private:
  * Any changes to this code needs to be also made to the code in zelnode.h and zelnode.cpp
  * We are unable to use the same code because of build/linking restrictions
  */
-extern std::vector<CAmount> vCoinTierAmounts;
-extern std::map<int, float> mapCoinTierPercentages;
+extern std::map<int, double> mapCoinTierPercentages;
 void InitializeCoinTierAmounts();
-bool GetCoinTierFromAmount(const CAmount& nAmount, int& nTier);
-bool GetCoinTierPercentage(const int& nTier, float& p_float);
+bool GetCoinTierFromAmount(const int& p_Height, const CAmount& nAmount, int& nTier);
+bool GetCoinTierPercentage(const int& nTier, double& p_float);
 bool IsCoinTierValid(const int& nTier);
+bool IsAP2SHFluxNodePublicKey(const CPubKey& pubkey);
+bool GetFluxNodeP2SHDestination(const CCoinsViewCache* coinsCache, const COutPoint& outpoint, CTxDestination& destination);
+
+std::set<CAmount> GetCoinAmountsByTier(const int& p_Height, const int& nTier);
 /** Coins Tier code end **/
 
 #endif // BITCOIN_COINS_H

@@ -25,12 +25,20 @@
 #define ZELNODE_DOS_REMOVE_AMOUNT 180
 
 // How often a new confirmation transaction needs to be seen on chain to keep a node up and running
-#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT 60
-#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_PARAMS_1 80
+#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V1 60
+#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V2 80
+#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V3 160
 
 // Nodes are allowed to send a update confirm notification only after this many blocks past there last confirm
-#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT 40
-#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE 5
+#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1 40
+#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2 120
+#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 5
+
+// Maximum ip address size in zelnode confirm transaction
+#define FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V1 40
+#define FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V2 60
+
+
 
 /// Mempool only
 // Max signature time that we accept into the mempool
@@ -44,6 +52,11 @@
 #define V1_ZELNODE_COLLAT_CUMULUS 10000
 #define V1_ZELNODE_COLLAT_NIMBUS 25000
 #define V1_ZELNODE_COLLAT_STRATUS 100000
+
+#define V2_ZELNODE_COLLAT_CUMULUS 1000
+#define V2_ZELNODE_COLLAT_NIMBUS 12500
+#define V2_ZELNODE_COLLAT_STRATUS 40000
+
 
 /** Zelnode Payout Percentages
  * This will be the place that will hold all Zelnode Payout Percentages
@@ -69,6 +82,7 @@ std::string TierToString(int tier);
 
 bool CheckZelnodeTxSignatures(const CTransaction& transaction);
 bool CheckBenchmarkSignature(const CTransaction& transaction);
+bool IsMigrationCollateralAmount(const CAmount& amount);
 
 // Locations
 enum {
@@ -93,17 +107,12 @@ enum Tier {
     LAST = 4 // All newly added Tier must be added above LAST, and change the assigned values so they are in order
 };
 
-/** Zelnode Tier code
+/** Zelnode Tier code start
  * Any changes to this code needs to be also made to the code in coins.h and coins.cpp
  * We are unable to use the same code because of build/linking restrictions
  */
-extern std::vector<CAmount> vTierAmounts;
-extern std::map<int, double> mapTierPercentages;
-void InitializeTierAmounts();
-bool GetTierFromAmount(const CAmount& nAmount, int& nTier);
 bool IsTierValid(const int& nTier);
 int GetNumberOfTiers();
-bool GetTierPercentage(const int& nTier, double& p_double);
 /** Zelnode Tier code end **/
 
 
@@ -131,6 +140,8 @@ public:
 
     int8_t nStatus;
 
+    CAmount nCollateral;
+
     void SetNull() {
         nType = ZELNODE_NO_TYPE;
         nAddedBlockHeight = 0;
@@ -140,6 +151,7 @@ public:
         ip = "";
         nTier = 0;
         nStatus =  ZELNODE_TX_ERROR;
+        nCollateral = 0;
     }
 
     ZelnodeCacheData() {
@@ -210,6 +222,9 @@ public:
         READWRITE(ip);
         READWRITE(nTier);
         READWRITE(nStatus);
+        if (nType & ZELNODE_HAS_COLLATERAL) {
+            READWRITE(nCollateral);
+        }
     }
 };
 
@@ -369,7 +384,7 @@ public:
         mapPaidNodes.clear();
     }
 
-    void AddNewStart(const CTransaction& p_transaction, const int p_nHeight, int nTier = 0);
+    void AddNewStart(const CTransaction& p_transaction, const int p_nHeight, int nTier = 0, const CAmount nCollateral = 0);
     void UndoNewStart(const CTransaction& p_transaction, const int p_nHeight);
 
     void AddNewConfirm(const CTransaction& p_transaction, const int p_nHeight);
@@ -388,7 +403,7 @@ public:
     bool InStartTracker(const COutPoint& out);
     bool InDoSTracker(const COutPoint& out);
     bool InConfirmTracker(const COutPoint& out);
-    bool CheckIfNeedsNextConfirm(const COutPoint& out);
+    bool CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_nHeight);
 
     bool GetNextPayment(CTxDestination& dest, int nTier, COutPoint& p_zelnodeOut);
 
@@ -421,12 +436,16 @@ public:
     void DumpZelnodeCache();
 
     void CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<int>& vNodeCount);
+    void CountMigration(int& nOldTotal, int& nNewTotal, std::vector<int>& vOldNodeCount, std::vector<int>& vNewNodeCount);
 
     bool CheckConfirmationHeights(const int nHeight, const COutPoint& out, const std::string& ip);
 };
 
 int GetZelnodeExpirationCount(const int& p_nHeight);
 std::string GetZelnodeBenchmarkPublicKey(const CTransaction& tx);
+std::string GetP2SHFluxNodePublicKey(const uint32_t& nSigTime);
+std::string GetP2SHFluxNodePublicKey(const CTransaction& tx);
+bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet);
 
 bool IsDZelnodeActive();
 bool IsZelnodeTransactionsActive();
