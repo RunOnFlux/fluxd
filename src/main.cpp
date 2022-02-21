@@ -1175,15 +1175,33 @@ bool ContextualCheckTransaction(
                     strFailMessage = "zelnode-tx-coins-not-found";
                 }
 
+                if (!fFailure && !coins.IsAvailable(outPoint.n)) {
+                    fFailure = true;
+                    strFailMessage = "zelnode-tx-coins-not-available";
+                }
+
                 CTxDestination destination;
                 if (!fFailure && !ExtractDestination(coins.vout[outPoint.n].scriptPubKey, destination)) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-failed-to-extract-destination";
                 }
 
-                if (!fFailure && EncodeDestination(destination) != EncodeDestination(userpubkey.GetID())) {
-                    fFailure = true;
-                    strFailMessage = "zelnode-tx-destinations-didn't-match";
+                if (!fFailure && coins.vout[outPoint.n].scriptPubKey.IsPayToScriptHash()) {
+                    // Here we have a node of which the collatoral is stored in a multisig address.
+                    // Only the flux foundation can do this. So lets use the chainparams public key to verify the signature
+                    // This means that the userpubkey is unable to be the same as the destination
+                    std::string public_key = GetP2SHFluxNodePublicKey(tx);
+                    CPubKey pubkey(ParseHex(public_key));
+
+                    if (tx.collateralPubkey != pubkey) {
+                        fFailure = true;
+                        strFailMessage = "zelnode-tx-p2sh-publickeys-didn't-match";
+                    }
+                } else {
+                    if (!fFailure && EncodeDestination(destination) != EncodeDestination(userpubkey.GetID())) {
+                        fFailure = true;
+                        strFailMessage = "zelnode-tx-destinations-didn't-match";
+                    }
                 }
             }
 
@@ -1376,7 +1394,14 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
                                  REJECT_INVALID, "bad-txns-zelnode-tx-invalid-benchmark-tier");
             }
 
-            if (tx.ip.size() > 40) {
+            // Get the Maximum IP address size
+            int MAX_IP_ADDRESS_SIZE = FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V1;
+            if (tx.benchmarkSigTime >= 1647262800) { // This time stamp is the fluxnode halving benchmarking updated timestamp
+                MAX_IP_ADDRESS_SIZE = FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V2;
+            }
+
+            // Check the ip address size
+            if (tx.ip.size() > MAX_IP_ADDRESS_SIZE) {
                 return state.DoS(100,error("CheckTransaction(): Is Zelnode Tx, ip address to large"),
                         REJECT_INVALID, "bad-txns-zelnode-tx-ip-address-to-large");
             }
@@ -1768,12 +1793,14 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             if (tx.nType == ZELNODE_START_TX_TYPE) {
                 // Check to make sure the input is not spent and meets the criteria of a zelnode input
                 int nTier;
-                if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier)) {
+                CAmount nCollateralAmount;
+                if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier, nCollateralAmount)) {
                     return state.DoS(10, error("bad-txns-zelnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-zelnode-inputs-invalid-spent-or-bad-value");
                 }
             } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
                 int nTier;
-                if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier)) {
+                CAmount nCollateralAmount;
+                if (!view.CheckZelnodeTxInput(tx, nextBlockHeight, nTier, nCollateralAmount)) {
                     return state.DoS(10, error("bad-txns-zelnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-zelnode-inputs-invalid-spent-or-bad-value");
                 }
             }
@@ -2421,7 +2448,7 @@ CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier)
 //    std::cout << "Got total of: " << total << std::endl;
 
      double percentage = ZELNODE_PERCENT_NULL;
-     if (GetTierPercentage(nNodeTier, percentage)) {
+     if (GetCoinTierPercentage(nNodeTier, percentage)) {
          return blockValue * (percentage * fMultiple);
      }
 
@@ -3365,7 +3392,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
             if (tx.IsZelnodeTx()) {
                 int nTier = 0;
-                if (!view.CheckZelnodeTxInput(tx, pindex->nHeight, nTier))
+                CAmount nCollateralAmount;
+                if (!view.CheckZelnodeTxInput(tx, pindex->nHeight, nTier, nCollateralAmount))
                     return state.DoS(100, error("ConnectBlock(): zelnode tx inputs missing/spent"),
                                      REJECT_INVALID, "bad-txns-zelnode-tx-inputs-missingorspent");
 
@@ -3377,7 +3405,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                         }
 
                         // Add new Zelnode Start Tx into local cache
-                        p_zelnodeCache->AddNewStart(tx, pindex->nHeight, nTier);
+                        p_zelnodeCache->AddNewStart(tx, pindex->nHeight, nTier, nCollateralAmount);
                     }
                 } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
                     if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
@@ -6464,7 +6492,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             bool fAlreadyHave = AlreadyHave(inv);
             LogPrint("net", "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
 
-            if (!fAlreadyHave && !fImporting && !fReindex && inv.type != MSG_BLOCK)
+            if (!fAlreadyHave && !fImporting && !fReindex && inv.type != MSG_BLOCK && !IsInitialBlockDownload(Params()))
                 pfrom->AskFor(inv);
 
             if (inv.type == MSG_BLOCK) {
@@ -6614,6 +6642,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
     else if (strCommand == "tx")
     {
+        if (IsInitialBlockDownload(Params())) {
+            return false;
+        }
+
         vector<uint256> vWorkQueue;
         vector<uint256> vEraseQueue;
         CTransaction tx;

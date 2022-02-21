@@ -48,6 +48,11 @@ const struct NUInfo NetworkUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
         /*.nBranchId =*/ 0x76b809bb,
         /*.strName =*/ "Flux",
         /*.strInfo =*/ "Flux Upgrade, Multiple chains",
+    },
+    {
+        /*.nBranchId =*/ 0x76b809bb,
+        /*.strName =*/ "Halving",
+        /*.strInfo =*/ "Flux Halving",
     }
 };
 

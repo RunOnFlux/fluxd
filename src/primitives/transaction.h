@@ -510,9 +510,11 @@ static constexpr uint32_t SAPLING_VERSION_GROUP_ID = 0x892F2085;
 static_assert(SAPLING_VERSION_GROUP_ID != 0, "version group id must be non-zero as specified in ZIP 202");
 
 enum {
-    ZELNODE_NO_TYPE = 1 << 0,
-    ZELNODE_START_TX_TYPE = 1 << 1,
-    ZELNODE_CONFIRM_TX_TYPE = 1 << 2
+    ZELNODE_NO_TYPE = 1 << 0, // 0001
+    ZELNODE_START_TX_TYPE = 1 << 1, // 0010
+    ZELNODE_CONFIRM_TX_TYPE = 1 << 2, // 0100
+    ZELNODE_HAS_COLLATERAL= 1 << 3, // 1000
+
 };
 
 struct CMutableTransaction;

@@ -35,6 +35,11 @@ std::string TierToString(int tier)
     return strStatus;
 }
 
+bool IsMigrationCollateralAmount(const CAmount& amount)
+{
+    return amount == V2_ZELNODE_COLLAT_CUMULUS * COIN || amount == V2_ZELNODE_COLLAT_NIMBUS * COIN || amount == V2_ZELNODE_COLLAT_STRATUS * COIN;
+}
+
 bool CheckZelnodeTxSignatures(const CTransaction&  transaction)
 {
     if (transaction.nType & ZELNODE_START_TX_TYPE) {
@@ -44,8 +49,17 @@ bool CheckZelnodeTxSignatures(const CTransaction&  transaction)
 
         std::string strMessage = transaction.GetHash().GetHex();
 
-        if (!obfuScationSigner.VerifyMessage(transaction.collateralPubkey, transaction.sig, strMessage, errorMessage))
-            return error("%s - START Error: %s", __func__, errorMessage);
+        // If the transaction collateral pubkey matches the chainparams for paytoscripthash signing
+        // Verify the signature against it.
+        std::string public_key = GetP2SHFluxNodePublicKey(transaction);
+        CPubKey pubkey(ParseHex(public_key));
+        if (transaction.collateralPubkey == pubkey) {
+            if (!obfuScationSigner.VerifyMessage(transaction.collateralPubkey, transaction.sig, strMessage, errorMessage))
+                return error("%s - P2SH - START Error: %s", __func__, errorMessage);
+        } else {
+            if (!obfuScationSigner.VerifyMessage(transaction.collateralPubkey, transaction.sig, strMessage,errorMessage))
+                return error("%s - NORMAL START Error: %s", __func__, errorMessage);
+        }
 
         return true;
     } else if (transaction.nType & ZELNODE_CONFIRM_TX_TYPE) {
@@ -106,10 +120,49 @@ void GetUndoDataForExpiredConfirmZelnodes(CZelnodeTxBlockUndo& p_zelnodeTxUndoDa
     int nExpirationCount = GetZelnodeExpirationCount(p_nHeight);
     int nHeightToExpire = p_nHeight - nExpirationCount;
 
+    // Get set of enforced tiers
+    set<Tier> enforceTiers;
+    if (p_nHeight >= Params().GetCumulusEndTransitionHeight()) {
+        enforceTiers.insert(CUMULUS);
+    }
+
+    if (p_nHeight >= Params().GetNimbusEndTransitionHeight()) {
+        enforceTiers.insert(NIMBUS);
+    }
+
+    if (p_nHeight >= Params().GetStratusEndTransitionHeight()) {
+        enforceTiers.insert(STRATUS);
+    }
+
+    // Get set of valid collateral amounts
+    set<CAmount> validAmounts;
+    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+        set<CAmount> tempAmount = GetCoinAmountsByTier(p_nHeight, currentTier);
+        validAmounts.insert(tempAmount.begin(), tempAmount.end());
+    }
+
     for (const auto& item : g_zelnodeCache.mapConfirmedZelnodeData) {
+        // We only need to enforce new collaterals until all tiers have been enforced.
+        // Stratus is our last tier to enforce so, once it has ended the transition, we shouldn't need to do this anymore.
+        if (p_nHeight >= Params().GetCumulusStartTransitionHeight() && p_nHeight < Params().GetStratusEndTransitionHeight() + 10) {
+            // Enforce new collateral amounts
+            if (enforceTiers.count((Tier) item.second.nTier)) {
+                if (!validAmounts.count(item.second.nCollateral)) {
+                    LogPrintf(
+                            "%s : expiring output because collateral isn't valid output: %s, current collateral: %s, block height: %d\n",
+                            __func__, item.second.collateralIn.ToFullString(), FormatMoney(item.second.nCollateral),
+                            p_nHeight);
+                    p_zelnodeTxUndoData.vecExpiredConfirmedData.emplace_back(item.second);
+                    continue;
+                }
+            }
+        }
+
         // The p_zelnodeTxUndoData has a map of all new confirms that have been updated this block. So if it is in there don't expire it. They made it barely in time
-        if (p_zelnodeTxUndoData.mapUpdateLastConfirmHeight.count(item.first))
+        if (p_zelnodeTxUndoData.mapUpdateLastConfirmHeight.count(item.first)) {
             continue;
+        }
+
         if (item.second.nLastConfirmedBlockHeight < nHeightToExpire) {
             p_zelnodeTxUndoData.vecExpiredConfirmedData.emplace_back(item.second);
         }
@@ -134,7 +187,7 @@ void GetUndoDataForPaidZelnodes(CZelnodeTxBlockUndo& zelnodeTxBlockUndo, Zelnode
     }
 }
 
-void ZelnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_nHeight, int nTier)
+void ZelnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_nHeight, int nTier, const CAmount nCollateral)
 {
     ZelnodeCacheData data;
     data.nStatus = ZELNODE_TX_STARTED;
@@ -146,6 +199,11 @@ void ZelnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_nH
     data.nLastPaidHeight = 0;
     data.nAddedBlockHeight = p_nHeight;
     data.nTier = nTier;
+    data.nCollateral = nCollateral;
+
+    if (data.nCollateral > 0) {
+        data.nType = ZELNODE_HAS_COLLATERAL;
+    }
 
     LOCK(cs);
     mapStartTxTracker.insert(std::make_pair(p_transaction.collateralOut, data));
@@ -335,18 +393,28 @@ bool ZelnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COut
     // Allow ip address changes at a different interval
     if (fFluxActive) {
         if (ip != data.ip) {
-            if (nCurrentHeight - data.nLastConfirmedBlockHeight >= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE) {
+            if (nCurrentHeight - data.nLastConfirmedBlockHeight >= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1) {
                 return true;
             }
         }
     }
 
-    if (nCurrentHeight - data.nLastConfirmedBlockHeight <= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT) {
-        // TODO - Remove this error message after release + 1 month and we don't see any problems
-        error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
-              __LINE__,
-              out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
-        return false;
+    bool fHalvingActive = NetworkUpgradeActive(nCurrentHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
+    if (fHalvingActive) {
+        if (nCurrentHeight - data.nLastConfirmedBlockHeight <= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2) {
+            error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
+                  __LINE__,
+                  out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
+            return false;
+        }
+    } else {
+        if (nCurrentHeight - data.nLastConfirmedBlockHeight <= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1) {
+            // TODO - Remove this error message after release + 1 month and we don't see any problems
+            error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
+                  __LINE__,
+                  out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
+            return false;
+        }
     }
 
     return true;
@@ -370,11 +438,18 @@ bool ZelnodeCache::InConfirmTracker(const COutPoint& out)
     return mapConfirmedZelnodeData.count(out);
 }
 
-bool ZelnodeCache::CheckIfNeedsNextConfirm(const COutPoint& out)
+bool ZelnodeCache::CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_nHeight)
 {
     LOCK(cs);
+
+    bool fHalvingActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
+
     if (mapConfirmedZelnodeData.count(out)) {
-        return chainActive.Height() - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight > ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT;
+        if (fHalvingActive) {
+            return p_nHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight > ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2;
+        } else {
+            return p_nHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight > ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1;
+        }
     }
 
     return false;
@@ -417,8 +492,29 @@ bool ZelnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPoi
                 if (mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.size()) {
                     p_zelnodeOut = mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.front().out;
                     if (mapConfirmedZelnodeData.count(p_zelnodeOut)) {
-                        dest = mapConfirmedZelnodeData.at(p_zelnodeOut).collateralPubkey.GetID();
-                        return true;
+                        if (IsAP2SHFluxNodePublicKey(mapConfirmedZelnodeData.at(p_zelnodeOut).collateralPubkey)) {
+                            CTxDestination payment_destination;
+                            if (GetFluxNodeP2SHDestination(pcoinsTip, p_zelnodeOut, payment_destination)) {
+                                dest = payment_destination;
+                                return true;
+                            } else {
+                                /**
+                                 * This shouldn't ever happen. As the only scenario this fails at is if the coin is spent.
+                                 * If the coin is spent in the block previous to the block where this fluxnode is next
+                                 * on the list to get a payment. It will be removed from the confirmed list just as
+                                 * any other node would be. See -> func (GetUndoDataForExpiredConfirmZelnodes)
+                                 * If this coin is spent in the same block that it would receive a payout
+                                 * the coin would be found in the pcoinsTip Cache and the correct destination would be found
+                                 * Only after the block is connected would the pcoinTip cache be updated spending the coin"
+                                 * Making it so we could no longer find the coins scriptPubKey in func ( GetFluxNodeP2SHDestination )
+                              */
+                                error("Failed to get p2sh destination %s", p_zelnodeOut.ToFullString());
+                                return false;
+                            }
+                        } else {
+                            dest = mapConfirmedZelnodeData.at(p_zelnodeOut).collateralPubkey.GetID();
+                            return true;
+                        }
                     } else {
                         // The front of the list, wasn't in the confirmed zelnode data. These means it expired
                         mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.pop_front();
@@ -1093,14 +1189,30 @@ void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<i
     }
 }
 
+void ZelnodeCache::CountMigration(int& nOldTotal, int& nNewTotal, std::vector<int>& vOldNodeCount, std::vector<int>& vNewNodeCount) {
+    for (const auto& entry : mapConfirmedZelnodeData) {
+        if (IsMigrationCollateralAmount(entry.second.nCollateral)) {
+            vNewNodeCount[entry.second.nTier - 1]++;
+            nNewTotal++;
+        } else {
+            vOldNodeCount[entry.second.nTier - 1]++;
+            nOldTotal++;
+        }
+    }
+}
+
 int GetZelnodeExpirationCount(const int& p_nHeight)
 {
     // Get the status on if Zelnode params1 is activated
     bool fFluxActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
-    if (fFluxActive) {
-        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_PARAMS_1;
+    bool fHalvingActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
+
+    if (fHalvingActive) {
+        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V3;
+    } else if (fFluxActive) {
+        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V2;
     } else {
-        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT;
+        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V1;
     }
 }
 
@@ -1128,54 +1240,54 @@ std::string GetZelnodeBenchmarkPublicKey(const CTransaction& tx)
     return vectorPublicKeys[0].first;
 }
 
-/** Zelnode Tier code
- * Any changes to this code needs to be also made to the code in coins.h and coins.cpp
- * We are unable to use the same code because of build/linking restrictions
- */
-std::vector<CAmount> vTierAmounts;
-std::map<int, double> mapTierPercentages;
-void InitializeTierAmounts() {
-    static bool fInit = false;
-
-    if (fInit)
-        return;
-
-    vTierAmounts.clear();
-    vTierAmounts.push_back(0); // NONE
-    vTierAmounts.push_back(V1_ZELNODE_COLLAT_CUMULUS * COIN); // CUMULUS
-    vTierAmounts.push_back(V1_ZELNODE_COLLAT_NIMBUS * COIN); // NIMBUS
-    vTierAmounts.push_back(V1_ZELNODE_COLLAT_STRATUS * COIN); // STRATUS
-    vTierAmounts.push_back(0); // LAST
-
-    mapTierPercentages[CUMULUS] = V1_ZELNODE_PERCENT_CUMULUS;
-    mapTierPercentages[NIMBUS] = V1_ZELNODE_PERCENT_NIMBUS;
-    mapTierPercentages[STRATUS] = V1_ZELNODE_PERCENT_STRATUS;
-
-    fInit = true;
-}
-
-bool GetTierPercentage(const int& nTier, double& p_double)
+std::string GetP2SHFluxNodePublicKey(const uint32_t& nSigTime)
 {
-    if (mapTierPercentages.count(nTier)) {
-        p_double = mapTierPercentages.at(nTier);
-        return true;
+    // Get the public keys and timestamps from the chainparams
+    std::vector< std::pair<std::string, uint32_t> > vectorPublicKeys = Params().GetP2SHFluxnodePublicKeys();
+
+    // If only have one public key return it
+    if (vectorPublicKeys.size() == 1) {
+        return vectorPublicKeys[0].first;
     }
 
-    return false;
-}
+    // Get the last index in the array
+    int nLast = vectorPublicKeys.size() - 1;
 
-bool GetTierFromAmount(const CAmount& nAmount, int& nTier)
-{
-    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-        if (nAmount == vTierAmounts[currentTier]) {
-            nTier = currentTier;
-            return true;
+    // Loop backwards until we find the correct public key
+    for (int i = nLast; i >= 0; i--) {
+        if (nSigTime >= vectorPublicKeys[i].second) {
+            return vectorPublicKeys[i].first;
         }
     }
 
-    return false;
+    // Only reason this should happen is if there is a problem with the chainparams
+    return vectorPublicKeys[0].first;
 }
 
+
+std::string GetP2SHFluxNodePublicKey(const CTransaction& tx)
+{
+    return GetP2SHFluxNodePublicKey(tx.sigTime);
+}
+
+bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet)
+{
+    std::string p2shprivkey = GetArg("-fluxnodep2shprivkey", "");
+    CKey key;
+    key = DecodeSecret(p2shprivkey);
+
+    if (!key.IsValid()) {
+        LogPrintf("%s -- Invalid P2SH priv key\n", __func__);
+        return false;
+    }
+
+    keyRet = key;
+    pubKeyRet = keyRet.GetPubKey();
+    return true;
+}
+
+/** Zelnode Tier functions
+ */
 bool IsTierValid(const int& nTier)
 {
     return nTier > NONE && nTier < LAST;

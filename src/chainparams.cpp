@@ -135,6 +135,10 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].hashActivationBlock =
                 uint256S("000000ce99aa6765bdaae673cdf41f661ff20a116eb6f2fe0843488d8061f193");
 
+        consensus.vUpgrades[Consensus::UPGRADE_HALVING].nProtocolVersion = 170018;
+        consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight = 1076532; // Around March 12 2022
+
+
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 11;
 
@@ -207,10 +211,10 @@ public:
         nStartZelnodePaymentsHeight = 560000; // Start paying deterministic zelnodes on height
 
         // These are the benchmarking public keys, if you are adding a key, you must increase the resize integer
-        vecBenchmarkingPublicKeys.resize(2);
+        vecBenchmarkingPublicKeys.resize(3);
         vecBenchmarkingPublicKeys[0] = std::make_pair("042e79d7dd1483996157df6b16c831be2b14b31c69944ea2a585c63b5101af1f9517ba392cee5b1f45a62e9d936488429374535a2f76870bfa8eea6667b13eb39e", 0);
         vecBenchmarkingPublicKeys[1] = std::make_pair("04517413e51fa9b2e94f200b254cca69beb86f2d74bf66ca53854ba66bc376dde9b52e9b4403731d9a4f3e8edd9687f1e1824b688fe26454bd9fb823a3307b4682", 1618113600); // Sun Apr 11 2021 04:00:00 UTC
-
+        vecBenchmarkingPublicKeys[2] = std::make_pair("0480dff65aa9d4b4c4234e4723a5e7c5bf527ca683b53aa26a7225cc5eb16e6e79f9629eb5f96c12b173de7a20e9823b2d36575759f3490864922f7ed04e171fad", 1647262800); // Mon Mar 14 2022 13:00:00 UTC
         assert(vecBenchmarkingPublicKeys.size() > 0);
 
 
@@ -231,11 +235,12 @@ public:
             (1000000, uint256S("0x0000001a80e7f30d21fb14116cd01d51e1fad8ac84cc960896f4691a57368a47"))
             (1040000, uint256S("0x00000007f3b465bd4b0e161e43c05a3d946144330e33ea3a91cb952e6ef86b7d"))
             (1040577, uint256S("0x000000071fe89682ac260bc0a49621344eb28ae01659c9e7ce86e3762e45f52d"))
-            (1042126, uint256S("0x0000000295e4663178fd9e533787e74206645910a2bfb61938db5f67796eaad0")),
-            1643039394,     // * UNIX timestamp of last checkpoint block
-            16728243,              // * total number of transactions between genesis and last checkpoint
+            (1042126, uint256S("0x0000000295e4663178fd9e533787e74206645910a2bfb61938db5f67796eaad0"))
+            (1060000, uint256S("0x0000000fd721d8d381c4b24a4f78fc036955d7a0f98d2765b8c7badad8b66c1b")),
+            1645201099,     // * UNIX timestamp of last checkpoint block
+            17772234,              // * total number of transactions between genesis and last checkpoint
                             //   (the tx=... number in the SetBestChain debug.log lines)
-            20065            // * estimated number of transactions per day
+            24683            // * estimated number of transactions per day
                             //   total number of tx / (checkpoint block height / (24 * 30))
         };
 
@@ -253,6 +258,19 @@ public:
         nSwapPoolAmount = 22000000 * COIN; // 22 Million every time
         nSwapPoolInterval = 21600; // Avg Block per day (720) *  - Trying to get to around once a month
         nSwapPoolMaxTimes = 10;
+
+        nBeginCumulusTransition = 1076532;
+        nEndCumulusTransition = 1086612;
+
+        nBeginNimbusTransition = 1081572;
+        nEndNimbusTransition = 1092372;
+
+        nBeginStratusTransition = 1087332;
+        nEndStratusTransition = 1097412;
+
+        vecP2SHPublicKeys.resize(1);
+        vecP2SHPublicKeys[0] = std::make_pair("04ab11edbb8a15f7cc2628a4a2c18cea095d250f8c9a2924cbd581b8d8fb3a8b91e39e5febddb7ffc60f20dfd352a40aa4f061aa60a9ace26d43e1b7a18aea4162", 0);
+        assert(vecP2SHPublicKeys.size() > 0);
 
         // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
@@ -312,7 +330,10 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 350;
 
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
-        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 420; // Around March 30 2021
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 420;
+
+        consensus.vUpgrades[Consensus::UPGRADE_HALVING].nProtocolVersion = 170018;
+        consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight = 18000;
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
@@ -410,6 +431,18 @@ public:
         nSwapPoolInterval = 100;
         nSwapPoolMaxTimes = 10;
 
+        nBeginCumulusTransition = 18000;
+        nEndCumulusTransition = 24000;
+
+        nBeginNimbusTransition = 22000;
+        nEndNimbusTransition = 28000;
+
+        nBeginStratusTransition = 26000;
+        nEndStratusTransition = 32000;
+
+        vecP2SHPublicKeys.resize(1);
+        vecP2SHPublicKeys[0] = std::make_pair("04276f105ff36a670a56e75c2462cff05a4a7864756e6e1af01022e32752d6fe57b1e13cab4f2dbe3a6a51b4e0de83a5c4627345f5232151867850018c9a3c3a1d", 0);
+
     // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
         // in #2795.
@@ -476,6 +509,10 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+        consensus.vUpgrades[Consensus::UPGRADE_HALVING].nProtocolVersion = 170018;
+        consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight =
                 Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 
@@ -559,6 +596,19 @@ public:
         nSwapPoolAmount = 2100000 * COIN;
         nSwapPoolInterval = 10;
         nSwapPoolMaxTimes = 5;
+
+        nBeginCumulusTransition = 999999999;
+        nEndCumulusTransition = 999999999;
+
+        nBeginNimbusTransition = 999999999;
+        nEndNimbusTransition = 999999999;
+
+        nBeginStratusTransition = 999999999;
+        nEndStratusTransition = 999999999;
+
+        vecP2SHPublicKeys.resize(1);
+        vecP2SHPublicKeys[0] = std::make_pair("04276f105ff36a670a56e75c2462cff05a4a7864756e6e1af01022e32752d6fe57b1e13cab4f2dbe3a6a51b4e0de83a5c4627345f5232151867850018c9a3c3a1d", 0);
+
     }
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)

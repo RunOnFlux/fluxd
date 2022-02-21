@@ -2987,25 +2987,30 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
 //                    continue;
 //            }
 
+            const int nCurrentHeight = chainActive.Height();
+
             for (unsigned int i = 0; i < pcoin->vout.size(); i++) {
                 bool found = false;
 
-                if (nCoinType == ONLY_10000) {
-                    found = pcoin->vout[i].nValue == 10000 * COIN;
-                } else if (nCoinType == ONLY_25000) {
-                    found = pcoin->vout[i].nValue == 25000 * COIN;
-                } else if (nCoinType == ONLY_100000) {
-                    found = pcoin->vout[i].nValue == 100000 * COIN;
+                bool fluxnodeTierFound = false;
+                int nTier = NONE;
+                GetCoinTierFromAmount(nCurrentHeight, pcoin->vout[i].nValue, nTier);
+
+
+                if (nCoinType == ONLY_CUMULUS) {
+                    if (nTier == CUMULUS) {
+                        found = true;
+                    }
+                } else if (nCoinType == ONLY_NIMBUS) {
+                    if (nTier == NIMBUS) {
+                        found = true;
+                    }
+                } else if (nCoinType == ONLY_STRATUS) {
+                    if (nTier == STRATUS) {
+                        found = true;
+                    }
                 } else if (nCoinType == ALL_ZELNODE) {
-                    if (pcoin->vout[i].nValue == 10000 * COIN) {
-                        found = true;
-                    }
-                    else if (pcoin->vout[i].nValue == 25000 * COIN) {
-                        found = true;
-                    }
-                    else if (pcoin->vout[i].nValue == 100000 * COIN) {
-                        found = true;
-                    }
+                    found = IsTierValid(nTier);
                 } else {
                     found = true;
                 }
@@ -3017,10 +3022,13 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                 if (IsSpent(wtxid, i))
                     continue;
 
-                if (mine == ISMINE_NO)
-                    continue;
+                if (mine == ISMINE_NO) {
+                    if (!pcoin->vout[i].scriptPubKey.IsPayToScriptHash()) {
+                        continue;
+                    }
+                }
 
-                if (IsLockedCoin((*it).first, i) && nCoinType != ONLY_10000 && nCoinType != ONLY_25000 && nCoinType != ONLY_100000 && nCoinType != ALL_ZELNODE )
+                if (IsLockedCoin((*it).first, i) && nCoinType != ONLY_CUMULUS && nCoinType != ONLY_NIMBUS && nCoinType != ONLY_STRATUS && nCoinType != ALL_ZELNODE )
                     continue;
 
                 if (pcoin->vout[i].nValue <= 0 && !fIncludeZeroValue)
@@ -4857,6 +4865,14 @@ bool CWallet::GetVinAndKeysFromOutput(COutput out, CTxIn& txinRet, CPubKey& pubK
 
     CTxDestination address1;
     ExtractDestination(pubScript, address1);
+
+    if (pubScript.IsPayToScriptHash()) {
+        if (!GetKeysForP2SHFluxNode(pubKeyRet, keyRet)) {
+            LogPrintf("%s-- Failed to get P2SH keys\n", __func__);
+            return false;
+        }
+        return true;
+    }
 
     CKeyID* keyID;
     keyID = boost::get<CKeyID>(&address1);
