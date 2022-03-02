@@ -242,8 +242,8 @@ void Shutdown()
         pcoinsdbview = NULL;
         delete pblocktree;
         pblocktree = NULL;
-        delete pZelnodeDB;
-        pZelnodeDB = NULL;
+        delete pFluxnodeDB;
+        pFluxnodeDB = NULL;
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
@@ -1501,10 +1501,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete pcoinsdbview;
                 delete pcoinscatcher;
                 delete pblocktree;
-                delete pZelnodeDB;
+                delete pFluxnodeDB;
 
                 /** Zelnode Database */
-                pZelnodeDB = new CDeterministicZelnodeDB(0, false, fReindex);
+                pFluxnodeDB = new CDeterministicFluxnodeDB(0, false, fReindex);
 
                 pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
@@ -1519,17 +1519,17 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 }
 
                 uiInterface.InitMessage(_("Init zelnodecache"));
-                g_zelnodeCache.InitMapZelnodeList();
+                g_fluxnodeCache.InitMapZelnodeList();
 
                 uiInterface.InitMessage(_("Init Tier Amounts Vectors"));
                 InitializeCoinTierAmounts();
 
                 uiInterface.InitMessage(_("Loading zelnodecache..."));
-                pZelnodeDB->LoadZelnodeCacheData();
+                pFluxnodeDB->LoadFluxnodeCacheData();
 
                 uiInterface.InitMessage(_("Sorting zelnode lists"));
                 for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-                    g_zelnodeCache.SortList(currentTier);
+                    g_fluxnodeCache.SortList(currentTier);
                 }
 
                 uiInterface.InitMessage(_("Loading block index..."));
@@ -1877,7 +1877,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     fZelnode = GetBoolArg("-zelnode", false);
 
-    if ((fZelnode || zelnodeConfig.getCount() > -1) && fTxIndex == false) {
+    if ((fZelnode || fluxnodeConfig.getCount() > -1) && fTxIndex == false) {
         return InitError("Enabling Zelnode support requires turning on transaction indexing."
                          "Please add txindex=1 to your configuration and start with -reindex");
     }
@@ -1905,13 +1905,13 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         uint256 hash = uint256S(strHash);
         int index = GetArg("-zelnodeindex", -1);
 
-        zelnodeOutPoint = COutPoint(hash, index);
+        fluxnodeOutPoint = COutPoint(hash, index);
 
-        if (zelnodeOutPoint.IsNull()) {
+        if (fluxnodeOutPoint.IsNull()) {
             return InitError(_("Invalid zelnode outpoint data. assign zelnodeoutpoint and zelnodeindex."));
         }
 
-        activeZelnode.deterministicOutPoint = zelnodeOutPoint;
+        activeZelnode.deterministicOutPoint = fluxnodeOutPoint;
 
         strZelnodePrivKey = GetArg("-zelnodeprivkey", "");
         if (!strZelnodePrivKey.empty()) {
@@ -1935,7 +1935,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         LOCK(pwalletMain->cs_wallet);
         LogPrintf("Locking Fluxnodes:\n");
         uint256 znTxHash;
-        for (ZelnodeConfig::ZelnodeEntry zne : zelnodeConfig.getEntries()) {
+        for (FluxnodeConfig::ZelnodeEntry zne : fluxnodeConfig.getEntries()) {
             LogPrintf("  %s %s\n", zne.getTxHash(), zne.getOutputIndex());
             znTxHash.SetHex(zne.getTxHash());
             COutPoint outpoint = COutPoint(znTxHash, (unsigned int) std::stoul(zne.getOutputIndex().c_str()));

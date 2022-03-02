@@ -133,7 +133,7 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific = true);
 bool RenameDirectoriesFromZelcashToFlux();
 void ClearDatadirCache();
 boost::filesystem::path GetConfigFile();
-boost::filesystem::path GetZelnodeConfigFile();
+boost::filesystem::path GetFluxnodeConfigFile();
 #ifndef WIN32
 boost::filesystem::path GetPidFile();
 void CreatePidFile(const boost::filesystem::path &path, pid_t pid);

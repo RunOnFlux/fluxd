@@ -31,7 +31,7 @@ void ActiveZelnode::ManageDeterministricZelnode()
 
     // Check if zelnode is currently in the start list, if so we will be building the Initial Confirm Transaction
     // If the zelnode is already confirmed check to see if it needs to be re confirmed, if so, Create the Update Transaction
-    if (g_zelnodeCache.InStartTracker(activeZelnode.deterministicOutPoint)) {
+    if (g_fluxnodeCache.InStartTracker(activeZelnode.deterministicOutPoint)) {
         // Check if we currently have a tx with the same vin in our mempool
         // If we do, Resend the wallet transactions to our peers
         if (mempool.mapZelnodeTxMempool.count(activeZelnode.deterministicOutPoint)) {
@@ -48,7 +48,7 @@ void ActiveZelnode::ManageDeterministricZelnode()
         } else {
             return;
         }
-    } else if (g_zelnodeCache.CheckIfNeedsNextConfirm(activeZelnode.deterministicOutPoint, nHeight)) {
+    } else if (g_fluxnodeCache.CheckIfNeedsNextConfirm(activeZelnode.deterministicOutPoint, nHeight)) {
         activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::UPDATE_CONFIRM);
         LogPrintf("Time to Confirm Zelnode reached, Creating Update Confirm Transaction on height: %s for outpoint: %s\n", nHeight, activeZelnode.deterministicOutPoint.ToString());
     } else {
@@ -188,7 +188,7 @@ vector<std::pair<COutput, CAmount>> ActiveZelnode::SelectCoinsZelnode()
     // Temporary unlock ZN coins from zelnode.conf
     if (GetBoolArg("-znconflock", true)) {
         uint256 znTxHash;
-        for (ZelnodeConfig::ZelnodeEntry zelnodeEntry : zelnodeConfig.getEntries()) {
+        for (FluxnodeConfig::ZelnodeEntry zelnodeEntry : fluxnodeConfig.getEntries()) {
             znTxHash.SetHex(zelnodeEntry.getTxHash());
 
             int nIndex;
@@ -278,7 +278,7 @@ bool ActiveZelnode::SignDeterministicConfirmTx(CMutableTransaction& mutableTrans
         return error("%s : %s", __func__, errorMessage);
     }
 
-    auto data = g_zelnodeCache.GetZelnodeData(mutableTransaction.collateralIn);
+    auto data = g_fluxnodeCache.GetFluxnodeData(mutableTransaction.collateralIn);
 
     if (data.IsNull()) {
         errorMessage = "zelnode-data-is-null";

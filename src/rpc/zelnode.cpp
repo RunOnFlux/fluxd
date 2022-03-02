@@ -37,16 +37,16 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
                 + HelpExampleRpc("rebuildzelnodedb", "")
         );
     {
-        LOCK2(cs_main, g_zelnodeCache.cs);
+        LOCK2(cs_main, g_fluxnodeCache.cs);
 
         int nCurrentHeight = chainActive.Height();
 
-        g_zelnodeCache.SetNull();
-        g_zelnodeCache.InitMapZelnodeList();
+        g_fluxnodeCache.SetNull();
+        g_fluxnodeCache.InitMapZelnodeList();
 
-        delete pZelnodeDB;
-        pZelnodeDB = NULL;
-        pZelnodeDB = new CDeterministicZelnodeDB(0, false, true);
+        delete pFluxnodeDB;
+        pFluxnodeDB = NULL;
+        pFluxnodeDB = new CDeterministicFluxnodeDB(0, false, true);
 
         CBlockIndex *rescanIndex = nullptr;
 
@@ -103,7 +103,7 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
             zelnodeTxBlockUndo.SetNull();
             setSpentOutPoints.clear();
 
-            ZelnodeCache zelnodeCache;
+            FluxnodeCache fluxnodeCache;
             CBlock block;
 
             int64_t nTimeStart = GetTimeMicros();
@@ -117,8 +117,8 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
                 CTxDestination t_dest;
                 COutPoint t_out;
                 for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-                    if (g_zelnodeCache.GetNextPayment(t_dest, currentTier, t_out)) {
-                        zelnodeCache.AddPaidNode(currentTier, t_out, rescanIndex->nHeight);
+                    if (g_fluxnodeCache.GetNextPayment(t_dest, currentTier, t_out)) {
+                        fluxnodeCache.AddPaidNode(currentTier, t_out, rescanIndex->nHeight);
                     }
                 }
             }
@@ -157,17 +157,17 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
                     if (tx.nType == ZELNODE_START_TX_TYPE) {
 
                         // Add new Zelnode Start Tx into local cache
-                        zelnodeCache.AddNewStart(tx, rescanIndex->nHeight, nTier, get_tx.vout[tx.collateralOut.n].nValue);
+                        fluxnodeCache.AddNewStart(tx, rescanIndex->nHeight, nTier, get_tx.vout[tx.collateralOut.n].nValue);
                         int64_t nLoop3 = GetTimeMicros(); nAddStart += nLoop3 - nLoop2;
 
                     } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
                         if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
 
-                            zelnodeCache.AddNewConfirm(tx, rescanIndex->nHeight);
+                            fluxnodeCache.AddNewConfirm(tx, rescanIndex->nHeight);
                             int64_t nLoop4 = GetTimeMicros(); nAddNewConfirm += nLoop4 - nLoop2;
                         } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
-                            zelnodeCache.AddUpdateConfirm(tx, rescanIndex->nHeight);
-                            ZelnodeCacheData global_data = g_zelnodeCache.GetZelnodeData(tx.collateralOut);
+                            fluxnodeCache.AddUpdateConfirm(tx, rescanIndex->nHeight);
+                            FluxnodeCacheData global_data = g_fluxnodeCache.GetFluxnodeData(tx.collateralOut);
                             if (global_data.IsNull()) {
                                 return error("Failed to find global data on update confirm tx, %s",
                                              tx.GetHash().GetHex());
@@ -186,17 +186,17 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
 
             // Update the temp cache with the set of started outpoints that have now expired from the dos list
             GetUndoDataForExpiredZelnodeDosScores(zelnodeTxBlockUndo, rescanIndex->nHeight);
-            zelnodeCache.AddExpiredDosTx(zelnodeTxBlockUndo, rescanIndex->nHeight);
+            fluxnodeCache.AddExpiredDosTx(zelnodeTxBlockUndo, rescanIndex->nHeight);
 
             // Update the temp cache with the set of confirmed outpoints that have now expired
             GetUndoDataForExpiredConfirmZelnodes(zelnodeTxBlockUndo, rescanIndex->nHeight, setSpentOutPoints);
-            zelnodeCache.AddExpiredConfirmTx(zelnodeTxBlockUndo);
+            fluxnodeCache.AddExpiredConfirmTx(zelnodeTxBlockUndo);
 
             // Update the block undo, with the paid nodes last paid height.
-            GetUndoDataForPaidZelnodes(zelnodeTxBlockUndo, zelnodeCache);
+            GetUndoDataForPaidZelnodes(zelnodeTxBlockUndo, fluxnodeCache);
 
             // Check for Start tx that are going to expire
-            zelnodeCache.CheckForExpiredStartTx(rescanIndex->nHeight);
+            fluxnodeCache.CheckForExpiredStartTx(rescanIndex->nHeight);
 
             int64_t nTime4 = GetTimeMicros(); nTimeUndoData += nTime4 - nTime3;
 
@@ -204,19 +204,19 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
                 zelnodeTxBlockUndo.vecExpiredConfirmedData.size() ||
                 zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.size() ||
                 zelnodeTxBlockUndo.mapLastPaidHeights.size()) {
-                if (!pZelnodeDB->WriteBlockUndoZelnodeData(block.GetHash(), zelnodeTxBlockUndo))
+                if (!pFluxnodeDB->WriteBlockUndoFluxnodeData(block.GetHash(), zelnodeTxBlockUndo))
                     return error("Failed to write zelnodetx undo data");
             }
 
             int64_t nTime5 = GetTimeMicros(); nTimeWriteUndo += nTime5 - nTime4;
 
-            assert(zelnodeCache.Flush());
+            assert(fluxnodeCache.Flush());
 
             int64_t nTime6 = GetTimeMicros(); nTimeFlush += nTime6 - nTime5;
 
             rescanIndex = chainActive.Next(rescanIndex);
         }
-        g_zelnodeCache.DumpZelnodeCache();
+        g_fluxnodeCache.DumpFluxnodeCache();
     }
 
     return true;
@@ -401,7 +401,7 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
 
         UniValue resultsObj(UniValue::VARR);
 
-        for (ZelnodeConfig::ZelnodeEntry zne : zelnodeConfig.getEntries()) {
+        for (FluxnodeConfig::ZelnodeEntry zne : fluxnodeConfig.getEntries()) {
             UniValue zelnodeEntry(UniValue::VOBJ);
 
             if (fAlias && zne.getAlias() == alias) {
@@ -424,13 +424,13 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
             if (mempool.mapZelnodeTxMempool.count(outpoint)) {
                 zelnodeEntry.push_back(Pair("result", "failed"));
                 zelnodeEntry.push_back(Pair("reason", "Mempool already has a zelnode transaction using this outpoint"));
-            } else if (g_zelnodeCache.InStartTracker(outpoint)) {
+            } else if (g_fluxnodeCache.InStartTracker(outpoint)) {
                 zelnodeEntry.push_back(Pair("result", "failed"));
                 zelnodeEntry.push_back(Pair("reason", "Zelnode already started, waiting to be confirmed"));
-            } else if (g_zelnodeCache.InDoSTracker(outpoint)) {
+            } else if (g_fluxnodeCache.InDoSTracker(outpoint)) {
                 zelnodeEntry.push_back(Pair("result", "failed"));
                 zelnodeEntry.push_back(Pair("reason", "Zelnode already started then not confirmed, in DoS tracker. Must wait until out of DoS tracker to start"));
-            } else if (g_zelnodeCache.InConfirmTracker(outpoint)) {
+            } else if (g_fluxnodeCache.InConfirmTracker(outpoint)) {
                 zelnodeEntry.push_back(Pair("result", "failed"));
                 zelnodeEntry.push_back(Pair("reason", "Zelnode already confirmed and in zelnode list"));
             } else {
@@ -561,7 +561,7 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
     UniValue statusObj(UniValue::VOBJ);
     statusObj.push_back(Pair("alias", alias));
 
-    for (ZelnodeConfig::ZelnodeEntry zne : zelnodeConfig.getEntries()) {
+    for (FluxnodeConfig::ZelnodeEntry zne : fluxnodeConfig.getEntries()) {
         if (zne.getAlias() == alias) {
             found = true;
             std::string errorMessage;
@@ -576,15 +576,15 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
                 returnObj.push_back(Pair("result", "failed"));
                 returnObj.push_back(Pair("reason", "Mempool already has a zelnode transaction using this outpoint"));
                 return returnObj;
-            } else if (g_zelnodeCache.InStartTracker(outpoint)) {
+            } else if (g_fluxnodeCache.InStartTracker(outpoint)) {
                 returnObj.push_back(Pair("result", "failed"));
                 returnObj.push_back(Pair("reason", "Zelnode already started, waiting to be confirmed"));
                 return returnObj;
-            } else if (g_zelnodeCache.InDoSTracker(outpoint)) {
+            } else if (g_fluxnodeCache.InDoSTracker(outpoint)) {
                 returnObj.push_back(Pair("result", "failed"));
                 returnObj.push_back(Pair("reason", "Zelnode already started then not confirmed, in DoS tracker. Must wait until out of DoS tracker to start"));
                 return returnObj;
-            } else if (g_zelnodeCache.InConfirmTracker(outpoint)) {
+            } else if (g_fluxnodeCache.InConfirmTracker(outpoint)) {
                 returnObj.push_back(Pair("result", "failed"));
                 returnObj.push_back(Pair("reason", "Zelnode already confirmed and in zelnode list"));
                 return returnObj;
@@ -639,9 +639,9 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
 
 void GetDeterministicListData(UniValue& listData, const std::string& strFilter, const Tier tier) {
     int count = 0;
-    for (const auto& item : g_zelnodeCache.mapZelnodeList.at(tier).listConfirmedZelnodes) {
+    for (const auto& item : g_fluxnodeCache.mapZelnodeList.at(tier).listConfirmedZelnodes) {
 
-        auto data = g_zelnodeCache.GetZelnodeData(item.out);
+        auto data = g_fluxnodeCache.GetFluxnodeData(item.out);
 
         UniValue info(UniValue::VOBJ);
 
@@ -781,10 +781,10 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
 
         std::map<int, std::vector<UniValue>> mapOrderedDosList;
 
-        for (const auto& item : g_zelnodeCache.mapStartTxDosTracker) {
+        for (const auto& item : g_fluxnodeCache.mapStartTxDosTracker) {
 
             // Get the data from the item in the map of dox tracking
-            const ZelnodeCacheData data = item.second;
+            const FluxnodeCacheData data = item.second;
 
             CTxDestination payment_destination;
             if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
@@ -852,10 +852,10 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
 
         std::map<int, std::vector<UniValue>> mapOrderedStartList;
 
-        for (const auto& item : g_zelnodeCache.mapStartTxTracker) {
+        for (const auto& item : g_fluxnodeCache.mapStartTxTracker) {
 
             // Get the data from the item in the map of dox tracking
-            const ZelnodeCacheData data = item.second;
+            const FluxnodeCacheData data = item.second;
 
             CTxDestination payment_destination;
             if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
@@ -931,7 +931,7 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
 
     if (IsDZelnodeActive()) {
         int nLocation = ZELNODE_TX_ERROR;
-        auto data = g_zelnodeCache.GetZelnodeData(activeZelnode.deterministicOutPoint, &nLocation);
+        auto data = g_fluxnodeCache.GetFluxnodeData(activeZelnode.deterministicOutPoint, &nLocation);
 
         UniValue info(UniValue::VOBJ);
 
@@ -1004,9 +1004,9 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
             CTxDestination dest;
             COutPoint outpoint;
             string strWinner = TierToString(currentTier) + " Winner";
-            if (g_zelnodeCache.GetNextPayment(dest, currentTier, outpoint)) {
+            if (g_fluxnodeCache.GetNextPayment(dest, currentTier, outpoint)) {
                 UniValue obj(UniValue::VOBJ);
-                auto data = g_zelnodeCache.GetZelnodeData(outpoint);
+                auto data = g_fluxnodeCache.GetFluxnodeData(outpoint);
                 obj.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
                 obj.push_back(std::make_pair("ip", data.ip));
                 obj.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
@@ -1050,11 +1050,11 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
         int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0;
         std::vector<int> vNodeCount(GetNumberOfTiers());
         {
-            LOCK(g_zelnodeCache.cs);
+            LOCK(g_fluxnodeCache.cs);
 
-            g_zelnodeCache.CountNetworks(ipv4, ipv6, onion, vNodeCount);
+            g_fluxnodeCache.CountNetworks(ipv4, ipv6, onion, vNodeCount);
 
-            nTotal = g_zelnodeCache.mapConfirmedZelnodeData.size();
+            nTotal = g_fluxnodeCache.mapConfirmedFluxnodeData.size();
         }
 
         obj.push_back(Pair("total", nTotal));
@@ -1113,8 +1113,8 @@ UniValue getmigrationcount (const UniValue& params, bool fHelp)
         std::vector<int> vOldNodeCount(GetNumberOfTiers());
         std::vector<int> vNewNodeCount(GetNumberOfTiers());
         {
-            LOCK(g_zelnodeCache.cs);
-            g_zelnodeCache.CountMigration(nTotalOld, nTotalNew,vOldNodeCount, vNewNodeCount);
+            LOCK(g_fluxnodeCache.cs);
+            g_fluxnodeCache.CountMigration(nTotalOld, nTotalNew,vOldNodeCount, vNewNodeCount);
         }
 
         std::map<int,pair<string,string> > words;
@@ -1193,12 +1193,12 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("listzelnodeconf", "") + HelpExampleRpc("listzelnodeconf", ""));
 
-    std::vector<ZelnodeConfig::ZelnodeEntry> zelnodeEntries;
-    zelnodeEntries = zelnodeConfig.getEntries();
+    std::vector<FluxnodeConfig::ZelnodeEntry> zelnodeEntries;
+    zelnodeEntries = fluxnodeConfig.getEntries();
 
     UniValue ret(UniValue::VARR);
 
-    for (ZelnodeConfig::ZelnodeEntry zelnode : zelnodeEntries) {
+    for (FluxnodeConfig::ZelnodeEntry zelnode : zelnodeEntries) {
         if (IsDZelnodeActive()) {
             int nIndex;
             if (!zelnode.castOutputIndex(nIndex))
@@ -1206,7 +1206,7 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
             COutPoint out = COutPoint(uint256S(zelnode.getTxHash()), uint32_t(nIndex));
 
             int nLocation = ZELNODE_TX_ERROR;
-            auto data = g_zelnodeCache.GetZelnodeData(out, &nLocation);
+            auto data = g_fluxnodeCache.GetFluxnodeData(out, &nLocation);
 
             UniValue info(UniValue::VOBJ);
             info.push_back(Pair("alias", zelnode.getAlias()));

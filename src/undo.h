@@ -97,8 +97,8 @@ void ReadWriteExtraZelnodeUndoBlockData(Stream &s, Operation ser_action, std::ma
 class CZelnodeTxBlockUndo
 {
 public:
-    std::vector<ZelnodeCacheData> vecExpiredDosData;
-    std::vector<ZelnodeCacheData> vecExpiredConfirmedData;
+    std::vector<FluxnodeCacheData> vecExpiredDosData;
+    std::vector<FluxnodeCacheData> vecExpiredConfirmedData;
     std::map<COutPoint, int> mapUpdateLastConfirmHeight;
     std::map<COutPoint, int> mapLastPaidHeights;
     std::map<COutPoint, std::string> mapLastIpAddress;

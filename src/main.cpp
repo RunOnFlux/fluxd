@@ -592,7 +592,7 @@ CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& loc
 
 CCoinsViewCache *pcoinsTip = NULL;
 CBlockTreeDB *pblocktree = NULL;
-CDeterministicZelnodeDB* pZelnodeDB = NULL;
+CDeterministicFluxnodeDB* pFluxnodeDB = NULL;
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -1155,12 +1155,12 @@ bool ContextualCheckTransaction(
 
             bool fFailure = false;
             std::string strFailMessage;
-            if (!g_zelnodeCache.CheckNewStartTx(tx.collateralOut)) {
+            if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralOut)) {
                 fFailure = true;
                 strFailMessage = "zelnode-tx-already-in-chain-or-waiting-for-dos-unban";
             }
 
-            if (!fFailure && g_zelnodeCache.CheckIfConfirmed(tx.collateralOut)) {
+            if (!fFailure && g_fluxnodeCache.CheckIfConfirmed(tx.collateralOut)) {
                 fFailure = true;
                 strFailMessage = "zelnode-tx-already-in-confirm-chain";
             }
@@ -1211,7 +1211,7 @@ bool ContextualCheckTransaction(
         } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
             bool fFailure = false;
             std::string strFailMessage;
-            if (g_zelnodeCache.GetZelnodeData(tx.collateralOut).nTier > tx.benchmarkTier) {
+            if (g_fluxnodeCache.GetFluxnodeData(tx.collateralOut).nTier > tx.benchmarkTier) {
                 fFailure = true;
                 strFailMessage = "zelnode-tx-benchmark-tier-to-low-for-collateral";
             }
@@ -1221,7 +1221,7 @@ bool ContextualCheckTransaction(
             }
 
             // Check the signatures. This is a contextual check as it requires the zelnode pubkey
-            auto data = g_zelnodeCache.GetZelnodeData(tx.collateralOut);
+            auto data = g_fluxnodeCache.GetFluxnodeData(tx.collateralOut);
             std::string errorMessage;
 
             if (!data.IsNull()) {
@@ -1243,7 +1243,7 @@ bool ContextualCheckTransaction(
             if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
                 bool fFailure = false;
                 std::string strFailMessage;
-                if (!g_zelnodeCache.CheckIfStarted(tx.collateralOut)) {
+                if (!g_fluxnodeCache.CheckIfStarted(tx.collateralOut)) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-invalid-confirm-outpoint-not-started";
                 }
@@ -1254,19 +1254,19 @@ bool ContextualCheckTransaction(
             } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
                 bool fFailure = false;
                 std::string strFailMessage;
-                if (!g_zelnodeCache.CheckIfConfirmed(tx.collateralOut)) {
+                if (!g_fluxnodeCache.CheckIfConfirmed(tx.collateralOut)) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed";
                 }
 
                 // Check the update height, but make sure we only pass in the height if this check is coming from an AcceptBlock call
                 // If it is coming from an AcceptBlock call pass in the height of the block otherwise use the default 0
-                if (!fFailure && !g_zelnodeCache.CheckUpdateHeight(tx, nHeight)) {
+                if (!fFailure && !g_fluxnodeCache.CheckUpdateHeight(tx, nHeight)) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon";
                 }
 
-                if (!fFailure && g_zelnodeCache.GetZelnodeData(tx.collateralOut).nTier > tx.benchmarkTier) {
+                if (!fFailure && g_fluxnodeCache.GetFluxnodeData(tx.collateralOut).nTier > tx.benchmarkTier) {
                     fFailure = true;
                     strFailMessage = "zelnode-tx-benchmark-tier-to-low-for-collateral";
                 }
@@ -1666,8 +1666,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         // Instead of DOSing our peers for sending us what they think are valid transactions do this check first
         if (tx.nType == ZELNODE_CONFIRM_TX_TYPE && tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
             {
-                LOCK(g_zelnodeCache.cs);
-                if (!g_zelnodeCache.CheckConfirmationHeights(nextBlockHeight, tx.collateralOut, tx.ip)) {
+                LOCK(g_fluxnodeCache.cs);
+                if (!g_fluxnodeCache.CheckConfirmationHeights(nextBlockHeight, tx.collateralOut, tx.ip)) {
                     LogPrint("mempool", "Dropping confirmation zelnode txid %s : failed CheckConfirmationHeights check\n", tx.GetHash().ToString());
                     return false;
                 }
@@ -2942,7 +2942,7 @@ enum DisconnectResult
  *  The addressIndex and spentIndex will be updated if requested.
  */
 static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& state,
-    const CBlockIndex* pindex, CCoinsViewCache& view, ZelnodeCache* p_zelnodeCache, const CChainParams& chainparams,
+    const CBlockIndex* pindex, CCoinsViewCache& view, FluxnodeCache* p_fluxnodeCache, const CChainParams& chainparams,
     const bool updateIndices)
 {
     assert(pindex->GetBlockHash() == view.GetBestBlock());
@@ -2966,24 +2966,24 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
     }
 
     CZelnodeTxBlockUndo zelnodeBlockUndo;
-    if (!pZelnodeDB->ReadBlockUndoZelnodeData(block.GetHash(), zelnodeBlockUndo)) {
+    if (!pFluxnodeDB->ReadBlockUndoFluxnodeData(block.GetHash(), zelnodeBlockUndo)) {
         error("DisconnectBlock(): block zelnodetx undo data inconsistent");
         return DISCONNECT_FAILED;
     }
 
 
-    if (!p_zelnodeCache) {
-        error("DisconnectBlock(): p_zelnodeCache is null");
+    if (!p_fluxnodeCache) {
+        error("DisconnectBlock(): p_fluxnodeCache is null");
         return DISCONNECT_FAILED;
     }
 
-    p_zelnodeCache->AddBackUndoData(zelnodeBlockUndo);
+    p_fluxnodeCache->AddBackUndoData(zelnodeBlockUndo);
 
     std::vector<CAddressIndexDbEntry> addressIndex;
     std::vector<CAddressUnspentDbEntry> addressUnspentIndex;
     std::vector<CSpentIndexDbEntry> spentIndex;
 
-    p_zelnodeCache->CheckForUndoExpiredStartTx(pindex->nHeight);
+    p_fluxnodeCache->CheckForUndoExpiredStartTx(pindex->nHeight);
 
     // undo transactions in reverse order
     for (int i = block.vtx.size() - 1; i >= 0; i--) {
@@ -3015,12 +3015,12 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
         if (tx.IsZelnodeTx()) {
             if (tx.nType == ZELNODE_START_TX_TYPE) {
                 // Undo the start from the list
-                p_zelnodeCache->UndoNewStart(tx, pindex->nHeight);
+                p_fluxnodeCache->UndoNewStart(tx, pindex->nHeight);
             } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
                 if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
-                    p_zelnodeCache->UndoNewConfirm(tx);
+                    p_fluxnodeCache->UndoNewConfirm(tx);
                 } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
-                    // Handled by the p_zelnodeCache->AddBackUndoData function
+                    // Handled by the p_fluxnodeCache->AddBackUndoData function
                     // This function uses the undo block data and handles it accordingly
                 }
             }
@@ -3228,7 +3228,7 @@ static int64_t nTimeCallbacks = 0;
 static int64_t nTimeTotal = 0;
 
 bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,
-                  CCoinsViewCache& view, const CChainParams& chainparams, bool fJustCheck, ZelnodeCache* p_zelnodeCache)
+                  CCoinsViewCache& view, const CChainParams& chainparams, bool fJustCheck, FluxnodeCache* p_fluxnodeCache)
 {
     AssertLockHeld(cs_main);
 
@@ -3315,7 +3315,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     // Check the deterministric zelnode payouts
     if (pindex->nHeight >= chainparams.StartZelnodePayments()) {
-        if (!g_zelnodeCache.CheckZelnodePayout(block.vtx[0], pindex->nHeight, p_zelnodeCache)) {
+        if (!g_fluxnodeCache.CheckZelnodePayout(block.vtx[0], pindex->nHeight, p_fluxnodeCache)) {
             LogPrint("zelnode", "%s : Couldn't find deterministic zelnode payment", __func__);
             // TODO, up the DoS score when ready for mainnet launch
             return state.DoS(1, error("ConnectBlock(): not paying deterministic zelnodes"),
@@ -3398,24 +3398,24 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                                      REJECT_INVALID, "bad-txns-zelnode-tx-inputs-missingorspent");
 
                 if (tx.nType == ZELNODE_START_TX_TYPE) {
-                    if (p_zelnodeCache) {
-                        if (!g_zelnodeCache.CheckNewStartTx(tx.collateralOut)) {
+                    if (p_fluxnodeCache) {
+                        if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralOut)) {
                             return state.DoS(100, error("ConnectBlock(): zelnode tx, failed CheckNewStartTx call"),
                                              REJECT_INVALID, "bad-txns-zelnode-tx-check-new-start");
                         }
 
                         // Add new Zelnode Start Tx into local cache
-                        p_zelnodeCache->AddNewStart(tx, pindex->nHeight, nTier, nCollateralAmount);
+                        p_fluxnodeCache->AddNewStart(tx, pindex->nHeight, nTier, nCollateralAmount);
                     }
                 } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
                     if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
-                        if (p_zelnodeCache) {
-                            p_zelnodeCache->AddNewConfirm(tx, pindex->nHeight);
+                        if (p_fluxnodeCache) {
+                            p_fluxnodeCache->AddNewConfirm(tx, pindex->nHeight);
                         }
                     } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
-                        if (p_zelnodeCache) {
-                            p_zelnodeCache->AddUpdateConfirm(tx, pindex->nHeight);
-                            ZelnodeCacheData global_data = g_zelnodeCache.GetZelnodeData(tx.collateralOut);
+                        if (p_fluxnodeCache) {
+                            p_fluxnodeCache->AddUpdateConfirm(tx, pindex->nHeight);
+                            FluxnodeCacheData global_data = g_fluxnodeCache.GetFluxnodeData(tx.collateralOut);
                             if (global_data.IsNull()) {
                                 return state.DoS(100,
                                                  error("ConnectBlock(): zelnode tx, failed finding data to creating undo data"),
@@ -3539,17 +3539,17 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     // Update the temp cache with the set of started outpoints that have now expired from the dos list
     GetUndoDataForExpiredZelnodeDosScores(zelnodeTxBlockUndo, pindex->nHeight);
-    p_zelnodeCache->AddExpiredDosTx(zelnodeTxBlockUndo, pindex->nHeight);
+    p_fluxnodeCache->AddExpiredDosTx(zelnodeTxBlockUndo, pindex->nHeight);
 
     // Update the temp cache with the set of confirmed outpoints that have now expired
     GetUndoDataForExpiredConfirmZelnodes(zelnodeTxBlockUndo, pindex->nHeight, setSpentOutPoints);
-    p_zelnodeCache->AddExpiredConfirmTx(zelnodeTxBlockUndo);
+    p_fluxnodeCache->AddExpiredConfirmTx(zelnodeTxBlockUndo);
 
     // Update the block undo, with the paid nodes last paid height.
-    GetUndoDataForPaidZelnodes(zelnodeTxBlockUndo, *p_zelnodeCache);
+    GetUndoDataForPaidZelnodes(zelnodeTxBlockUndo, *p_fluxnodeCache);
 
     // Check for Start tx that are going to expire
-    p_zelnodeCache->CheckForExpiredStartTx(pindex->nHeight);
+    p_fluxnodeCache->CheckForExpiredStartTx(pindex->nHeight);
 
     view.PushAnchor(sprout_tree);
     view.PushAnchor(sapling_tree);
@@ -3609,7 +3609,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.size() ||
             zelnodeTxBlockUndo.mapLastPaidHeights.size())
         {
-            if (!pZelnodeDB->WriteBlockUndoZelnodeData(block.GetHash(), zelnodeTxBlockUndo))
+            if (!pFluxnodeDB->WriteBlockUndoFluxnodeData(block.GetHash(), zelnodeTxBlockUndo))
                 return AbortNode(state, "Failed to write zelnodetx undo data");
         }
 
@@ -3785,7 +3785,7 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
             return AbortNode(state, "Failed to write to coin database");
 
         // Dump Zelnode cache to database
-        g_zelnodeCache.DumpZelnodeCache();
+        g_fluxnodeCache.DumpFluxnodeCache();
         nLastFlush = nNow;
     }
     if ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) && nNow > nLastSetChain + (int64_t)DATABASE_WRITE_INTERVAL * 1000000) {
@@ -3844,12 +3844,12 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
     int64_t nStart = GetTimeMicros();
     {
         CCoinsViewCache view(pcoinsTip);
-        ZelnodeCache zelnodeCache;
+        FluxnodeCache fluxnodeCache;
         // insightexplorer: update indices (true)
-        if (DisconnectBlock(block, state, pindexDelete, view, &zelnodeCache, chainparams, true) != DISCONNECT_OK)
+        if (DisconnectBlock(block, state, pindexDelete, view, &fluxnodeCache, chainparams, true) != DISCONNECT_OK)
             return error("DisconnectTip(): DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString());
         assert(view.Flush());
-        assert(zelnodeCache.Flush());
+        assert(fluxnodeCache.Flush());
     }
     LogPrint("bench", "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
     uint256 sproutAnchorAfterDisconnect = pcoinsTip->GetBestAnchor(SPROUT);
@@ -3881,7 +3881,7 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
 
     if (fDebug) {
         // Logging zelnodecache start and dos information
-        g_zelnodeCache.LogDebugData(pindexDelete->nHeight, pindexDelete->GetBlockHash(), true);
+        g_fluxnodeCache.LogDebugData(pindexDelete->nHeight, pindexDelete->GetBlockHash(), true);
     }
 
     // Update chainActive and related variables.
@@ -3955,8 +3955,8 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     LogPrint("bench", "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
     {
         CCoinsViewCache view(pcoinsTip);
-        ZelnodeCache zelnodeCache;
-        bool rv = ConnectBlock(*pblock, state, pindexNew, view, chainparams, false, &zelnodeCache);
+        FluxnodeCache fluxnodeCache;
+        bool rv = ConnectBlock(*pblock, state, pindexNew, view, chainparams, false, &fluxnodeCache);
         GetMainSignals().BlockChecked(*pblock, state);
         if (!rv) {
             if (state.IsInvalid())
@@ -3968,10 +3968,10 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
         LogPrint("bench", "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
         assert(view.Flush());
 
-        assert(zelnodeCache.Flush());
+        assert(fluxnodeCache.Flush());
 
-        LogPrint("dzelnode", "%s : Size of global zelnodeCache mapStartTxTracker : %u\n", __func__, g_zelnodeCache.mapStartTxTracker.size());
-        LogPrint("dzelnode", "%s : Size of global zelnodeCache mapStartTxDosTrackerTxTracker : %u\n", __func__, g_zelnodeCache.mapStartTxDosTracker.size());
+        LogPrint("dzelnode", "%s : Size of global fluxnodeCache mapStartTxTracker : %u\n", __func__, g_fluxnodeCache.mapStartTxTracker.size());
+        LogPrint("dzelnode", "%s : Size of global fluxnodeCache mapStartTxDosTrackerTxTracker : %u\n", __func__, g_fluxnodeCache.mapStartTxDosTracker.size());
     }
     int64_t nTime4 = GetTimeMicros(); nTimeFlush += nTime4 - nTime3;
     LogPrint("bench", "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
@@ -3986,9 +3986,9 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
 
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-        if (g_zelnodeCache.mapZelnodeList.count((Tier) currentTier)) {
-            if (g_zelnodeCache.mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.size() !=
-                g_zelnodeCache.mapZelnodeList.at((Tier) currentTier).listConfirmedZelnodes.size()) {
+        if (g_fluxnodeCache.mapZelnodeList.count((Tier) currentTier)) {
+            if (g_fluxnodeCache.mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.size() !=
+                g_fluxnodeCache.mapZelnodeList.at((Tier) currentTier).listConfirmedZelnodes.size()) {
                 error("%s set map, doesn't have the same size as the listconfirmed zelnodes",
                       TierToString(currentTier));
             }
@@ -4002,7 +4002,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
     if (fDebug) {
         // Logging zelnodecache start and dos information
-        g_zelnodeCache.LogDebugData(pindexNew->nHeight, pindexNew->GetBlockHash(), false);
+        g_fluxnodeCache.LogDebugData(pindexNew->nHeight, pindexNew->GetBlockHash(), false);
     }
 
     // Update chainActive & related variables.
@@ -4978,7 +4978,7 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
 
     CCoinsViewCache viewNew(pcoinsTip);
     CBlockIndex indexDummy(block);
-    ZelnodeCache cache;
+    FluxnodeCache cache;
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev->nHeight + 1;
     // JoinSplit proofs are verified in ConnectBlock
@@ -5368,7 +5368,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
     nCheckLevel = std::max(0, std::min(4, nCheckLevel));
     LogPrintf("Verifying last %i blocks at level %i\n", nCheckDepth, nCheckLevel);
     CCoinsViewCache coins(coinsview);
-    ZelnodeCache zelnodeCache;
+    FluxnodeCache fluxnodeCache;
     CBlockIndex* pindexState = chainActive.Tip();
     CBlockIndex* pindexFailure = NULL;
     int nGoodTransactions = 0;
@@ -5400,7 +5400,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
         // check level 3: check for inconsistencies during memory-only disconnect of tip blocks
         if (nCheckLevel >= 3 && pindex == pindexState && (coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheUsage) {
             // insightexplorer: do not update indices (false)
-            DisconnectResult res = DisconnectBlock(block, state, pindex, coins, &zelnodeCache, chainparams, false);
+            DisconnectResult res = DisconnectBlock(block, state, pindex, coins, &fluxnodeCache, chainparams, false);
             if (res == DISCONNECT_FAILED) {
                 return error("VerifyDB(): *** irrecoverable inconsistency in block data at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
             }
