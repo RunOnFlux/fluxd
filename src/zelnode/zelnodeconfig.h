@@ -17,11 +17,11 @@
 #include <boost/filesystem/fstream.hpp>
 
 
-class ZelnodeConfig;
-extern ZelnodeConfig zelnodeConfig;
+class FluxnodeConfig;
+extern FluxnodeConfig fluxnodeConfig;
 
 
-class ZelnodeConfig
+class FluxnodeConfig
 {
 public:
     class ZelnodeEntry
@@ -97,7 +97,7 @@ public:
         }
     };
 
-    ZelnodeConfig()
+    FluxnodeConfig()
     {
         entries = std::vector<ZelnodeEntry>();
     }

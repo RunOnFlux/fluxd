@@ -12,22 +12,22 @@
 #include "chainparams.h"
 #include <base58.h>
 
-ZelnodeConfig zelnodeConfig;
+FluxnodeConfig fluxnodeConfig;
 
-void ZelnodeConfig::add(std::string alias, std::string ip, std::string privKey, std::string txHash, std::string outputIndex)
+void FluxnodeConfig::add(std::string alias, std::string ip, std::string privKey, std::string txHash, std::string outputIndex)
 {
     ZelnodeEntry zelnodeEntry(alias, ip, privKey, txHash, outputIndex);
     entries.push_back(zelnodeEntry);
 }
 
-bool ZelnodeConfig::read(std::string& strErr)
+bool FluxnodeConfig::read(std::string& strErr)
 {
     int linenumber = 1;
-    boost::filesystem::path pathZelnodeConfigFile = GetZelnodeConfigFile();
-    boost::filesystem::ifstream streamConfig(pathZelnodeConfigFile);
+    boost::filesystem::path pathFluxnodeConfigFile = GetFluxnodeConfigFile();
+    boost::filesystem::ifstream streamConfig(pathFluxnodeConfigFile);
 
     if (!streamConfig.good()) {
-        FILE* configFile = fopen(pathZelnodeConfigFile.string().c_str(), "a");
+        FILE* configFile = fopen(pathFluxnodeConfigFile.string().c_str(), "a");
         if (configFile != NULL) {
             std::string strHeader = "# Zelnode config file\n"
                                     "# Format: alias IP:port zelnodeprivkey collateral_output_txid collateral_output_index\n"
@@ -96,7 +96,7 @@ bool ZelnodeConfig::read(std::string& strErr)
     return true;
 }
 
-bool ZelnodeConfig::ZelnodeEntry::castOutputIndex(int &n)
+bool FluxnodeConfig::ZelnodeEntry::castOutputIndex(int &n)
 {
     try {
         n = std::stoi(outputIndex);
