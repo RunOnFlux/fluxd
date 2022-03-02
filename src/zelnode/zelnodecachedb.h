@@ -10,7 +10,7 @@
 
 class FluxnodeCacheData;
 class COutPoint;
-class CZelnodeTxBlockUndo;
+class CFluxnodeTxBlockUndo;
 
 class CDeterministicFluxnodeDB : public CDBWrapper
 {
@@ -29,8 +29,8 @@ public:
 
     bool LoadFluxnodeCacheData();
 
-    bool WriteBlockUndoFluxnodeData(const uint256& p_blockHash, CZelnodeTxBlockUndo& p_undoData);
-    bool ReadBlockUndoFluxnodeData(const uint256 &p_blockHash, CZelnodeTxBlockUndo& p_undoData);
+    bool WriteBlockUndoFluxnodeData(const uint256& p_blockHash, CFluxnodeTxBlockUndo& p_undoData);
+    bool ReadBlockUndoFluxnodeData(const uint256 &p_blockHash, CFluxnodeTxBlockUndo& p_undoData);
 };
 
 #endif //ZELCASH_ZELNODECACHEDB_H

@@ -100,9 +100,9 @@ namespace boost {
 
 using namespace std;
 
-string strZelnodeAddr = "";
-string strZelnodePrivKey = "";
-bool fZelnode = false;
+string strFluxnodeAddr = "";
+string strFluxnodePrivKey = "";
+bool fFluxnode = false;
 
 CCriticalSection cs_args;
 map<string, string> mapArgs;

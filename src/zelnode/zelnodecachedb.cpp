@@ -67,12 +67,12 @@ bool CDeterministicFluxnodeDB::LoadFluxnodeCacheData()
     return true;
 }
 
-bool CDeterministicFluxnodeDB::WriteBlockUndoFluxnodeData(const uint256& p_blockHash, CZelnodeTxBlockUndo& p_undoData)
+bool CDeterministicFluxnodeDB::WriteBlockUndoFluxnodeData(const uint256& p_blockHash, CFluxnodeTxBlockUndo& p_undoData)
 {
     return Write(std::make_pair(BLOCK_ZELNODE_UNDO_DATA, p_blockHash), p_undoData);
 }
 
-bool CDeterministicFluxnodeDB::ReadBlockUndoFluxnodeData(const uint256 &p_blockHash, CZelnodeTxBlockUndo &p_undoData)
+bool CDeterministicFluxnodeDB::ReadBlockUndoFluxnodeData(const uint256 &p_blockHash, CFluxnodeTxBlockUndo &p_undoData)
 {
     // If it exists, return the read value.
     if (Exists(std::make_pair(BLOCK_ZELNODE_UNDO_DATA, p_blockHash)))

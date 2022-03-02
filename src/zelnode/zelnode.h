@@ -44,7 +44,7 @@
 // Max signature time that we accept into the mempool
 #define ZELNODE_MAX_SIG_TIME 3600
 
-/** Zelnode Collateral Amounts
+/** Fluxnode Collateral Amounts
  * This will be the place that will hold all zelnode collateral amounts
  * As we make changes to the node structure, this is where the new amount should be placed
  * Use the naming mechanism as we make changes V1 -> V2 -> V3 -> V4
@@ -58,8 +58,8 @@
 #define V2_ZELNODE_COLLAT_STRATUS 40000
 
 
-/** Zelnode Payout Percentages
- * This will be the place that will hold all Zelnode Payout Percentages
+/** Fluxnode Payout Percentages
+ * This will be the place that will hold all Fluxnode Payout Percentages
  * As we make changes to the node structure, this is where the new percentages should be placed
  * Use the naming mechanism as we make changes V1 -> V2 -> V3 -> V4
  */
@@ -69,18 +69,18 @@
 #define V1_ZELNODE_PERCENT_STRATUS 0.15
 
 class FluxnodeCache;
-class CZelnodeTxBlockUndo;
-class ActiveZelnode;
+class CFluxnodeTxBlockUndo;
+class ActiveFluxnode;
 
 extern FluxnodeCache g_fluxnodeCache;
-extern ActiveZelnode activeZelnode;
+extern ActiveFluxnode activeFluxnode;
 extern COutPoint fluxnodeOutPoint;
 
 /** REMOVE THE ABOVE CODE AFTER DETERMINISTIC ZELNODES IS ACTIVATED **/
 
 std::string TierToString(int tier);
 
-bool CheckZelnodeTxSignatures(const CTransaction& transaction);
+bool CheckFluxnodeTxSignatures(const CTransaction& transaction);
 bool CheckBenchmarkSignature(const CTransaction& transaction);
 bool IsMigrationCollateralAmount(const CAmount& amount);
 
@@ -94,7 +94,7 @@ enum {
     ZELNODE_TX_EXPIRED
 };
 
-enum  ZelnodeUpdateType {
+enum  FluxnodeUpdateType {
     INITIAL_CONFIRM = 0,
     UPDATE_CONFIRM = 1
 };
@@ -107,26 +107,26 @@ enum Tier {
     LAST = 4 // All newly added Tier must be added above LAST, and change the assigned values so they are in order
 };
 
-/** Zelnode Tier code start
+/** Fluxnode Tier code start
  * Any changes to this code needs to be also made to the code in coins.h and coins.cpp
  * We are unable to use the same code because of build/linking restrictions
  */
 bool IsTierValid(const int& nTier);
 int GetNumberOfTiers();
-/** Zelnode Tier code end **/
+/** Fluxnode Tier code end **/
 
 
-std::string ZelnodeLocationToString(int nLocation);
+std::string FluxnodeLocationToString(int nLocation);
 
-void GetUndoDataForExpiredZelnodeDosScores(CZelnodeTxBlockUndo& p_zelnodeTxUudoData, const int& p_nHeight);
-void GetUndoDataForExpiredConfirmZelnodes(CZelnodeTxBlockUndo& p_zelnodeTxUudoData, const int& p_nHeight, const std::set<COutPoint> setSpentOuts);
+void GetUndoDataForExpiredFluxnodeDosScores(CFluxnodeTxBlockUndo& p_fluxnodeTxUudoData, const int& p_nHeight);
+void GetUndoDataForExpiredConfirmFluxnodes(CFluxnodeTxBlockUndo& p_fluxnodeTxUudoData, const int& p_nHeight, const std::set<COutPoint> setSpentOuts);
 
-void GetUndoDataForPaidZelnodes(CZelnodeTxBlockUndo& zelnodeTxBlockUndo, FluxnodeCache& p_localCache);
+void GetUndoDataForPaidFluxnodes(CFluxnodeTxBlockUndo& fluxnodeTxBlockUndo, FluxnodeCache& p_localCache);
 
 class FluxnodeCacheData {
 
 public:
-    // Zelnode Tx data
+    // Fluxnode Tx data
     int8_t nType;
     COutPoint collateralIn; // collateral in
     CPubKey collateralPubkey;
@@ -228,7 +228,7 @@ public:
     }
 };
 
-class ZelnodeListData {
+class FluxnodeListData {
 public:
 
     COutPoint out;
@@ -243,19 +243,19 @@ public:
         out.n = 0;
     }
 
-    ZelnodeListData()
+    FluxnodeListData()
     {
         SetNull();
     }
 
-    ZelnodeListData(const FluxnodeCacheData& p_zelnodeData)
+    FluxnodeListData(const FluxnodeCacheData& p_fluxnodeData)
     {
-        nConfirmedBlockHeight = p_zelnodeData.nConfirmedBlockHeight;
-        nLastPaidHeight = p_zelnodeData.nLastPaidHeight;
-        out = p_zelnodeData.collateralIn;
+        nConfirmedBlockHeight = p_fluxnodeData.nConfirmedBlockHeight;
+        nLastPaidHeight = p_fluxnodeData.nLastPaidHeight;
+        out = p_fluxnodeData.collateralIn;
     }
 
-    friend bool operator<(const ZelnodeListData& a, const ZelnodeListData& b)
+    friend bool operator<(const FluxnodeListData& a, const FluxnodeListData& b)
     {
         int aComparatorHeight = a.nLastPaidHeight > 0 ? a.nLastPaidHeight : a.nConfirmedBlockHeight;
         int bComparatorHeight = b.nLastPaidHeight > 0 ? b.nLastPaidHeight : b.nConfirmedBlockHeight;
@@ -273,19 +273,19 @@ public:
     }
 };
 
-class ZelnodeList {
+class FluxnodeList {
 public:
     // Sorted list of zelnodes ready to be paid
     std::set<COutPoint> setConfirmedTxInList;
-    std::list<ZelnodeListData> listConfirmedZelnodes;
+    std::list<FluxnodeListData> listConfirmedFluxnodes;
 
-    ZelnodeList(){
+    FluxnodeList(){
         SetNull();
     }
 
     void SetNull() {
         setConfirmedTxInList.clear();
-        listConfirmedZelnodes.clear();
+        listConfirmedFluxnodes.clear();
     }
 };
 
@@ -301,34 +301,34 @@ public:
     std::set<COutPoint> setDirtyOutPoint;
 
     //! LOCAL CACHE ITEMS ONLY
-    // Set only used by local cache to inform the global cache when Flushing to remove Started Zelnode from being tracked
+    // Set only used by local cache to inform the global cache when Flushing to remove Started Fluxnode from being tracked
     std::set<COutPoint> setUndoStartTx;
 
     // Int only used by local cache to inform the global cache when Flushing to remove all Started Outpoint at this height from being tracked
     int setUndoStartTxHeight;
 
-    // Map only used by local cache to inform the global cache when Flushing to expire DoS Zelnode from being tracked
+    // Map only used by local cache to inform the global cache when Flushing to expire DoS Fluxnode from being tracked
     std::map<int, std::set<COutPoint>> mapDosExpiredToRemove;
 
-    // Map only used by local cache to inform the global cache to undo Zelnode added to DoS tacker, and put them back into the Started Zelnode tracking
+    // Map only used by local cache to inform the global cache to undo Fluxnode added to DoS tacker, and put them back into the Started Fluxnode tracking
     std::map<int, std::set<COutPoint>> mapDoSToUndo;
 
-    // Set only used by local cache to inform the global cache when Flushing to move Started Zelnodes to the Confirm list and updating IP address
+    // Set only used by local cache to inform the global cache when Flushing to move Started Fluxnodes to the Confirm list and updating IP address
     std::map<COutPoint, std::string> setAddToConfirm;
 
-    // Int only used by local cache to inform the global cache when Flushing to set the Started Zelnodes Confirm Height
+    // Int only used by local cache to inform the global cache when Flushing to set the Started Fluxnodes Confirm Height
     int setAddToConfirmHeight;
 
-    // Set only used by local chache to inform the global cache when Flushing to undo the Confirm Zelnodes
+    // Set only used by local chache to inform the global cache when Flushing to undo the Confirm Fluxnodes
     std::set<COutPoint> setUndoAddToConfirm;
 
-    // Set only used by local cache to inform the global cache when Flushing to update the Confirm Zelnodes nLastConfirmHeight and IP address
+    // Set only used by local cache to inform the global cache when Flushing to update the Confirm Fluxnodes nLastConfirmHeight and IP address
     std::map<COutPoint, std::string> setAddToUpdateConfirm;
 
-    // Int only used by local cache to inform the global cache when Flushing to update the Confirm Zelnodes nLastConfirmHeight
+    // Int only used by local cache to inform the global cache when Flushing to update the Confirm Fluxnodes nLastConfirmHeight
     int setAddToUpdateConfirmHeight;
 
-    // Set only used by local cache to inform the global cache when Flushing to remove certain OutPoints from the Confirm Zelnode data
+    // Set only used by local cache to inform the global cache when Flushing to remove certain OutPoints from the Confirm Fluxnode data
     std::set<COutPoint> setExpireConfirmOutPoints;
 
     std::set<FluxnodeCacheData> setUndoExpireConfirm;
@@ -338,27 +338,27 @@ public:
     std::map<COutPoint, int> mapUndoPaidNodes;
 
     //! GLOBAL CACHE ITEMS ONLY
-    // Global tracking of Started Zelnode
+    // Global tracking of Started Fluxnode
     std::map<COutPoint, FluxnodeCacheData> mapStartTxTracker;
     std::map<int, std::set<COutPoint> > mapStartTxHeights;
 
-    // Global tracking of DoS Prevention Zelnode
+    // Global tracking of DoS Prevention Fluxnode
     std::map<COutPoint, FluxnodeCacheData> mapStartTxDosTracker;
     std::map<int, std::set<COutPoint> > mapStartTxDosHeights;
 
-    // Global tracking of Confirmed Zelnodes
+    // Global tracking of Confirmed Fluxnodes
     std::map<COutPoint, FluxnodeCacheData> mapConfirmedFluxnodeData;
 
-    std::map<Tier, ZelnodeList> mapZelnodeList;
+    std::map<Tier, FluxnodeList> mapFluxnodeList;
 
     FluxnodeCache(){
         SetNull();
     }
 
-    void InitMapZelnodeList() {
+    void InitMapFluxnodeList() {
         for (int currentTier = CUMULUS; currentTier != LAST; currentTier++ )
         {
-            mapZelnodeList.insert(std::make_pair((Tier)currentTier, ZelnodeList()));
+            mapFluxnodeList.insert(std::make_pair((Tier)currentTier, FluxnodeList()));
         }
     }
 
@@ -379,7 +379,7 @@ public:
         setAddToUpdateConfirmHeight = 0;
         setUndoAddToConfirm.clear();
 
-        mapZelnodeList.clear();
+        mapFluxnodeList.clear();
 
         mapPaidNodes.clear();
     }
@@ -392,12 +392,12 @@ public:
 
     void AddUpdateConfirm(const CTransaction& p_transaction, const int p_nHeight);
 
-    void AddExpiredDosTx(const CZelnodeTxBlockUndo& p_undoData, const int p_nHeight);
-    void AddExpiredConfirmTx(const CZelnodeTxBlockUndo& p_undoData);
+    void AddExpiredDosTx(const CFluxnodeTxBlockUndo& p_undoData, const int p_nHeight);
+    void AddExpiredConfirmTx(const CFluxnodeTxBlockUndo& p_undoData);
 
     void AddPaidNode(const int& tier, const COutPoint& out, const int p_Height);
 
-    void AddBackUndoData(const CZelnodeTxBlockUndo& p_undoData);
+    void AddBackUndoData(const CFluxnodeTxBlockUndo& p_undoData);
 
     //! Getting info Methods
     bool InStartTracker(const COutPoint& out);
@@ -415,7 +415,7 @@ public:
     bool CheckIfConfirmed(const COutPoint& out);
     bool CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight = 0);
 
-    bool CheckZelnodePayout(const CTransaction& coinbase, const int p_Height, FluxnodeCache* p_fluxnodeCache = nullptr);
+    bool CheckFluxnodePayout(const CTransaction& coinbase, const int p_Height, FluxnodeCache* p_fluxnodeCache = nullptr);
 
     //! Helper functions
     FluxnodeCacheData GetFluxnodeData(const CTransaction& tx);
@@ -428,8 +428,8 @@ public:
     void SortList(const int& nTier);
 
     bool CheckListSet(const COutPoint& p_OutPoint);
-    bool CheckListHas(const FluxnodeCacheData& p_zelnodeData);
-    void InsertIntoList(const FluxnodeCacheData& p_zelnodeData);
+    bool CheckListHas(const FluxnodeCacheData& p_fluxnodeData);
+    void InsertIntoList(const FluxnodeCacheData& p_fluxnodeData);
     void EraseFromListSet(const COutPoint& p_OutPoint);
     void EraseFromList(const std::set<COutPoint>& setToRemove, const Tier nTier);
 
@@ -441,14 +441,14 @@ public:
     bool CheckConfirmationHeights(const int nHeight, const COutPoint& out, const std::string& ip);
 };
 
-int GetZelnodeExpirationCount(const int& p_nHeight);
-std::string GetZelnodeBenchmarkPublicKey(const CTransaction& tx);
+int GetFluxnodeExpirationCount(const int& p_nHeight);
+std::string GetFluxnodeBenchmarkPublicKey(const CTransaction& tx);
 std::string GetP2SHFluxNodePublicKey(const uint32_t& nSigTime);
 std::string GetP2SHFluxNodePublicKey(const CTransaction& tx);
 bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet);
 
-bool IsDZelnodeActive();
-bool IsZelnodeTransactionsActive();
+bool IsDFluxnodeActive();
+bool IsFluxnodeTransactionsActive();
 
 
 

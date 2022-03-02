@@ -42,7 +42,7 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
         int nCurrentHeight = chainActive.Height();
 
         g_fluxnodeCache.SetNull();
-        g_fluxnodeCache.InitMapZelnodeList();
+        g_fluxnodeCache.InitMapFluxnodeList();
 
         delete pFluxnodeDB;
         pFluxnodeDB = NULL;
@@ -57,7 +57,7 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
         int nPrintTrigger = 0;
         int nPercent = 0;
         std::set<COutPoint> setSpentOutPoints;
-        CZelnodeTxBlockUndo zelnodeTxBlockUndo;
+        CFluxnodeTxBlockUndo fluxnodeTxBlockUndo;
 
         // Main benchmarks
         static int64_t nTimeLoadBlock = 0;
@@ -100,7 +100,7 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
             }
             nPrintTrigger--;
 
-            zelnodeTxBlockUndo.SetNull();
+            fluxnodeTxBlockUndo.SetNull();
             setSpentOutPoints.clear();
 
             FluxnodeCache fluxnodeCache;
@@ -113,7 +113,7 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
             int64_t nTime1 = GetTimeMicros(); nTimeLoadBlock += nTime1 - nTimeStart;
 
             // Add paidnode info
-            if (rescanIndex->nHeight >= Params().StartZelnodePayments()) {
+            if (rescanIndex->nHeight >= Params().StartFluxnodePayments()) {
                 CTxDestination t_dest;
                 COutPoint t_out;
                 for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
@@ -129,7 +129,7 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
 
                 int64_t nLoopStart = GetTimeMicros();
 
-                if (!tx.IsCoinBase() && !tx.IsZelnodeTx()) {
+                if (!tx.IsCoinBase() && !tx.IsFluxnodeTx()) {
                     for (const auto &input : tx.vin) {
                         setSpentOutPoints.insert(input.prevout);
                     }
@@ -137,7 +137,7 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
 
                 int64_t nLoop1 = GetTimeMicros(); nLoopSpentOutputs += nLoop1 - nLoopStart;
 
-                if (tx.IsZelnodeTx()) {
+                if (tx.IsFluxnodeTx()) {
                     int nTier = 0;
                     CTransaction get_tx;
                     uint256 block_hash;
@@ -156,26 +156,26 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
 
                     if (tx.nType == ZELNODE_START_TX_TYPE) {
 
-                        // Add new Zelnode Start Tx into local cache
+                        // Add new Fluxnode Start Tx into local cache
                         fluxnodeCache.AddNewStart(tx, rescanIndex->nHeight, nTier, get_tx.vout[tx.collateralOut.n].nValue);
                         int64_t nLoop3 = GetTimeMicros(); nAddStart += nLoop3 - nLoop2;
 
                     } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
-                        if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
+                        if (tx.nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM) {
 
                             fluxnodeCache.AddNewConfirm(tx, rescanIndex->nHeight);
                             int64_t nLoop4 = GetTimeMicros(); nAddNewConfirm += nLoop4 - nLoop2;
-                        } else if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
+                        } else if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
                             fluxnodeCache.AddUpdateConfirm(tx, rescanIndex->nHeight);
                             FluxnodeCacheData global_data = g_fluxnodeCache.GetFluxnodeData(tx.collateralOut);
                             if (global_data.IsNull()) {
                                 return error("Failed to find global data on update confirm tx, %s",
                                              tx.GetHash().GetHex());
                             }
-                            zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.insert(
+                            fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight.insert(
                                     std::make_pair(tx.collateralOut,
                                                    global_data.nLastConfirmedBlockHeight));
-                            zelnodeTxBlockUndo.mapLastIpAddress.insert(std::make_pair(tx.collateralOut, global_data.ip));
+                            fluxnodeTxBlockUndo.mapLastIpAddress.insert(std::make_pair(tx.collateralOut, global_data.ip));
                             int64_t nLoop5 = GetTimeMicros(); nAddUpdateConfirm += nLoop5 - nLoop2;
                         }
                     }
@@ -185,26 +185,26 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
             int64_t nTime3 = GetTimeMicros(); nTimeLoopTx += nTime3 - nTime2;
 
             // Update the temp cache with the set of started outpoints that have now expired from the dos list
-            GetUndoDataForExpiredZelnodeDosScores(zelnodeTxBlockUndo, rescanIndex->nHeight);
-            fluxnodeCache.AddExpiredDosTx(zelnodeTxBlockUndo, rescanIndex->nHeight);
+            GetUndoDataForExpiredFluxnodeDosScores(fluxnodeTxBlockUndo, rescanIndex->nHeight);
+            fluxnodeCache.AddExpiredDosTx(fluxnodeTxBlockUndo, rescanIndex->nHeight);
 
             // Update the temp cache with the set of confirmed outpoints that have now expired
-            GetUndoDataForExpiredConfirmZelnodes(zelnodeTxBlockUndo, rescanIndex->nHeight, setSpentOutPoints);
-            fluxnodeCache.AddExpiredConfirmTx(zelnodeTxBlockUndo);
+            GetUndoDataForExpiredConfirmFluxnodes(fluxnodeTxBlockUndo, rescanIndex->nHeight, setSpentOutPoints);
+            fluxnodeCache.AddExpiredConfirmTx(fluxnodeTxBlockUndo);
 
             // Update the block undo, with the paid nodes last paid height.
-            GetUndoDataForPaidZelnodes(zelnodeTxBlockUndo, fluxnodeCache);
+            GetUndoDataForPaidFluxnodes(fluxnodeTxBlockUndo, fluxnodeCache);
 
             // Check for Start tx that are going to expire
             fluxnodeCache.CheckForExpiredStartTx(rescanIndex->nHeight);
 
             int64_t nTime4 = GetTimeMicros(); nTimeUndoData += nTime4 - nTime3;
 
-            if (zelnodeTxBlockUndo.vecExpiredDosData.size() ||
-                zelnodeTxBlockUndo.vecExpiredConfirmedData.size() ||
-                zelnodeTxBlockUndo.mapUpdateLastConfirmHeight.size() ||
-                zelnodeTxBlockUndo.mapLastPaidHeights.size()) {
-                if (!pFluxnodeDB->WriteBlockUndoFluxnodeData(block.GetHash(), zelnodeTxBlockUndo))
+            if (fluxnodeTxBlockUndo.vecExpiredDosData.size() ||
+                fluxnodeTxBlockUndo.vecExpiredConfirmedData.size() ||
+                fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight.size() ||
+                fluxnodeTxBlockUndo.mapLastPaidHeights.size()) {
+                if (!pFluxnodeDB->WriteBlockUndoFluxnodeData(block.GetHash(), fluxnodeTxBlockUndo))
                     return error("Failed to write zelnodetx undo data");
             }
 
@@ -231,7 +231,7 @@ UniValue createzelnodekey(const UniValue& params, bool fHelp)
                 "\nCreate a new zelnode private key\n"
 
                 "\nResult:\n"
-                "\"key\"    (string) Zelnode private key\n"
+                "\"key\"    (string) Fluxnode private key\n"
 
                 "\nExamples:\n" +
                 HelpExampleCli("createzelnodekey", "") + HelpExampleRpc("createzelnodekey", ""));
@@ -291,7 +291,7 @@ UniValue getzelnodeoutputs(const UniValue& params, bool fHelp)
                 HelpExampleCli("getzelnodeoutputs", "") + HelpExampleRpc("getzelnodeoutputs", ""));
 
     // Find possible candidates
-    vector<std::pair<COutput, CAmount>> possibleCoins = activeZelnode.SelectCoinsZelnode();
+    vector<std::pair<COutput, CAmount>> possibleCoins = activeFluxnode.SelectCoinsFluxnode();
 
     UniValue ret(UniValue::VARR);
     for (auto& pair : possibleCoins) {
@@ -320,15 +320,15 @@ UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("createconfirmationtransaction", "") + HelpExampleRpc("createconfirmationtransaction", ""));
 
-    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
     std::string errorMessage;
     CMutableTransaction mutTx;
     mutTx.nVersion = ZELNODE_TX_VERSION;
 
-    activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::UPDATE_CONFIRM);
+    activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::UPDATE_CONFIRM);
 
-    if (!activeZelnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
+    if (!activeFluxnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
         throw runtime_error(strprintf("Failed to sign new confirmation transaction: %s\n", errorMessage));
     }
 
@@ -347,7 +347,7 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
         strCommand = params[0].get_str();
 
 
-    if (IsZelnodeTransactionsActive()) {
+    if (IsFluxnodeTransactionsActive()) {
         if (fHelp || params.size() < 2 || params.size() > 3 ||
             (params.size() == 2 && (strCommand != "all")) ||
             (params.size() == 3 && strCommand != "alias"))
@@ -358,10 +358,10 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
                     "\nArguments:\n"
                     "1. set         (string, required) Specify which set of zelnode(s) to start.\n"
                     "2. lockwallet  (boolean, required) Lock wallet after completion.\n"
-                    "3. alias       (string) Zelnode alias. Required if using 'alias' as the set.\n"
+                    "3. alias       (string) Fluxnode alias. Required if using 'alias' as the set.\n"
 
                     "\nResult: (for 'local' set):\n"
-                    "\"status\"     (string) Zelnode status message\n"
+                    "\"status\"     (string) Fluxnode status message\n"
 
                     "\nResult: (for other sets):\n"
                     "{\n"
@@ -401,8 +401,8 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
 
         UniValue resultsObj(UniValue::VARR);
 
-        for (FluxnodeConfig::ZelnodeEntry zne : fluxnodeConfig.getEntries()) {
-            UniValue zelnodeEntry(UniValue::VOBJ);
+        for (FluxnodeConfig::FluxnodeEntry zne : fluxnodeConfig.getEntries()) {
+            UniValue fluxnodeEntry(UniValue::VOBJ);
 
             if (fAlias && zne.getAlias() == alias) {
                 found = true;
@@ -417,28 +417,28 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
             zne.castOutputIndex(index);
             COutPoint outpoint = COutPoint(uint256S(zne.getTxHash()), index);
 
-            zelnodeEntry.push_back(Pair("outpoint", outpoint.ToString()));
-            zelnodeEntry.push_back(Pair("alias", zne.getAlias()));
+            fluxnodeEntry.push_back(Pair("outpoint", outpoint.ToString()));
+            fluxnodeEntry.push_back(Pair("alias", zne.getAlias()));
 
             bool fChecked = false;
-            if (mempool.mapZelnodeTxMempool.count(outpoint)) {
-                zelnodeEntry.push_back(Pair("result", "failed"));
-                zelnodeEntry.push_back(Pair("reason", "Mempool already has a zelnode transaction using this outpoint"));
+            if (mempool.mapFluxnodeTxMempool.count(outpoint)) {
+                fluxnodeEntry.push_back(Pair("result", "failed"));
+                fluxnodeEntry.push_back(Pair("reason", "Mempool already has a zelnode transaction using this outpoint"));
             } else if (g_fluxnodeCache.InStartTracker(outpoint)) {
-                zelnodeEntry.push_back(Pair("result", "failed"));
-                zelnodeEntry.push_back(Pair("reason", "Zelnode already started, waiting to be confirmed"));
+                fluxnodeEntry.push_back(Pair("result", "failed"));
+                fluxnodeEntry.push_back(Pair("reason", "Fluxnode already started, waiting to be confirmed"));
             } else if (g_fluxnodeCache.InDoSTracker(outpoint)) {
-                zelnodeEntry.push_back(Pair("result", "failed"));
-                zelnodeEntry.push_back(Pair("reason", "Zelnode already started then not confirmed, in DoS tracker. Must wait until out of DoS tracker to start"));
+                fluxnodeEntry.push_back(Pair("result", "failed"));
+                fluxnodeEntry.push_back(Pair("reason", "Fluxnode already started then not confirmed, in DoS tracker. Must wait until out of DoS tracker to start"));
             } else if (g_fluxnodeCache.InConfirmTracker(outpoint)) {
-                zelnodeEntry.push_back(Pair("result", "failed"));
-                zelnodeEntry.push_back(Pair("reason", "Zelnode already confirmed and in zelnode list"));
+                fluxnodeEntry.push_back(Pair("result", "failed"));
+                fluxnodeEntry.push_back(Pair("reason", "Fluxnode already confirmed and in zelnode list"));
             } else {
                 fChecked = true;
             }
 
             if (!fChecked) {
-                resultsObj.push_back(zelnodeEntry);
+                resultsObj.push_back(fluxnodeEntry);
 
                 if (fAlias)
                     return resultsObj;
@@ -448,23 +448,23 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
 
             mutTransaction.nVersion = ZELNODE_TX_VERSION;
 
-            bool result = activeZelnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
+            bool result = activeFluxnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
 
-            zelnodeEntry.push_back(Pair("transaction_built", result ? "successful" : "failed"));
+            fluxnodeEntry.push_back(Pair("transaction_built", result ? "successful" : "failed"));
 
             if (result) {
                 CReserveKey reservekey(pwalletMain);
                 std::string errorMessage;
 
                 bool fSigned = false;
-                if (activeZelnode.SignDeterministicStartTx(mutTransaction, errorMessage)) {
+                if (activeFluxnode.SignDeterministicStartTx(mutTransaction, errorMessage)) {
                     CTransaction tx(mutTransaction);
                     fSigned = true;
 
                     CWalletTx walletTx(pwalletMain, tx);
                     CValidationState state;
                     bool fCommited = pwalletMain->CommitTransaction(walletTx, reservekey, &state);
-                    zelnodeEntry.push_back(Pair("transaction_commited", fCommited ? "successful" : "failed"));
+                    fluxnodeEntry.push_back(Pair("transaction_commited", fCommited ? "successful" : "failed"));
                     if (fCommited) {
                         successful++;
                     } else {
@@ -474,14 +474,14 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
                 } else {
                     failed++;
                 }
-                zelnodeEntry.push_back(Pair("transaction_signed", fSigned ? "successful" : "failed"));
-                zelnodeEntry.push_back(Pair("errorMessage", errorMessage));
+                fluxnodeEntry.push_back(Pair("transaction_signed", fSigned ? "successful" : "failed"));
+                fluxnodeEntry.push_back(Pair("errorMessage", errorMessage));
             } else {
                 failed++;
-                zelnodeEntry.push_back(Pair("errorMessage", errorMessage));
+                fluxnodeEntry.push_back(Pair("errorMessage", errorMessage));
             }
 
-            resultsObj.push_back(zelnodeEntry);
+            resultsObj.push_back(fluxnodeEntry);
 
             if (fAlias && found) {
                 break;
@@ -510,7 +510,7 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
 
 UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
 {
-    if (!IsZelnodeTransactionsActive()) {
+    if (!IsFluxnodeTransactionsActive()) {
         throw runtime_error("deterministic zelnodes transactions is not active yet");
     }
 
@@ -526,10 +526,10 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
                 "\nArguments:\n"
                 "1. set         (string, required) Specify which set of zelnode(s) to start.\n"
                 "2. lockwallet  (boolean, required) Lock wallet after completion.\n"
-                "3. alias       (string) Zelnode alias. Required if using 'alias' as the set.\n"
+                "3. alias       (string) Fluxnode alias. Required if using 'alias' as the set.\n"
 
                 "\nResult: (for 'local' set):\n"
-                "\"status\"     (string) Zelnode status message\n"
+                "\"status\"     (string) Fluxnode status message\n"
 
                 "\nResult: (for other sets):\n"
                 "{\n"
@@ -561,7 +561,7 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
     UniValue statusObj(UniValue::VOBJ);
     statusObj.push_back(Pair("alias", alias));
 
-    for (FluxnodeConfig::ZelnodeEntry zne : fluxnodeConfig.getEntries()) {
+    for (FluxnodeConfig::FluxnodeEntry zne : fluxnodeConfig.getEntries()) {
         if (zne.getAlias() == alias) {
             found = true;
             std::string errorMessage;
@@ -572,27 +572,27 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
             zne.castOutputIndex(index);
             UniValue returnObj(UniValue::VOBJ);
             COutPoint outpoint = COutPoint(uint256S(zne.getTxHash()), index);
-            if (mempool.mapZelnodeTxMempool.count(outpoint)) {
+            if (mempool.mapFluxnodeTxMempool.count(outpoint)) {
                 returnObj.push_back(Pair("result", "failed"));
                 returnObj.push_back(Pair("reason", "Mempool already has a zelnode transaction using this outpoint"));
                 return returnObj;
             } else if (g_fluxnodeCache.InStartTracker(outpoint)) {
                 returnObj.push_back(Pair("result", "failed"));
-                returnObj.push_back(Pair("reason", "Zelnode already started, waiting to be confirmed"));
+                returnObj.push_back(Pair("reason", "Fluxnode already started, waiting to be confirmed"));
                 return returnObj;
             } else if (g_fluxnodeCache.InDoSTracker(outpoint)) {
                 returnObj.push_back(Pair("result", "failed"));
-                returnObj.push_back(Pair("reason", "Zelnode already started then not confirmed, in DoS tracker. Must wait until out of DoS tracker to start"));
+                returnObj.push_back(Pair("reason", "Fluxnode already started then not confirmed, in DoS tracker. Must wait until out of DoS tracker to start"));
                 return returnObj;
             } else if (g_fluxnodeCache.InConfirmTracker(outpoint)) {
                 returnObj.push_back(Pair("result", "failed"));
-                returnObj.push_back(Pair("reason", "Zelnode already confirmed and in zelnode list"));
+                returnObj.push_back(Pair("reason", "Fluxnode already confirmed and in zelnode list"));
                 return returnObj;
             }
 
             mutTransaction.nVersion = ZELNODE_TX_VERSION;
 
-            bool result = activeZelnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
+            bool result = activeFluxnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
 
             statusObj.push_back(Pair("result", result ? "successful" : "failed"));
 
@@ -600,7 +600,7 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
                 CReserveKey reservekey(pwalletMain);
                 std::string errorMessage;
 
-                if (activeZelnode.SignDeterministicStartTx(mutTransaction, errorMessage)) {
+                if (activeFluxnode.SignDeterministicStartTx(mutTransaction, errorMessage)) {
                     CTransaction tx(mutTransaction);
 
                     CWalletTx walletTx(pwalletMain, tx);
@@ -639,7 +639,7 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
 
 void GetDeterministicListData(UniValue& listData, const std::string& strFilter, const Tier tier) {
     int count = 0;
-    for (const auto& item : g_fluxnodeCache.mapZelnodeList.at(tier).listConfirmedZelnodes) {
+    for (const auto& item : g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes) {
 
         auto data = g_fluxnodeCache.GetFluxnodeData(item.out);
 
@@ -717,8 +717,8 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
                 "    \"last_confirmed_height\": \"height\"    (string) Last block height when zelnode was confirmed\n"
                 "    \"last_paid_height\": \"height\"         (string) Last block height when zelnode was paid\n"
                 "    \"tier\": \"type\",                      (string) Tier (CUMULUS/NIMBUS/STRATUS)\n"
-                "    \"payment_address\": \"addr\",           (string) Zelnode ZEL address\n"
-                "    \"pubkey\": \"key\",                     (string) Zelnode public key used for message broadcasting\n"
+                "    \"payment_address\": \"addr\",           (string) Fluxnode ZEL address\n"
+                "    \"pubkey\": \"key\",                     (string) Fluxnode public key used for message broadcasting\n"
                 "    \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
                 "    \"lastpaid\": ttt,                       (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode was last paid\n"
                 "    \"rank\": n                              (numberic) rank\n"
@@ -776,7 +776,7 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getdoslist", "") + HelpExampleRpc("getdoslist", ""));
 
-    if (IsDZelnodeActive()) {
+    if (IsDFluxnodeActive()) {
         UniValue wholelist(UniValue::VARR);
 
         std::map<int, std::vector<UniValue>> mapOrderedDosList;
@@ -847,7 +847,7 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getstartlist", "") + HelpExampleRpc("getstartlist", ""));
 
-    if (IsDZelnodeActive()) {
+    if (IsDFluxnodeActive()) {
         UniValue wholelist(UniValue::VARR);
 
         std::map<int, std::vector<UniValue>> mapOrderedStartList;
@@ -907,11 +907,11 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
 
                 "\nResult:\n"
                 "{\n"
-                "  \"status\": \"xxxx\",                    (string) Zelnode status\n"
+                "  \"status\": \"xxxx\",                    (string) Fluxnode status\n"
                 "  \"collateral\": n,                       (string) Collateral transaction\n"
                 "  \"txhash\": \"xxxx\",                    (string) Collateral transaction hash\n"
                 "  \"outidx\": n,                           (numeric) Collateral transaction output index number\n"
-                "  \"ip\": \"xxxx\",                        (string) Zelnode network address\n"
+                "  \"ip\": \"xxxx\",                        (string) Fluxnode network address\n"
                 "  \"network\": \"network\",                (string) Network type (IPv4, IPv6, onion)\n"
                 "  \"added_height\": \"height\",            (string) Block height when zelnode was added\n"
                 "  \"confirmed_height\": \"height\",        (string) Block height when zelnode was confirmed\n"
@@ -919,7 +919,7 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
                 "  \"last_paid_height\": \"height\",        (string) Last block height when zelnode was paid\n"
                 "  \"tier\": \"type\",                      (string) Tier (CUMULUS/NIMBUS/STRATUS)\n"
                 "  \"payment_address\": \"xxxx\",           (string) ZEL address for zelnode payments\n"
-                "  \"pubkey\": \"key\",                     (string) Zelnode public key used for message broadcasting\n"
+                "  \"pubkey\": \"key\",                     (string) Fluxnode public key used for message broadcasting\n"
                 "  \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
                 "  \"lastpaid\": ttt,                       (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode was last paid\n"
                 "}\n"
@@ -927,24 +927,24 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getzelnodestatus", "") + HelpExampleRpc("getzelnodestatus", ""));
 
-    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
-    if (IsDZelnodeActive()) {
+    if (IsDFluxnodeActive()) {
         int nLocation = ZELNODE_TX_ERROR;
-        auto data = g_fluxnodeCache.GetFluxnodeData(activeZelnode.deterministicOutPoint, &nLocation);
+        auto data = g_fluxnodeCache.GetFluxnodeData(activeFluxnode.deterministicOutPoint, &nLocation);
 
         UniValue info(UniValue::VOBJ);
 
         if (data.IsNull()) {
             info.push_back(std::make_pair("status", "expired"));
-            info.push_back(std::make_pair("collateral", activeZelnode.deterministicOutPoint.ToFullString()));
+            info.push_back(std::make_pair("collateral", activeFluxnode.deterministicOutPoint.ToFullString()));
         } else {
             std::string strTxHash = data.collateralIn.GetTxHash();
             std::string strHost = data.ip;
             CNetAddr node = CNetAddr(strHost, false);
             std::string strNetwork = GetNetworkName(node.GetNetwork());
 
-            info.push_back(std::make_pair("status", ZelnodeLocationToString(nLocation)));
+            info.push_back(std::make_pair("status", FluxnodeLocationToString(nLocation)));
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             info.push_back(std::make_pair("txhash", strTxHash));
             info.push_back(std::make_pair("outidx", data.collateralIn.GetTxIndex()));
@@ -997,7 +997,7 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("zelnodecurrentwinner", "") + HelpExampleRpc("zelnodecurrentwinner", ""));
 
-    if (IsDZelnodeActive()) {
+    if (IsDFluxnodeActive()) {
         UniValue ret(UniValue::VOBJ);
 
         for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
@@ -1037,7 +1037,7 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
                 "  \"total\": n,        (numeric) Total zelnodes\n"
                 "  \"stable\": n,       (numeric) Stable count\n"
                 "  \"enabled\": n,      (numeric) Enabled zelnodes\n"
-                "  \"inqueue\": n       (numeric) Zelnodes in queue\n"
+                "  \"inqueue\": n       (numeric) Fluxnodes in queue\n"
                 "}\n"
 
                 "\nExamples:\n" +
@@ -1045,7 +1045,7 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
 
     UniValue obj(UniValue::VOBJ);
 
-    if (IsDZelnodeActive())
+    if (IsDFluxnodeActive())
     {
         int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0;
         std::vector<int> vNodeCount(GetNumberOfTiers());
@@ -1106,7 +1106,7 @@ UniValue getmigrationcount (const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getmigrationcount", "") + HelpExampleRpc("getmigrationcount", ""));
 
-    if (IsDZelnodeActive())
+    if (IsDFluxnodeActive())
     {
         int nTotalOld = 0;
         int nTotalNew = 0;
@@ -1176,7 +1176,7 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
                 "    \"outputIndex\": n,                        (numeric) transaction output index\n"
                 "    \"privateKey\": \"xxxx\",                  (string) zelnode private key\n"
                 "    \"address\": \"xxxx\",                     (string) zelnode IP address\n"
-                "    \"ip\": \"xxxx\",                          (string) Zelnode network address\n"
+                "    \"ip\": \"xxxx\",                          (string) Fluxnode network address\n"
                 "    \"network\": \"network\",                  (string) Network type (IPv4, IPv6, onion)\n"
                 "    \"added_height\": \"height\",              (string) Block height when zelnode was added\n"
                 "    \"confirmed_height\": \"height\",          (string) Block height when zelnode was confirmed\n"
@@ -1193,13 +1193,13 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("listzelnodeconf", "") + HelpExampleRpc("listzelnodeconf", ""));
 
-    std::vector<FluxnodeConfig::ZelnodeEntry> zelnodeEntries;
+    std::vector<FluxnodeConfig::FluxnodeEntry> zelnodeEntries;
     zelnodeEntries = fluxnodeConfig.getEntries();
 
     UniValue ret(UniValue::VARR);
 
-    for (FluxnodeConfig::ZelnodeEntry zelnode : zelnodeEntries) {
-        if (IsDZelnodeActive()) {
+    for (FluxnodeConfig::FluxnodeEntry zelnode : zelnodeEntries) {
+        if (IsDFluxnodeActive()) {
             int nIndex;
             if (!zelnode.castOutputIndex(nIndex))
                 continue;
@@ -1210,7 +1210,7 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
 
             UniValue info(UniValue::VOBJ);
             info.push_back(Pair("alias", zelnode.getAlias()));
-            info.push_back(Pair("status", ZelnodeLocationToString(nLocation)));
+            info.push_back(Pair("status", FluxnodeLocationToString(nLocation)));
             info.push_back(Pair("collateral", out.ToFullString()));
             info.push_back(Pair("txHash", zelnode.getTxHash()));
             info.push_back(Pair("outputIndex", zelnode.getOutputIndex()));
@@ -1263,7 +1263,7 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
 
 UniValue getbenchmarks(const UniValue& params, bool fHelp)
 {
-    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -1278,7 +1278,7 @@ UniValue getbenchmarks(const UniValue& params, bool fHelp)
 
 UniValue getbenchstatus(const UniValue& params, bool fHelp)
 {
-    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -1294,7 +1294,7 @@ UniValue getbenchstatus(const UniValue& params, bool fHelp)
 
 UniValue stopzelbenchd(const UniValue& params, bool fHelp)
 {
-    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -1314,7 +1314,7 @@ UniValue stopzelbenchd(const UniValue& params, bool fHelp)
 
 UniValue startzelbenchd(const UniValue& params, bool fHelp)
 {
-    if (!fZelnode) throw runtime_error("This is not a Flux Node");
+    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -1369,7 +1369,7 @@ static const CRPCCommand commands[] =
         };
 
 
-void RegisterZelnodeRPCCommands(CRPCTable &tableRPC)
+void RegisterFluxnodeRPCCommands(CRPCTable &tableRPC)
 {
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
         tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);

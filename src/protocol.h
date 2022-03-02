@@ -144,7 +144,7 @@ public:
     friend bool operator<(const CInv& a, const CInv& b);
 
     bool IsKnownType() const;
-    bool IsZelnodeType() const;
+    bool IsFluxnodeType() const;
     const char* GetCommand() const;
     std::string ToString() const;
 

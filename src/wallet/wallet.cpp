@@ -3675,7 +3675,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, boost::optional<CReserveKey&>
 
             // Add tx to wallet, because if it has change it's also ours,
             // otherwise just for transaction history.
-            if (!wtxNew.IsZelnodeTx())
+            if (!wtxNew.IsFluxnodeTx())
                 AddToWallet(wtxNew, false, pwalletdb);
 
             // Notify that old coins are spent
@@ -4818,7 +4818,7 @@ SpendingKeyAddResult AddSpendingKeyToWallet::operator()(const libzelcash::Invali
     throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid spending key");
 }
 
-bool CWallet::GetZelnodeVinAndKeys(CTxIn& txinRet, CPubKey& pubKeyRet, CKey& keyRet, std::string strTxHash, std::string strOutputIndex)
+bool CWallet::GetFluxnodeVinAndKeys(CTxIn& txinRet, CPubKey& pubKeyRet, CKey& keyRet, std::string strTxHash, std::string strOutputIndex)
 {
     // wait for reindex and/or import to finish
     if (fImporting || fReindex) return false;
@@ -4827,7 +4827,7 @@ bool CWallet::GetZelnodeVinAndKeys(CTxIn& txinRet, CPubKey& pubKeyRet, CKey& key
     std::vector<COutput> vPossibleCoins;
     AvailableCoins(vPossibleCoins, true, NULL, false, false,ALL_ZELNODE);
     if (vPossibleCoins.empty()) {
-        LogPrintf("CWallet::GetZelnodeVinAndKeys -- Could not locate any valid zelnode vin\n");
+        LogPrintf("CWallet::GetFluxnodeVinAndKeys -- Could not locate any valid zelnode vin\n");
         return false;
     }
 
@@ -4849,7 +4849,7 @@ bool CWallet::GetZelnodeVinAndKeys(CTxIn& txinRet, CPubKey& pubKeyRet, CKey& key
                     if (out.tx->GetHash() == txHash && out.i == nOutputIndex) // found it!
                         return GetVinAndKeysFromOutput(out, txinRet, pubKeyRet, keyRet);
 
-    LogPrintf("CWallet::GetZelnodeVinAndKeys -- Could not locate specified zelnode vin\n");
+    LogPrintf("CWallet::GetFluxnodeVinAndKeys -- Could not locate specified zelnode vin\n");
     return false;
 }
 

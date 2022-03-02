@@ -554,7 +554,7 @@ CAmount CCoinsViewCache::GetValueIn(const CTransaction& tx) const
     if (tx.IsCoinBase())
         return 0;
 
-    if (tx.IsZelnodeTx())
+    if (tx.IsFluxnodeTx())
         return 0;
 
     CAmount nResult = 0;
@@ -624,9 +624,9 @@ bool CCoinsViewCache::HaveInputs(const CTransaction& tx) const
     return true;
 }
 
-bool CCoinsViewCache::CheckZelnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier, CAmount& nCollateralAmount) const
+bool CCoinsViewCache::CheckFluxnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier, CAmount& nCollateralAmount) const
 {
-    if (!tx.IsZelnodeTx()) {
+    if (!tx.IsFluxnodeTx()) {
         return false;
     }
 

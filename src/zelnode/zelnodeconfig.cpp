@@ -16,8 +16,8 @@ FluxnodeConfig fluxnodeConfig;
 
 void FluxnodeConfig::add(std::string alias, std::string ip, std::string privKey, std::string txHash, std::string outputIndex)
 {
-    ZelnodeEntry zelnodeEntry(alias, ip, privKey, txHash, outputIndex);
-    entries.push_back(zelnodeEntry);
+    FluxnodeEntry fluxnodeEntry(alias, ip, privKey, txHash, outputIndex);
+    entries.push_back(fluxnodeEntry);
 }
 
 bool FluxnodeConfig::read(std::string& strErr)
@@ -29,7 +29,7 @@ bool FluxnodeConfig::read(std::string& strErr)
     if (!streamConfig.good()) {
         FILE* configFile = fopen(pathFluxnodeConfigFile.string().c_str(), "a");
         if (configFile != NULL) {
-            std::string strHeader = "# Zelnode config file\n"
+            std::string strHeader = "# Fluxnode config file\n"
                                     "# Format: alias IP:port zelnodeprivkey collateral_output_txid collateral_output_index\n"
                                     "# Example: zn1 127.0.0.2:16125 93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg 2bcd3c84c84f87eaa86e4e56834c92927a07f9e18718810b92e0d0324456a67c 0\n";
             fwrite(strHeader.c_str(), std::strlen(strHeader.c_str()), 1, configFile);
@@ -96,7 +96,7 @@ bool FluxnodeConfig::read(std::string& strErr)
     return true;
 }
 
-bool FluxnodeConfig::ZelnodeEntry::castOutputIndex(int &n)
+bool FluxnodeConfig::FluxnodeEntry::castOutputIndex(int &n)
 {
     try {
         n = std::stoi(outputIndex);

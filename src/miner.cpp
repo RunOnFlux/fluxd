@@ -221,7 +221,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                 dPriority += (double)nValueIn * nConf;
             }
 
-            if (tx.IsZelnodeTx()) {
+            if (tx.IsFluxnodeTx()) {
                 const CCoins* coins = view.AccessCoins(tx.collateralOut.hash);
                 if (!coins) {
                     LogPrintf("Remove zelnode transaction because its collateral is not found. %s\n", tx.GetHash().GetHex());
@@ -241,7 +241,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                         continue;
                     }
 
-                    if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
+                    if (tx.nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM) {
                          if (nNeedLocation != ZELNODE_TX_STARTED) {
                              LogPrintf("Remove zelnode transaction because its not started %s\n", tx.GetHash().GetHex());
                              std::list<CTransaction> removed;
@@ -250,7 +250,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                          }
                     }
 
-                    if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
+                    if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
                         {
                             LOCK(g_fluxnodeCache.cs);
                             if (!g_fluxnodeCache.CheckConfirmationHeights(nHeight, tx.collateralOut, tx.ip)) {
@@ -281,7 +281,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
             CFeeRate feeRate(nTotalIn-tx.GetValueOut(), nTxSize);
 
-            if (tx.IsZelnodeTx()) {
+            if (tx.IsFluxnodeTx()) {
                 feeRate = CFeeRate (1 * CENT, nTxSize);
             }
 
@@ -366,10 +366,10 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             if (!view.HaveInputs(tx))
                 continue;
 
-            if (tx.IsZelnodeTx()) {
+            if (tx.IsFluxnodeTx()) {
                 int nTier;
                 CAmount nCollateralAmount;
-                if (!view.CheckZelnodeTxInput(tx, pindexPrev->nHeight + 1, nTier, nCollateralAmount))
+                if (!view.CheckFluxnodeTxInput(tx, pindexPrev->nHeight + 1, nTier, nCollateralAmount))
                     continue;
             }
 
@@ -467,8 +467,8 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         // Set to 0 so expiry height does not apply to coinbase txs
         txNew.nExpiryHeight = 0;
 
-        //Zelnode payments
-        if (pindexPrev->nHeight + 1 >= chainparams.StartZelnodePayments()) {
+        //Fluxnode payments
+        if (pindexPrev->nHeight + 1 >= chainparams.StartFluxnodePayments()) {
             FillBlockPayeeWithDeterministicPayouts(txNew, nFees, zelnodePayouts);
         }
 

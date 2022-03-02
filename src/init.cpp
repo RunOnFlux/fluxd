@@ -1503,7 +1503,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete pblocktree;
                 delete pFluxnodeDB;
 
-                /** Zelnode Database */
+                /** Fluxnode Database */
                 pFluxnodeDB = new CDeterministicFluxnodeDB(0, false, fReindex);
 
                 pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
@@ -1519,7 +1519,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 }
 
                 uiInterface.InitMessage(_("Init zelnodecache"));
-                g_fluxnodeCache.InitMapZelnodeList();
+                g_fluxnodeCache.InitMapFluxnodeList();
 
                 uiInterface.InitMessage(_("Init Tier Amounts Vectors"));
                 InitializeCoinTierAmounts();
@@ -1875,29 +1875,29 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             MilliSleep(10);
     }
 
-    fZelnode = GetBoolArg("-zelnode", false);
+    fFluxnode = GetBoolArg("-zelnode", false);
 
-    if ((fZelnode || fluxnodeConfig.getCount() > -1) && fTxIndex == false) {
-        return InitError("Enabling Zelnode support requires turning on transaction indexing."
+    if ((fFluxnode || fluxnodeConfig.getCount() > -1) && fTxIndex == false) {
+        return InitError("Enabling Fluxnode support requires turning on transaction indexing."
                          "Please add txindex=1 to your configuration and start with -reindex");
     }
 
     #if !defined(__linux)
-        if (fZelnode) {
-            return InitError("Zelnode can be run only on Linux");
+        if (fFluxnode) {
+            return InitError("Fluxnode can be run only on Linux");
         }
     #endif
 
-    if (fZelnode) {
+    if (fFluxnode) {
         LogPrintf("IS FLUXNODE\n");
-        strZelnodeAddr = GetArg("-zelnodeaddr", "");
+        strFluxnodeAddr = GetArg("-zelnodeaddr", "");
 
-        LogPrintf(" addr %s\n", strZelnodeAddr.c_str());
+        LogPrintf(" addr %s\n", strFluxnodeAddr.c_str());
 
-        if (!strZelnodeAddr.empty()) {
-            CService addrTest = CService(strZelnodeAddr);
+        if (!strFluxnodeAddr.empty()) {
+            CService addrTest = CService(strFluxnodeAddr);
             if (!addrTest.IsValid()) {
-                return InitError("Invalid -zelnodeaddr address: " + strZelnodeAddr);
+                return InitError("Invalid -zelnodeaddr address: " + strFluxnodeAddr);
             }
         }
 
@@ -1911,20 +1911,20 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             return InitError(_("Invalid zelnode outpoint data. assign zelnodeoutpoint and zelnodeindex."));
         }
 
-        activeZelnode.deterministicOutPoint = fluxnodeOutPoint;
+        activeFluxnode.deterministicOutPoint = fluxnodeOutPoint;
 
-        strZelnodePrivKey = GetArg("-zelnodeprivkey", "");
-        if (!strZelnodePrivKey.empty()) {
+        strFluxnodePrivKey = GetArg("-zelnodeprivkey", "");
+        if (!strFluxnodePrivKey.empty()) {
             std::string errorMessage;
 
             CKey key;
             CPubKey pubkey;
 
-            if (!obfuScationSigner.SetKey(strZelnodePrivKey, errorMessage, key, pubkey)) {
+            if (!obfuScationSigner.SetKey(strFluxnodePrivKey, errorMessage, key, pubkey)) {
                 return InitError(_("Invalid zelnodeprivkey. Please see documenation."));
             }
 
-            activeZelnode.pubKeyZelnode = pubkey;
+            activeFluxnode.pubKeyFluxnode = pubkey;
 
         } else {
             return InitError(_("You must specify a zelnodeprivkey in the configuration. Please see documentation for help."));
@@ -1935,7 +1935,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         LOCK(pwalletMain->cs_wallet);
         LogPrintf("Locking Fluxnodes:\n");
         uint256 znTxHash;
-        for (FluxnodeConfig::ZelnodeEntry zne : fluxnodeConfig.getEntries()) {
+        for (FluxnodeConfig::FluxnodeEntry zne : fluxnodeConfig.getEntries()) {
             LogPrintf("  %s %s\n", zne.getTxHash(), zne.getOutputIndex());
             znTxHash.SetHex(zne.getTxHash());
             COutPoint outpoint = COutPoint(znTxHash, (unsigned int) std::stoul(zne.getOutputIndex().c_str()));
@@ -1943,7 +1943,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
     }
 
-    if (fZelnode) {
+    if (fFluxnode) {
         
         strPath = GetSelfPath();
         LogPrintf("Path: %s\n",strPath);
@@ -1975,7 +1975,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         
     }
 
-    if (fZelnode) {
+    if (fFluxnode) {
         // Check if the benchmark application is running
         if (!IsZelBenchdRunning()) {
             StartZelBenchd();
