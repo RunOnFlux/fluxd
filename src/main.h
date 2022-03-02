@@ -257,7 +257,7 @@ bool GetTransaction(const uint256 &hash, CTransaction &tx, const Consensus::Para
 /** Find the best known block, and make it the tip of the block chain */
 bool ActivateBestChain(CValidationState& state, const CChainParams& chainparams, const CBlock* pblock = NULL);
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams);
-CAmount GetZelnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier);
+CAmount GetFluxnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier);
 CAmount GetExchangeFundAmount(int nHeight, const Consensus::Params& consensusParams);
 CAmount GetFoundationFundAmount(int nHeight, const Consensus::Params& consensusParams);
 bool IsSwapPoolInterval(const int64_t nHeight);

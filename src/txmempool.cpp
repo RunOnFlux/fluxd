@@ -298,9 +298,9 @@ void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction>& rem
             weightedTxTree->remove(tx.GetHash());
         }
 
-        if (origTx.IsZelnodeTx()) {
+        if (origTx.IsFluxnodeTx()) {
             LogPrint("zelnode", "%s: Remove zelnode tx from mempool %s\n", __func__, origTx.GetHash().GetHex());
-            mapZelnodeTxMempool.erase(origTx.collateralOut);
+            mapFluxnodeTxMempool.erase(origTx.collateralOut);
         }
     }
 }
@@ -447,9 +447,9 @@ void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx, unsigned i
 
         indexed_transaction_set::iterator i = mapTx.find(hash);
 
-        if (tx.IsZelnodeTx()) {
-            if (mapZelnodeTxMempool.count(tx.collateralOut)) {
-                i = mapTx.find(mapZelnodeTxMempool.at(tx.collateralOut));
+        if (tx.IsFluxnodeTx()) {
+            if (mapFluxnodeTxMempool.count(tx.collateralOut)) {
+                i = mapTx.find(mapFluxnodeTxMempool.at(tx.collateralOut));
 
                 if (i != mapTx.end()) {
                     entries.push_back(*i);
@@ -517,7 +517,7 @@ void CTxMemPool::clear()
     cachedInnerUsage = 0;
     ++nTransactionsUpdated;
 
-    mapZelnodeTxMempool.clear();
+    mapFluxnodeTxMempool.clear();
 }
 
 void CTxMemPool::check(const CCoinsViewCache *pcoins) const

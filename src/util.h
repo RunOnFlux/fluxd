@@ -33,9 +33,9 @@ static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS        = false;
 static const bool DEFAULT_LOGTIMESTAMPS = true;
 
-/** Zelnode features */
-extern bool fZelnode;
-extern std::string strZelnodeAddr;
+/** Fluxnode features */
+extern bool fFluxnode;
+extern std::string strFluxnodeAddr;
 
 
 /** Signals for translation. */

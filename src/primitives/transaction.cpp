@@ -290,7 +290,7 @@ CTransaction& CTransaction::operator=(const CTransaction &tx) {
     *const_cast<binding_sig_t*>(&bindingSig) = tx.bindingSig;
     *const_cast<uint256*>(&hash) = tx.hash;
 
-    // Zelnode tx data
+    // Fluxnode tx data
     *const_cast<int8_t*>(&nType) = tx.nType;
     *const_cast<COutPoint*>(&collateralOut) = tx.collateralOut;
     *const_cast<CPubKey*>(&collateralPubkey) = tx.collateralPubkey;

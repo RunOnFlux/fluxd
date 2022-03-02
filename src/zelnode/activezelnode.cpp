@@ -14,10 +14,10 @@
 #include "zelnode/benchmarks.h"
 
 
-void ActiveZelnode::ManageDeterministricZelnode()
+void ActiveFluxnode::ManageDeterministricFluxnode()
 {
     // We only want to run this command on the VPS that has zelnode=1 and is running zelbenchd
-    if (!fZelnode)
+    if (!fFluxnode)
         return;
 
     std::string errorMessage;
@@ -31,32 +31,32 @@ void ActiveZelnode::ManageDeterministricZelnode()
 
     // Check if zelnode is currently in the start list, if so we will be building the Initial Confirm Transaction
     // If the zelnode is already confirmed check to see if it needs to be re confirmed, if so, Create the Update Transaction
-    if (g_fluxnodeCache.InStartTracker(activeZelnode.deterministicOutPoint)) {
+    if (g_fluxnodeCache.InStartTracker(activeFluxnode.deterministicOutPoint)) {
         // Check if we currently have a tx with the same vin in our mempool
         // If we do, Resend the wallet transactions to our peers
-        if (mempool.mapZelnodeTxMempool.count(activeZelnode.deterministicOutPoint)) {
+        if (mempool.mapFluxnodeTxMempool.count(activeFluxnode.deterministicOutPoint)) {
             if (pwalletMain)
                 pwalletMain->ResendWalletTransactions(GetAdjustedTime());
-            LogPrintf("Zelnode found in start tracker. Skipping confirm transaction creation, because transaction already in mempool %s\n", activeZelnode.deterministicOutPoint.ToString());
+            LogPrintf("Fluxnode found in start tracker. Skipping confirm transaction creation, because transaction already in mempool %s\n", activeFluxnode.deterministicOutPoint.ToString());
             return;
         }
 
         // If we don't have one in our mempool. That means it is time to confirm the zelnode
         if (nHeight - nLastTriedToConfirm > 3) { // Only try this every couple blocks
-            activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::INITIAL_CONFIRM);
-            LogPrintf("Zelnode found in start tracker. Creating Initial Confirm Transactions %s\n", activeZelnode.deterministicOutPoint.ToString());
+            activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::INITIAL_CONFIRM);
+            LogPrintf("Fluxnode found in start tracker. Creating Initial Confirm Transactions %s\n", activeFluxnode.deterministicOutPoint.ToString());
         } else {
             return;
         }
-    } else if (g_fluxnodeCache.CheckIfNeedsNextConfirm(activeZelnode.deterministicOutPoint, nHeight)) {
-        activeZelnode.BuildDeterministicConfirmTx(mutTx, ZelnodeUpdateType::UPDATE_CONFIRM);
-        LogPrintf("Time to Confirm Zelnode reached, Creating Update Confirm Transaction on height: %s for outpoint: %s\n", nHeight, activeZelnode.deterministicOutPoint.ToString());
+    } else if (g_fluxnodeCache.CheckIfNeedsNextConfirm(activeFluxnode.deterministicOutPoint, nHeight)) {
+        activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::UPDATE_CONFIRM);
+        LogPrintf("Time to Confirm Fluxnode reached, Creating Update Confirm Transaction on height: %s for outpoint: %s\n", nHeight, activeFluxnode.deterministicOutPoint.ToString());
     } else {
-        LogPrintf("Zelnode found nothing to do on height: %s for outpoint: %s\n", nHeight, activeZelnode.deterministicOutPoint.ToString());
+        LogPrintf("Fluxnode found nothing to do on height: %s for outpoint: %s\n", nHeight, activeFluxnode.deterministicOutPoint.ToString());
         return;
     }
 
-    if (activeZelnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
+    if (activeFluxnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
         CReserveKey reservekey(pwalletMain);
         CTransaction tx(mutTx);
         CTransaction signedTx;
@@ -65,22 +65,22 @@ void ActiveZelnode::ManageDeterministricZelnode()
             pwalletMain->CommitTransaction(walletTx, reservekey);
             nLastTriedToConfirm = nHeight;
         } else {
-            error("Failed to sign benchmarking for zelnode confirm transaction for outpoint %s, Error message: %s", activeZelnode.deterministicOutPoint.ToString(), errorMessage);
+            error("Failed to sign benchmarking for zelnode confirm transaction for outpoint %s, Error message: %s", activeFluxnode.deterministicOutPoint.ToString(), errorMessage);
             return;
         }
     } else {
-        error("Failed to sign zelnode for confirm transaction for outpoint %s, Error message: %s", activeZelnode.deterministicOutPoint.ToString(), errorMessage);
+        error("Failed to sign zelnode for confirm transaction for outpoint %s, Error message: %s", activeFluxnode.deterministicOutPoint.ToString(), errorMessage);
         return;
     }
 }
 
-bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey)
+bool ActiveFluxnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey)
 {
     std::string strErrorMessage;
     return GetZelNodeVin(vin, pubkey, secretKey, "", "", strErrorMessage);
 }
 
-bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage)
+bool ActiveFluxnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage)
 {
     // wait for reindex and/or import to finish
     if (fImporting || fReindex) return false;
@@ -89,7 +89,7 @@ bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, 
     TRY_LOCK(pwalletMain->cs_wallet, fWallet);
     if (!fWallet) return false;
 
-    vector<std::pair<COutput, CAmount>> possibleCoins = SelectCoinsZelnode();
+    vector<std::pair<COutput, CAmount>> possibleCoins = SelectCoinsFluxnode();
     COutput* selectedOutput;
 
     // Find the vin
@@ -130,7 +130,7 @@ bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, 
     }
 
     if (selectedOutput->nDepth < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC) {
-        errorMessage = strprintf("Zelnode hasn't met confirmation requirement (remaining confirmations required: %d)\n", ZELNODE_MIN_CONFIRMATION_DETERMINISTIC - selectedOutput->nDepth);
+        errorMessage = strprintf("Fluxnode hasn't met confirmation requirement (remaining confirmations required: %d)\n", ZELNODE_MIN_CONFIRMATION_DETERMINISTIC - selectedOutput->nDepth);
         LogPrintf("%s - zelnode hasn't met confirmation requirement (remaining confirmations required: %d)\n", __func__, ZELNODE_MIN_CONFIRMATION_DETERMINISTIC - selectedOutput->nDepth);
         return false;
     }
@@ -139,8 +139,8 @@ bool ActiveZelnode::GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, 
     return GetVinFromOutput(*selectedOutput, vin, pubkey, secretKey);
 }
 
-// Extract Zelnode vin information from output
-bool ActiveZelnode::GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, CKey& secretKey)
+// Extract Fluxnode vin information from output
+bool ActiveFluxnode::GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, CKey& secretKey)
 {
     // wait for reindex and/or import to finish
     if (fImporting || fReindex) return false;
@@ -178,8 +178,8 @@ bool ActiveZelnode::GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, C
     return true;
 }
 
-// get all possible outputs for running Zelnode
-vector<std::pair<COutput, CAmount>> ActiveZelnode::SelectCoinsZelnode()
+// get all possible outputs for running Fluxnode
+vector<std::pair<COutput, CAmount>> ActiveFluxnode::SelectCoinsFluxnode()
 {
     vector<COutput> vCoins;
     vector<std::pair<COutput, CAmount>> filteredCoins;
@@ -188,11 +188,11 @@ vector<std::pair<COutput, CAmount>> ActiveZelnode::SelectCoinsZelnode()
     // Temporary unlock ZN coins from zelnode.conf
     if (GetBoolArg("-znconflock", true)) {
         uint256 znTxHash;
-        for (FluxnodeConfig::ZelnodeEntry zelnodeEntry : fluxnodeConfig.getEntries()) {
-            znTxHash.SetHex(zelnodeEntry.getTxHash());
+        for (FluxnodeConfig::FluxnodeEntry fluxnodeEntry : fluxnodeConfig.getEntries()) {
+            znTxHash.SetHex(fluxnodeEntry.getTxHash());
 
             int nIndex;
-            if(!zelnodeEntry.castOutputIndex(nIndex))
+            if(!fluxnodeEntry.castOutputIndex(nIndex))
                 continue;
 
             COutPoint outpoint = COutPoint(znTxHash, nIndex);
@@ -217,22 +217,22 @@ vector<std::pair<COutput, CAmount>> ActiveZelnode::SelectCoinsZelnode()
     }
 
     // Build list of valid amounts
-    set<CAmount> validZelnodeCollaterals;
+    set<CAmount> validFluxnodeCollaterals;
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
         set<CAmount> setTierAmounts = GetCoinAmountsByTier(nCurrentHeight, currentTier);
-        validZelnodeCollaterals.insert(setTierAmounts.begin(), setTierAmounts.end());
+        validFluxnodeCollaterals.insert(setTierAmounts.begin(), setTierAmounts.end());
     }
 
     // Filter
     for (const COutput& out : vCoins) {
-        if (validZelnodeCollaterals.count(out.tx->vout[out.i].nValue)) {
+        if (validFluxnodeCollaterals.count(out.tx->vout[out.i].nValue)) {
             filteredCoins.push_back(std::make_pair(out, out.tx->vout[out.i].nValue));
         }
     }
     return filteredCoins;
 }
 
-bool ActiveZelnode::SignDeterministicStartTx(CMutableTransaction& mutableTransaction, std::string& errorMessage)
+bool ActiveFluxnode::SignDeterministicStartTx(CMutableTransaction& mutableTransaction, std::string& errorMessage)
 {
     if (mutableTransaction.nType != ZELNODE_START_TX_TYPE) {
         errorMessage = "invalid-tx-type";
@@ -242,7 +242,7 @@ bool ActiveZelnode::SignDeterministicStartTx(CMutableTransaction& mutableTransac
     CTxIn txin;
     CPubKey pubKeyAddressNew;
     CKey keyAddressNew;
-    if (!pwalletMain->GetZelnodeVinAndKeys(txin, pubKeyAddressNew, keyAddressNew, mutableTransaction.collateralIn.hash.GetHex(), std::to_string(mutableTransaction.collateralIn.n))) {
+    if (!pwalletMain->GetFluxnodeVinAndKeys(txin, pubKeyAddressNew, keyAddressNew, mutableTransaction.collateralIn.hash.GetHex(), std::to_string(mutableTransaction.collateralIn.n))) {
         errorMessage = strprintf("Could not allocate txin %s:%s for zelnode %s", mutableTransaction.collateralIn.hash.GetHex(), std::to_string(mutableTransaction.collateralIn.n), mutableTransaction.ip);
         LogPrintf("zelnode","%s -- %s\n", __func__, errorMessage);
         return false;
@@ -258,10 +258,10 @@ bool ActiveZelnode::SignDeterministicStartTx(CMutableTransaction& mutableTransac
         std::string strMessage = mutableTransaction.GetHash().GetHex();
 
         if (!obfuScationSigner.SignMessage(strMessage, errorMessage, mutableTransaction.sig, keyAddressNew))
-            return error("%s - Error: Sign Zelnode for start transaction %s", __func__, errorMessage);
+            return error("%s - Error: Sign Fluxnode for start transaction %s", __func__, errorMessage);
 
         if (!obfuScationSigner.VerifyMessage(mutableTransaction.collateralPubkey, mutableTransaction.sig, strMessage, errorMessage))
-            return error("%s - Error: Verify Zelnode for start transaction: %s", __func__, errorMessage);
+            return error("%s - Error: Verify Fluxnode for start transaction: %s", __func__, errorMessage);
 
         return true;
     }
@@ -269,7 +269,7 @@ bool ActiveZelnode::SignDeterministicStartTx(CMutableTransaction& mutableTransac
     return false;
 }
 
-bool ActiveZelnode::SignDeterministicConfirmTx(CMutableTransaction& mutableTransaction, std::string& errorMessage)
+bool ActiveFluxnode::SignDeterministicConfirmTx(CMutableTransaction& mutableTransaction, std::string& errorMessage)
 {
     std::string strErrorRet;
 
@@ -291,29 +291,29 @@ bool ActiveZelnode::SignDeterministicConfirmTx(CMutableTransaction& mutableTrans
     std::string strMessage = mutableTransaction.collateralIn.ToString() + std::to_string(mutableTransaction.collateralIn.n) + std::to_string(mutableTransaction.nUpdateType) + std::to_string(mutableTransaction.sigTime);
 
     // send to all nodes
-    CPubKey pubKeyZelnode;
-    CKey keyZelnode;
+    CPubKey pubKeyFluxnode;
+    CKey keyFluxnode;
 
-    if (!obfuScationSigner.SetKey(strZelnodePrivKey, errorMessage, keyZelnode, pubKeyZelnode)) {
+    if (!obfuScationSigner.SetKey(strFluxnodePrivKey, errorMessage, keyFluxnode, pubKeyFluxnode)) {
         notCapableReason = "Error upon calling SetKey: " + errorMessage;
         errorMessage = "unable-set-key";
         return error("%s : %s", __func__, errorMessage);
     }
 
-    if (data.pubKey != pubKeyZelnode) {
+    if (data.pubKey != pubKeyFluxnode) {
         return error("%s - PubKey miss match", __func__);
     }
 
-    if (!obfuScationSigner.SignMessage(strMessage, errorMessage, mutableTransaction.sig, keyZelnode))
-        return error("%s - Error: Signing Zelnode %s", __func__, errorMessage);
+    if (!obfuScationSigner.SignMessage(strMessage, errorMessage, mutableTransaction.sig, keyFluxnode))
+        return error("%s - Error: Signing Fluxnode %s", __func__, errorMessage);
 
-    if (!obfuScationSigner.VerifyMessage(pubKeyZelnode, mutableTransaction.sig, strMessage, errorMessage))
-        return error("%s - Error: Verify Zelnode sig %s", __func__, errorMessage);
+    if (!obfuScationSigner.VerifyMessage(pubKeyFluxnode, mutableTransaction.sig, strMessage, errorMessage))
+        return error("%s - Error: Verify Fluxnode sig %s", __func__, errorMessage);
 
     return true;
 }
 
-bool ActiveZelnode::BuildDeterministicStartTx(std::string strKeyZelnode, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, CMutableTransaction& mutTransaction)
+bool ActiveFluxnode::BuildDeterministicStartTx(std::string strKeyFluxnode, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, CMutableTransaction& mutTransaction)
 {
     // wait for reindex and/or import to finish
     if (IsInitialBlockDownload(Params())) {
@@ -324,10 +324,10 @@ bool ActiveZelnode::BuildDeterministicStartTx(std::string strKeyZelnode, std::st
     CTxIn vin;
     CPubKey pubKeyCollateralAddress;
     CKey keyCollateralAddress;
-    CPubKey pubKeyZelnode;
-    CKey keyZelnode;
+    CPubKey pubKeyFluxnode;
+    CKey keyFluxnode;
 
-    if (!obfuScationSigner.SetKey(strKeyZelnode, errorMessage, keyZelnode, pubKeyZelnode)) {
+    if (!obfuScationSigner.SetKey(strKeyFluxnode, errorMessage, keyFluxnode, pubKeyFluxnode)) {
         errorMessage = strprintf("Can't find keys for zelnode - %s", errorMessage);
         LogPrintf("%s - %s\n", __func__, errorMessage);
         return false;
@@ -346,20 +346,20 @@ bool ActiveZelnode::BuildDeterministicStartTx(std::string strKeyZelnode, std::st
     if (mutTransaction.nType == ZELNODE_START_TX_TYPE) {
         mutTransaction.collateralIn = vin.prevout;
         mutTransaction.collateralPubkey = pubKeyCollateralAddress;
-        mutTransaction.pubKey = pubKeyZelnode;
+        mutTransaction.pubKey = pubKeyFluxnode;
     } else if (mutTransaction.nType == ZELNODE_CONFIRM_TX_TYPE) {
         mutTransaction.collateralIn = vin.prevout;
-        if (mutTransaction.nUpdateType != ZelnodeUpdateType::UPDATE_CONFIRM)
-            mutTransaction.nUpdateType = ZelnodeUpdateType::INITIAL_CONFIRM;
+        if (mutTransaction.nUpdateType != FluxnodeUpdateType::UPDATE_CONFIRM)
+            mutTransaction.nUpdateType = FluxnodeUpdateType::INITIAL_CONFIRM;
     }
 
     return true;
 }
 
-void ActiveZelnode::BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType)
+void ActiveFluxnode::BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType)
 {
     CKey keyCollateralAddress;
-    CKey keyZelnode;
+    CKey keyFluxnode;
 
     mutTransaction.nType = ZELNODE_CONFIRM_TX_TYPE;
     mutTransaction.collateralIn = deterministicOutPoint;

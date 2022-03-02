@@ -136,7 +136,7 @@ bool CInv::IsKnownType() const
     return (type >= 1 && type < (int)ARRAYLEN(ppszTypeName));
 }
 
-bool CInv::IsZelnodeType() const
+bool CInv::IsFluxnodeType() const
 {
     return (type >= 4);
 }

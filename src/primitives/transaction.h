@@ -584,7 +584,7 @@ public:
     const joinsplit_sig_t joinSplitSig = {{0}};
     const binding_sig_t bindingSig = {{0}};
 
-    // Zelnode Tx data
+    // Fluxnode Tx data
     const int8_t nType;
     const COutPoint collateralOut; // collateral out
     const CPubKey collateralPubkey;
@@ -692,12 +692,12 @@ public:
     template <typename Stream>
     CTransaction(deserialize_type, Stream& s) : CTransaction(CMutableTransaction(deserialize, s)) {}
 
-    bool IsZelnodeTx() const {
+    bool IsFluxnodeTx() const {
         return nVersion == ZELNODE_TX_VERSION;
     }
 
     bool IsNull() const {
-        return (vin.empty() && vout.empty() && !IsZelnodeTx()) || (IsZelnodeTx() && collateralOut.IsNull());
+        return (vin.empty() && vout.empty() && !IsFluxnodeTx()) || (IsFluxnodeTx() && collateralOut.IsNull());
     }
 
     std::string TypeToString() const {

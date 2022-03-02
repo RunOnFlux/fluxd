@@ -153,7 +153,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
     entry.push_back(Pair("txid", txid.GetHex()));
     entry.push_back(Pair("version", tx.nVersion));
 
-    if (tx.IsZelnodeTx()) {
+    if (tx.IsFluxnodeTx()) {
         entry.push_back(Pair("type", tx.TypeToString()));
         entry.push_back(Pair("collateral_output", tx.collateralOut.ToString()));
         entry.push_back(Pair("collateral", tx.collateralOut.ToFullString()));

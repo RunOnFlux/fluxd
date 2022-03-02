@@ -15,7 +15,7 @@ class CTxIn;
 class CObfuScationSigner;
 
 extern CObfuScationSigner obfuScationSigner;
-extern std::string strZelnodePrivKey;
+extern std::string strFluxnodePrivKey;
 
 bool GetTestingCollateralScript(std::string strAddress, CScript& script);
 
