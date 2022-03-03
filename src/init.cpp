@@ -1518,16 +1518,16 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                         CleanupBlockRevFiles();
                 }
 
-                uiInterface.InitMessage(_("Init zelnodecache"));
+                uiInterface.InitMessage(_("Init fluxnodecache"));
                 g_fluxnodeCache.InitMapFluxnodeList();
 
                 uiInterface.InitMessage(_("Init Tier Amounts Vectors"));
                 InitializeCoinTierAmounts();
 
-                uiInterface.InitMessage(_("Loading zelnodecache..."));
+                uiInterface.InitMessage(_("Loading fluxnodecache..."));
                 pFluxnodeDB->LoadFluxnodeCacheData();
 
-                uiInterface.InitMessage(_("Sorting zelnode lists"));
+                uiInterface.InitMessage(_("Sorting fluxnode lists"));
                 for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
                     g_fluxnodeCache.SortList(currentTier);
                 }
@@ -1875,7 +1875,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             MilliSleep(10);
     }
 
-    fFluxnode = GetBoolArg("-zelnode", false);
+    fFluxnode = GetBoolArg("-fluxnode", false);
 
     if ((fFluxnode || fluxnodeConfig.getCount() > -1) && fTxIndex == false) {
         return InitError("Enabling Fluxnode support requires turning on transaction indexing."
@@ -1890,30 +1890,30 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     if (fFluxnode) {
         LogPrintf("IS FLUXNODE\n");
-        strFluxnodeAddr = GetArg("-zelnodeaddr", "");
+        strFluxnodeAddr = GetArg("-fluxnodeaddr", "");
 
         LogPrintf(" addr %s\n", strFluxnodeAddr.c_str());
 
         if (!strFluxnodeAddr.empty()) {
             CService addrTest = CService(strFluxnodeAddr);
             if (!addrTest.IsValid()) {
-                return InitError("Invalid -zelnodeaddr address: " + strFluxnodeAddr);
+                return InitError("Invalid -fluxnodeaddr address: " + strFluxnodeAddr);
             }
         }
 
-        std::string strHash = GetArg("-zelnodeoutpoint", "");
+        std::string strHash = GetArg("-fluxnodeoutpoint", "");
         uint256 hash = uint256S(strHash);
-        int index = GetArg("-zelnodeindex", -1);
+        int index = GetArg("-fluxnodeindex", -1);
 
         fluxnodeOutPoint = COutPoint(hash, index);
 
         if (fluxnodeOutPoint.IsNull()) {
-            return InitError(_("Invalid zelnode outpoint data. assign zelnodeoutpoint and zelnodeindex."));
+            return InitError(_("Invalid fluxnode outpoint data. assign fluxnodeoutpoint and fluxnodeindex."));
         }
 
         activeFluxnode.deterministicOutPoint = fluxnodeOutPoint;
 
-        strFluxnodePrivKey = GetArg("-zelnodeprivkey", "");
+        strFluxnodePrivKey = GetArg("-fluxnodeprivkey", "");
         if (!strFluxnodePrivKey.empty()) {
             std::string errorMessage;
 
@@ -1921,13 +1921,13 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             CPubKey pubkey;
 
             if (!obfuScationSigner.SetKey(strFluxnodePrivKey, errorMessage, key, pubkey)) {
-                return InitError(_("Invalid zelnodeprivkey. Please see documenation."));
+                return InitError(_("Invalid fluxnodeprivkey. Please see documenation."));
             }
 
             activeFluxnode.pubKeyFluxnode = pubkey;
 
         } else {
-            return InitError(_("You must specify a zelnodeprivkey in the configuration. Please see documentation for help."));
+            return InitError(_("You must specify a fluxnodeprivkey in the configuration. Please see documentation for help."));
         }
     }
 

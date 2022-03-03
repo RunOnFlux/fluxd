@@ -108,7 +108,7 @@ void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, 
     }
 }
 
-CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, std::map<int, std::pair<CScript, CAmount>>* zelnodePayouts)
+CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, std::map<int, std::pair<CScript, CAmount>>* fluxnodePayouts)
 {
     // Create new block
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
@@ -224,26 +224,26 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             if (tx.IsFluxnodeTx()) {
                 const CCoins* coins = view.AccessCoins(tx.collateralOut.hash);
                 if (!coins) {
-                    LogPrintf("Remove zelnode transaction because its collateral is not found. %s\n", tx.GetHash().GetHex());
+                    LogPrintf("Remove fluxnode transaction because its collateral is not found. %s\n", tx.GetHash().GetHex());
                     std::list<CTransaction> removed;
                     mempool.remove(tx, removed, false);
                     continue;
                 }
 
-                if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
+                if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
                     int nNeedLocation = 0;
                     auto data = g_fluxnodeCache.GetFluxnodeData(tx.collateralOut, &nNeedLocation);
 
                     if (data.IsNull()) {
-                        LogPrintf("Remove zelnode transaction because its confirm isn't ready. %s\n", tx.GetHash().GetHex());
+                        LogPrintf("Remove fluxnode transaction because its confirm isn't ready. %s\n", tx.GetHash().GetHex());
                         std::list<CTransaction> removed;
                         mempool.remove(tx, removed, false);
                         continue;
                     }
 
                     if (tx.nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM) {
-                         if (nNeedLocation != ZELNODE_TX_STARTED) {
-                             LogPrintf("Remove zelnode transaction because its not started %s\n", tx.GetHash().GetHex());
+                         if (nNeedLocation != FLUXNODE_TX_STARTED) {
+                             LogPrintf("Remove fluxnode transaction because its not started %s\n", tx.GetHash().GetHex());
                              std::list<CTransaction> removed;
                              mempool.remove(tx, removed, false);
                              continue;
@@ -254,7 +254,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                         {
                             LOCK(g_fluxnodeCache.cs);
                             if (!g_fluxnodeCache.CheckConfirmationHeights(nHeight, tx.collateralOut, tx.ip)) {
-                                LogPrintf("Remove zelnode transaction if failed CheckConfirmationHeights %s\n", tx.GetHash().GetHex());
+                                LogPrintf("Remove fluxnode transaction if failed CheckConfirmationHeights %s\n", tx.GetHash().GetHex());
                                 std::list<CTransaction> removed;
                                 mempool.remove(tx, removed, false);
                                 continue;
@@ -469,7 +469,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
         //Fluxnode payments
         if (pindexPrev->nHeight + 1 >= chainparams.StartFluxnodePayments()) {
-            FillBlockPayeeWithDeterministicPayouts(txNew, nFees, zelnodePayouts);
+            FillBlockPayeeWithDeterministicPayouts(txNew, nFees, fluxnodePayouts);
         }
 
         // Exchange Fund

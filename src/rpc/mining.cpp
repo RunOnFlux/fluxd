@@ -597,7 +597,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     static int64_t nStart;
     static CBlockTemplate* pblocktemplate;
 
-    // Create map to hold zelnodepayouts
+    // Create map to hold fluxnodepayouts
     static std::map<int, std::pair<CScript, CAmount>> mapFluxnodePayouts;
 
     if (pindexPrev != chainActive.Tip() ||
@@ -745,8 +745,8 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         CTxDestination dest;
         ExtractDestination(payout.second.first, dest);
 
-        result.push_back(Pair(std::string(start + "_zelnode_address"), EncodeDestination(dest)));
-        result.push_back(Pair(std::string(start + "_zelnode_payout"), payout.second.second));
+        result.push_back(Pair(std::string(start + "_fluxnode_address"), EncodeDestination(dest)));
+        result.push_back(Pair(std::string(start + "_fluxnode_payout"), payout.second.second));
 
         result.push_back(Pair(std::string(start_rename + "_fluxnode_address"), EncodeDestination(dest)));
         result.push_back(Pair(std::string(start_rename + "_fluxnode_payout"), payout.second.second));

@@ -154,13 +154,13 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
 
                     int64_t nLoop2 = GetTimeMicros(); nLoopFetchTx += nLoop2 - nLoop1;
 
-                    if (tx.nType == ZELNODE_START_TX_TYPE) {
+                    if (tx.nType == FLUXNODE_START_TX_TYPE) {
 
                         // Add new Fluxnode Start Tx into local cache
                         fluxnodeCache.AddNewStart(tx, rescanIndex->nHeight, nTier, get_tx.vout[tx.collateralOut.n].nValue);
                         int64_t nLoop3 = GetTimeMicros(); nAddStart += nLoop3 - nLoop2;
 
-                    } else if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
+                    } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
                         if (tx.nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM) {
 
                             fluxnodeCache.AddNewConfirm(tx, rescanIndex->nHeight);
@@ -205,7 +205,7 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
                 fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight.size() ||
                 fluxnodeTxBlockUndo.mapLastPaidHeights.size()) {
                 if (!pFluxnodeDB->WriteBlockUndoFluxnodeData(block.GetHash(), fluxnodeTxBlockUndo))
-                    return error("Failed to write zelnodetx undo data");
+                    return error("Failed to write fluxnodetx undo data");
             }
 
             int64_t nTime5 = GetTimeMicros(); nTimeWriteUndo += nTime5 - nTime4;
@@ -324,7 +324,7 @@ UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
 
     std::string errorMessage;
     CMutableTransaction mutTx;
-    mutTx.nVersion = ZELNODE_TX_VERSION;
+    mutTx.nVersion = FLUXNODE_TX_VERSION;
 
     activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::UPDATE_CONFIRM);
 
@@ -446,7 +446,7 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
                     continue;
             }
 
-            mutTransaction.nVersion = ZELNODE_TX_VERSION;
+            mutTransaction.nVersion = FLUXNODE_TX_VERSION;
 
             bool result = activeFluxnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
 
@@ -500,7 +500,7 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
             pwalletMain->Lock();
 
         UniValue returnObj(UniValue::VOBJ);
-        returnObj.push_back(Pair("overall", strprintf("Successfully started %d zelnodes, failed to start %d, total %d", successful, failed, successful + failed)));
+        returnObj.push_back(Pair("overall", strprintf("Successfully started %d fluxnodes, failed to start %d, total %d", successful, failed, successful + failed)));
         returnObj.push_back(Pair("detail", resultsObj));
 
         return returnObj;
@@ -511,7 +511,7 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
 UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
 {
     if (!IsFluxnodeTransactionsActive()) {
-        throw runtime_error("deterministic zelnodes transactions is not active yet");
+        throw runtime_error("deterministic fluxnodes transactions is not active yet");
     }
 
     std::string strCommand;
@@ -521,10 +521,10 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
     if (fHelp || params.size() != 2)
         throw runtime_error(
                 "startdeterministiczelnode alias_name lockwallet\n"
-                "\nAttempts to start one zelnode\n"
+                "\nAttempts to start one fluxnode\n"
 
                 "\nArguments:\n"
-                "1. set         (string, required) Specify which set of zelnode(s) to start.\n"
+                "1. set         (string, required) Specify which set of fluxnode(s) to start.\n"
                 "2. lockwallet  (boolean, required) Lock wallet after completion.\n"
                 "3. alias       (string) Fluxnode alias. Required if using 'alias' as the set.\n"
 
@@ -574,7 +574,7 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
             COutPoint outpoint = COutPoint(uint256S(zne.getTxHash()), index);
             if (mempool.mapFluxnodeTxMempool.count(outpoint)) {
                 returnObj.push_back(Pair("result", "failed"));
-                returnObj.push_back(Pair("reason", "Mempool already has a zelnode transaction using this outpoint"));
+                returnObj.push_back(Pair("reason", "Mempool already has a fluxnode transaction using this outpoint"));
                 return returnObj;
             } else if (g_fluxnodeCache.InStartTracker(outpoint)) {
                 returnObj.push_back(Pair("result", "failed"));
@@ -586,11 +586,11 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
                 return returnObj;
             } else if (g_fluxnodeCache.InConfirmTracker(outpoint)) {
                 returnObj.push_back(Pair("result", "failed"));
-                returnObj.push_back(Pair("reason", "Fluxnode already confirmed and in zelnode list"));
+                returnObj.push_back(Pair("reason", "Fluxnode already confirmed and in fluxnode list"));
                 return returnObj;
             }
 
-            mutTransaction.nVersion = ZELNODE_TX_VERSION;
+            mutTransaction.nVersion = FLUXNODE_TX_VERSION;
 
             bool result = activeFluxnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
 
@@ -630,7 +630,7 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
         pwalletMain->Lock();
 
     UniValue returnObj(UniValue::VOBJ);
-    returnObj.push_back(Pair("overall", strprintf("Successfully started %d zelnodes, failed to start %d, total %d", successful, failed, successful + failed)));
+    returnObj.push_back(Pair("overall", strprintf("Successfully started %d fluxnodes, failed to start %d, total %d", successful, failed, successful + failed)));
     returnObj.push_back(Pair("detail", resultsObj));
 
     return returnObj;
@@ -701,8 +701,8 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
         throw runtime_error(
-                "viewdeterministiczelnodelist ( \"filter\" )\n"
-                "\nView the list of deterministric zelnode(s)\n"
+                "viewdeterministicfluxnodelist ( \"filter\" )\n"
+                "\nView the list of deterministric fluxnode(s)\n"
 
                 "\nResult:\n"
                 "[\n"
@@ -712,15 +712,15 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
                 "    \"outidx\": n,                           (numeric) Collateral transaction output index\n"
                 "    \"ip\": \"address\"                      (string) IP address\n"
                 "    \"network\": \"network\"                 (string) Network type (IPv4, IPv6, onion)\n"
-                "    \"added_height\": \"height\"             (string) Block height when zelnode was added\n"
-                "    \"confirmed_height\": \"height\"         (string) Block height when zelnode was confirmed\n"
-                "    \"last_confirmed_height\": \"height\"    (string) Last block height when zelnode was confirmed\n"
-                "    \"last_paid_height\": \"height\"         (string) Last block height when zelnode was paid\n"
+                "    \"added_height\": \"height\"             (string) Block height when fluxnode was added\n"
+                "    \"confirmed_height\": \"height\"         (string) Block height when fluxnode was confirmed\n"
+                "    \"last_confirmed_height\": \"height\"    (string) Last block height when fluxnode was confirmed\n"
+                "    \"last_paid_height\": \"height\"         (string) Last block height when fluxnode was paid\n"
                 "    \"tier\": \"type\",                      (string) Tier (CUMULUS/NIMBUS/STRATUS)\n"
                 "    \"payment_address\": \"addr\",           (string) Fluxnode ZEL address\n"
                 "    \"pubkey\": \"key\",                     (string) Fluxnode public key used for message broadcasting\n"
-                "    \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
-                "    \"lastpaid\": ttt,                       (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode was last paid\n"
+                "    \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode has been active\n"
+                "    \"lastpaid\": ttt,                       (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode was last paid\n"
                 "    \"rank\": n                              (numberic) rank\n"
                 "  }\n"
                 "  ,...\n"
@@ -760,15 +760,15 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
     if (fHelp || (params.size() > 0))
         throw runtime_error(
                 "getdoslist\n"
-                "\nGet a list of all zelnodes in the DOS list\n"
+                "\nGet a list of all fluxnodes in the DOS list\n"
 
                 "\nResult:\n"
                 "[\n"
                 "  {\n"
                 "    \"collateral\": \"hash\",  (string) Collateral transaction hash\n"
-                "    \"added_height\": n,   (numeric) Height the zelnode start transaction was added to the chain\n"
-                "    \"payment_address\": \"xxx\",   (string) The payment address associated with the zelnode\n"
-                "    \"eligible_in\": n,     (numeric) The amount of blocks before the zelnode is eligible to be started again\n"
+                "    \"added_height\": n,   (numeric) Height the fluxnode start transaction was added to the chain\n"
+                "    \"payment_address\": \"xxx\",   (string) The payment address associated with the fluxnode\n"
+                "    \"eligible_in\": n,     (numeric) The amount of blocks before the fluxnode is eligible to be started again\n"
                 "  }\n"
                 "  ,...\n"
                 "]\n"
@@ -800,7 +800,7 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
             info.push_back(std::make_pair("payment_address", EncodeDestination(payment_destination)));
 
             int nCurrentHeight = chainActive.Height();
-            int nEligibleIn = ZELNODE_DOS_REMOVE_AMOUNT - (nCurrentHeight - data.nAddedBlockHeight);
+            int nEligibleIn = FLUXNODE_DOS_REMOVE_AMOUNT - (nCurrentHeight - data.nAddedBlockHeight);
             info.push_back(std::make_pair("eligible_in",  nEligibleIn));
 
             if (data.nCollateral > 0) {
@@ -811,7 +811,7 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
         }
 
         if (mapOrderedDosList.size()) {
-            for (int i = 0; i < ZELNODE_DOS_REMOVE_AMOUNT + 1; i++) {
+            for (int i = 0; i < FLUXNODE_DOS_REMOVE_AMOUNT + 1; i++) {
                 if (mapOrderedDosList.count(i)) {
                     for (const auto& item : mapOrderedDosList.at(i)) {
                         wholelist.push_back(item);
@@ -831,14 +831,14 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
     if (fHelp || (params.size() > 0))
         throw runtime_error(
                 "getstartlist\n"
-                "\nGet a list of all zelnodes in the start list\n"
+                "\nGet a list of all fluxnodes in the start list\n"
 
                 "\nResult:\n"
                 "[\n"
                 "  {\n"
                 "    \"collateral\": \"hash\",  (string) Collateral transaction hash\n"
-                "    \"added_height\": n,   (numeric) Height the zelnode start transaction was added to the chain\n"
-                "    \"payment_address\": \"xxx\",   (string) The payment address associated with the zelnode\n"
+                "    \"added_height\": n,   (numeric) Height the fluxnode start transaction was added to the chain\n"
+                "    \"payment_address\": \"xxx\",   (string) The payment address associated with the fluxnode\n"
                 "    \"expires_in\": n,     (numeric) The amount of blocks before the start transaction expires, unless a confirmation transaction is added to a block\n"
                 "  }\n"
                 "  ,...\n"
@@ -871,7 +871,7 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
             info.push_back(std::make_pair("payment_address", EncodeDestination(payment_destination)));
 
             int nCurrentHeight = chainActive.Height();
-            int nExpiresIn = ZELNODE_START_TX_EXPIRATION_HEIGHT - (nCurrentHeight - data.nAddedBlockHeight);
+            int nExpiresIn = FLUXNODE_START_TX_EXPIRATION_HEIGHT - (nCurrentHeight - data.nAddedBlockHeight);
 
             info.push_back(std::make_pair("expires_in",  nExpiresIn));
 
@@ -883,7 +883,7 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
         }
 
         if (mapOrderedStartList.size()) {
-            for (int i = 0; i < ZELNODE_START_TX_EXPIRATION_HEIGHT + 1; i++) {
+            for (int i = 0; i < FLUXNODE_START_TX_EXPIRATION_HEIGHT + 1; i++) {
                 if (mapOrderedStartList.count(i)) {
                     for (const auto& item : mapOrderedStartList.at(i)) {
                         wholelist.push_back(item);
@@ -913,15 +913,15 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
                 "  \"outidx\": n,                           (numeric) Collateral transaction output index number\n"
                 "  \"ip\": \"xxxx\",                        (string) Fluxnode network address\n"
                 "  \"network\": \"network\",                (string) Network type (IPv4, IPv6, onion)\n"
-                "  \"added_height\": \"height\",            (string) Block height when zelnode was added\n"
-                "  \"confirmed_height\": \"height\",        (string) Block height when zelnode was confirmed\n"
-                "  \"last_confirmed_height\": \"height\",   (string) Last block height when zelnode was confirmed\n"
-                "  \"last_paid_height\": \"height\",        (string) Last block height when zelnode was paid\n"
+                "  \"added_height\": \"height\",            (string) Block height when fluxnode was added\n"
+                "  \"confirmed_height\": \"height\",        (string) Block height when fluxnode was confirmed\n"
+                "  \"last_confirmed_height\": \"height\",   (string) Last block height when fluxnode was confirmed\n"
+                "  \"last_paid_height\": \"height\",        (string) Last block height when fluxnode was paid\n"
                 "  \"tier\": \"type\",                      (string) Tier (CUMULUS/NIMBUS/STRATUS)\n"
-                "  \"payment_address\": \"xxxx\",           (string) ZEL address for zelnode payments\n"
+                "  \"payment_address\": \"xxxx\",           (string) ZEL address for fluxnode payments\n"
                 "  \"pubkey\": \"key\",                     (string) Fluxnode public key used for message broadcasting\n"
-                "  \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
-                "  \"lastpaid\": ttt,                       (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode was last paid\n"
+                "  \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode has been active\n"
+                "  \"lastpaid\": ttt,                       (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode was last paid\n"
                 "}\n"
 
                 "\nExamples:\n" +
@@ -930,7 +930,7 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
     if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
     if (IsDFluxnodeActive()) {
-        int nLocation = ZELNODE_TX_ERROR;
+        int nLocation = FLUXNODE_TX_ERROR;
         auto data = g_fluxnodeCache.GetFluxnodeData(activeFluxnode.deterministicOutPoint, &nLocation);
 
         UniValue info(UniValue::VOBJ);
@@ -1034,9 +1034,9 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
 
                 "\nResult:\n"
                 "{\n"
-                "  \"total\": n,        (numeric) Total zelnodes\n"
+                "  \"total\": n,        (numeric) Total fluxnodes\n"
                 "  \"stable\": n,       (numeric) Stable count\n"
-                "  \"enabled\": n,      (numeric) Enabled zelnodes\n"
+                "  \"enabled\": n,      (numeric) Enabled fluxnodes\n"
                 "  \"inqueue\": n       (numeric) Fluxnodes in queue\n"
                 "}\n"
 
@@ -1095,12 +1095,12 @@ UniValue getmigrationcount (const UniValue& params, bool fHelp)
     if (fHelp || (params.size() > 0))
         throw runtime_error(
                 "getmigrationcount\n"
-                "\nGet zelnode migration count values\n"
+                "\nGet fluxnode migration count values\n"
 
                 "\nResult:\n"
                 "{\n"
-                "  \"total-old\": n,        (numeric) Total zelnodes\n"
-                "  \"total-new\": n,        (numeric) Total zelnodes\n"
+                "  \"total-old\": n,        (numeric) Total fluxnodes\n"
+                "  \"total-new\": n,        (numeric) Total fluxnodes\n"
                 "}\n"
 
                 "\nExamples:\n" +
@@ -1161,7 +1161,7 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
     if (fHelp || (params.size() > 1))
         throw runtime_error(
                 "listzelnodeconf ( \"filter\" )\n"
-                "\nPrint zelnode.conf in JSON format\n"
+                "\nPrint fluxnode.conf in JSON format\n"
 
                 "\nArguments:\n"
                 "1. \"filter\"    (string, optional) Filter search text. Partial match on alias, address, txHash, or status.\n"
@@ -1169,23 +1169,23 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
                 "\nResult:\n"
                 "[\n"
                 "  {\n"
-                "    \"alias\": \"xxxx\",                       (string) zelnode alias\n"
-                "    \"status\": \"xxxx\",                      (string) zelnode status\n"
+                "    \"alias\": \"xxxx\",                       (string) fluxnode alias\n"
+                "    \"status\": \"xxxx\",                      (string) fluxnode status\n"
                 "    \"collateral\": n,                         (string) Collateral transaction\n"
                 "    \"txHash\": \"xxxx\",                      (string) transaction hash\n"
                 "    \"outputIndex\": n,                        (numeric) transaction output index\n"
-                "    \"privateKey\": \"xxxx\",                  (string) zelnode private key\n"
-                "    \"address\": \"xxxx\",                     (string) zelnode IP address\n"
+                "    \"privateKey\": \"xxxx\",                  (string) fluxnode private key\n"
+                "    \"address\": \"xxxx\",                     (string) fluxnode IP address\n"
                 "    \"ip\": \"xxxx\",                          (string) Fluxnode network address\n"
                 "    \"network\": \"network\",                  (string) Network type (IPv4, IPv6, onion)\n"
-                "    \"added_height\": \"height\",              (string) Block height when zelnode was added\n"
-                "    \"confirmed_height\": \"height\",          (string) Block height when zelnode was confirmed\n"
-                "    \"last_confirmed_height\": \"height\",     (string) Last block height when zelnode was confirmed\n"
-                "    \"last_paid_height\": \"height\",          (string) Last block height when zelnode was paid\n"
+                "    \"added_height\": \"height\",              (string) Block height when fluxnode was added\n"
+                "    \"confirmed_height\": \"height\",          (string) Block height when fluxnode was confirmed\n"
+                "    \"last_confirmed_height\": \"height\",     (string) Last block height when fluxnode was confirmed\n"
+                "    \"last_paid_height\": \"height\",          (string) Last block height when fluxnode was paid\n"
                 "    \"tier\": \"type\",                        (string) Tier (CUMULUS/NIMBUS/STRATUS)\n"
-                "    \"payment_address\": \"xxxx\",             (string) ZEL address for zelnode payments\n"
-                "    \"activesince\": ttt,                      (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode has been active\n"
-                "    \"lastpaid\": ttt,                         (numeric) The time in seconds since epoch (Jan 1 1970 GMT) zelnode was last paid\n"
+                "    \"payment_address\": \"xxxx\",             (string) ZEL address for fluxnode payments\n"
+                "    \"activesince\": ttt,                      (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode has been active\n"
+                "    \"lastpaid\": ttt,                         (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode was last paid\n"
                 "  }\n"
                 "  ,...\n"
                 "]\n"
@@ -1193,29 +1193,29 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("listzelnodeconf", "") + HelpExampleRpc("listzelnodeconf", ""));
 
-    std::vector<FluxnodeConfig::FluxnodeEntry> zelnodeEntries;
-    zelnodeEntries = fluxnodeConfig.getEntries();
+    std::vector<FluxnodeConfig::FluxnodeEntry> fluxnodeEntries;
+    fluxnodeEntries = fluxnodeConfig.getEntries();
 
     UniValue ret(UniValue::VARR);
 
-    for (FluxnodeConfig::FluxnodeEntry zelnode : zelnodeEntries) {
+    for (FluxnodeConfig::FluxnodeEntry fluxnode : fluxnodeEntries) {
         if (IsDFluxnodeActive()) {
             int nIndex;
-            if (!zelnode.castOutputIndex(nIndex))
+            if (!fluxnode.castOutputIndex(nIndex))
                 continue;
-            COutPoint out = COutPoint(uint256S(zelnode.getTxHash()), uint32_t(nIndex));
+            COutPoint out = COutPoint(uint256S(fluxnode.getTxHash()), uint32_t(nIndex));
 
-            int nLocation = ZELNODE_TX_ERROR;
+            int nLocation = FLUXNODE_TX_ERROR;
             auto data = g_fluxnodeCache.GetFluxnodeData(out, &nLocation);
 
             UniValue info(UniValue::VOBJ);
-            info.push_back(Pair("alias", zelnode.getAlias()));
+            info.push_back(Pair("alias", fluxnode.getAlias()));
             info.push_back(Pair("status", FluxnodeLocationToString(nLocation)));
             info.push_back(Pair("collateral", out.ToFullString()));
-            info.push_back(Pair("txHash", zelnode.getTxHash()));
-            info.push_back(Pair("outputIndex", zelnode.getOutputIndex()));
-            info.push_back(Pair("privateKey", zelnode.getPrivKey()));
-            info.push_back(Pair("address", zelnode.getIp()));
+            info.push_back(Pair("txHash", fluxnode.getTxHash()));
+            info.push_back(Pair("outputIndex", fluxnode.getOutputIndex()));
+            info.push_back(Pair("privateKey", fluxnode.getPrivKey()));
+            info.push_back(Pair("address", fluxnode.getIp()));
 
             if (data.IsNull()) {
                 info.push_back(std::make_pair("ip", "UNKNOWN"));

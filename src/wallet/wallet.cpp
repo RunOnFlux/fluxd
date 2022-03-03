@@ -2983,7 +2983,7 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                 continue;
 
 //            if (nCoinType != ALL_COINS) {
-//                if (nDepth < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC)
+//                if (nDepth < FLUXNODE_MIN_CONFIRMATION_DETERMINISTIC)
 //                    continue;
 //            }
 
@@ -3009,7 +3009,7 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                     if (nTier == STRATUS) {
                         found = true;
                     }
-                } else if (nCoinType == ALL_ZELNODE) {
+                } else if (nCoinType == ALL_FLUXNODE) {
                     found = IsTierValid(nTier);
                 } else {
                     found = true;
@@ -3028,7 +3028,7 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                     }
                 }
 
-                if (IsLockedCoin((*it).first, i) && nCoinType != ONLY_CUMULUS && nCoinType != ONLY_NIMBUS && nCoinType != ONLY_STRATUS && nCoinType != ALL_ZELNODE )
+                if (IsLockedCoin((*it).first, i) && nCoinType != ONLY_CUMULUS && nCoinType != ONLY_NIMBUS && nCoinType != ONLY_STRATUS && nCoinType != ALL_FLUXNODE )
                     continue;
 
                 if (pcoin->vout[i].nValue <= 0 && !fIncludeZeroValue)
@@ -4825,9 +4825,9 @@ bool CWallet::GetFluxnodeVinAndKeys(CTxIn& txinRet, CPubKey& pubKeyRet, CKey& ke
 
     // Find possible candidates
     std::vector<COutput> vPossibleCoins;
-    AvailableCoins(vPossibleCoins, true, NULL, false, false,ALL_ZELNODE);
+    AvailableCoins(vPossibleCoins, true, NULL, false, false,ALL_FLUXNODE);
     if (vPossibleCoins.empty()) {
-        LogPrintf("CWallet::GetFluxnodeVinAndKeys -- Could not locate any valid zelnode vin\n");
+        LogPrintf("CWallet::GetFluxnodeVinAndKeys -- Could not locate any valid fluxnode vin\n");
         return false;
     }
 
@@ -4849,7 +4849,7 @@ bool CWallet::GetFluxnodeVinAndKeys(CTxIn& txinRet, CPubKey& pubKeyRet, CKey& ke
                     if (out.tx->GetHash() == txHash && out.i == nOutputIndex) // found it!
                         return GetVinAndKeysFromOutput(out, txinRet, pubKeyRet, keyRet);
 
-    LogPrintf("CWallet::GetFluxnodeVinAndKeys -- Could not locate specified zelnode vin\n");
+    LogPrintf("CWallet::GetFluxnodeVinAndKeys -- Could not locate specified fluxnode vin\n");
     return false;
 }
 

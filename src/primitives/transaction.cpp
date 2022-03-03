@@ -238,7 +238,7 @@ void CTransaction::UpdateHash() const
 }
 
 CTransaction::CTransaction() : nVersion(CTransaction::SPROUT_MIN_CURRENT_VERSION), fOverwintered(false), nVersionGroupId(0), nExpiryHeight(0), vin(), vout(), nLockTime(0),
-                               valueBalance(0), vShieldedSpend(), vShieldedOutput(), vJoinSplit(), joinSplitPubKey(), joinSplitSig(), bindingSig(), nType(ZELNODE_NO_TYPE), collateralOut(), collateralPubkey(), pubKey(), sigTime(0), ip(), sig(), benchmarkTier(0), benchmarkSig(), benchmarkSigTime(0), nUpdateType(0)  { }
+                               valueBalance(0), vShieldedSpend(), vShieldedOutput(), vJoinSplit(), joinSplitPubKey(), joinSplitSig(), bindingSig(), nType(FLUXNODE_NO_TYPE), collateralOut(), collateralPubkey(), pubKey(), sigTime(0), ip(), sig(), benchmarkTier(0), benchmarkSig(), benchmarkSigTime(0), nUpdateType(0)  { }
 
 CTransaction::CTransaction(const CMutableTransaction &tx) : nVersion(tx.nVersion), fOverwintered(tx.fOverwintered), nVersionGroupId(tx.nVersionGroupId), nExpiryHeight(tx.nExpiryHeight),
                                                             vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime),
@@ -390,7 +390,7 @@ unsigned int CTransaction::CalculateModifiedSize(unsigned int nTxSize) const
 
 std::string CTransaction::ToString() const
 {
-    if (nVersion == ZELNODE_TX_VERSION) {
+    if (nVersion == FLUXNODE_TX_VERSION) {
         return strprintf("CTransaction(hash=%s, ver=%d, type=%d)\n",
                          GetHash().ToString().substr(0,10),
                          nVersion,

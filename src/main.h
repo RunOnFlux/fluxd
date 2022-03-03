@@ -533,7 +533,7 @@ extern CCoinsViewCache *pcoinsTip;
 /** Global variable that points to the active block tree (protected by cs_main) */
 extern CBlockTreeDB *pblocktree;
 
-/** Global variable that points to the zelnode database (protected by cs_main) */
+/** Global variable that points to the fluxnode database (protected by cs_main) */
 extern CDeterministicFluxnodeDB* pFluxnodeDB;
 
 /**

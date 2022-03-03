@@ -24,7 +24,7 @@ struct CBlockTemplate
 };
 
 /** Generate a new block, without valid proof-of-work */
-CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, std::map<int, std::pair<CScript, CAmount>>* zelnodePayouts = nullptr);
+CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, std::map<int, std::pair<CScript, CAmount>>* fluxnodePayouts = nullptr);
 
 #ifdef ENABLE_MINING
 /** Get script for -mineraddress */
