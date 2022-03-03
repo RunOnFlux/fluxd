@@ -2,8 +2,8 @@
 // Created by ja on 11/14/19.
 //
 
-#ifndef ZELCASH_ZELNODECACHEDB_H
-#define ZELCASH_ZELNODECACHEDB_H
+#ifndef ZELCASH_FLUXNODECACHEDB_H
+#define ZELCASH_FLUXNODECACHEDB_H
 
 #include "dbwrapper.h"
 #include <boost/filesystem/path.hpp>
@@ -33,4 +33,4 @@ public:
     bool ReadBlockUndoFluxnodeData(const uint256 &p_blockHash, CFluxnodeTxBlockUndo& p_undoData);
 };
 
-#endif //ZELCASH_ZELNODECACHEDB_H
+#endif //ZELCASH_FLUXNODECACHEDB_H

@@ -7,8 +7,8 @@
 
 
 
-#ifndef SRC_ZELNODECONFIG_H_
-#define SRC_ZELNODECONFIG_H_
+#ifndef SRC_FLUXNODECONFIG_H_
+#define SRC_FLUXNODECONFIG_H_
 
 #include <string>
 #include <vector>
@@ -124,4 +124,4 @@ private:
     std::vector <FluxnodeEntry> entries;
 
 };
-#endif //SRC_ZELNODECONFIG_H_
+#endif //SRC_FLUXNODECONFIG_H_

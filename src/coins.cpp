@@ -637,7 +637,7 @@ bool CCoinsViewCache::CheckFluxnodeTxInput(const CTransaction& tx, const int& p_
     }
 
     // Check for minimum height requirement
-    if (p_Height - coins->nHeight < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC) {
+    if (p_Height - coins->nHeight < FLUXNODE_MIN_CONFIRMATION_DETERMINISTIC) {
         return false;
     }
 
@@ -718,9 +718,9 @@ void InitializeCoinTierAmounts() {
     if (fInit)
         return;
 
-    mapCoinTierPercentages[CUMULUS] = V1_ZELNODE_PERCENT_CUMULUS;
-    mapCoinTierPercentages[NIMBUS] = V1_ZELNODE_PERCENT_NIMBUS;
-    mapCoinTierPercentages[STRATUS] = V1_ZELNODE_PERCENT_STRATUS;
+    mapCoinTierPercentages[CUMULUS] = V1_FLUXNODE_PERCENT_CUMULUS;
+    mapCoinTierPercentages[NIMBUS] = V1_FLUXNODE_PERCENT_NIMBUS;
+    mapCoinTierPercentages[STRATUS] = V1_FLUXNODE_PERCENT_STRATUS;
 
     fInit = true;
 }
@@ -751,31 +751,31 @@ std::set<CAmount> GetCoinAmountsByTier(const int& p_Height, const int& nTier)
 
     if (nTier == STRATUS) {
         if (p_Height < Params().GetStratusStartTransitionHeight()) {
-            setAmounts.insert(V1_ZELNODE_COLLAT_STRATUS * COIN);
+            setAmounts.insert(V1_FLUXNODE_COLLAT_STRATUS * COIN);
         } else if (p_Height >= Params().GetStratusStartTransitionHeight() &&
                    p_Height < Params().GetStratusEndTransitionHeight()) {
-            setAmounts.insert(V1_ZELNODE_COLLAT_STRATUS * COIN);
-            setAmounts.insert(V2_ZELNODE_COLLAT_STRATUS * COIN);
+            setAmounts.insert(V1_FLUXNODE_COLLAT_STRATUS * COIN);
+            setAmounts.insert(V2_FLUXNODE_COLLAT_STRATUS * COIN);
         } else {
-            setAmounts.insert(V2_ZELNODE_COLLAT_STRATUS * COIN);
+            setAmounts.insert(V2_FLUXNODE_COLLAT_STRATUS * COIN);
         }
     } else if (nTier == NIMBUS) {
         if (p_Height < Params().GetNimbusStartTransitionHeight()) {
-            setAmounts.insert(V1_ZELNODE_COLLAT_NIMBUS * COIN);
+            setAmounts.insert(V1_FLUXNODE_COLLAT_NIMBUS * COIN);
         } else if (p_Height >= Params().GetNimbusStartTransitionHeight() && p_Height < Params().GetNimbusEndTransitionHeight()) {
-            setAmounts.insert(V1_ZELNODE_COLLAT_NIMBUS * COIN);
-            setAmounts.insert(V2_ZELNODE_COLLAT_NIMBUS * COIN);
+            setAmounts.insert(V1_FLUXNODE_COLLAT_NIMBUS * COIN);
+            setAmounts.insert(V2_FLUXNODE_COLLAT_NIMBUS * COIN);
         } else {
-            setAmounts.insert(V2_ZELNODE_COLLAT_NIMBUS * COIN);
+            setAmounts.insert(V2_FLUXNODE_COLLAT_NIMBUS * COIN);
         }
     } else if (nTier == CUMULUS) {
         if (p_Height < Params().GetCumulusStartTransitionHeight()) {
-            setAmounts.insert(V1_ZELNODE_COLLAT_CUMULUS * COIN);
+            setAmounts.insert(V1_FLUXNODE_COLLAT_CUMULUS * COIN);
         } else if (p_Height >= Params().GetCumulusStartTransitionHeight() && p_Height < Params().GetCumulusEndTransitionHeight()) {
-            setAmounts.insert(V1_ZELNODE_COLLAT_CUMULUS * COIN);
-            setAmounts.insert(V2_ZELNODE_COLLAT_CUMULUS * COIN);
+            setAmounts.insert(V1_FLUXNODE_COLLAT_CUMULUS * COIN);
+            setAmounts.insert(V2_FLUXNODE_COLLAT_CUMULUS * COIN);
         } else {
-            setAmounts.insert(V2_ZELNODE_COLLAT_CUMULUS * COIN);
+            setAmounts.insert(V2_FLUXNODE_COLLAT_CUMULUS * COIN);
         }
     }
 

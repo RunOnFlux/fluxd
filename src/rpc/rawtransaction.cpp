@@ -173,13 +173,13 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
         entry.push_back(Pair("payment_address", EncodeDestination(destination)));
         */
 
-        if (tx.nType & ZELNODE_START_TX_TYPE) {
+        if (tx.nType & FLUXNODE_START_TX_TYPE) {
             entry.push_back(
                     Pair("collateral_pubkey", EncodeBase64(tx.collateralPubkey.begin(), tx.collateralPubkey.size())));
-            entry.push_back(Pair("zelnode_pubkey", EncodeBase64(tx.pubKey.begin(), tx.pubKey.size())));
+            entry.push_back(Pair("fluxnode_pubkey", EncodeBase64(tx.pubKey.begin(), tx.pubKey.size())));
         }
 
-        if (tx.nType & ZELNODE_CONFIRM_TX_TYPE) {
+        if (tx.nType & FLUXNODE_CONFIRM_TX_TYPE) {
             entry.push_back(Pair("update_type", tx.nUpdateType));
             entry.push_back(Pair("benchmark_tier", TierToString(tx.benchmarkTier)));
             entry.push_back(Pair("benchmark_sigtime", tx.benchmarkSigTime));

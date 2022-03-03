@@ -36,10 +36,10 @@ static const int MEMPOOL_GD_VERSION = 60002;
 //! "filter*" commands are disabled without NODE_BLOOM after and including this version
 static const int NO_BLOOM_VERSION = 170004;
 
-//! protocol version that requires zelnode payments
-static const int MIN_PEER_PROTO_VERSION_ZELNODE = 170009;
+//! protocol version that requires fluxnode payments
+static const int MIN_PEER_PROTO_VERSION_FLUXNODE = 170009;
 
-//! protocol version that means they support deterministic zelnodes, not used as of now, usage of UPGRADE_KAMATA
-static const int DETERMINISTIC_ZELNODES = 170016;
+//! protocol version that means they support deterministic fluxnodes, not used as of now, usage of UPGRADE_KAMATA
+static const int DETERMINISTIC_FLUXNODES = 170016;
 
 #endif // BITCOIN_VERSION_H

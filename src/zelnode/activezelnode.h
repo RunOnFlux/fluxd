@@ -4,8 +4,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
-#ifndef ZELCASHNODES_ACTIVEZELNODE_H
-#define ZELCASHNODES_ACTIVEZELNODE_H
+#ifndef ZELCASHNODES_ACTIVEFLUXNODE_H
+#define ZELCASHNODES_ACTIVEFLUXNODE_H
 
 
 #include "init.h"
@@ -16,8 +16,8 @@
 #include "sync.h"
 #include "wallet/wallet.h"
 
-#define ACTIVE_ZELNODE_INITIAL 0 // initial state
-#define ACTIVE_ZELNODE_STARTED 4
+#define ACTIVE_FLUXNODE_INITIAL 0 // initial state
+#define ACTIVE_FLUXNODE_STARTED 4
 
 class ActiveFluxnode
 {
@@ -26,11 +26,11 @@ private:
     mutable CCriticalSection cs;
 
     /// Get ZEL input that can be used for the Fluxnode
-    bool GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage);
+    bool GetFluxNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage);
     bool GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
 
     /// Get 10000 ZEL input that can be used for the Fluxnode
-    bool GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
+    bool GetFluxNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
 
 public:
     // Initialized by init.cpp
@@ -67,4 +67,4 @@ public:
 
     int nLastTriedToConfirm;
 };
-#endif //ZELCASHNODES_ACTIVEZELNODE_H
+#endif //ZELCASHNODES_ACTIVEFLUXNODE_H

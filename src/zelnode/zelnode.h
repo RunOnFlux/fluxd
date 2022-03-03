@@ -4,8 +4,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
-#ifndef ZELCASHNODES_ZELNODE_H
-#define ZELCASHNODES_ZELNODE_H
+#ifndef ZELCASHNODES_FLUXNODE_H
+#define ZELCASHNODES_FLUXNODE_H
 
 #include "base58.h"
 #include "key.h"
@@ -15,26 +15,26 @@
 #include "timedata.h"
 #include "util.h"
 
-// How old the output must be for zelnodes collateral to be considered valid
-#define ZELNODE_MIN_CONFIRMATION_DETERMINISTIC 100
+// How old the output must be for fluxnodes collateral to be considered valid
+#define FLUXNODE_MIN_CONFIRMATION_DETERMINISTIC 100
 
-// If the zelnode isn't confirmed within this amount of blocks, the zelnode is moved to a DoS list
-#define ZELNODE_START_TX_EXPIRATION_HEIGHT 60
+// If the fluxnode isn't confirmed within this amount of blocks, the fluxnode is moved to a DoS list
+#define FLUXNODE_START_TX_EXPIRATION_HEIGHT 60
 
-// How long the zelnode will stay in the DoS list. Is the calculated from that height the start transaction was added to the chain
-#define ZELNODE_DOS_REMOVE_AMOUNT 180
+// How long the fluxnode will stay in the DoS list. Is the calculated from that height the start transaction was added to the chain
+#define FLUXNODE_DOS_REMOVE_AMOUNT 180
 
 // How often a new confirmation transaction needs to be seen on chain to keep a node up and running
-#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V1 60
-#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V2 80
-#define ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V3 160
+#define FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V1 60
+#define FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V2 80
+#define FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V3 160
 
 // Nodes are allowed to send a update confirm notification only after this many blocks past there last confirm
-#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1 40
-#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2 120
-#define ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 5
+#define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1 40
+#define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2 120
+#define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 5
 
-// Maximum ip address size in zelnode confirm transaction
+// Maximum ip address size in fluxnode confirm transaction
 #define FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V1 40
 #define FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V2 60
 
@@ -42,20 +42,20 @@
 
 /// Mempool only
 // Max signature time that we accept into the mempool
-#define ZELNODE_MAX_SIG_TIME 3600
+#define FLUXNODE_MAX_SIG_TIME 3600
 
 /** Fluxnode Collateral Amounts
- * This will be the place that will hold all zelnode collateral amounts
+ * This will be the place that will hold all fluxnode collateral amounts
  * As we make changes to the node structure, this is where the new amount should be placed
  * Use the naming mechanism as we make changes V1 -> V2 -> V3 -> V4
  */
-#define V1_ZELNODE_COLLAT_CUMULUS 10000
-#define V1_ZELNODE_COLLAT_NIMBUS 25000
-#define V1_ZELNODE_COLLAT_STRATUS 100000
+#define V1_FLUXNODE_COLLAT_CUMULUS 10000
+#define V1_FLUXNODE_COLLAT_NIMBUS 25000
+#define V1_FLUXNODE_COLLAT_STRATUS 100000
 
-#define V2_ZELNODE_COLLAT_CUMULUS 1000
-#define V2_ZELNODE_COLLAT_NIMBUS 12500
-#define V2_ZELNODE_COLLAT_STRATUS 40000
+#define V2_FLUXNODE_COLLAT_CUMULUS 1000
+#define V2_FLUXNODE_COLLAT_NIMBUS 12500
+#define V2_FLUXNODE_COLLAT_STRATUS 40000
 
 
 /** Fluxnode Payout Percentages
@@ -63,10 +63,10 @@
  * As we make changes to the node structure, this is where the new percentages should be placed
  * Use the naming mechanism as we make changes V1 -> V2 -> V3 -> V4
  */
-#define ZELNODE_PERCENT_NULL 0.00
-#define V1_ZELNODE_PERCENT_CUMULUS 0.0375
-#define V1_ZELNODE_PERCENT_NIMBUS 0.0625
-#define V1_ZELNODE_PERCENT_STRATUS 0.15
+#define FLUXNODE_PERCENT_NULL 0.00
+#define V1_FLUXNODE_PERCENT_CUMULUS 0.0375
+#define V1_FLUXNODE_PERCENT_NIMBUS 0.0625
+#define V1_FLUXNODE_PERCENT_STRATUS 0.15
 
 class FluxnodeCache;
 class CFluxnodeTxBlockUndo;
@@ -76,7 +76,7 @@ extern FluxnodeCache g_fluxnodeCache;
 extern ActiveFluxnode activeFluxnode;
 extern COutPoint fluxnodeOutPoint;
 
-/** REMOVE THE ABOVE CODE AFTER DETERMINISTIC ZELNODES IS ACTIVATED **/
+/** REMOVE THE ABOVE CODE AFTER DETERMINISTIC FLUXNODES IS ACTIVATED **/
 
 std::string TierToString(int tier);
 
@@ -86,12 +86,12 @@ bool IsMigrationCollateralAmount(const CAmount& amount);
 
 // Locations
 enum {
-    ZELNODE_TX_ERROR = 0,
-    ZELNODE_TX_STARTED = 1,
-    ZELNODE_TX_DOS_PROTECTION,
-    ZELNODE_TX_CONFIRMED,
-    ZELNODE_TX_MISS_CONFIRMED,
-    ZELNODE_TX_EXPIRED
+    FLUXNODE_TX_ERROR = 0,
+    FLUXNODE_TX_STARTED = 1,
+    FLUXNODE_TX_DOS_PROTECTION,
+    FLUXNODE_TX_CONFIRMED,
+    FLUXNODE_TX_MISS_CONFIRMED,
+    FLUXNODE_TX_EXPIRED
 };
 
 enum  FluxnodeUpdateType {
@@ -143,14 +143,14 @@ public:
     CAmount nCollateral;
 
     void SetNull() {
-        nType = ZELNODE_NO_TYPE;
+        nType = FLUXNODE_NO_TYPE;
         nAddedBlockHeight = 0;
         nConfirmedBlockHeight = 0;
         nLastConfirmedBlockHeight = 0;
         nLastPaidHeight = 0;
         ip = "";
         nTier = 0;
-        nStatus =  ZELNODE_TX_ERROR;
+        nStatus =  FLUXNODE_TX_ERROR;
         nCollateral = 0;
     }
 
@@ -159,7 +159,7 @@ public:
     }
 
     bool IsNull() {
-        return nType == ZELNODE_NO_TYPE;
+        return nType == FLUXNODE_NO_TYPE;
     }
 
     bool isCumulus()
@@ -222,7 +222,7 @@ public:
         READWRITE(ip);
         READWRITE(nTier);
         READWRITE(nStatus);
-        if (nType & ZELNODE_HAS_COLLATERAL) {
+        if (nType & FLUXNODE_HAS_COLLATERAL) {
             READWRITE(nCollateral);
         }
     }
@@ -275,7 +275,7 @@ public:
 
 class FluxnodeList {
 public:
-    // Sorted list of zelnodes ready to be paid
+    // Sorted list of fluxnodes ready to be paid
     std::set<COutPoint> setConfirmedTxInList;
     std::list<FluxnodeListData> listConfirmedFluxnodes;
 
@@ -453,4 +453,4 @@ bool IsFluxnodeTransactionsActive();
 
 
 
-#endif //ZELCASHNODES_ZELNODE_H
+#endif //ZELCASHNODES_FLUXNODE_H
