@@ -222,6 +222,9 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
     return true;
 }
 
+UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp) {
+    return rebuildzelnodedb(params, fHelp);
+}
 
 UniValue createzelnodekey(const UniValue& params, bool fHelp)
 {
@@ -241,6 +244,11 @@ UniValue createzelnodekey(const UniValue& params, bool fHelp)
     return EncodeSecret(secret);
 }
 
+UniValue createfluxnodekey(const UniValue& params, bool fHelp)
+{
+    return createzelnodekey(params, fHelp);
+
+}
 UniValue createsporkkeys(const UniValue& params, bool fHelp)
 {
     if (fHelp || (params.size() != 0))
@@ -305,6 +313,11 @@ UniValue getzelnodeoutputs(const UniValue& params, bool fHelp)
     }
 
     return ret;
+}
+
+UniValue getfluxnodeoutputs(const UniValue& params, bool fHelp)
+{
+    return getzelnodeoutputs(params, fHelp);
 }
 
 UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
@@ -508,6 +521,10 @@ UniValue startzelnode(const UniValue& params, bool fHelp)
     return NullUniValue;
 }
 
+UniValue startfluxnode(const UniValue& params, bool fHelp) {
+    return startzelnode(params, fHelp);
+}
+
 UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
 {
     if (!IsFluxnodeTransactionsActive()) {
@@ -636,6 +653,10 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
     return returnObj;
 }
 
+UniValue startdeterministicfluxnode(const UniValue& params, bool fHelp)
+{
+    return startdeterministiczelnode(params, fHelp);
+}
 
 void GetDeterministicListData(UniValue& listData, const std::string& strFilter, const Tier tier) {
     int count = 0;
@@ -751,6 +772,16 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
 }
 
 UniValue listzelnodes(const UniValue& params, bool fHelp)
+{
+    return viewdeterministiczelnodelist(params, fHelp);
+}
+
+UniValue listfluxnodes(const UniValue& params, bool fHelp)
+{
+    return viewdeterministiczelnodelist(params, fHelp);
+}
+
+UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp)
 {
     return viewdeterministiczelnodelist(params, fHelp);
 }
@@ -978,6 +1009,11 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp)
 
 }
 
+UniValue getfluxnodestatus (const UniValue& params, bool fHelp)
+{
+    return getzelnodestatus (params, fHelp);
+}
+
 UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
 {
     if (fHelp || (params.size() != 0))
@@ -1023,6 +1059,11 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
     }
 
     return NullUniValue;
+}
+
+UniValue fluxnodecurrentwinner (const UniValue& params, bool fHelp)
+{
+    return zelnodecurrentwinner (params, fHelp);
 }
 
 UniValue getzelnodecount (const UniValue& params, bool fHelp)
@@ -1088,6 +1129,11 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp)
     }
 
     return NullUniValue;
+}
+
+UniValue getfluxnodecount (const UniValue& params, bool fHelp)
+{
+    return getzelnodecount (params, fHelp);
 }
 
 UniValue getmigrationcount (const UniValue& params, bool fHelp)
@@ -1260,6 +1306,10 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp)
     return ret;
 }
 
+UniValue listfluxnodeconf (const UniValue& params, bool fHelp)
+{
+    return listzelnodeconf (params, fHelp);
+}
 
 UniValue getbenchmarks(const UniValue& params, bool fHelp)
 {
@@ -1338,21 +1388,34 @@ UniValue startzelbenchd(const UniValue& params, bool fHelp)
 static const CRPCCommand commands[] =
         { //  category              name                      actor (function)         okSafeMode
                 //  --------------------- ------------------------  -----------------------  ----------
-                { "zelnode",    "createzelnodekey",       &createzelnodekey,       false  },
-                { "zelnode",    "getzelnodeoutputs",      &getzelnodeoutputs,      false  },
-                { "zelnode",    "startzelnode",           &startzelnode,           false  },
-                { "zelnode",    "listzelnodes",           &listzelnodes,           false  },
-                { "zelnode",    "getdoslist",             &getdoslist,             false  },
-                { "zelnode",    "getstartlist",           &getstartlist,           false  },
-                { "zelnode",    "getzelnodecount",        &getzelnodecount,        false  },
-                { "zelnode",    "getmigrationcount",      &getmigrationcount,        false },
-                { "zelnode",    "zelnodecurrentwinner",   &zelnodecurrentwinner,   false  }, /* uses wallet if enabled */
-                { "zelnode",    "getzelnodestatus",       &getzelnodestatus,       false  },
-                { "zelnode",    "listzelnodeconf",        &listzelnodeconf,        false  },
-                { "hidden",    "rebuildzelnodedb",       &rebuildzelnodedb,       false  },
+                { "fluxnode",   "createzelnodekey",       &createzelnodekey,       false  },
+                { "fluxnode",   "getzelnodeoutputs",      &getzelnodeoutputs,      false  },
+                { "fluxnode",   "startzelnode",           &startzelnode,           false  },
+                { "fluxnode",   "listzelnodes",           &listzelnodes,           false  },
+                { "fluxnode",   "getdoslist",             &getdoslist,             false  },
+                { "fluxnode",   "getstartlist",           &getstartlist,           false  },
+                { "fluxnode",   "getzelnodecount",        &getzelnodecount,        false  },
+                { "fluxnode",   "getmigrationcount",      &getmigrationcount,        false },
+                { "fluxnode",   "zelnodecurrentwinner",   &zelnodecurrentwinner,   false  }, /* uses wallet if enabled */
+                { "fluxnode",   "getzelnodestatus",       &getzelnodestatus,       false  },
+                { "fluxnode",   "listzelnodeconf",        &listzelnodeconf,        false  },
+                { "hidden",     "rebuildzelnodedb",       &rebuildzelnodedb,       false  },
 
-                {"zelnode",     "startdeterministiczelnode", &startdeterministiczelnode, false },
-                {"zelnode",     "viewdeterministiczelnodelist", &viewdeterministiczelnodelist, false },
+                { "fluxnode",   "startdeterministiczelnode", &startdeterministiczelnode, false },
+                { "fluxnode",   "viewdeterministiczelnodelist", &viewdeterministiczelnodelist, false },
+
+                { "fluxnode",   "createfluxnodekey",      &createfluxnodekey,      false  },
+                { "fluxnode",   "getfluxnodeoutputs",     &getfluxnodeoutputs,     false  },
+                { "fluxnode",   "startfluxnode",          &startfluxnode,          false  },
+                { "fluxnode",   "listfluxnodes",          &listfluxnodes,          false  },
+                { "fluxnode",   "getfluxnodecount",       &getfluxnodecount,       false  },
+                { "fluxnode",   "fluxnodecurrentwinner",  &fluxnodecurrentwinner,  false  }, /* uses wallet if enabled */
+                { "fluxnode",   "getfluxnodestatus",      &getfluxnodestatus,      false  },
+                { "fluxnode",   "listfluxnodeconf",       &listfluxnodeconf,       false  },
+                { "hidden",     "rebuildfluxnodedb",      &rebuildfluxnodedb,      false  },
+
+                { "fluxnode",   "startdeterministicfluxnode", &startdeterministicfluxnode, false },
+                { "fluxnode",   "viewdeterministicfluxnodelist", &viewdeterministicfluxnodelist, false },
 
                 { "benchmarks", "getbenchmarks",         &getbenchmarks,           false  },
                 { "benchmarks", "getbenchstatus",        &getbenchstatus,          false  },
@@ -1360,8 +1423,8 @@ static const CRPCCommand commands[] =
                 { "benchmarks", "startzelbenchd",       &startzelbenchd,         false  },
 
                 /** Not shown in help menu */
-                { "hidden",    "createsporkkeys",        &createsporkkeys,         false  },
-                { "hidden",    "createconfirmationtransaction",        &createconfirmationtransaction,         false  }
+                { "hidden",     "createsporkkeys",        &createsporkkeys,         false  },
+                { "hidden",     "createconfirmationtransaction",        &createconfirmationtransaction,         false  }
 
 
 
