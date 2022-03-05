@@ -2683,7 +2683,7 @@ UniValue zc_sample_joinsplit(const UniValue& params, bool fHelp)
 
     uint256 joinSplitPubKey;
     uint256 anchor = SproutMerkleTree().root();
-    JSDescription samplejoinsplit(*pzelcashParams,
+    JSDescription samplejoinsplit(*pfluxParams,
                                   joinSplitPubKey,
                                   anchor,
                                   {JSInput(), JSInput()},
@@ -3049,7 +3049,7 @@ UniValue zc_raw_joinsplit(const UniValue& params, bool fHelp)
     mtx.nVersionGroupId = SAPLING_VERSION_GROUP_ID;
     mtx.joinSplitPubKey = joinSplitPubKey;
 
-    JSDescription jsdesc(*pzelcashParams,
+    JSDescription jsdesc(*pfluxParams,
                          joinSplitPubKey,
                          anchor,
                          {vjsin[0], vjsin[1]},
@@ -3059,7 +3059,7 @@ UniValue zc_raw_joinsplit(const UniValue& params, bool fHelp)
 
     {
         auto verifier = libzelcash::ProofVerifier::Strict();
-        assert(jsdesc.Verify(*pzelcashParams, verifier, joinSplitPubKey));
+        assert(jsdesc.Verify(*pfluxParams, verifier, joinSplitPubKey));
     }
 
     mtx.vJoinSplit.push_back(jsdesc);
@@ -3094,7 +3094,7 @@ UniValue zc_raw_joinsplit(const UniValue& params, bool fHelp)
         ss2 << ((unsigned char) 0x00);
         ss2 << jsdesc.ephemeralKey;
         ss2 << jsdesc.ciphertexts[0];
-        ss2 << jsdesc.h_sig(*pzelcashParams, joinSplitPubKey);
+        ss2 << jsdesc.h_sig(*pfluxParams, joinSplitPubKey);
 
         encryptedNote1 = HexStr(ss2.begin(), ss2.end());
     }
@@ -3103,7 +3103,7 @@ UniValue zc_raw_joinsplit(const UniValue& params, bool fHelp)
         ss2 << ((unsigned char) 0x01);
         ss2 << jsdesc.ephemeralKey;
         ss2 << jsdesc.ciphertexts[1];
-        ss2 << jsdesc.h_sig(*pzelcashParams, joinSplitPubKey);
+        ss2 << jsdesc.h_sig(*pfluxParams, joinSplitPubKey);
 
         encryptedNote2 = HexStr(ss2.begin(), ss2.end());
     }
