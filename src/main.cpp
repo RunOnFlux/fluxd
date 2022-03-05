@@ -1298,7 +1298,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state,
     } else {
         // Ensure that zk-SNARKs verify
         BOOST_FOREACH(const JSDescription &joinsplit, tx.vJoinSplit) {
-            if (!joinsplit.Verify(*pzelcashParams, verifier, tx.joinSplitPubKey)) {
+            if (!joinsplit.Verify(*pfluxParams, verifier, tx.joinSplitPubKey)) {
                 return state.DoS(100, error("CheckTransaction(): joinsplit does not verify"),
                                     REJECT_INVALID, "bad-txns-joinsplit-verification-failed");
             }
@@ -3158,7 +3158,7 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
 static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
 
 void ThreadScriptCheck() {
-    RenameThread("zelcash-scriptch");
+    RenameThread("fluxcash-scriptch");
     scriptcheckqueue.Thread();
 }
 

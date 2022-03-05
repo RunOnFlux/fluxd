@@ -30,14 +30,14 @@
 
 CClientUIInterface uiInterface; // Declared but not defined in ui_interface.h
 CWallet* pwalletMain;
-ZCJoinSplit *pzelcashParams;
+ZCJoinSplit *pfluxParams;
 
 extern bool fPrintToConsole;
 extern void noui_connect();
 
 JoinSplitTestingSetup::JoinSplitTestingSetup()
 {
-    pzelcashParams = ZCJoinSplit::Prepared();
+    pfluxParams = ZCJoinSplit::Prepared();
 
     boost::filesystem::path sapling_spend = ZC_GetParamsDir() / "sapling-spend.params";
     boost::filesystem::path sapling_output = ZC_GetParamsDir() / "sapling-output.params";
@@ -65,7 +65,7 @@ JoinSplitTestingSetup::JoinSplitTestingSetup()
 
 JoinSplitTestingSetup::~JoinSplitTestingSetup()
 {
-    delete pzelcashParams;
+    delete pfluxParams;
 }
 
 BasicTestingSetup::BasicTestingSetup()

@@ -100,7 +100,7 @@ double benchmark_create_joinsplit()
 
     struct timeval tv_start;
     timer_start(tv_start);
-    JSDescription jsdesc(*pzelcashParams,
+    JSDescription jsdesc(*pfluxParams,
                          joinSplitPubKey,
                          anchor,
                          {JSInput(), JSInput()},
@@ -110,7 +110,7 @@ double benchmark_create_joinsplit()
     double ret = timer_stop(tv_start);
 
     auto verifier = libzelcash::ProofVerifier::Strict();
-    assert(jsdesc.Verify(*pzelcashParams, verifier, joinSplitPubKey));
+    assert(jsdesc.Verify(*pfluxParams, verifier, joinSplitPubKey));
     return ret;
 }
 
@@ -141,7 +141,7 @@ double benchmark_verify_joinsplit(const JSDescription &joinsplit)
     timer_start(tv_start);
     uint256 joinSplitPubKey;
     auto verifier = libzelcash::ProofVerifier::Strict();
-    joinsplit.Verify(*pzelcashParams, verifier, joinSplitPubKey);
+    joinsplit.Verify(*pfluxParams, verifier, joinSplitPubKey);
     return timer_stop(tv_start);
 }
 
@@ -275,7 +275,7 @@ double benchmark_try_decrypt_sprout_notes(size_t nKeys)
     }
 
     auto sk = libzelcash::SproutSpendingKey::random();
-    auto tx = GetValidSproutReceive(*pzelcashParams, sk, 10, true);
+    auto tx = GetValidSproutReceive(*pfluxParams, sk, 10, true);
 
     struct timeval tv_start;
     timer_start(tv_start);
@@ -311,8 +311,8 @@ double benchmark_try_decrypt_sapling_notes(size_t nKeys)
 }
 
 CWalletTx CreateSproutTxWithNoteData(const libzelcash::SproutSpendingKey& sk) {
-    auto wtx = GetValidSproutReceive(*pzelcashParams, sk, 10, true);
-    auto note = GetSproutNote(*pzelcashParams, sk, wtx, 0, 1);
+    auto wtx = GetValidSproutReceive(*pfluxParams, sk, 10, true);
+    auto note = GetSproutNote(*pfluxParams, sk, wtx, 0, 1);
     auto nullifier = note.nullifier(sk);
 
     mapSproutNoteData_t noteDataMap;
