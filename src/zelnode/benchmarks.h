@@ -10,7 +10,7 @@
 class Benchmarks;
 class CTransaction;
 extern Benchmarks benchmarks;
-extern bool fZelStartedBench;
+extern bool fFluxStartedBench;
 extern std::string strPath;
 
 class Benchmarks {
@@ -26,11 +26,11 @@ std::string GetBenchCliPath();
 std::string GetBenchDaemonPath();
 std::string GetSelfPath();
 
-bool IsZelBenchdRunning();
-void StartZelBenchd();
-void StopZelBenchd();
+bool IsFluxBenchdRunning();
+void StartFluxBenchd();
+void StopFluxBenchd();
 std::string GetBenchmarks();
-std::string GetZelBenchdStatus();
+std::string GetFluxBenchdStatus();
 bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedTx, std::string& error);
 
 std::string GetStdoutFromCommand(std::string cmd, bool redirect_stdout = false, bool redirect_devnull = false);

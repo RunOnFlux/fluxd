@@ -246,13 +246,13 @@ UniValue stop(const UniValue& params, bool fHelp)
     if (fHelp || params.size() > 1)
         throw runtime_error(
             "stop\n"
-            "\nStop Zelcash server.");
+            "\nStop Flux server.");
     // Event loop will exit after current HTTP requests have been handled, so
     // this reply will get back to the client.
-    if (fZelStartedBench)
-        StopZelBenchd();
+    if (fFluxStartedBench)
+        StopFluxBenchd();
     StartShutdown();
-    return "Zelcash server stopping";
+    return "Flux server stopping";
 }
 
 /**
@@ -461,7 +461,7 @@ UniValue CRPCTable::execute(const std::string &strMethod, const UniValue &params
 
 std::string HelpExampleCli(const std::string& methodname, const std::string& args)
 {
-    return "> zelcash-cli " + methodname + " " + args + "\n";
+    return "> flux-cli " + methodname + " " + args + "\n";
 }
 
 std::string HelpExampleRpc(const std::string& methodname, const std::string& args)

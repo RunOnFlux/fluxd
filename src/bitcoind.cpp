@@ -149,7 +149,7 @@ bool AppInit(int argc, char* argv[])
 
         if (fCommandLine)
         {
-            fprintf(stderr, "Error: There is no RPC client functionality in zelcashd. Use the zelcash-cli utility instead.\n");
+            fprintf(stderr, "Error: There is no RPC client functionality in zelcashd. Use the flux-cli utility instead.\n");
             exit(EXIT_FAILURE);
         }
 #ifndef WIN32

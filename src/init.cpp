@@ -199,7 +199,7 @@ void Shutdown()
     /// for example if the data directory was found to be locked.
     /// Be sure that anything that writes files or flushes caches only does this if the respective
     /// module was initialized.
-    RenameThread("fluxcash-shutoff");
+    RenameThread("flux-shutoff");
     mempool.AddTransactionsUpdated(1);
 
     StopHTTPRPC();
@@ -351,7 +351,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-blocknotify=<cmd>", _("Execute command when the best block changes (%s in cmd is replaced by block hash)"));
     strUsage += HelpMessageOpt("-checkblocks=<n>", strprintf(_("How many blocks to check at startup (default: %u, 0 = all)"), 288));
     strUsage += HelpMessageOpt("-checklevel=<n>", strprintf(_("How thorough the block verification of -checkblocks is (0-4, default: %u)"), 3));
-    strUsage += HelpMessageOpt("-conf=<file>", strprintf(_("Specify configuration file (default: %s)"), "fluxcash.conf"));
+    strUsage += HelpMessageOpt("-conf=<file>", strprintf(_("Specify configuration file (default: %s)"), "flux.conf"));
     if (mode == HMM_BITCOIND)
     {
 #if !defined(WIN32)
@@ -367,7 +367,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-par=<n>", strprintf(_("Set the number of script verification threads (%u to %d, 0 = auto, <0 = leave that many cores free, default: %d)"),
         -GetNumCores(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS));
 #ifndef WIN32
-    strUsage += HelpMessageOpt("-pid=<file>", strprintf(_("Specify pid file (default: %s)"), "fluxcashd.pid"));
+    strUsage += HelpMessageOpt("-pid=<file>", strprintf(_("Specify pid file (default: %s)"), "fluxd.pid"));
 #endif
     strUsage += HelpMessageOpt("-prune=<n>", strprintf(_("Reduce storage requirements by pruning (deleting) old blocks. This mode disables wallet support and is incompatible with -txindex. "
             "Warning: Reverting this setting requires re-downloading the entire blockchain. "
@@ -621,7 +621,7 @@ void CleanupBlockRevFiles()
 void ThreadImport(std::vector<boost::filesystem::path> vImportFiles)
 {
     const CChainParams& chainparams = Params();
-    RenameThread("fluxcash-loadblk");
+    RenameThread("flux-loadblk");
     // -reindex
     if (fReindex) {
         CImportingNow imp;
@@ -729,7 +729,7 @@ static void ZC_LoadParams(
         uiInterface.ThreadSafeMessageBox(strprintf(
             _("Cannot find the Zelcash network parameters in the following directory:\n"
               "%s\n"
-              "Please run 'fluxcash-fetch-params' or './zcutil/fetch-params.sh' and then restart."),
+              "Please run 'flux-fetch-params' or './zcutil/fetch-params.sh' and then restart."),
                 ZC_GetParamsDir()),
             "", CClientUIInterface::MSG_ERROR);
         StartShutdown();
@@ -1960,14 +1960,14 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         } else {
 
-             if (FindBenchmarkPath("zelbenchd", strPath)) {
-                  LogPrintf("Found zelbenchd in %s\n",strPath);
+             if (FindBenchmarkPath("fluxbenchd", strPath)) {
+                  LogPrintf("Found fluxbenchd in %s\n",strPath);
              } else {
                  return InitError("Failed to find benchmark application");
              }
 
-             if (FindBenchmarkPath("zelbench-cli", strPath)) {
-                  LogPrintf("Found zelbench-cli in %s\n",strPath);
+             if (FindBenchmarkPath("fluxbench-cli", strPath)) {
+                  LogPrintf("Found fluxbench-cli in %s\n",strPath);
              } else {
                  return InitError("Failed to find benchmark cli application");
              }
@@ -1977,12 +1977,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     if (fFluxnode) {
         // Check if the benchmark application is running
-        if (!IsZelBenchdRunning()) {
-            StartZelBenchd();
+        if (!IsFluxBenchdRunning()) {
+            StartFluxBenchd();
         }
 
-        // Make sure that zelbenchd is running and stop fluxcash if it isn't
-        if (!IsZelBenchdRunning()) {
+        // Make sure that fluxbenchd is running and stop flux if it isn't
+        if (!IsFluxBenchdRunning()) {
             return InitError("Failed to start benchmark application");
         }
     }

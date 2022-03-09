@@ -255,7 +255,7 @@ void RenameThread(const char* name);
  */
 template <typename Callable> void TraceThread(const char* name,  Callable func)
 {
-    std::string s = strprintf("zelcash-%s", name);
+    std::string s = strprintf("flux-%s", name);
     RenameThread(s.c_str());
     try
     {

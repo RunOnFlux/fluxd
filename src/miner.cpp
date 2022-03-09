@@ -620,7 +620,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
 {
     LogPrintf("ZelcashMiner started\n");
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
-    RenameThread("zelcash-miner");
+    RenameThread("flux-miner");
 
     // Each thread has its own counter
     unsigned int nExtraNonce = 0;
