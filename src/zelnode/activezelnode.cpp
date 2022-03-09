@@ -16,7 +16,7 @@
 
 void ActiveFluxnode::ManageDeterministricFluxnode()
 {
-    // We only want to run this command on the VPS that has fluxnode=1 and is running zelbenchd
+    // We only want to run this command on the VPS that has fluxnode=1 and is running fluxbenchd
     if (!fFluxnode)
         return;
 

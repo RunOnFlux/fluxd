@@ -3158,7 +3158,7 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
 static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
 
 void ThreadScriptCheck() {
-    RenameThread("fluxcash-scriptch");
+    RenameThread("flux-scriptch");
     scriptcheckqueue.Thread();
 }
 
