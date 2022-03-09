@@ -700,9 +700,10 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
                 payment_destination = data.collateralPubkey.GetID();
             }
 
+            count++;
 
-            if (strFilter != "" && strTxHash.find(strFilter) == string::npos && HexStr(data.pubKey).find(strFilter) &&
-                data.ip.find(strFilter) && EncodeDestination(payment_destination).find(strFilter) == string::npos)
+            if (strFilter != "" && strTxHash.find(strFilter) == string::npos && HexStr(data.pubKey).find(strFilter) == string::npos &&
+                data.ip.find(strFilter) == string::npos && EncodeDestination(payment_destination).find(strFilter) == string::npos)
                 continue;
 
             std::string strHost = data.ip;
@@ -734,7 +735,7 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
                 info.push_back(std::make_pair("amount", FormatMoney(data.nCollateral)));
             }
 
-            info.push_back(std::make_pair("rank", count++));
+            info.push_back(std::make_pair("rank", count));
 
             listData.push_back(info);
         }
