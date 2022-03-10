@@ -682,7 +682,7 @@ UniValue startdeterministicfluxnode(const UniValue& params, bool fHelp)
 }
 
 void GetDeterministicListData(UniValue& listData, const std::string& strFilter, const Tier tier) {
-    int count = 0;
+    int count = -1;
     for (const auto& item : g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes) {
 
         auto data = g_fluxnodeCache.GetFluxnodeData(item.out);
