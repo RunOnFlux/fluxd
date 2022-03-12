@@ -340,20 +340,20 @@ UniValue getmininginfo(const UniValue& params, bool fHelp)
     LOCK(cs_main);
 
     UniValue obj(UniValue::VOBJ);
-    obj.push_back(Pair("blocks",           (int)chainActive.Height()));
-    obj.push_back(Pair("currentblocksize", (uint64_t)nLastBlockSize));
-    obj.push_back(Pair("currentblocktx",   (uint64_t)nLastBlockTx));
-    obj.push_back(Pair("difficulty",       (double)GetNetworkDifficulty()));
-    obj.push_back(Pair("errors",           GetWarnings("statusbar")));
-    obj.push_back(Pair("genproclimit",     (int)GetArg("-genproclimit", -1)));
-    obj.push_back(Pair("localsolps"  ,     getlocalsolps(params, false)));
-    obj.push_back(Pair("networksolps",     getnetworksolps(params, false)));
-    obj.push_back(Pair("networkhashps",    getnetworksolps(params, false)));
-    obj.push_back(Pair("pooledtx",         (uint64_t)mempool.size()));
-    obj.push_back(Pair("testnet",          Params().TestnetToBeDeprecatedFieldRPC()));
-    obj.push_back(Pair("chain",            Params().NetworkIDString()));
+    obj.pushKV("blocks",           (int)chainActive.Height());
+    obj.pushKV("currentblocksize", (uint64_t)nLastBlockSize);
+    obj.pushKV("currentblocktx",   (uint64_t)nLastBlockTx);
+    obj.pushKV("difficulty",       (double)GetNetworkDifficulty());
+    obj.pushKV("errors",           GetWarnings("statusbar"));
+    obj.pushKV("genproclimit",     (int)GetArg("-genproclimit", -1));
+    obj.pushKV("localsolps"  ,     getlocalsolps(params, false));
+    obj.pushKV("networksolps",     getnetworksolps(params, false));
+    obj.pushKV("networkhashps",    getnetworksolps(params, false));
+    obj.pushKV("pooledtx",         (uint64_t)mempool.size());
+    obj.pushKV("testnet",          Params().TestnetToBeDeprecatedFieldRPC());
+    obj.pushKV("chain",            Params().NetworkIDString());
 #ifdef ENABLE_MINING
-    obj.push_back(Pair("generate",         getgenerate(params, false)));
+    obj.pushKV("generate",         getgenerate(params, false));
 #endif
     return obj;
 }
@@ -658,9 +658,9 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
 
         UniValue entry(UniValue::VOBJ);
 
-        entry.push_back(Pair("data", EncodeHexTx(tx)));
+        entry.pushKV("data", EncodeHexTx(tx));
 
-        entry.push_back(Pair("hash", txHash.GetHex()));
+        entry.pushKV("hash", txHash.GetHex());
 
         UniValue deps(UniValue::VARR);
         BOOST_FOREACH (const CTxIn &in, tx.vin)
@@ -668,14 +668,14 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
             if (setTxIndex.count(in.prevout.hash))
                 deps.push_back(setTxIndex[in.prevout.hash]);
         }
-        entry.push_back(Pair("depends", deps));
+        entry.pushKV("depends", deps);
 
         int index_in_template = i - 1;
-        entry.push_back(Pair("fee", pblocktemplate->vTxFees[index_in_template]));
-        entry.push_back(Pair("sigops", pblocktemplate->vTxSigOps[index_in_template]));
+        entry.pushKV("fee", pblocktemplate->vTxFees[index_in_template]);
+        entry.pushKV("sigops", pblocktemplate->vTxSigOps[index_in_template]);
 
         if (tx.IsCoinBase()) {
-            entry.push_back(Pair("required", true));
+            entry.pushKV("required", true);
             txCoinbase = entry;
         } else {
             transactions.push_back(entry);
@@ -683,7 +683,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     }
 
     UniValue aux(UniValue::VOBJ);
-    aux.push_back(Pair("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end())));
+    aux.pushKV("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end()));
 
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
 
@@ -696,33 +696,33 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     }
 
     UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("capabilities", aCaps));
-    result.push_back(Pair("version", pblock->nVersion));
-    result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
-    result.push_back(Pair("finalsaplingroothash", pblock->hashFinalSaplingRoot.GetHex()));
-    result.push_back(Pair("transactions", transactions));
+    result.pushKV("capabilities", aCaps);
+    result.pushKV("version", pblock->nVersion);
+    result.pushKV("previousblockhash", pblock->hashPrevBlock.GetHex());
+    result.pushKV("finalsaplingroothash", pblock->hashFinalSaplingRoot.GetHex());
+    result.pushKV("transactions", transactions);
     if (coinbasetxn) {
         assert(txCoinbase.isObject());
-        result.push_back(Pair("coinbasetxn", txCoinbase));
+        result.pushKV("coinbasetxn", txCoinbase);
     } else {
-        result.push_back(Pair("coinbaseaux", aux));
-        result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0].vout[0].nValue));
+        result.pushKV("coinbaseaux", aux);
+        result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0].vout[0].nValue);
     }
-    result.push_back(Pair("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast)));
-    result.push_back(Pair("target", hashTarget.GetHex()));
-    result.push_back(Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1));
-    result.push_back(Pair("mutable", aMutable));
-    result.push_back(Pair("noncerange", "00000000ffffffff"));
-    result.push_back(Pair("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS));
-    result.push_back(Pair("sizelimit", (int64_t)MAX_BLOCK_SIZE));
-    result.push_back(Pair("curtime", pblock->GetBlockTime()));
-    result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
-    result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight+1)));
+    result.pushKV("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast));
+    result.pushKV("target", hashTarget.GetHex());
+    result.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1);
+    result.pushKV("mutable", aMutable);
+    result.pushKV("noncerange", "00000000ffffffff");
+    result.pushKV("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS);
+    result.pushKV("sizelimit", (int64_t)MAX_BLOCK_SIZE);
+    result.pushKV("curtime", pblock->GetBlockTime());
+    result.pushKV("bits", strprintf("%08x", pblock->nBits));
+    result.pushKV("height", (int64_t)(pindexPrev->nHeight+1));
 
     if (pblock->vtx.size()) {
         int nCoinbaseOutSize = pblock->vtx[0].vout.size();
         if (nCoinbaseOutSize > 0) {
-            result.push_back(Pair("miner_reward", pblock->vtx[0].vout[0].nValue));
+            result.pushKV("miner_reward", pblock->vtx[0].vout[0].nValue);
         }
     } else {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Block didn't have any transactions in it...");
@@ -745,28 +745,28 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         CTxDestination dest;
         ExtractDestination(payout.second.first, dest);
 
-        result.push_back(Pair(std::string(start + "_fluxnode_address"), EncodeDestination(dest)));
-        result.push_back(Pair(std::string(start + "_fluxnode_payout"), payout.second.second));
+        result.pushKV(std::string(start + "_fluxnode_address"), EncodeDestination(dest));
+        result.pushKV(std::string(start + "_fluxlnode_payout"), payout.second.second);
 
-        result.push_back(Pair(std::string(start_rename + "_fluxnode_address"), EncodeDestination(dest)));
-        result.push_back(Pair(std::string(start_rename + "_fluxnode_payout"), payout.second.second));
+        result.pushKV(std::string(start_rename + "_fluxnode_address"), EncodeDestination(dest));
+        result.pushKV(std::string(start_rename + "_fluxnode_payout"), payout.second.second);
     }
 
     // These should never be on the same block. So to keep it clean for pools we will use the same
     // name for address and amount specifics
     if (pindexPrev->nHeight + 1 == Params().GetExchangeFundingHeight()) {
-        result.push_back(Pair("flux_creation_address", Params().GetExchangeFundingAddress()));
-        result.push_back(Pair("flux_creation_amount", Params().GetExchangeFundingAmount()));
+        result.pushKV("flux_creation_address", Params().GetExchangeFundingAddress());
+        result.pushKV("flux_creation_amount", Params().GetExchangeFundingAmount());
     }
 
     if (pindexPrev->nHeight + 1 == Params().GetFoundationFundingHeight()) {
-        result.push_back(Pair("flux_creation_address", Params().GetFoundationFundingAddress()));
-        result.push_back(Pair("flux_creation_amount", Params().GetFoundationFundingAmount()));
+        result.pushKV("flux_creation_address", Params().GetFoundationFundingAddress());
+        result.pushKV("flux_creation_amount", Params().GetFoundationFundingAmount());
     }
 
     if (IsSwapPoolInterval(pindexPrev->nHeight + 1)) {
-        result.push_back(Pair("flux_creation_address", Params().GetSwapPoolAddress()));
-        result.push_back(Pair("flux_creation_amount", Params().GetSwapPoolAmount()));
+        result.pushKV("flux_creation_address", Params().GetSwapPoolAddress());
+        result.pushKV("flux_creation_amount", Params().GetSwapPoolAmount());
     }
 
     return result;
@@ -941,7 +941,7 @@ UniValue getblocksubsidy(const UniValue& params, bool fHelp)
 
     CAmount nReward = GetBlockSubsidy(nHeight, Params().GetConsensus());
     UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("miner", ValueFromAmount(nReward)));
+    result.pushKV("miner", ValueFromAmount(nReward));
     return result;
 }
 
