@@ -1005,7 +1005,7 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp, string cmdname)
 
             info.pushKV("status", FluxnodeLocationToString(nLocation));
             info.pushKV("collateral", data.collateralIn.ToFullString());
-            info.pushKV("txhash", strTxHash));
+            info.pushKV("txhash", strTxHash);
             info.pushKV("outidx", data.collateralIn.GetTxIndex());
             info.pushKV("ip", data.ip);
             info.pushKV("network", strNetwork);
