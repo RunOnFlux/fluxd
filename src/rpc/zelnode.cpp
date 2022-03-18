@@ -706,8 +706,10 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
                 data.ip.find(strFilter) == string::npos && EncodeDestination(payment_destination).find(strFilter) == string::npos)
                 continue;
 
-            std::string strHost = data.ip;
-            CNetAddr node = CNetAddr(strHost, false);
+            std::string host;
+            int port;
+            SplitHostPort(data.ip, port, host);
+            CNetAddr node = CNetAddr(host, false);
             std::string strNetwork = GetNetworkName(node.GetNetwork());
 
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
