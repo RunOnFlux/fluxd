@@ -25,7 +25,7 @@
 #define MICRO 0.000001
 #define MILLI 0.001
 
-UniValue rebuildzelnodedb(const UniValue& params, bool fHelp, string cmdname) {
+UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname = "rebuildfluxnodedb") {
     if (fHelp || params.size() > 0)
         throw runtime_error(
                 cmdname + " \n"
@@ -222,15 +222,15 @@ UniValue rebuildzelnodedb(const UniValue& params, bool fHelp, string cmdname) {
     return true;
 }
 
-UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
-    return rebuildzelnodedb(params, fHelp, "rebuildzelnodedb");
-}
-
 UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp) {
-    return rebuildzelnodedb(params, fHelp, "rebuildfluxnodedb");
+    return rebuildfluxnodedb(params, fHelp, "rebuildfluxnodedb");
 }
 
-UniValue createzelnodekey(const UniValue& params, bool fHelp, string cmdname)
+UniValue rebuildzelnodedb(const UniValue& params, bool fHelp) {
+    return rebuildfluxnodedb(params, fHelp, "rebuildzelnodedb");
+}
+
+UniValue createfluxnodekey(const UniValue& params, bool fHelp, string cmdname = "createfluxnodekey")
 {
     if (fHelp || (params.size() != 0))
         throw runtime_error(
@@ -248,14 +248,14 @@ UniValue createzelnodekey(const UniValue& params, bool fHelp, string cmdname)
     return EncodeSecret(secret);
 }
 
-UniValue createzelnodekey(const UniValue& params, bool fHelp)
-{
-    return createzelnodekey(params, fHelp, "createzelnodekey");
-}
-
 UniValue createfluxnodekey(const UniValue& params, bool fHelp)
 {
-    return createzelnodekey(params, fHelp, "createfluxnodekey");
+    return createfluxnodekey(params, fHelp, "createfluxnodekey");
+}
+
+UniValue createzelnodekey(const UniValue& params, bool fHelp)
+{
+    return createfluxnodekey(params, fHelp, "createzelnodekey");
 }
 
 UniValue createsporkkeys(const UniValue& params, bool fHelp)
@@ -288,7 +288,7 @@ UniValue createsporkkeys(const UniValue& params, bool fHelp)
     return ret;
 }
 
-UniValue getzelnodeoutputs(const UniValue& params, bool fHelp, string cmdname)
+UniValue getfluxnodeoutputs(const UniValue& params, bool fHelp, string cmdname = "getfluxnodeoutputs")
 {
     if (fHelp || (params.size() != 0))
         throw runtime_error(
@@ -324,14 +324,14 @@ UniValue getzelnodeoutputs(const UniValue& params, bool fHelp, string cmdname)
     return ret;
 }
 
-UniValue getzelnodeoutputs(const UniValue& params, bool fHelp)
-{
-    return getzelnodeoutputs(params, fHelp, "getzelnodeoutputs");
-}
-
 UniValue getfluxnodeoutputs(const UniValue& params, bool fHelp)
 {
-    return getzelnodeoutputs(params, fHelp, "getfluxnodeoutputs");
+    return getfluxnodeoutputs(params, fHelp, "getfluxnodeoutputs");
+}
+
+UniValue getzelnodeoutputs(const UniValue& params, bool fHelp)
+{
+    return getfluxnodeoutputs(params, fHelp, "getzelnodeoutputs");
 }
 
 UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
@@ -366,7 +366,7 @@ UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
     return HexStr(ss.begin(), ss.end());
 }
 
-UniValue startzelnode(const UniValue& params, bool fHelp, string cmdname)
+UniValue startfluxnode(const UniValue& params, bool fHelp, string cmdname = "startfluxnode")
 {
 
     std::string strCommand;
@@ -535,15 +535,15 @@ UniValue startzelnode(const UniValue& params, bool fHelp, string cmdname)
     return NullUniValue;
 }
 
-UniValue startzelnode(const UniValue& params, bool fHelp) {
-    return startzelnode(params, fHelp, "startzelnode");
-}
-
 UniValue startfluxnode(const UniValue& params, bool fHelp) {
-    return startzelnode(params, fHelp, "startfluxnode");
+    return startfluxnode(params, fHelp, "startfluxnode");
 }
 
-UniValue startdeterministiczelnode(const UniValue& params, bool fHelp, string cmdname)
+UniValue startzelnode(const UniValue& params, bool fHelp) {
+    return startfluxnode(params, fHelp, "startzelnode");
+}
+
+UniValue startdeterministicfluxnode(const UniValue& params, bool fHelp, string cmdname = "startdeterministicfluxnode")
 {
     if (!IsFluxnodeTransactionsActive()) {
         throw runtime_error("deterministic fluxnodes transactions is not active yet");
@@ -671,14 +671,14 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp, string cm
     return returnObj;
 }
 
-UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
-{
-    return startdeterministiczelnode(params, fHelp, "startdeterministiczelnode");
-}
-
 UniValue startdeterministicfluxnode(const UniValue& params, bool fHelp)
 {
-    return startdeterministiczelnode(params, fHelp, "startdeterministicfluxnode");
+    return startdeterministicfluxnode(params, fHelp, "startdeterministicfluxnode");
+}
+
+UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
+{
+    return startdeterministicfluxnode(params, fHelp, "startdeterministiczelnode");
 }
 
 void GetDeterministicListData(UniValue& listData, const std::string& strFilter, const Tier tier) {
@@ -744,7 +744,7 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
     }
 }
 
-UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp, string cmdname)
+UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp, string cmdname = "viewdeterministicfluxnodelist")
 {
     if (fHelp || params.size() > 1)
         throw runtime_error(
@@ -797,24 +797,24 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp, string
     return deterministicList;
 }
 
+UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp)
+{
+    return viewdeterministicfluxnodelist(params, fHelp, "viewdeterministicfluxnodelist");
+}
+
 UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
 {
-    return viewdeterministiczelnodelist(params, fHelp, "viewdeterministiczelnodelist");
+    return viewdeterministicfluxnodelist(params, fHelp, "viewdeterministiczelnodelist");
 }
 
 UniValue listzelnodes(const UniValue& params, bool fHelp)
 {
-    return viewdeterministiczelnodelist(params, fHelp, "listzelnodes");
+    return viewdeterministicfluxnodelist(params, fHelp, "listzelnodes");
 }
 
 UniValue listfluxnodes(const UniValue& params, bool fHelp)
 {
-    return viewdeterministiczelnodelist(params, fHelp, "listfluxnodes");
-}
-
-UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp)
-{
-    return viewdeterministiczelnodelist(params, fHelp, "viewdeterministicfluxnodelist");
+    return viewdeterministicfluxnodelist(params, fHelp, "listfluxnodes");
 }
 
 UniValue getdoslist(const UniValue& params, bool fHelp)
@@ -960,7 +960,7 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
     return NullUniValue;
 }
 
-UniValue getzelnodestatus (const UniValue& params, bool fHelp, string cmdname)
+UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname = "getfluxnodestatus")
 {
     if (fHelp || (params.size() != 0))
         throw runtime_error(
@@ -1040,17 +1040,17 @@ UniValue getzelnodestatus (const UniValue& params, bool fHelp, string cmdname)
 
 }
 
-UniValue getzelnodestatus (const UniValue& params, bool fHelp)
-{
-    return getzelnodestatus(params, fHelp, "getzelnodestatus");
-}
-
 UniValue getfluxnodestatus (const UniValue& params, bool fHelp)
 {
-    return getzelnodestatus(params, fHelp, "getfluxnodestatus");
+    return getfluxnodestatus(params, fHelp, "getfluxnodestatus");
 }
 
-UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp, string cmdname)
+UniValue getzelnodestatus (const UniValue& params, bool fHelp)
+{
+    return getfluxnodestatus(params, fHelp, "getzelnodestatus");
+}
+
+UniValue fluxnodecurrentwinner (const UniValue& params, bool fHelp, string cmdname = "fluxnodecurrentwinner")
 {
     if (fHelp || (params.size() != 0))
         throw runtime_error(
@@ -1097,17 +1097,17 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp, string cmdnam
     return NullUniValue;
 }
 
-UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
-{
-    return zelnodecurrentwinner(params, fHelp, "zelnodecurrentwinner");
-}
-
 UniValue fluxnodecurrentwinner (const UniValue& params, bool fHelp)
 {
-    return zelnodecurrentwinner(params, fHelp, "fluxnodecurrentwinner");
+    return fluxnodecurrentwinner(params, fHelp, "fluxnodecurrentwinner");
 }
 
-UniValue getzelnodecount (const UniValue& params, bool fHelp, string cmdname)
+UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
+{
+    return fluxnodecurrentwinner(params, fHelp, "zelnodecurrentwinner");
+}
+
+UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname = "getfluxnodecount")
 {
     if (fHelp || (params.size() > 0))
         throw runtime_error(
@@ -1174,12 +1174,12 @@ UniValue getzelnodecount (const UniValue& params, bool fHelp, string cmdname)
 
 UniValue getfluxnodecount (const UniValue& params, bool fHelp)
 {
-    return getzelnodecount(params, fHelp, "getfluxnodecount");
+    return getfluxnodecount(params, fHelp, "getfluxnodecount");
 }
 
 UniValue getzelnodecount (const UniValue& params, bool fHelp)
 {
-    return getzelnodecount(params, fHelp, "getzelnodecount");
+    return getfluxnodecount(params, fHelp, "getzelnodecount");
 }
 
 UniValue getmigrationcount (const UniValue& params, bool fHelp)
@@ -1244,7 +1244,7 @@ UniValue getmigrationcount (const UniValue& params, bool fHelp)
     return NullUniValue;
 }
 
-UniValue listzelnodeconf (const UniValue& params, bool fHelp, string cmdname)
+UniValue listfluxnodeconf (const UniValue& params, bool fHelp, string cmdname = "listfluxnodeconf")
 {
     std::string strFilter = "";
 
@@ -1352,14 +1352,14 @@ UniValue listzelnodeconf (const UniValue& params, bool fHelp, string cmdname)
     return ret;
 }
 
-UniValue listzelnodeconf (const UniValue& params, bool fHelp)
-{
-    return listzelnodeconf(params, fHelp, "listzelnodeconf");
-}
-
 UniValue listfluxnodeconf (const UniValue& params, bool fHelp)
 {
-    return listzelnodeconf(params, fHelp, "listfluxnodeconf");
+    return listfluxnodeconf(params, fHelp, "listfluxnodeconf");
+}
+
+UniValue listzelnodeconf (const UniValue& params, bool fHelp)
+{
+    return listfluxnodeconf(params, fHelp, "listzelnodeconf");
 }
 
 UniValue getbenchmarks(const UniValue& params, bool fHelp)
@@ -1393,7 +1393,7 @@ UniValue getbenchstatus(const UniValue& params, bool fHelp)
 }
 
 
-UniValue stopzelbenchd(const UniValue& params, bool fHelp, string cmdname)
+UniValue stopfluxbenchd(const UniValue& params, bool fHelp, string cmdname = "stopfluxbenchd")
 {
     if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
@@ -1413,17 +1413,17 @@ UniValue stopzelbenchd(const UniValue& params, bool fHelp, string cmdname)
     return "Not running";
 }
 
-UniValue stopzelbenchd(const UniValue& params, bool fHelp)
-{
-    return stopzelbenchd(params, fHelp, "stopzelbenchd");
-}
-
 UniValue stopfluxbenchd(const UniValue& params, bool fHelp)
 {
-    return stopzelbenchd(params, fHelp, "stopfluxbenchd");
+    return stopfluxbenchd(params, fHelp, "stopfluxbenchd");
 }
 
-UniValue startzelbenchd(const UniValue& params, bool fHelp, string cmdname)
+UniValue stopzelbenchd(const UniValue& params, bool fHelp)
+{
+    return stopfluxbenchd(params, fHelp, "stopzelbenchd");
+}
+
+UniValue startfluxbenchd(const UniValue& params, bool fHelp, string cmdname = "startfluxbenchd")
 {
     if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
@@ -1443,14 +1443,14 @@ UniValue startzelbenchd(const UniValue& params, bool fHelp, string cmdname)
     return "Already running";
 }
 
-UniValue startzelbenchd(const UniValue& params, bool fHelp)
-{
-    return startzelbenchd(params, fHelp, "startzelbenchd");
-}
-
 UniValue startfluxbenchd(const UniValue& params, bool fHelp)
 {
-    return startzelbenchd(params, fHelp, "startfluxbenchd");
+    return startfluxbenchd(params, fHelp, "startfluxbenchd");
+}
+
+UniValue startzelbenchd(const UniValue& params, bool fHelp)
+{
+    return startfluxbenchd(params, fHelp, "startzelbenchd");
 }
 
 static const CRPCCommand commands[] =
