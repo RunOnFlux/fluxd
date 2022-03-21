@@ -174,6 +174,7 @@ public:
 
         vFixedSeeds.clear();
         vSeeds.clear();
+        vSeeds.push_back(CDNSSeedData("dnsseed.asoftwaresolution.com", "dnsseed.asoftwaresolution.com")); // Flux-Seeder Hosted by Blondfrogs
         vSeeds.push_back(CDNSSeedData("vps.zel.network", "dnsseed.zel.network")); // Zel
         vSeeds.push_back(CDNSSeedData("vps.runonflux.io", "dnsseed.runonflux.io")); // Flux
 
