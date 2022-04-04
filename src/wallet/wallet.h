@@ -92,7 +92,7 @@ enum AvailableCoinsType {
     ONLY_CUMULUS = 2,   // find zelnode outputs including locked ones (use with caution) for 10000
     ONLY_NIMBUS = 3,   // find zelnode outputs including locked ones (use with caution) for 25000
     ONLY_STRATUS = 4,  // find zelnode outputs including locked ones (use with caution) for 100000
-    ALL_ZELNODE = 5
+    ALL_FLUXNODE = 5
 };
 
 
@@ -1329,9 +1329,9 @@ public:
                           bool ignoreUnspendable=true);
 
 
-    /** Zelnode Additions */
-    /// Get 10000, 25000, 100000, ZEL output and keys which can be used for the Zelnode
-    bool GetZelnodeVinAndKeys(CTxIn& txinRet, CPubKey& pubKeyRet, CKey& keyRet, std::string strTxHash = "", std::string strOutputIndex = "");
+    /** Fluxnode Additions */
+    /// Get 10000, 25000, 100000, ZEL output and keys which can be used for the Fluxnode
+    bool GetFluxnodeVinAndKeys(CTxIn& txinRet, CPubKey& pubKeyRet, CKey& keyRet, std::string strTxHash = "", std::string strOutputIndex = "");
     /// Extract txin information and keys from output
     bool GetVinAndKeysFromOutput(COutput out, CTxIn& txinRet, CPubKey& pubKeyRet, CKey& keyRet);
 

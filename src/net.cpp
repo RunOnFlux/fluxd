@@ -1897,12 +1897,12 @@ void RelayTransaction(const CTransaction& tx, const CDataStream& ss)
     }
 }
 
-void RelayZelnodeTx(const CInv& inv)
+void RelayFluxnodeTx(const CInv& inv)
 {
     LOCK(cs_vNodes);
     BOOST_FOREACH(CNode* pnode, vNodes)
                 {
-                    if((pnode->nServices==NODE_BLOOM_WITHOUT_ZN) && inv.IsZelnodeType())continue;
+                    if((pnode->nServices==NODE_BLOOM_WITHOUT_ZN) && inv.IsFluxnodeType())continue;
 
                     if ((Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION) || (Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION_TESTNET))
                         pnode->PushInventory(inv);
@@ -1914,7 +1914,7 @@ void RelayInv(const CInv& inv)
     LOCK(cs_vNodes);
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
-        if((pnode->nServices==NODE_BLOOM_WITHOUT_ZN) && inv.IsZelnodeType())continue;
+        if((pnode->nServices==NODE_BLOOM_WITHOUT_ZN) && inv.IsFluxnodeType())continue;
 
         if ((Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION) || (Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION_TESTNET))
             pnode->PushInventory(inv);

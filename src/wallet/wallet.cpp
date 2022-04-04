@@ -1395,7 +1395,7 @@ bool CWallet::UpdateNullifierNoteMap()
                     if (GetNoteDecryptor(item.second.address, dec)) {
                         auto i = item.first.js;
                         auto hSig = wtxItem.second.vJoinSplit[i].h_sig(
-                            *pzelcashParams, wtxItem.second.joinSplitPubKey);
+                            *pfluxParams, wtxItem.second.joinSplitPubKey);
                         item.second.nullifier = GetSproutNoteNullifier(
                             wtxItem.second.vJoinSplit[i],
                             item.second.address,
@@ -1810,7 +1810,7 @@ mapSproutNoteData_t CWallet::FindMySproutNotes(const CTransaction &tx) const
 
     mapSproutNoteData_t noteData;
     for (size_t i = 0; i < tx.vJoinSplit.size(); i++) {
-        auto hSig = tx.vJoinSplit[i].h_sig(*pzelcashParams, tx.joinSplitPubKey);
+        auto hSig = tx.vJoinSplit[i].h_sig(*pfluxParams, tx.joinSplitPubKey);
         for (uint8_t j = 0; j < tx.vJoinSplit[i].ciphertexts.size(); j++) {
             for (const NoteDecryptorMap::value_type& item : mapNoteDecryptors) {
                 try {
@@ -2983,7 +2983,7 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                 continue;
 
 //            if (nCoinType != ALL_COINS) {
-//                if (nDepth < ZELNODE_MIN_CONFIRMATION_DETERMINISTIC)
+//                if (nDepth < FLUXNODE_MIN_CONFIRMATION_DETERMINISTIC)
 //                    continue;
 //            }
 
@@ -3009,7 +3009,7 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                     if (nTier == STRATUS) {
                         found = true;
                     }
-                } else if (nCoinType == ALL_ZELNODE) {
+                } else if (nCoinType == ALL_FLUXNODE) {
                     found = IsTierValid(nTier);
                 } else {
                     found = true;
@@ -3028,7 +3028,7 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                     }
                 }
 
-                if (IsLockedCoin((*it).first, i) && nCoinType != ONLY_CUMULUS && nCoinType != ONLY_NIMBUS && nCoinType != ONLY_STRATUS && nCoinType != ALL_ZELNODE )
+                if (IsLockedCoin((*it).first, i) && nCoinType != ONLY_CUMULUS && nCoinType != ONLY_NIMBUS && nCoinType != ONLY_STRATUS && nCoinType != ALL_FLUXNODE )
                     continue;
 
                 if (pcoin->vout[i].nValue <= 0 && !fIncludeZeroValue)
@@ -3675,7 +3675,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, boost::optional<CReserveKey&>
 
             // Add tx to wallet, because if it has change it's also ours,
             // otherwise just for transaction history.
-            if (!wtxNew.IsZelnodeTx())
+            if (!wtxNew.IsFluxnodeTx())
                 AddToWallet(wtxNew, false, pwalletdb);
 
             // Notify that old coins are spent
@@ -4617,7 +4617,7 @@ void CWallet::GetFilteredNotes(
             }
 
             // determine amount of funds in the note
-            auto hSig = wtx.vJoinSplit[i].h_sig(*pzelcashParams, wtx.joinSplitPubKey);
+            auto hSig = wtx.vJoinSplit[i].h_sig(*pfluxParams, wtx.joinSplitPubKey);
             try {
                 SproutNotePlaintext plaintext = SproutNotePlaintext::decrypt(
                         decryptor,
@@ -4818,16 +4818,16 @@ SpendingKeyAddResult AddSpendingKeyToWallet::operator()(const libzelcash::Invali
     throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid spending key");
 }
 
-bool CWallet::GetZelnodeVinAndKeys(CTxIn& txinRet, CPubKey& pubKeyRet, CKey& keyRet, std::string strTxHash, std::string strOutputIndex)
+bool CWallet::GetFluxnodeVinAndKeys(CTxIn& txinRet, CPubKey& pubKeyRet, CKey& keyRet, std::string strTxHash, std::string strOutputIndex)
 {
     // wait for reindex and/or import to finish
     if (fImporting || fReindex) return false;
 
     // Find possible candidates
     std::vector<COutput> vPossibleCoins;
-    AvailableCoins(vPossibleCoins, true, NULL, false, false,ALL_ZELNODE);
+    AvailableCoins(vPossibleCoins, true, NULL, false, false,ALL_FLUXNODE);
     if (vPossibleCoins.empty()) {
-        LogPrintf("CWallet::GetZelnodeVinAndKeys -- Could not locate any valid zelnode vin\n");
+        LogPrintf("CWallet::GetFluxnodeVinAndKeys -- Could not locate any valid fluxnode vin\n");
         return false;
     }
 
@@ -4849,7 +4849,7 @@ bool CWallet::GetZelnodeVinAndKeys(CTxIn& txinRet, CPubKey& pubKeyRet, CKey& key
                     if (out.tx->GetHash() == txHash && out.i == nOutputIndex) // found it!
                         return GetVinAndKeysFromOutput(out, txinRet, pubKeyRet, keyRet);
 
-    LogPrintf("CWallet::GetZelnodeVinAndKeys -- Could not locate specified zelnode vin\n");
+    LogPrintf("CWallet::GetFluxnodeVinAndKeys -- Could not locate specified fluxnode vin\n");
     return false;
 }
 

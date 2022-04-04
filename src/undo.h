@@ -80,7 +80,7 @@ public:
 };
 
 template <typename Stream, typename Operation>
-void ReadWriteExtraZelnodeUndoBlockData(Stream &s, Operation ser_action, std::map<COutPoint, std::string> &mapLastIpAddress)
+void ReadWriteExtraFluxnodeUndoBlockData(Stream &s, Operation ser_action, std::map<COutPoint, std::string> &mapLastIpAddress)
 {
     if (ser_action.ForRead())
     {
@@ -94,11 +94,11 @@ void ReadWriteExtraZelnodeUndoBlockData(Stream &s, Operation ser_action, std::ma
     }
 };
 
-class CZelnodeTxBlockUndo
+class CFluxnodeTxBlockUndo
 {
 public:
-    std::vector<ZelnodeCacheData> vecExpiredDosData;
-    std::vector<ZelnodeCacheData> vecExpiredConfirmedData;
+    std::vector<FluxnodeCacheData> vecExpiredDosData;
+    std::vector<FluxnodeCacheData> vecExpiredConfirmedData;
     std::map<COutPoint, int> mapUpdateLastConfirmHeight;
     std::map<COutPoint, int> mapLastPaidHeights;
     std::map<COutPoint, std::string> mapLastIpAddress;
@@ -111,7 +111,7 @@ public:
         mapLastIpAddress.clear();
     }
 
-    CZelnodeTxBlockUndo(){
+    CFluxnodeTxBlockUndo(){
         SetNull();
     }
 
@@ -123,7 +123,7 @@ public:
         READWRITE(vecExpiredConfirmedData);
         READWRITE(mapUpdateLastConfirmHeight);
         READWRITE(mapLastPaidHeights);
-        ReadWriteExtraZelnodeUndoBlockData(s, ser_action, mapLastIpAddress);
+        ReadWriteExtraFluxnodeUndoBlockData(s, ser_action, mapLastIpAddress);
     }
 };
 

@@ -374,8 +374,8 @@ BOOST_AUTO_TEST_CASE(test_basic_joinsplit_verification)
     auto verifier = libzelcash::ProofVerifier::Strict();
 
     {
-        JSDescription jsdesc(*pzelcashParams, joinSplitPubKey, rt, inputs, outputs, 0, 0);
-        BOOST_CHECK(jsdesc.Verify(*pzelcashParams, verifier, joinSplitPubKey));
+        JSDescription jsdesc(*pfluxParams, joinSplitPubKey, rt, inputs, outputs, 0, 0);
+        BOOST_CHECK(jsdesc.Verify(*pfluxParams, verifier, joinSplitPubKey));
 
         CDataStream ss(SER_DISK, CLIENT_VERSION);
         auto os = WithVersion(&ss, SAPLING_TX_VERSION | 1 << 31);
@@ -385,20 +385,20 @@ BOOST_AUTO_TEST_CASE(test_basic_joinsplit_verification)
         os >> jsdesc_deserialized;
 
         BOOST_CHECK(jsdesc_deserialized == jsdesc);
-        BOOST_CHECK(jsdesc_deserialized.Verify(*pzelcashParams, verifier, joinSplitPubKey));
+        BOOST_CHECK(jsdesc_deserialized.Verify(*pfluxParams, verifier, joinSplitPubKey));
     }
 
     {
         // Ensure that the balance equation is working.
-        BOOST_CHECK_THROW(JSDescription(*pzelcashParams, joinSplitPubKey, rt, inputs, outputs, 10, 0), std::invalid_argument);
-        BOOST_CHECK_THROW(JSDescription(*pzelcashParams, joinSplitPubKey, rt, inputs, outputs, 0, 10), std::invalid_argument);
+        BOOST_CHECK_THROW(JSDescription(*pfluxParams, joinSplitPubKey, rt, inputs, outputs, 10, 0), std::invalid_argument);
+        BOOST_CHECK_THROW(JSDescription(*pfluxParams, joinSplitPubKey, rt, inputs, outputs, 0, 10), std::invalid_argument);
     }
 
     {
         // Ensure that it won't verify if the root is changed.
-        auto test = JSDescription(*pzelcashParams, joinSplitPubKey, rt, inputs, outputs, 0, 0);
+        auto test = JSDescription(*pfluxParams, joinSplitPubKey, rt, inputs, outputs, 0, 0);
         test.anchor = GetRandHash();
-        BOOST_CHECK(!test.Verify(*pzelcashParams, verifier, joinSplitPubKey));
+        BOOST_CHECK(!test.Verify(*pfluxParams, verifier, joinSplitPubKey));
     }
 }
 

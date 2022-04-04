@@ -100,9 +100,9 @@ namespace boost {
 
 using namespace std;
 
-string strZelnodeAddr = "";
-string strZelnodePrivKey = "";
-bool fZelnode = false;
+string strFluxnodeAddr = "";
+string strFluxnodePrivKey = "";
+bool fFluxnode = false;
 
 CCriticalSection cs_args;
 map<string, string> mapArgs;
@@ -691,9 +691,9 @@ boost::filesystem::path GetConfigFile()
     return pathZelcashConfigFile;
 }
 
-boost::filesystem::path GetZelnodeConfigFile()
+boost::filesystem::path GetFluxnodeConfigFile()
 {
-    boost::filesystem::path pathConfigFile(GetArg("-znconf", "zelnode.conf"));
+    boost::filesystem::path pathConfigFile(GetArg("-znconf", "fluxnode.conf"));
     if (!pathConfigFile.is_complete())
         pathConfigFile = GetDataDir() / pathConfigFile;
     return pathConfigFile;

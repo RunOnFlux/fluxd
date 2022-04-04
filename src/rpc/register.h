@@ -20,7 +20,7 @@ void RegisterMiningRPCCommands(CRPCTable &tableRPC);
 /** Register raw transaction RPC commands */
 void RegisterRawTransactionRPCCommands(CRPCTable &tableRPC);
 /** Register zelnode RPC commands */
-void RegisterZelnodeRPCCommands(CRPCTable &tableRPC);
+void RegisterFluxnodeRPCCommands(CRPCTable &tableRPC);
 
 static inline void RegisterAllCoreRPCCommands(CRPCTable &tableRPC)
 {
@@ -29,7 +29,7 @@ static inline void RegisterAllCoreRPCCommands(CRPCTable &tableRPC)
     RegisterMiscRPCCommands(tableRPC);
     RegisterMiningRPCCommands(tableRPC);
     RegisterRawTransactionRPCCommands(tableRPC);
-    RegisterZelnodeRPCCommands(tableRPC);
+    RegisterFluxnodeRPCCommands(tableRPC);
 }
 
 #endif

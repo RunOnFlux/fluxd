@@ -108,7 +108,7 @@ void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, 
     }
 }
 
-CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, std::map<int, std::pair<CScript, CAmount>>* zelnodePayouts)
+CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, std::map<int, std::pair<CScript, CAmount>>* fluxnodePayouts)
 {
     // Create new block
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
@@ -221,40 +221,40 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                 dPriority += (double)nValueIn * nConf;
             }
 
-            if (tx.IsZelnodeTx()) {
+            if (tx.IsFluxnodeTx()) {
                 const CCoins* coins = view.AccessCoins(tx.collateralOut.hash);
                 if (!coins) {
-                    LogPrintf("Remove zelnode transaction because its collateral is not found. %s\n", tx.GetHash().GetHex());
+                    LogPrintf("Remove fluxnode transaction because its collateral is not found. %s\n", tx.GetHash().GetHex());
                     std::list<CTransaction> removed;
                     mempool.remove(tx, removed, false);
                     continue;
                 }
 
-                if (tx.nType == ZELNODE_CONFIRM_TX_TYPE) {
+                if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
                     int nNeedLocation = 0;
-                    auto data = g_zelnodeCache.GetZelnodeData(tx.collateralOut, &nNeedLocation);
+                    auto data = g_fluxnodeCache.GetFluxnodeData(tx.collateralOut, &nNeedLocation);
 
                     if (data.IsNull()) {
-                        LogPrintf("Remove zelnode transaction because its confirm isn't ready. %s\n", tx.GetHash().GetHex());
+                        LogPrintf("Remove fluxnode transaction because its confirm isn't ready. %s\n", tx.GetHash().GetHex());
                         std::list<CTransaction> removed;
                         mempool.remove(tx, removed, false);
                         continue;
                     }
 
-                    if (tx.nUpdateType == ZelnodeUpdateType::INITIAL_CONFIRM) {
-                         if (nNeedLocation != ZELNODE_TX_STARTED) {
-                             LogPrintf("Remove zelnode transaction because its not started %s\n", tx.GetHash().GetHex());
+                    if (tx.nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM) {
+                         if (nNeedLocation != FLUXNODE_TX_STARTED) {
+                             LogPrintf("Remove fluxnode transaction because its not started %s\n", tx.GetHash().GetHex());
                              std::list<CTransaction> removed;
                              mempool.remove(tx, removed, false);
                              continue;
                          }
                     }
 
-                    if (tx.nUpdateType == ZelnodeUpdateType::UPDATE_CONFIRM) {
+                    if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
                         {
-                            LOCK(g_zelnodeCache.cs);
-                            if (!g_zelnodeCache.CheckConfirmationHeights(nHeight, tx.collateralOut, tx.ip)) {
-                                LogPrintf("Remove zelnode transaction if failed CheckConfirmationHeights %s\n", tx.GetHash().GetHex());
+                            LOCK(g_fluxnodeCache.cs);
+                            if (!g_fluxnodeCache.CheckConfirmationHeights(nHeight, tx.collateralOut, tx.ip)) {
+                                LogPrintf("Remove fluxnode transaction if failed CheckConfirmationHeights %s\n", tx.GetHash().GetHex());
                                 std::list<CTransaction> removed;
                                 mempool.remove(tx, removed, false);
                                 continue;
@@ -281,7 +281,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
             CFeeRate feeRate(nTotalIn-tx.GetValueOut(), nTxSize);
 
-            if (tx.IsZelnodeTx()) {
+            if (tx.IsFluxnodeTx()) {
                 feeRate = CFeeRate (1 * CENT, nTxSize);
             }
 
@@ -366,10 +366,10 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             if (!view.HaveInputs(tx))
                 continue;
 
-            if (tx.IsZelnodeTx()) {
+            if (tx.IsFluxnodeTx()) {
                 int nTier;
                 CAmount nCollateralAmount;
-                if (!view.CheckZelnodeTxInput(tx, pindexPrev->nHeight + 1, nTier, nCollateralAmount))
+                if (!view.CheckFluxnodeTxInput(tx, pindexPrev->nHeight + 1, nTier, nCollateralAmount))
                     continue;
             }
 
@@ -467,9 +467,9 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         // Set to 0 so expiry height does not apply to coinbase txs
         txNew.nExpiryHeight = 0;
 
-        //Zelnode payments
-        if (pindexPrev->nHeight + 1 >= chainparams.StartZelnodePayments()) {
-            FillBlockPayeeWithDeterministicPayouts(txNew, nFees, zelnodePayouts);
+        //Fluxnode payments
+        if (pindexPrev->nHeight + 1 >= chainparams.StartFluxnodePayments()) {
+            FillBlockPayeeWithDeterministicPayouts(txNew, nFees, fluxnodePayouts);
         }
 
         // Exchange Fund
@@ -620,7 +620,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
 {
     LogPrintf("ZelcashMiner started\n");
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
-    RenameThread("zelcash-miner");
+    RenameThread("flux-miner");
 
     // Each thread has its own counter
     unsigned int nExtraNonce = 0;

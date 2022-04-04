@@ -153,7 +153,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
     entry.pushKV("txid", txid.GetHex());
     entry.pushKV("version", tx.nVersion);
 
-    if (tx.IsZelnodeTx()) {
+    if (tx.IsFluxnodeTx()) {
         entry.pushKV("type", tx.TypeToString());
         entry.pushKV("collateral_output", tx.collateralOut.ToString());
         entry.pushKV("collateral", tx.collateralOut.ToFullString());
@@ -173,17 +173,16 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
         entry.pushKV("payment_address", EncodeDestination(destination));
         */
 
-        if (tx.nType & ZELNODE_START_TX_TYPE) {
+        if (tx.nType & FLUXNODE_START_TX_TYPE) {
             entry.pushKV("collateral_pubkey", EncodeBase64(tx.collateralPubkey.begin(), tx.collateralPubkey.size()));
             entry.pushKV("zelnode_pubkey", EncodeBase64(tx.pubKey.begin(), tx.pubKey.size()));
         }
 
-        if (tx.nType & ZELNODE_CONFIRM_TX_TYPE) {
+        if (tx.nType & FLUXNODE_CONFIRM_TX_TYPE) {
             entry.pushKV("update_type", tx.nUpdateType);
             entry.pushKV("benchmark_tier", TierToString(tx.benchmarkTier));
             entry.pushKV("benchmark_sigtime", tx.benchmarkSigTime);
             entry.pushKV("benchmark_sig", EncodeBase64(&tx.benchmarkSig[0], tx.benchmarkSig.size()));
-
         }
     } else {
         entry.pushKV("overwintered", tx.fOverwintered);
@@ -332,7 +331,7 @@ UniValue getrawtransaction(const UniValue& params, bool fHelp)
             "         \"reqSigs\" : n,            (numeric) The required sigs\n"
             "         \"type\" : \"pubkeyhash\",  (string) The type, eg 'pubkeyhash'\n"
             "         \"addresses\" : [           (json array of string)\n"
-            "           \"zelcashaddress\"          (string) Zelcash address\n"
+            "           \"fluxaddress\"          (string) Flux address\n"
             "           ,...\n"
             "         ]\n"
             "       }\n"
@@ -618,7 +617,7 @@ UniValue createrawtransaction(const UniValue& params, bool fHelp)
     for (const std::string& name_ : addrList) {
         CTxDestination destination = DecodeDestination(name_);
         if (!IsValidDestination(destination)) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Zelcash address: ") + name_);
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Flux address: ") + name_);
         }
 
         if (!destinations.insert(destination).second) {
@@ -772,7 +771,7 @@ UniValue decodescript(const UniValue& params, bool fHelp)
             "  \"type\":\"type\", (string) The output type\n"
             "  \"reqSigs\": n,    (numeric) The required signatures\n"
             "  \"addresses\": [   (json array of string)\n"
-            "     \"address\"     (string) Zelcash address\n"
+            "     \"address\"     (string) Flux address\n"
             "     ,...\n"
             "  ],\n"
             "  \"p2sh\",\"address\" (string) script address\n"

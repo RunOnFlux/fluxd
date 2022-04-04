@@ -4,8 +4,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
-#ifndef ZELCASHNODES_ACTIVEZELNODE_H
-#define ZELCASHNODES_ACTIVEZELNODE_H
+#ifndef ZELCASHNODES_ACTIVEFLUXNODE_H
+#define ZELCASHNODES_ACTIVEFLUXNODE_H
 
 
 #include "init.h"
@@ -16,28 +16,28 @@
 #include "sync.h"
 #include "wallet/wallet.h"
 
-#define ACTIVE_ZELNODE_INITIAL 0 // initial state
-#define ACTIVE_ZELNODE_STARTED 4
+#define ACTIVE_FLUXNODE_INITIAL 0 // initial state
+#define ACTIVE_FLUXNODE_STARTED 4
 
-class ActiveZelnode
+class ActiveFluxnode
 {
 private:
     // critical section to protect the inner data structures
     mutable CCriticalSection cs;
 
-    /// Get ZEL input that can be used for the Zelnode
-    bool GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage);
+    /// Get ZEL input that can be used for the Fluxnode
+    bool GetFluxNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage);
     bool GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
 
-    /// Get 10000 ZEL input that can be used for the Zelnode
-    bool GetZelNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
+    /// Get 10000 ZEL input that can be used for the Fluxnode
+    bool GetFluxNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
 
 public:
     // Initialized by init.cpp
-    // Keys for the main Zelnode
-    CPubKey pubKeyZelnode;
+    // Keys for the main Fluxnode
+    CPubKey pubKeyFluxnode;
 
-    // Initialized while registering Zelnode
+    // Initialized while registering Fluxnode
     CTxIn vin;
 
     // This is the zelnode OutPoint
@@ -46,17 +46,17 @@ public:
     std::string notCapableReason;
 
 
-    ActiveZelnode()
+    ActiveFluxnode()
     {
         notCapableReason = "";
     }
 
-    /** Deterministric Zelnode functions **/
+    /** Deterministric Fluxnode functions **/
 
-    vector<std::pair<COutput, CAmount>> SelectCoinsZelnode();
+    vector<std::pair<COutput, CAmount>> SelectCoinsFluxnode();
 
     //Manage my active deterministic zelnode
-    void ManageDeterministricZelnode();
+    void ManageDeterministricFluxnode();
 
     bool BuildDeterministicStartTx(std::string strKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, CMutableTransaction& mutTransaction);
     void BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType);
@@ -67,4 +67,4 @@ public:
 
     int nLastTriedToConfirm;
 };
-#endif //ZELCASHNODES_ACTIVEZELNODE_H
+#endif //ZELCASHNODES_ACTIVEFLUXNODE_H
