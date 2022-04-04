@@ -25,7 +25,7 @@
 using namespace std;
 using namespace boost;
 
-// A helper object for signing messages from Zelnodes
+// A helper object for signing messages from Fluxnodes
 CObfuScationSigner obfuScationSigner;
 
 bool GetTestingCollateralScript(std::string strAddress, CScript& script)

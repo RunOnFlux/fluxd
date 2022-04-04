@@ -539,10 +539,10 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
 
     if (vNodes.empty())
-        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Zelcash is not connected!");
+        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Flux is not connected!");
 
     if (IsInitialBlockDownload(Params()))
-        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Zelcash is downloading blocks...");
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Flux is downloading blocks...");
 
     static unsigned int nTransactionsUpdatedLast;
 
@@ -597,8 +597,8 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     static int64_t nStart;
     static CBlockTemplate* pblocktemplate;
 
-    // Create map to hold zelnodepayouts
-    static std::map<int, std::pair<CScript, CAmount>> mapZelnodePayouts;
+    // Create map to hold fluxnodepayouts
+    static std::map<int, std::pair<CScript, CAmount>> mapFluxnodePayouts;
 
     if (pindexPrev != chainActive.Tip() ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5))
@@ -617,7 +617,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
             delete pblocktemplate;
             pblocktemplate = NULL;
 
-            mapZelnodePayouts.clear();
+            mapFluxnodePayouts.clear();
         }
 
         boost::shared_ptr<CReserveScript> coinbaseScript;
@@ -627,7 +627,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         if (!coinbaseScript->reserveScript.size())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet or -mineraddress)");
 
-        pblocktemplate = CreateNewBlock(Params(), coinbaseScript->reserveScript, &mapZelnodePayouts);
+        pblocktemplate = CreateNewBlock(Params(), coinbaseScript->reserveScript, &mapFluxnodePayouts);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -728,7 +728,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Block didn't have any transactions in it...");
     }
 
-    for (auto payout : mapZelnodePayouts) {
+    for (auto payout : mapFluxnodePayouts) {
         std::string start = "basic";
         std::string start_rename = "cumulus";
 
@@ -745,8 +745,8 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         CTxDestination dest;
         ExtractDestination(payout.second.first, dest);
 
-        result.pushKV(std::string(start + "_zelnode_address"), EncodeDestination(dest));
-        result.pushKV(std::string(start + "_zelnode_payout"), payout.second.second);
+        result.pushKV(std::string(start + "_fluxnode_address"), EncodeDestination(dest));
+        result.pushKV(std::string(start + "_fluxlnode_payout"), payout.second.second);
 
         result.pushKV(std::string(start_rename + "_fluxnode_address"), EncodeDestination(dest));
         result.pushKV(std::string(start_rename + "_fluxnode_payout"), payout.second.second);

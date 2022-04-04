@@ -2,35 +2,35 @@
 // Created by ja on 11/14/19.
 //
 
-#ifndef ZELCASH_ZELNODECACHEDB_H
-#define ZELCASH_ZELNODECACHEDB_H
+#ifndef ZELCASH_FLUXNODECACHEDB_H
+#define ZELCASH_FLUXNODECACHEDB_H
 
 #include "dbwrapper.h"
 #include <boost/filesystem/path.hpp>
 
-class ZelnodeCacheData;
+class FluxnodeCacheData;
 class COutPoint;
-class CZelnodeTxBlockUndo;
+class CFluxnodeTxBlockUndo;
 
-class CDeterministicZelnodeDB : public CDBWrapper
+class CDeterministicFluxnodeDB : public CDBWrapper
 {
 public:
-    CDeterministicZelnodeDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
+    CDeterministicFluxnodeDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
 
 private:
-    CDeterministicZelnodeDB(const CDeterministicZelnodeDB&);
-    void operator=(const CDeterministicZelnodeDB&);
+    CDeterministicFluxnodeDB(const CDeterministicFluxnodeDB&);
+    void operator=(const CDeterministicFluxnodeDB&);
 
 public:
-    bool WriteZelnodeCacheData(const ZelnodeCacheData& data);
-    bool ReadZelnodeCacheData(const COutPoint& outpoint, ZelnodeCacheData& data);
-    bool EraseZelnodeCacheData(const COutPoint& outpoint);
-    bool ZelnodeCacheDataExists(const COutPoint& outpoint);
+    bool WriteFluxnodeCacheData(const FluxnodeCacheData& data);
+    bool ReadFluxnodeCacheData(const COutPoint& outpoint, FluxnodeCacheData& data);
+    bool EraseFluxnodeCacheData(const COutPoint& outpoint);
+    bool FluxnodeCacheDataExists(const COutPoint& outpoint);
 
-    bool LoadZelnodeCacheData();
+    bool LoadFluxnodeCacheData();
 
-    bool WriteBlockUndoZelnodeData(const uint256& p_blockHash, CZelnodeTxBlockUndo& p_undoData);
-    bool ReadBlockUndoZelnodeData(const uint256 &p_blockHash, CZelnodeTxBlockUndo& p_undoData);
+    bool WriteBlockUndoFluxnodeData(const uint256& p_blockHash, CFluxnodeTxBlockUndo& p_undoData);
+    bool ReadBlockUndoFluxnodeData(const uint256 &p_blockHash, CFluxnodeTxBlockUndo& p_undoData);
 };
 
-#endif //ZELCASH_ZELNODECACHEDB_H
+#endif //ZELCASH_FLUXNODECACHEDB_H

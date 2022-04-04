@@ -125,8 +125,8 @@ public:
     void SetRegTestCoinbaseMustBeProtected() { consensus.fCoinbaseMustBeProtected = true; }
 
 
-    /** Zelnode Handling **/
-    int64_t StartZelnodePayments() const { return nStartZelnodePaymentsHeight; }
+    /** Fluxnode Handling **/
+    int64_t StartFluxnodePayments() const { return nStartFluxnodePaymentsHeight; }
     CBaseChainParams::Network NetworkID() const { return networkID; }
     std::vector<std::pair<std::string, uint32_t> > BenchmarkingPublicKeys() const { return vecBenchmarkingPublicKeys; }
 
@@ -192,8 +192,8 @@ protected:
     uint256 hashSproutValuePoolCheckpointBlock;
     bool fZIP209Enabled = false;
     
-    /** Zelnode params **/
-    int64_t nStartZelnodePaymentsHeight;
+    /** Fluxnode params **/
+    int64_t nStartFluxnodePaymentsHeight;
     CBaseChainParams::Network networkID;
     std::vector< std::pair<std::string, uint32_t> > vecBenchmarkingPublicKeys;
 

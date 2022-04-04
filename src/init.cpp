@@ -81,7 +81,7 @@ using namespace std;
 
 extern void ThreadSendAlert();
 
-ZCJoinSplit* pzelcashParams = NULL;
+ZCJoinSplit* pfluxParams = NULL;
 
 #ifdef ENABLE_WALLET
 CWallet* pwalletMain = NULL;
@@ -199,7 +199,7 @@ void Shutdown()
     /// for example if the data directory was found to be locked.
     /// Be sure that anything that writes files or flushes caches only does this if the respective
     /// module was initialized.
-    RenameThread("zelcash-shutoff");
+    RenameThread("flux-shutoff");
     mempool.AddTransactionsUpdated(1);
 
     StopHTTPRPC();
@@ -242,8 +242,8 @@ void Shutdown()
         pcoinsdbview = NULL;
         delete pblocktree;
         pblocktree = NULL;
-        delete pZelnodeDB;
-        pZelnodeDB = NULL;
+        delete pFluxnodeDB;
+        pFluxnodeDB = NULL;
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
@@ -278,8 +278,8 @@ void Shutdown()
     delete pwalletMain;
     pwalletMain = NULL;
 #endif
-    delete pzelcashParams;
-    pzelcashParams = NULL;
+    delete pfluxParams;
+    pfluxParams = NULL;
     globalVerifyHandle.reset();
     ECC_Stop();
     LogPrintf("%s: done\n", __func__);
@@ -351,7 +351,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-blocknotify=<cmd>", _("Execute command when the best block changes (%s in cmd is replaced by block hash)"));
     strUsage += HelpMessageOpt("-checkblocks=<n>", strprintf(_("How many blocks to check at startup (default: %u, 0 = all)"), 288));
     strUsage += HelpMessageOpt("-checklevel=<n>", strprintf(_("How thorough the block verification of -checkblocks is (0-4, default: %u)"), 3));
-    strUsage += HelpMessageOpt("-conf=<file>", strprintf(_("Specify configuration file (default: %s)"), "zelcash.conf"));
+    strUsage += HelpMessageOpt("-conf=<file>", strprintf(_("Specify configuration file (default: %s)"), "flux.conf"));
     if (mode == HMM_BITCOIND)
     {
 #if !defined(WIN32)
@@ -367,7 +367,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-par=<n>", strprintf(_("Set the number of script verification threads (%u to %d, 0 = auto, <0 = leave that many cores free, default: %d)"),
         -GetNumCores(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS));
 #ifndef WIN32
-    strUsage += HelpMessageOpt("-pid=<file>", strprintf(_("Specify pid file (default: %s)"), "zelcashd.pid"));
+    strUsage += HelpMessageOpt("-pid=<file>", strprintf(_("Specify pid file (default: %s)"), "fluxd.pid"));
 #endif
     strUsage += HelpMessageOpt("-prune=<n>", strprintf(_("Reduce storage requirements by pruning (deleting) old blocks. This mode disables wallet support and is incompatible with -txindex. "
             "Warning: Reverting this setting requires re-downloading the entire blockchain. "
@@ -621,7 +621,7 @@ void CleanupBlockRevFiles()
 void ThreadImport(std::vector<boost::filesystem::path> vImportFiles)
 {
     const CChainParams& chainparams = Params();
-    RenameThread("zelcash-loadblk");
+    RenameThread("flux-loadblk");
     // -reindex
     if (fReindex) {
         CImportingNow imp;
@@ -729,14 +729,14 @@ static void ZC_LoadParams(
         uiInterface.ThreadSafeMessageBox(strprintf(
             _("Cannot find the Zelcash network parameters in the following directory:\n"
               "%s\n"
-              "Please run 'zelcash-fetch-params' or './zcutil/fetch-params.sh' and then restart."),
+              "Please run 'flux-fetch-params' or './zcutil/fetch-params.sh' and then restart."),
                 ZC_GetParamsDir()),
             "", CClientUIInterface::MSG_ERROR);
         StartShutdown();
         return;
     }
 
-    pzelcashParams = ZCJoinSplit::Prepared();
+    pfluxParams = ZCJoinSplit::Prepared();
 
     static_assert(
         sizeof(boost::filesystem::path::value_type) == sizeof(codeunit),
@@ -1501,10 +1501,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete pcoinsdbview;
                 delete pcoinscatcher;
                 delete pblocktree;
-                delete pZelnodeDB;
+                delete pFluxnodeDB;
 
-                /** Zelnode Database */
-                pZelnodeDB = new CDeterministicZelnodeDB(0, false, fReindex);
+                /** Fluxnode Database */
+                pFluxnodeDB = new CDeterministicFluxnodeDB(0, false, fReindex);
 
                 pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
@@ -1518,18 +1518,18 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                         CleanupBlockRevFiles();
                 }
 
-                uiInterface.InitMessage(_("Init zelnodecache"));
-                g_zelnodeCache.InitMapZelnodeList();
+                uiInterface.InitMessage(_("Init fluxnodecache"));
+                g_fluxnodeCache.InitMapFluxnodeList();
 
                 uiInterface.InitMessage(_("Init Tier Amounts Vectors"));
                 InitializeCoinTierAmounts();
 
-                uiInterface.InitMessage(_("Loading zelnodecache..."));
-                pZelnodeDB->LoadZelnodeCacheData();
+                uiInterface.InitMessage(_("Loading fluxnodecache..."));
+                pFluxnodeDB->LoadFluxnodeCacheData();
 
-                uiInterface.InitMessage(_("Sorting zelnode lists"));
+                uiInterface.InitMessage(_("Sorting fluxnode lists"));
                 for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-                    g_zelnodeCache.SortList(currentTier);
+                    g_fluxnodeCache.SortList(currentTier);
                 }
 
                 uiInterface.InitMessage(_("Loading block index..."));
@@ -1875,59 +1875,59 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             MilliSleep(10);
     }
 
-    fZelnode = GetBoolArg("-zelnode", false);
+    fFluxnode = GetBoolArg("-fluxnode", false);
 
-    if ((fZelnode || zelnodeConfig.getCount() > -1) && fTxIndex == false) {
-        return InitError("Enabling Zelnode support requires turning on transaction indexing."
+    if ((fFluxnode || fluxnodeConfig.getCount() > -1) && fTxIndex == false) {
+        return InitError("Enabling Fluxnode support requires turning on transaction indexing."
                          "Please add txindex=1 to your configuration and start with -reindex");
     }
 
     #if !defined(__linux)
-        if (fZelnode) {
-            return InitError("Zelnode can be run only on Linux");
+        if (fFluxnode) {
+            return InitError("Fluxnode can be run only on Linux");
         }
     #endif
 
-    if (fZelnode) {
+    if (fFluxnode) {
         LogPrintf("IS FLUXNODE\n");
-        strZelnodeAddr = GetArg("-zelnodeaddr", "");
+        strFluxnodeAddr = GetArg("-fluxnodeaddr", "");
 
-        LogPrintf(" addr %s\n", strZelnodeAddr.c_str());
+        LogPrintf(" addr %s\n", strFluxnodeAddr.c_str());
 
-        if (!strZelnodeAddr.empty()) {
-            CService addrTest = CService(strZelnodeAddr);
+        if (!strFluxnodeAddr.empty()) {
+            CService addrTest = CService(strFluxnodeAddr);
             if (!addrTest.IsValid()) {
-                return InitError("Invalid -zelnodeaddr address: " + strZelnodeAddr);
+                return InitError("Invalid -fluxnodeaddr address: " + strFluxnodeAddr);
             }
         }
 
-        std::string strHash = GetArg("-zelnodeoutpoint", "");
+        std::string strHash = GetArg("-fluxnodeoutpoint", "");
         uint256 hash = uint256S(strHash);
-        int index = GetArg("-zelnodeindex", -1);
+        int index = GetArg("-fluxnodeindex", -1);
 
-        zelnodeOutPoint = COutPoint(hash, index);
+        fluxnodeOutPoint = COutPoint(hash, index);
 
-        if (zelnodeOutPoint.IsNull()) {
-            return InitError(_("Invalid zelnode outpoint data. assign zelnodeoutpoint and zelnodeindex."));
+        if (fluxnodeOutPoint.IsNull()) {
+            return InitError(_("Invalid fluxnode outpoint data. assign fluxnodeoutpoint and fluxnodeindex."));
         }
 
-        activeZelnode.deterministicOutPoint = zelnodeOutPoint;
+        activeFluxnode.deterministicOutPoint = fluxnodeOutPoint;
 
-        strZelnodePrivKey = GetArg("-zelnodeprivkey", "");
-        if (!strZelnodePrivKey.empty()) {
+        strFluxnodePrivKey = GetArg("-fluxnodeprivkey", "");
+        if (!strFluxnodePrivKey.empty()) {
             std::string errorMessage;
 
             CKey key;
             CPubKey pubkey;
 
-            if (!obfuScationSigner.SetKey(strZelnodePrivKey, errorMessage, key, pubkey)) {
-                return InitError(_("Invalid zelnodeprivkey. Please see documenation."));
+            if (!obfuScationSigner.SetKey(strFluxnodePrivKey, errorMessage, key, pubkey)) {
+                return InitError(_("Invalid fluxnodeprivkey. Please see documenation."));
             }
 
-            activeZelnode.pubKeyZelnode = pubkey;
+            activeFluxnode.pubKeyFluxnode = pubkey;
 
         } else {
-            return InitError(_("You must specify a zelnodeprivkey in the configuration. Please see documentation for help."));
+            return InitError(_("You must specify a fluxnodeprivkey in the configuration. Please see documentation for help."));
         }
     }
 
@@ -1935,7 +1935,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         LOCK(pwalletMain->cs_wallet);
         LogPrintf("Locking Fluxnodes:\n");
         uint256 znTxHash;
-        for (ZelnodeConfig::ZelnodeEntry zne : zelnodeConfig.getEntries()) {
+        for (FluxnodeConfig::FluxnodeEntry zne : fluxnodeConfig.getEntries()) {
             LogPrintf("  %s %s\n", zne.getTxHash(), zne.getOutputIndex());
             znTxHash.SetHex(zne.getTxHash());
             COutPoint outpoint = COutPoint(znTxHash, (unsigned int) std::stoul(zne.getOutputIndex().c_str()));
@@ -1943,7 +1943,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
     }
 
-    if (fZelnode) {
+    if (fFluxnode) {
         
         strPath = GetSelfPath();
         LogPrintf("Path: %s\n",strPath);
@@ -1960,14 +1960,14 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         } else {
 
-             if (FindBenchmarkPath("zelbenchd", strPath)) {
-                  LogPrintf("Found zelbenchd in %s\n",strPath);
+             if (FindBenchmarkPath("fluxbenchd", strPath)) {
+                  LogPrintf("Found fluxbenchd in %s\n",strPath);
              } else {
                  return InitError("Failed to find benchmark application");
              }
 
-             if (FindBenchmarkPath("zelbench-cli", strPath)) {
-                  LogPrintf("Found zelbench-cli in %s\n",strPath);
+             if (FindBenchmarkPath("fluxbench-cli", strPath)) {
+                  LogPrintf("Found fluxbench-cli in %s\n",strPath);
              } else {
                  return InitError("Failed to find benchmark cli application");
              }
@@ -1975,14 +1975,14 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         
     }
 
-    if (fZelnode) {
+    if (fFluxnode) {
         // Check if the benchmark application is running
-        if (!IsZelBenchdRunning()) {
-            StartZelBenchd();
+        if (!IsFluxBenchdRunning()) {
+            StartFluxBenchd();
         }
 
-        // Make sure that zelbenchd is running and stop zelcash if it isn't
-        if (!IsZelBenchdRunning()) {
+        // Make sure that fluxbenchd is running and stop flux if it isn't
+        if (!IsFluxBenchdRunning()) {
             return InitError("Failed to start benchmark application");
         }
     }

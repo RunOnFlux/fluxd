@@ -28,7 +28,7 @@ namespace filesys = boost::filesystem;
 #define SYSTEM_BENCH_MIN_PATCH_VERSION 12
 
 Benchmarks benchmarks;
-bool fZelStartedBench = false;
+bool fFluxStartedBench = false;
 std::string strPath = "";
 
 std::string strTestnetSring = "-testnet ";
@@ -144,7 +144,7 @@ std::vector<std::string> split (std::string s, std::string delimiter) {
     return res;
 }
 
-bool IsZelBenchdRunning()
+bool IsFluxBenchdRunning()
 {
     std::string testnet = "";
     if (GetBoolArg("-testnet", false))
@@ -165,19 +165,19 @@ bool IsZelBenchdRunning()
     return false;
 }
 
-void StartZelBenchd()
+void StartFluxBenchd()
 {
     std::string testnet = "";
     if (GetBoolArg("-testnet", false))
         testnet = strTestnetSring;
     RunCommand(GetBenchDaemonPath() + testnet + "&");
     MilliSleep(4000);
-    fZelStartedBench = true;
+    fFluxStartedBench = true;
     LogPrintf("Benchmark Started\n");
 }
 
 
-void StopZelBenchd()
+void StopFluxBenchd()
 {
     std::string testnet = "";
     if (GetBoolArg("-testnet", false))
@@ -191,7 +191,7 @@ std::string GetBenchmarks()
     if (GetBoolArg("-testnet", false))
         testnet = strTestnetSring;
 
-    if (IsZelBenchdRunning()) {
+    if (IsFluxBenchdRunning()) {
         std::string strBenchmarkStatus = GetStdoutFromCommand(GetBenchCliPath() + testnet + "getbenchmarks");
 
         return strBenchmarkStatus;
@@ -200,13 +200,13 @@ std::string GetBenchmarks()
     return "Benchmark not running";
 }
 
-std::string GetZelBenchdStatus()
+std::string GetFluxBenchdStatus()
 {
     std::string testnet = "";
     if (GetBoolArg("-testnet", false))
         testnet = strTestnetSring;
 
-    if (IsZelBenchdRunning()) {
+    if (IsFluxBenchdRunning()) {
         std::string strBenchmarkStatus = GetStdoutFromCommand(GetBenchCliPath() + testnet + "getstatus");
 
         return strBenchmarkStatus;
@@ -221,11 +221,11 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
     if (GetBoolArg("-testnet", false))
         testnet = strTestnetSring;
 
-    if (IsZelBenchdRunning()) {
+    if (IsFluxBenchdRunning()) {
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         ss << tx;
         std::string txHexStr = HexStr(ss.begin(), ss.end());
-        std::string response = GetStdoutFromCommand(GetBenchCliPath() + testnet + "signzelnodetransaction " + txHexStr, true);
+        std::string response = GetStdoutFromCommand(GetBenchCliPath() + testnet + "signfluxnodetransaction " + txHexStr, true);
 
         UniValue signedresponse;
         signedresponse.read(response);

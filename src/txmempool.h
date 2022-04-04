@@ -176,8 +176,8 @@ public:
     std::map<COutPoint, CInPoint> mapNextTx;
     std::map<uint256, std::pair<double, CAmount> > mapDeltas;
 
-    std::map<COutPoint, uint256> mapZelnodeTxMempool;
-    std::map<uint256, uint32_t> mapSeenZelnodeTx;
+    std::map<COutPoint, uint256> mapFluxnodeTxMempool;
+    std::map<uint256, uint32_t> mapSeenFluxnodeTx;
 
     CTxMemPool(const CFeeRate& _minRelayFee);
     ~CTxMemPool();
@@ -273,11 +273,11 @@ public:
     void SetMempoolCostLimit(int64_t totalCostLimit, int64_t evictionMemorySeconds);
     // Returns true if a transaction has been recently evicted
     bool IsRecentlyEvicted(const uint256& txId);
-    // Returns true if a transaction has been recently seen in a block (ZelnodeTx)
+    // Returns true if a transaction has been recently seen in a block (FluxnodeTx)
     bool IsRecentlySeenInBlock(const uint256& txId);
-    // Add txid to recently seen list (ZelnodeTx)
+    // Add txid to recently seen list (FluxnodeTx)
     void AddRecentlySeenInBlock(const uint256& txId);
-    // Clear the recently seen in block list (ZelnodeTx)
+    // Clear the recently seen in block list (FluxnodeTx)
     void ClearRecentlySeenInBlock();
     // If the mempool size limit is exceeded, this evicts transactions from the mempool until it is below capacity
     void EnsureSizeLimit();

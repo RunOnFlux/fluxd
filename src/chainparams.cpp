@@ -208,7 +208,7 @@ public:
 
         networkID = CBaseChainParams::Network::MAIN;
 
-        nStartZelnodePaymentsHeight = 560000; // Start paying deterministic zelnodes on height
+        nStartFluxnodePaymentsHeight = 560000; // Start paying deterministic zelnodes on height
 
         // These are the benchmarking public keys, if you are adding a key, you must increase the resize integer
         vecBenchmarkingPublicKeys.resize(3);
@@ -398,7 +398,7 @@ public:
         fTestnetToBeDeprecatedFieldRPC = true;
         networkID = CBaseChainParams::Network::TESTNET;
 
-        nStartZelnodePaymentsHeight = 350;
+        nStartFluxnodePaymentsHeight = 350;
 
         vecBenchmarkingPublicKeys.resize(2);
         vecBenchmarkingPublicKeys[0] = std::make_pair("04d422e01f5acff68504b92df96a9004cf61be432a20efe83fe8a94c1aa730fe7dece5d2e8298f2d5672d4e569c55d9f0a73268ef7b92990d8c014e828a7cc48dd", 0);

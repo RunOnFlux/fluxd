@@ -43,7 +43,7 @@ static_assert(SAPLING_TX_VERSION >= SAPLING_MIN_TX_VERSION,
 static_assert(SAPLING_TX_VERSION <= SAPLING_MAX_TX_VERSION,
     "Sapling tx version must not be higher than maximum");
 
-static const int32_t ZELNODE_TX_VERSION = 5;
+static const int32_t FLUXNODE_TX_VERSION = 5;
 
 /**
  * A shielded input to a transaction. It contains data that describes a Spend transfer.
@@ -510,10 +510,10 @@ static constexpr uint32_t SAPLING_VERSION_GROUP_ID = 0x892F2085;
 static_assert(SAPLING_VERSION_GROUP_ID != 0, "version group id must be non-zero as specified in ZIP 202");
 
 enum {
-    ZELNODE_NO_TYPE = 1 << 0, // 0001
-    ZELNODE_START_TX_TYPE = 1 << 1, // 0010
-    ZELNODE_CONFIRM_TX_TYPE = 1 << 2, // 0100
-    ZELNODE_HAS_COLLATERAL= 1 << 3, // 1000
+    FLUXNODE_NO_TYPE = 1 << 0, // 0001
+    FLUXNODE_START_TX_TYPE = 1 << 1, // 0010
+    FLUXNODE_CONFIRM_TX_TYPE = 1 << 2, // 0100
+    FLUXNODE_HAS_COLLATERAL= 1 << 3, // 1000
 
 };
 
@@ -584,7 +584,7 @@ public:
     const joinsplit_sig_t joinSplitSig = {{0}};
     const binding_sig_t bindingSig = {{0}};
 
-    // Zelnode Tx data
+    // Fluxnode Tx data
     const int8_t nType;
     const COutPoint collateralOut; // collateral out
     const CPubKey collateralPubkey;
@@ -636,9 +636,9 @@ public:
             throw std::ios_base::failure("Unknown transaction format");
         }
 
-        if (nVersion == ZELNODE_TX_VERSION) {
+        if (nVersion == FLUXNODE_TX_VERSION) {
             READWRITE(*const_cast<int8_t*>(&nType));
-            if (nType & ZELNODE_START_TX_TYPE) {
+            if (nType & FLUXNODE_START_TX_TYPE) {
                 READWRITE(*const_cast<COutPoint*>(&collateralOut));
                 READWRITE(*const_cast<CPubKey*>(&collateralPubkey));
                 READWRITE(*const_cast<CPubKey*>(&pubKey));
@@ -646,7 +646,7 @@ public:
                 if (!(s.GetType() & SER_GETHASH))
                     READWRITE(*const_cast<std::vector<unsigned char>*>(&sig));
 
-            } else if (nType & ZELNODE_CONFIRM_TX_TYPE) {
+            } else if (nType & FLUXNODE_CONFIRM_TX_TYPE) {
                 READWRITE(*const_cast<COutPoint*>(&collateralOut));
                 READWRITE(*const_cast<uint32_t*>(&sigTime));
                 READWRITE(*const_cast<int8_t*>(&benchmarkTier));
@@ -692,19 +692,19 @@ public:
     template <typename Stream>
     CTransaction(deserialize_type, Stream& s) : CTransaction(CMutableTransaction(deserialize, s)) {}
 
-    bool IsZelnodeTx() const {
-        return nVersion == ZELNODE_TX_VERSION;
+    bool IsFluxnodeTx() const {
+        return nVersion == FLUXNODE_TX_VERSION;
     }
 
     bool IsNull() const {
-        return (vin.empty() && vout.empty() && !IsZelnodeTx()) || (IsZelnodeTx() && collateralOut.IsNull());
+        return (vin.empty() && vout.empty() && !IsFluxnodeTx()) || (IsFluxnodeTx() && collateralOut.IsNull());
     }
 
     std::string TypeToString() const {
-        if (nType & ZELNODE_START_TX_TYPE) {
-            return "Starting a zelnode";
-        } else if (nType & ZELNODE_CONFIRM_TX_TYPE) {
-            return "Confirming a zelnode";
+        if (nType & FLUXNODE_START_TX_TYPE) {
+            return "Starting a fluxnode";
+        } else if (nType & FLUXNODE_CONFIRM_TX_TYPE) {
+            return "Confirming a fluxnode";
         } else {
             return "No type (Error)";
         }
@@ -835,9 +835,9 @@ struct CMutableTransaction
             throw std::ios_base::failure("Unknown transaction format");
         }
 
-        if (nVersion == ZELNODE_TX_VERSION) {
+        if (nVersion == FLUXNODE_TX_VERSION) {
             READWRITE(nType);
-            if (nType & ZELNODE_START_TX_TYPE) {
+            if (nType & FLUXNODE_START_TX_TYPE) {
                 READWRITE(collateralIn);
                 READWRITE(collateralPubkey);
                 READWRITE(pubKey);
@@ -845,7 +845,7 @@ struct CMutableTransaction
                 if (!(s.GetType() & SER_GETHASH))
                     READWRITE(sig);
 
-            } else if (nType & ZELNODE_CONFIRM_TX_TYPE) {
+            } else if (nType & FLUXNODE_CONFIRM_TX_TYPE) {
                 READWRITE(collateralIn);
                 READWRITE(sigTime);
                 READWRITE(benchmarkTier);

@@ -33,9 +33,9 @@ static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS        = false;
 static const bool DEFAULT_LOGTIMESTAMPS = true;
 
-/** Zelnode features */
-extern bool fZelnode;
-extern std::string strZelnodeAddr;
+/** Fluxnode features */
+extern bool fFluxnode;
+extern std::string strFluxnodeAddr;
 
 
 /** Signals for translation. */
@@ -133,7 +133,7 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific = true);
 bool RenameDirectoriesFromZelcashToFlux();
 void ClearDatadirCache();
 boost::filesystem::path GetConfigFile();
-boost::filesystem::path GetZelnodeConfigFile();
+boost::filesystem::path GetFluxnodeConfigFile();
 #ifndef WIN32
 boost::filesystem::path GetPidFile();
 void CreatePidFile(const boost::filesystem::path &path, pid_t pid);
@@ -255,7 +255,7 @@ void RenameThread(const char* name);
  */
 template <typename Callable> void TraceThread(const char* name,  Callable func)
 {
-    std::string s = strprintf("zelcash-%s", name);
+    std::string s = strprintf("flux-%s", name);
     RenameThread(s.c_str());
     try
     {

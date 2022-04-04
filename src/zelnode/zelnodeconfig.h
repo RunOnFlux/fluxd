@@ -7,8 +7,8 @@
 
 
 
-#ifndef SRC_ZELNODECONFIG_H_
-#define SRC_ZELNODECONFIG_H_
+#ifndef SRC_FLUXNODECONFIG_H_
+#define SRC_FLUXNODECONFIG_H_
 
 #include <string>
 #include <vector>
@@ -17,14 +17,14 @@
 #include <boost/filesystem/fstream.hpp>
 
 
-class ZelnodeConfig;
-extern ZelnodeConfig zelnodeConfig;
+class FluxnodeConfig;
+extern FluxnodeConfig fluxnodeConfig;
 
 
-class ZelnodeConfig
+class FluxnodeConfig
 {
 public:
-    class ZelnodeEntry
+    class FluxnodeEntry
     {
     private:
         std::string alias;
@@ -34,7 +34,7 @@ public:
         std::string outputIndex;
 
     public:
-        ZelnodeEntry(std::string alias, std::string ip, std::string privKey, std::string txHash,
+        FluxnodeEntry(std::string alias, std::string ip, std::string privKey, std::string txHash,
                      std::string outputIndex)
         {
             this->alias = alias;
@@ -97,16 +97,16 @@ public:
         }
     };
 
-    ZelnodeConfig()
+    FluxnodeConfig()
     {
-        entries = std::vector<ZelnodeEntry>();
+        entries = std::vector<FluxnodeEntry>();
     }
 
     void clear();
     bool read(std::string& strErr);
     void add(std::string alias, std::string ip, std::string privKey, std::string txHash, std::string outputIndex);
 
-    std::vector <ZelnodeEntry>& getEntries()
+    std::vector <FluxnodeEntry>& getEntries()
     {
         return entries;
     }
@@ -114,14 +114,14 @@ public:
     int getCount()
     {
         int c = -1;
-        for (ZelnodeEntry e : entries) {
+        for (FluxnodeEntry e : entries) {
             if (e.getAlias() != "") c++;
         }
         return c;
     }
 
 private:
-    std::vector <ZelnodeEntry> entries;
+    std::vector <FluxnodeEntry> entries;
 
 };
-#endif //SRC_ZELNODECONFIG_H_
+#endif //SRC_FLUXNODECONFIG_H_

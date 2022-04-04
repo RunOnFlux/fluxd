@@ -15,12 +15,12 @@
 #include "key_io.h"
 #include "zelnode/activezelnode.h"
 
-ZelnodeCache g_zelnodeCache;
+FluxnodeCache g_fluxnodeCache;
 
-// Keep track of the active Zelnode
-ActiveZelnode activeZelnode;
+// Keep track of the active Fluxnode
+ActiveFluxnode activeFluxnode;
 
-COutPoint zelnodeOutPoint;
+COutPoint fluxnodeOutPoint;
 
 std::string TierToString(int tier)
 {
@@ -37,12 +37,12 @@ std::string TierToString(int tier)
 
 bool IsMigrationCollateralAmount(const CAmount& amount)
 {
-    return amount == V2_ZELNODE_COLLAT_CUMULUS * COIN || amount == V2_ZELNODE_COLLAT_NIMBUS * COIN || amount == V2_ZELNODE_COLLAT_STRATUS * COIN;
+    return amount == V2_FLUXNODE_COLLAT_CUMULUS * COIN || amount == V2_FLUXNODE_COLLAT_NIMBUS * COIN || amount == V2_FLUXNODE_COLLAT_STRATUS * COIN;
 }
 
-bool CheckZelnodeTxSignatures(const CTransaction&  transaction)
+bool CheckFluxnodeTxSignatures(const CTransaction&  transaction)
 {
-    if (transaction.nType & ZELNODE_START_TX_TYPE) {
+    if (transaction.nType & FLUXNODE_START_TX_TYPE) {
         // We need to sign the mutable transaction
 
         std::string errorMessage;
@@ -62,9 +62,9 @@ bool CheckZelnodeTxSignatures(const CTransaction&  transaction)
         }
 
         return true;
-    } else if (transaction.nType & ZELNODE_CONFIRM_TX_TYPE) {
+    } else if (transaction.nType & FLUXNODE_CONFIRM_TX_TYPE) {
 
-        auto data = g_zelnodeCache.GetZelnodeData(transaction.collateralOut);
+        auto data = g_fluxnodeCache.GetFluxnodeData(transaction.collateralOut);
         std::string errorMessage;
 
         std::string strMessage = transaction.collateralOut.ToString() + std::to_string(transaction.collateralOut.n) + std::to_string(transaction.nUpdateType) + std::to_string(transaction.sigTime);
@@ -89,7 +89,7 @@ bool CheckZelnodeTxSignatures(const CTransaction&  transaction)
 
 bool CheckBenchmarkSignature(const CTransaction& transaction)
 {
-    std::string public_key = GetZelnodeBenchmarkPublicKey(transaction);
+    std::string public_key = GetFluxnodeBenchmarkPublicKey(transaction);
     CPubKey pubkey(ParseHex(public_key));
     std::string errorMessage = "";
     std::string strMessage = std::string(transaction.sig.begin(), transaction.sig.end()) + std::to_string(transaction.benchmarkTier) + std::to_string(transaction.benchmarkSigTime) + transaction.ip;
@@ -100,24 +100,24 @@ bool CheckBenchmarkSignature(const CTransaction& transaction)
     return true;
 }
 
-void GetUndoDataForExpiredZelnodeDosScores(CZelnodeTxBlockUndo& p_zelnodeTxUndoData, const int& p_nHeight)
+void GetUndoDataForExpiredFluxnodeDosScores(CFluxnodeTxBlockUndo& p_fluxnodeTxUndoData, const int& p_nHeight)
 {
-    LOCK(g_zelnodeCache.cs);
-    int nUndoHeight = p_nHeight - ZELNODE_DOS_REMOVE_AMOUNT;
+    LOCK(g_fluxnodeCache.cs);
+    int nUndoHeight = p_nHeight - FLUXNODE_DOS_REMOVE_AMOUNT;
 
-    if (g_zelnodeCache.mapStartTxDosHeights.count(nUndoHeight)) {
-        for (const auto& item : g_zelnodeCache.mapStartTxDosHeights.at(nUndoHeight)) {
-            if (g_zelnodeCache.mapStartTxDosTracker.count(item)) {
-                p_zelnodeTxUndoData.vecExpiredDosData.emplace_back(g_zelnodeCache.mapStartTxDosTracker.at(item));
+    if (g_fluxnodeCache.mapStartTxDosHeights.count(nUndoHeight)) {
+        for (const auto& item : g_fluxnodeCache.mapStartTxDosHeights.at(nUndoHeight)) {
+            if (g_fluxnodeCache.mapStartTxDosTracker.count(item)) {
+                p_fluxnodeTxUndoData.vecExpiredDosData.emplace_back(g_fluxnodeCache.mapStartTxDosTracker.at(item));
             }
         }
     }
 }
 
-void GetUndoDataForExpiredConfirmZelnodes(CZelnodeTxBlockUndo& p_zelnodeTxUndoData, const int& p_nHeight, const std::set<COutPoint> setSpentOuts)
+void GetUndoDataForExpiredConfirmFluxnodes(CFluxnodeTxBlockUndo& p_fluxnodeTxUndoData, const int& p_nHeight, const std::set<COutPoint> setSpentOuts)
 {
-    LOCK(g_zelnodeCache.cs);
-    int nExpirationCount = GetZelnodeExpirationCount(p_nHeight);
+    LOCK(g_fluxnodeCache.cs);
+    int nExpirationCount = GetFluxnodeExpirationCount(p_nHeight);
     int nHeightToExpire = p_nHeight - nExpirationCount;
 
     // Get set of enforced tiers
@@ -141,7 +141,7 @@ void GetUndoDataForExpiredConfirmZelnodes(CZelnodeTxBlockUndo& p_zelnodeTxUndoDa
         validAmounts.insert(tempAmount.begin(), tempAmount.end());
     }
 
-    for (const auto& item : g_zelnodeCache.mapConfirmedZelnodeData) {
+    for (const auto& item : g_fluxnodeCache.mapConfirmedFluxnodeData) {
         // We only need to enforce new collaterals until all tiers have been enforced.
         // Stratus is our last tier to enforce so, once it has ended the transition, we shouldn't need to do this anymore.
         if (p_nHeight >= Params().GetCumulusStartTransitionHeight() && p_nHeight < Params().GetStratusEndTransitionHeight() + 10) {
@@ -152,46 +152,46 @@ void GetUndoDataForExpiredConfirmZelnodes(CZelnodeTxBlockUndo& p_zelnodeTxUndoDa
                             "%s : expiring output because collateral isn't valid output: %s, current collateral: %s, block height: %d\n",
                             __func__, item.second.collateralIn.ToFullString(), FormatMoney(item.second.nCollateral),
                             p_nHeight);
-                    p_zelnodeTxUndoData.vecExpiredConfirmedData.emplace_back(item.second);
+                    p_fluxnodeTxUndoData.vecExpiredConfirmedData.emplace_back(item.second);
                     continue;
                 }
             }
         }
 
-        // The p_zelnodeTxUndoData has a map of all new confirms that have been updated this block. So if it is in there don't expire it. They made it barely in time
-        if (p_zelnodeTxUndoData.mapUpdateLastConfirmHeight.count(item.first)) {
+        // The p_fluxnodeTxUndoData has a map of all new confirms that have been updated this block. So if it is in there don't expire it. They made it barely in time
+        if (p_fluxnodeTxUndoData.mapUpdateLastConfirmHeight.count(item.first)) {
             continue;
         }
 
         if (item.second.nLastConfirmedBlockHeight < nHeightToExpire) {
-            p_zelnodeTxUndoData.vecExpiredConfirmedData.emplace_back(item.second);
+            p_fluxnodeTxUndoData.vecExpiredConfirmedData.emplace_back(item.second);
         }
     }
 
     for (const auto& out : setSpentOuts) {
-        if (g_zelnodeCache.mapConfirmedZelnodeData.count(out)) {
-            LogPrint("dzelnode","%s : expiring spent output: %s\n", __func__, out.ToString());
-            p_zelnodeTxUndoData.vecExpiredConfirmedData.emplace_back(g_zelnodeCache.mapConfirmedZelnodeData.at(out));
+        if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(out)) {
+            LogPrint("dfluxnode","%s : expiring spent output: %s\n", __func__, out.ToString());
+            p_fluxnodeTxUndoData.vecExpiredConfirmedData.emplace_back(g_fluxnodeCache.mapConfirmedFluxnodeData.at(out));
         }
     }
 }
 
-void GetUndoDataForPaidZelnodes(CZelnodeTxBlockUndo& zelnodeTxBlockUndo, ZelnodeCache& p_localCache)
+void GetUndoDataForPaidFluxnodes(CFluxnodeTxBlockUndo& fluxnodeTxBlockUndo, FluxnodeCache& p_localCache)
 {
-    LOCK2(p_localCache.cs, g_zelnodeCache.cs);
+    LOCK2(p_localCache.cs, g_fluxnodeCache.cs);
 
     for (const auto& item : p_localCache.mapPaidNodes) {
-        if (g_zelnodeCache.mapConfirmedZelnodeData.count(item.second.second)) {
-            zelnodeTxBlockUndo.mapLastPaidHeights[item.second.second] = g_zelnodeCache.mapConfirmedZelnodeData.at(item.second.second).nLastPaidHeight;
+        if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.second.second)) {
+            fluxnodeTxBlockUndo.mapLastPaidHeights[item.second.second] = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.second.second).nLastPaidHeight;
         }
     }
 }
 
-void ZelnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_nHeight, int nTier, const CAmount nCollateral)
+void FluxnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_nHeight, int nTier, const CAmount nCollateral)
 {
-    ZelnodeCacheData data;
-    data.nStatus = ZELNODE_TX_STARTED;
-    data.nType = ZELNODE_START_TX_TYPE;
+    FluxnodeCacheData data;
+    data.nStatus = FLUXNODE_TX_STARTED;
+    data.nType = FLUXNODE_START_TX_TYPE;
     data.collateralIn = p_transaction.collateralOut;
     data.collateralPubkey = p_transaction.collateralPubkey;
     data.pubKey = p_transaction.pubKey;
@@ -202,7 +202,7 @@ void ZelnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_nH
     data.nCollateral = nCollateral;
 
     if (data.nCollateral > 0) {
-        data.nType = ZELNODE_HAS_COLLATERAL;
+        data.nType = FLUXNODE_HAS_COLLATERAL;
     }
 
     LOCK(cs);
@@ -210,56 +210,56 @@ void ZelnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_nH
     setDirtyOutPoint.insert(p_transaction.collateralOut);
 }
 
-void ZelnodeCache::UndoNewStart(const CTransaction& p_transaction, const int p_nHeight)
+void FluxnodeCache::UndoNewStart(const CTransaction& p_transaction, const int p_nHeight)
 {
     LOCK(cs);
     setUndoStartTx.insert(p_transaction.collateralOut);
     setUndoStartTxHeight = p_nHeight;
 }
 
-void ZelnodeCache::AddNewConfirm(const CTransaction& p_transaction, const int p_nHeight)
+void FluxnodeCache::AddNewConfirm(const CTransaction& p_transaction, const int p_nHeight)
 {
     LOCK(cs);
     setAddToConfirm.insert(std::make_pair(p_transaction.collateralOut, p_transaction.ip));
     setAddToConfirmHeight = p_nHeight;
 }
 
-void ZelnodeCache::UndoNewConfirm(const CTransaction& p_transaction)
+void FluxnodeCache::UndoNewConfirm(const CTransaction& p_transaction)
 {
     LOCK(cs);
     setUndoAddToConfirm.insert(p_transaction.collateralOut);
 }
 
-void ZelnodeCache::AddUpdateConfirm(const CTransaction& p_transaction, const int p_nHeight)
+void FluxnodeCache::AddUpdateConfirm(const CTransaction& p_transaction, const int p_nHeight)
 {
     LOCK(cs);
     setAddToUpdateConfirm.insert(std::make_pair(p_transaction.collateralOut, p_transaction.ip));
     setAddToUpdateConfirmHeight = p_nHeight;
 }
 
-bool ZelnodeCache::CheckIfStarted(const COutPoint& out)
+bool FluxnodeCache::CheckIfStarted(const COutPoint& out)
 {
     LOCK(cs);
     if (mapStartTxTracker.count(out)) {
         return true;
     }
 
-    LogPrint("dzelnode", "%s :  Initial Confirm tx, fail because outpoint %s is not in the mapStartTxTracker\n", __func__, out.ToString());
+    LogPrint("dfluxnode", "%s :  Initial Confirm tx, fail because outpoint %s is not in the mapStartTxTracker\n", __func__, out.ToString());
     return false;
 }
 
-bool ZelnodeCache::CheckIfConfirmed(const COutPoint& out)
+bool FluxnodeCache::CheckIfConfirmed(const COutPoint& out)
 {
     LOCK(cs);
     // We use the map here because the set contains list data that might have expired. the map doesn't
-    if (mapConfirmedZelnodeData.count(out)) {
+    if (mapConfirmedFluxnodeData.count(out)) {
         return true;
     }
 
     return false;
 }
 
-bool ZelnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight)
+bool FluxnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight)
 {
     int nCurrentHeight;
     if (p_nHeight)
@@ -268,12 +268,12 @@ bool ZelnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const in
         nCurrentHeight = chainActive.Height();
 
     COutPoint out = p_transaction.collateralOut;
-    if (!p_transaction.IsZelnodeTx()) {
+    if (!p_transaction.IsFluxnodeTx()) {
         return false;
     }
 
     // This function should only be called on UPDATE_CONFIRM tx types
-    if (p_transaction.nUpdateType != ZelnodeUpdateType::UPDATE_CONFIRM) {
+    if (p_transaction.nUpdateType != FluxnodeUpdateType::UPDATE_CONFIRM) {
         return false;
     }
 
@@ -290,48 +290,48 @@ bool ZelnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const in
     return true;
 }
 
-bool ZelnodeCache::CheckNewStartTx(const COutPoint& out)
+bool FluxnodeCache::CheckNewStartTx(const COutPoint& out)
 {
     LOCK(cs);
     if (mapStartTxTracker.count(out)) {
-        LogPrint("dzelnode", "%s :  Failed because it is in the mapStartTxTracker: %s\n", __func__, out.ToString());
+        LogPrint("dfluxnode", "%s :  Failed because it is in the mapStartTxTracker: %s\n", __func__, out.ToString());
         return false;
     }
 
     if (mapStartTxDosTracker.count(out)) {
-        LogPrint("dzelnode", "%s :  Failed because it is in the mapStartTxDosTracker: %s\n", __func__, out.ToString());
+        LogPrint("dfluxnode", "%s :  Failed because it is in the mapStartTxDosTracker: %s\n", __func__, out.ToString());
         return false;
     }
 
     return true;
 }
 
-void ZelnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
+void FluxnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
 {
-    LOCK2(cs, g_zelnodeCache.cs);
-    int removalHeight = p_nHeight - ZELNODE_START_TX_EXPIRATION_HEIGHT;
+    LOCK2(cs, g_fluxnodeCache.cs);
+    int removalHeight = p_nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT;
 
     std::vector<COutPoint> vecOutPoints;
     std::set<COutPoint> setNewDosHeights;
-    if (g_zelnodeCache.mapStartTxHeights.count(removalHeight)) {
-        for (const auto& item: g_zelnodeCache.mapStartTxHeights.at(removalHeight)) {
+    if (g_fluxnodeCache.mapStartTxHeights.count(removalHeight)) {
+        for (const auto& item: g_fluxnodeCache.mapStartTxHeights.at(removalHeight)) {
             // The start transaction might have been confirmed in this block. If it was the outpoint would be in the setAddToConfirm. Skip it
             if (setAddToConfirm.count(item))
                 continue;
 
             // If the item isn't in the mapStartTxTracker. Logs the errors and shutdown for the safety of the node
-            if (!g_zelnodeCache.mapStartTxTracker.count(item)) {
+            if (!g_fluxnodeCache.mapStartTxTracker.count(item)) {
                 error("Map:at -> Map Start Tx Tracker doesn't have item: %s", item.ToFullString());
-                if (g_zelnodeCache.mapStartTxDosTracker.count(item)) {
-                    error("Map::at error would of occured. pIndexHeight=%d, itemHeight=%d\n", p_nHeight, g_zelnodeCache.mapStartTxDosTracker.at(item).nAddedBlockHeight);
+                if (g_fluxnodeCache.mapStartTxDosTracker.count(item)) {
+                    error("Map::at error would of occured. pIndexHeight=%d, itemHeight=%d\n", p_nHeight, g_fluxnodeCache.mapStartTxDosTracker.at(item).nAddedBlockHeight);
                 } else {
                     error("Map Start Tx Tracker doesn't have item - and mapStartTxDostracker didn't have item. %s", item.ToFullString());
                 }
                 StartShutdown();
             }
 
-            ZelnodeCacheData data = g_zelnodeCache.mapStartTxTracker.at(item);
-            data.nStatus = ZELNODE_TX_DOS_PROTECTION;
+            FluxnodeCacheData data = g_fluxnodeCache.mapStartTxTracker.at(item);
+            data.nStatus = FLUXNODE_TX_DOS_PROTECTION;
             mapStartTxDosTracker[item] = data;
 
             setNewDosHeights.insert(item);
@@ -341,50 +341,50 @@ void ZelnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
             mapStartTxDosHeights[removalHeight] = setNewDosHeights;
     }
 
-    LogPrint("dzelnode", "%s : Size of mapStartTxTracker: %s\n", __func__, g_zelnodeCache.mapStartTxTracker.size());
-    LogPrint("dzelnode", "%s : Size of mapStartTxDosTracker: %s\n", __func__, g_zelnodeCache.mapStartTxDosTracker.size());
-    LogPrint("dzelnode", "%s : Size of mapConfirmedZelnodeData: %s\n", __func__, g_zelnodeCache.mapConfirmedZelnodeData.size());
+    LogPrint("dfluxnode", "%s : Size of mapStartTxTracker: %s\n", __func__, g_fluxnodeCache.mapStartTxTracker.size());
+    LogPrint("dfluxnode", "%s : Size of mapStartTxDosTracker: %s\n", __func__, g_fluxnodeCache.mapStartTxDosTracker.size());
+    LogPrint("dfluxnode", "%s : Size of mapConfirmedFluxnodeData: %s\n", __func__, g_fluxnodeCache.mapConfirmedFluxnodeData.size());
 }
 
-void ZelnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
+void FluxnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
 {
-    LOCK2(cs, g_zelnodeCache.cs);
-    int removalHeight = p_nHeight - ZELNODE_START_TX_EXPIRATION_HEIGHT;
+    LOCK2(cs, g_fluxnodeCache.cs);
+    int removalHeight = p_nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT;
 
-    if (g_zelnodeCache.mapStartTxDosHeights.count(removalHeight)) {
-        for (const auto& item : g_zelnodeCache.mapStartTxDosHeights.at(removalHeight)) {
+    if (g_fluxnodeCache.mapStartTxDosHeights.count(removalHeight)) {
+        for (const auto& item : g_fluxnodeCache.mapStartTxDosHeights.at(removalHeight)) {
 
             // If the item isn't in the mapStartTxDosTracker. Logs the errors and shutdown for the safety of the node
-            if (!g_zelnodeCache.mapStartTxDosTracker.count(item)) {
+            if (!g_fluxnodeCache.mapStartTxDosTracker.count(item)) {
                 error("Map:at -> Map Start Tx Dos Tracker doesn't have item: %s", item.ToFullString());
-                if (g_zelnodeCache.mapStartTxTracker.count(item)) {
-                    error("Map::at error would of occured. pIndexHeight=%d, itemHeight=%d\n", p_nHeight, g_zelnodeCache.mapStartTxTracker.at(item).nAddedBlockHeight);
+                if (g_fluxnodeCache.mapStartTxTracker.count(item)) {
+                    error("Map::at error would of occured. pIndexHeight=%d, itemHeight=%d\n", p_nHeight, g_fluxnodeCache.mapStartTxTracker.at(item).nAddedBlockHeight);
                 } else {
                     error("Map Start Dos Tx Tracker doesn't have item - and mapStartTxTracker didn't have item. %s", item.ToFullString());
                 }
                 StartShutdown();
             }
 
-            mapStartTxTracker.insert(std::make_pair(item, g_zelnodeCache.mapStartTxDosTracker.at(item)));
-            mapStartTxTracker[item].nStatus = ZELNODE_TX_STARTED;
+            mapStartTxTracker.insert(std::make_pair(item, g_fluxnodeCache.mapStartTxDosTracker.at(item)));
+            mapStartTxTracker[item].nStatus = FLUXNODE_TX_STARTED;
             mapStartTxHeights[removalHeight].insert(item);
 
             mapDoSToUndo[removalHeight].insert(item);
         }
     }
 
-    LogPrint("dzelnode", "%s : Size of mapStartTxTracker: %s\n", __func__, g_zelnodeCache.mapStartTxTracker.size());
-    LogPrint("dzelnode", "%s : Size of mapStartTxDosTracker: %s\n", __func__, g_zelnodeCache.mapStartTxDosTracker.size());
-    LogPrint("dzelnode","%s : Size of mapConfirmedZelnodeData: %s\n", __func__, g_zelnodeCache.mapConfirmedZelnodeData.size());
+    LogPrint("dfluxnode", "%s : Size of mapStartTxTracker: %s\n", __func__, g_fluxnodeCache.mapStartTxTracker.size());
+    LogPrint("dfluxnode", "%s : Size of mapStartTxDosTracker: %s\n", __func__, g_fluxnodeCache.mapStartTxDosTracker.size());
+    LogPrint("dfluxnode","%s : Size of mapConfirmedFluxnodeData: %s\n", __func__, g_fluxnodeCache.mapConfirmedFluxnodeData.size());
 }
 
 
-bool ZelnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COutPoint& out, const std::string& ip) {
-    if (!mapConfirmedZelnodeData.count(out)) {
+bool FluxnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COutPoint& out, const std::string& ip) {
+    if (!mapConfirmedFluxnodeData.count(out)) {
         return false;
     }
 
-    auto data = g_zelnodeCache.GetZelnodeData(out);
+    auto data = g_fluxnodeCache.GetFluxnodeData(out);
     if (data.IsNull()) {
         return false;
     }
@@ -393,7 +393,7 @@ bool ZelnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COut
     // Allow ip address changes at a different interval
     if (fFluxActive) {
         if (ip != data.ip) {
-            if (nCurrentHeight - data.nLastConfirmedBlockHeight >= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1) {
+            if (nCurrentHeight - data.nLastConfirmedBlockHeight >= FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1) {
                 return true;
             }
         }
@@ -401,14 +401,14 @@ bool ZelnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COut
 
     bool fHalvingActive = NetworkUpgradeActive(nCurrentHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
     if (fHalvingActive) {
-        if (nCurrentHeight - data.nLastConfirmedBlockHeight <= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2) {
+        if (nCurrentHeight - data.nLastConfirmedBlockHeight <= FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2) {
             error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
                   __LINE__,
                   out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
             return false;
         }
     } else {
-        if (nCurrentHeight - data.nLastConfirmedBlockHeight <= ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1) {
+        if (nCurrentHeight - data.nLastConfirmedBlockHeight <= FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1) {
             // TODO - Remove this error message after release + 1 month and we don't see any problems
             error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
                   __LINE__,
@@ -420,81 +420,81 @@ bool ZelnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COut
     return true;
 }
 
-bool ZelnodeCache::InStartTracker(const COutPoint& out)
+bool FluxnodeCache::InStartTracker(const COutPoint& out)
 {
     LOCK(cs);
     return mapStartTxTracker.count(out);
 }
 
-bool ZelnodeCache::InDoSTracker(const COutPoint& out)
+bool FluxnodeCache::InDoSTracker(const COutPoint& out)
 {
     LOCK(cs);
     return mapStartTxDosTracker.count(out);
 }
 
-bool ZelnodeCache::InConfirmTracker(const COutPoint& out)
+bool FluxnodeCache::InConfirmTracker(const COutPoint& out)
 {
     LOCK(cs);
-    return mapConfirmedZelnodeData.count(out);
+    return mapConfirmedFluxnodeData.count(out);
 }
 
-bool ZelnodeCache::CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_nHeight)
+bool FluxnodeCache::CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_nHeight)
 {
     LOCK(cs);
 
     bool fHalvingActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
 
-    if (mapConfirmedZelnodeData.count(out)) {
+    if (mapConfirmedFluxnodeData.count(out)) {
         if (fHalvingActive) {
-            return p_nHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight > ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2;
+            return p_nHeight - mapConfirmedFluxnodeData.at(out).nLastConfirmedBlockHeight > FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2;
         } else {
-            return p_nHeight - mapConfirmedZelnodeData.at(out).nLastConfirmedBlockHeight > ZELNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1;
+            return p_nHeight - mapConfirmedFluxnodeData.at(out).nLastConfirmedBlockHeight > FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1;
         }
     }
 
     return false;
 }
 
-ZelnodeCacheData ZelnodeCache::GetZelnodeData(const CTransaction& tx)
+FluxnodeCacheData FluxnodeCache::GetFluxnodeData(const CTransaction& tx)
 {
-    return GetZelnodeData(tx.collateralOut);
+    return GetFluxnodeData(tx.collateralOut);
 }
 
-ZelnodeCacheData ZelnodeCache::GetZelnodeData(const COutPoint& out, int* nNeedLocation)
+FluxnodeCacheData FluxnodeCache::GetFluxnodeData(const COutPoint& out, int* nNeedLocation)
 {
     LOCK(cs);
     if (mapStartTxTracker.count(out)) {
-        if (nNeedLocation) *nNeedLocation = ZELNODE_TX_STARTED;
+        if (nNeedLocation) *nNeedLocation = FLUXNODE_TX_STARTED;
         return mapStartTxTracker.at(out);
     } else if (mapStartTxDosTracker.count(out)) {
-        if (nNeedLocation) *nNeedLocation = ZELNODE_TX_DOS_PROTECTION;
+        if (nNeedLocation) *nNeedLocation = FLUXNODE_TX_DOS_PROTECTION;
         return mapStartTxDosTracker.at(out);
-    } else if (mapConfirmedZelnodeData.count(out)) {
-        if (nNeedLocation) *nNeedLocation = ZELNODE_TX_CONFIRMED;
-        return mapConfirmedZelnodeData.at(out);
+    } else if (mapConfirmedFluxnodeData.count(out)) {
+        if (nNeedLocation) *nNeedLocation = FLUXNODE_TX_CONFIRMED;
+        return mapConfirmedFluxnodeData.at(out);
     }
 
-    ZelnodeCacheData data;
+    FluxnodeCacheData data;
     return data;
 }
 
-bool ZelnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPoint& p_zelnodeOut)
+bool FluxnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPoint& p_fluxnodeOut)
 {
     if (nTier == NONE || nTier == LAST) {
         return false;
     }
 
     LOCK(cs);
-    if (mapZelnodeList.count((Tier)nTier)) {
-        int setSize = mapZelnodeList.at((Tier) nTier).setConfirmedTxInList.size();
+    if (mapFluxnodeList.count((Tier)nTier)) {
+        int setSize = mapFluxnodeList.at((Tier) nTier).setConfirmedTxInList.size();
         if (setSize) {
             for (int i = 0; i < setSize; i++) {
-                if (mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.size()) {
-                    p_zelnodeOut = mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.front().out;
-                    if (mapConfirmedZelnodeData.count(p_zelnodeOut)) {
-                        if (IsAP2SHFluxNodePublicKey(mapConfirmedZelnodeData.at(p_zelnodeOut).collateralPubkey)) {
+                if (mapFluxnodeList.at((Tier) nTier).listConfirmedFluxnodes.size()) {
+                    p_fluxnodeOut = mapFluxnodeList.at((Tier) nTier).listConfirmedFluxnodes.front().out;
+                    if (mapConfirmedFluxnodeData.count(p_fluxnodeOut)) {
+                        if (IsAP2SHFluxNodePublicKey(mapConfirmedFluxnodeData.at(p_fluxnodeOut).collateralPubkey)) {
                             CTxDestination payment_destination;
-                            if (GetFluxNodeP2SHDestination(pcoinsTip, p_zelnodeOut, payment_destination)) {
+                            if (GetFluxNodeP2SHDestination(pcoinsTip, p_fluxnodeOut, payment_destination)) {
                                 dest = payment_destination;
                                 return true;
                             } else {
@@ -502,23 +502,23 @@ bool ZelnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPoi
                                  * This shouldn't ever happen. As the only scenario this fails at is if the coin is spent.
                                  * If the coin is spent in the block previous to the block where this fluxnode is next
                                  * on the list to get a payment. It will be removed from the confirmed list just as
-                                 * any other node would be. See -> func (GetUndoDataForExpiredConfirmZelnodes)
+                                 * any other node would be. See -> func (GetUndoDataForExpiredConfirmFluxnodes)
                                  * If this coin is spent in the same block that it would receive a payout
                                  * the coin would be found in the pcoinsTip Cache and the correct destination would be found
                                  * Only after the block is connected would the pcoinTip cache be updated spending the coin"
                                  * Making it so we could no longer find the coins scriptPubKey in func ( GetFluxNodeP2SHDestination )
                               */
-                                error("Failed to get p2sh destination %s", p_zelnodeOut.ToFullString());
+                                error("Failed to get p2sh destination %s", p_fluxnodeOut.ToFullString());
                                 return false;
                             }
                         } else {
-                            dest = mapConfirmedZelnodeData.at(p_zelnodeOut).collateralPubkey.GetID();
+                            dest = mapConfirmedFluxnodeData.at(p_fluxnodeOut).collateralPubkey.GetID();
                             return true;
                         }
                     } else {
-                        // The front of the list, wasn't in the confirmed zelnode data. These means it expired
-                        mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.pop_front();
-                        mapZelnodeList.at((Tier) nTier).setConfirmedTxInList.erase(p_zelnodeOut);
+                        // The front of the list, wasn't in the confirmed fluxnode data. These means it expired
+                        mapFluxnodeList.at((Tier) nTier).listConfirmedFluxnodes.pop_front();
+                        mapFluxnodeList.at((Tier) nTier).setConfirmedTxInList.erase(p_fluxnodeOut);
                     }
                 } else {
                     return false;
@@ -526,13 +526,13 @@ bool ZelnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPoi
             }
         }
     } else {
-        error("Map::at -> mapZelnodeList didn't have tier=%d", nTier);
+        error("Map::at -> mapFluxnodeList didn't have tier=%d", nTier);
     }
 
     return false;
 }
 
-struct ZelnodePayoutInfo {
+struct FluxnodePayoutInfo {
     CTxDestination dest;
     COutPoint outpoint;
     CScript script;
@@ -541,26 +541,26 @@ struct ZelnodePayoutInfo {
     bool foundpayout = false;
 };
 
-bool ZelnodeCache::CheckZelnodePayout(const CTransaction& coinbase, const int p_Height, ZelnodeCache* p_zelnodeCache)
+bool FluxnodeCache::CheckFluxnodePayout(const CTransaction& coinbase, const int p_Height, FluxnodeCache* p_fluxnodeCache)
 {
     LOCK(cs);
     CAmount blockValue = GetBlockSubsidy(p_Height, Params().GetConsensus());
-    std::map<Tier, ZelnodePayoutInfo> mapZelnodePayouts;
+    std::map<Tier, FluxnodePayoutInfo> mapFluxnodePayouts;
 
     // Gather all correct payout data
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++ ) {
-        ZelnodePayoutInfo info;
+        FluxnodePayoutInfo info;
         if (GetNextPayment(info.dest, currentTier, info.outpoint)) {
             info.script = GetScriptForDestination(info.dest);
-            info.amount = GetZelnodeSubsidy(p_Height, blockValue, currentTier);
-            mapZelnodePayouts.insert(std::make_pair((Tier)currentTier, info));
+            info.amount = GetFluxnodeSubsidy(p_Height, blockValue, currentTier);
+            mapFluxnodePayouts.insert(std::make_pair((Tier)currentTier, info));
         }
     }
 
     // Compare it to what is in the block
     // Loop through Tx to make sure they all got paid
     for (const auto& out : coinbase.vout) {
-        for (auto& payout : mapZelnodePayouts) {
+        for (auto& payout : mapFluxnodePayouts) {
             if (!payout.second.approvedpayout) {
                 if (out.scriptPubKey == payout.second.script) {
                     if (out.nValue == payout.second.amount) {
@@ -573,13 +573,13 @@ bool ZelnodeCache::CheckZelnodePayout(const CTransaction& coinbase, const int p_
 
     // Check for failed payouts and add the paid nodes if approved
     bool fFail = false;
-    for (const auto payout : mapZelnodePayouts) {
+    for (const auto payout : mapFluxnodePayouts) {
         if (!payout.second.approvedpayout) {
             fFail = true;
-            error("Invalid block zelnode payee list: Invalid %s payee. Should be paying : %s -> %u", TierToString(payout.first), EncodeDestination(payout.second.dest), payout.second.amount);
+            error("Invalid block fluxnode payee list: Invalid %s payee. Should be paying : %s -> %u", TierToString(payout.first), EncodeDestination(payout.second.dest), payout.second.amount);
         } else {
-            if (p_zelnodeCache) {
-                p_zelnodeCache->AddPaidNode(payout.first, payout.second.outpoint, p_Height);
+            if (p_fluxnodeCache) {
+                p_fluxnodeCache->AddPaidNode(payout.first, payout.second.outpoint, p_Height);
             }
         }
     }
@@ -590,22 +590,22 @@ bool ZelnodeCache::CheckZelnodePayout(const CTransaction& coinbase, const int p_
 void FillBlockPayeeWithDeterministicPayouts(CMutableTransaction& txNew, CAmount nFees, std::map<int, std::pair<CScript, CAmount>>* payments)
 {
     CBlockIndex* pindexPrev = chainActive.Tip();
-    std::map<Tier, ZelnodePayoutInfo> mapZelnodePayouts;
+    std::map<Tier, FluxnodePayoutInfo> mapFluxnodePayouts;
     CAmount blockValue = GetBlockSubsidy(pindexPrev->nHeight + 1, Params().GetConsensus());
     int nTotalPayouts = 0;
 
     // Gather next payout information
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++ ) {
         nTotalPayouts++;
-        ZelnodePayoutInfo info;
-        if (g_zelnodeCache.GetNextPayment(info.dest, currentTier, info.outpoint)) {
-            info.amount = GetZelnodeSubsidy(pindexPrev->nHeight + 1, blockValue, currentTier);
+        FluxnodePayoutInfo info;
+        if (g_fluxnodeCache.GetNextPayment(info.dest, currentTier, info.outpoint)) {
+            info.amount = GetFluxnodeSubsidy(pindexPrev->nHeight + 1, blockValue, currentTier);
             info.foundpayout = true;
         } else {
             info.foundpayout = false;
             nTotalPayouts--;
         }
-        mapZelnodePayouts.insert(std::make_pair((Tier)currentTier, info));
+        mapFluxnodePayouts.insert(std::make_pair((Tier)currentTier, info));
     }
 
     // Resize tx to correct payout sizing
@@ -616,7 +616,7 @@ void FillBlockPayeeWithDeterministicPayouts(CMutableTransaction& txNew, CAmount 
     // Build tx with payout information
     CAmount nMinerReward = blockValue;
     int currentIndex = 1;
-    for (const auto& payout : mapZelnodePayouts) {
+    for (const auto& payout : mapFluxnodePayouts) {
         if (payout.second.foundpayout) {
             txNew.vout[currentIndex].scriptPubKey = GetScriptForDestination(payout.second.dest);
             txNew.vout[currentIndex].nValue = payout.second.amount;
@@ -627,7 +627,7 @@ void FillBlockPayeeWithDeterministicPayouts(CMutableTransaction& txNew, CAmount 
                 payments->insert(std::make_pair(payout.first,
                                                 std::make_pair(GetScriptForDestination(payout.second.dest),
                                                                payout.second.amount)));
-            LogPrint("dzelnode","Zelnode %s payment of %s to %s\n", TierToString(payout.first), FormatMoney(payout.second.amount).c_str(), EncodeDestination(payout.second.dest).c_str());
+            LogPrint("dfluxnode","Fluxnode %s payment of %s to %s\n", TierToString(payout.first), FormatMoney(payout.second.amount).c_str(), EncodeDestination(payout.second.dest).c_str());
         }
     }
 
@@ -635,7 +635,7 @@ void FillBlockPayeeWithDeterministicPayouts(CMutableTransaction& txNew, CAmount 
 }
 
 
-void ZelnodeCache::AddExpiredDosTx(const CZelnodeTxBlockUndo& p_undoData, const int p_nHeight)
+void FluxnodeCache::AddExpiredDosTx(const CFluxnodeTxBlockUndo& p_undoData, const int p_nHeight)
 {
     LOCK(cs);
     std::set<COutPoint> setOutPoint;
@@ -645,7 +645,7 @@ void ZelnodeCache::AddExpiredDosTx(const CZelnodeTxBlockUndo& p_undoData, const 
     mapDosExpiredToRemove[p_nHeight] = setOutPoint;
 }
 
-void ZelnodeCache::AddExpiredConfirmTx(const CZelnodeTxBlockUndo& p_undoData)
+void FluxnodeCache::AddExpiredConfirmTx(const CFluxnodeTxBlockUndo& p_undoData)
 {
     LOCK(cs);
     for (const auto& item : p_undoData.vecExpiredConfirmedData) {
@@ -653,15 +653,15 @@ void ZelnodeCache::AddExpiredConfirmTx(const CZelnodeTxBlockUndo& p_undoData)
     }
 }
 
-void ZelnodeCache::AddPaidNode(const int& tier, const COutPoint& out, const int p_Height)
+void FluxnodeCache::AddPaidNode(const int& tier, const COutPoint& out, const int p_Height)
 {
     LOCK(cs); // Lock local cache
     mapPaidNodes[tier] = std::make_pair(p_Height, out);
 }
 
-void ZelnodeCache::AddBackUndoData(const CZelnodeTxBlockUndo& p_undoData)
+void FluxnodeCache::AddBackUndoData(const CFluxnodeTxBlockUndo& p_undoData)
 {
-    // Locking local cache (p_zelnodecache)
+    // Locking local cache (p_fluxnodecache)
     LOCK(cs);
 
     std::set<COutPoint> setOutPoint;
@@ -680,30 +680,30 @@ void ZelnodeCache::AddBackUndoData(const CZelnodeTxBlockUndo& p_undoData)
 
     // Undo the Confirm Update transactions back to the old LastConfirmHeight
     for (const auto& item : p_undoData.mapUpdateLastConfirmHeight) {
-        LOCK(g_zelnodeCache.cs);
-        if (g_zelnodeCache.mapConfirmedZelnodeData.count(item.first)) {
-            mapConfirmedZelnodeData[item.first] = g_zelnodeCache.mapConfirmedZelnodeData.at(item.first);
-            mapConfirmedZelnodeData[item.first].nLastConfirmedBlockHeight = item.second;
+        LOCK(g_fluxnodeCache.cs);
+        if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.first)) {
+            mapConfirmedFluxnodeData[item.first] = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first);
+            mapConfirmedFluxnodeData[item.first].nLastConfirmedBlockHeight = item.second;
         } else {
             if (!fIsVerifying)
-                error("%s : This should never happen. When undo an update confirm nLastConfirmedBlockHeight . ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
+                error("%s : This should never happen. When undo an update confirm nLastConfirmedBlockHeight . FluxnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
                   __func__, item.first.hash.GetHex());
         }
     }
 
     // Undo the Confirm Update trasnaction back to the old ipAddresses
     for (const auto& item : p_undoData.mapLastIpAddress) {
-        LOCK(g_zelnodeCache.cs);
-        // Because we might have already retrieved the zelnode global data above when adding back the nLastConfirmedBlockHeight
+        LOCK(g_fluxnodeCache.cs);
+        // Because we might have already retrieved the fluxnode global data above when adding back the nLastConfirmedBlockHeight
         // We don't want to override the nLastConfirmedBlockHeight change above
-        if (mapConfirmedZelnodeData.count(item.first)) {
-            mapConfirmedZelnodeData.at(item.first).ip = item.second;
-        } else if (g_zelnodeCache.mapConfirmedZelnodeData.count(item.first)) {
-            mapConfirmedZelnodeData[item.first] = g_zelnodeCache.mapConfirmedZelnodeData.at(item.first);
-            mapConfirmedZelnodeData.at(item.first).ip = item.second;
+        if (mapConfirmedFluxnodeData.count(item.first)) {
+            mapConfirmedFluxnodeData.at(item.first).ip = item.second;
+        } else if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.first)) {
+            mapConfirmedFluxnodeData[item.first] = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first);
+            mapConfirmedFluxnodeData.at(item.first).ip = item.second;
         } else {
             if (!fIsVerifying)
-                error("%s : This should never happen. When undo an update confirm ip address. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
+                error("%s : This should never happen. When undo an update confirm ip address. FluxnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
                       __func__, item.first.hash.GetHex());
         }
     }
@@ -718,70 +718,70 @@ void ZelnodeCache::AddBackUndoData(const CZelnodeTxBlockUndo& p_undoData)
     }
 }
 
-bool ZelnodeCache::Flush()
+bool FluxnodeCache::Flush()
 {
     std::set<COutPoint> setRemoveFromList;
 
-    std::vector<ZelnodeCacheData> vecNodesToAdd;
+    std::vector<FluxnodeCacheData> vecNodesToAdd;
 
-    LOCK2(cs, g_zelnodeCache.cs);
+    LOCK2(cs, g_fluxnodeCache.cs);
     //! Add new start transactions to the tracker
     for (auto item : mapStartTxTracker) {
-        g_zelnodeCache.mapStartTxTracker.insert(std::make_pair(item.first, item.second));
-        if (!g_zelnodeCache.mapStartTxHeights.count(item.second.nAddedBlockHeight)) {
-            g_zelnodeCache.mapStartTxHeights.insert(make_pair(item.second.nAddedBlockHeight, std::set<COutPoint>()));
+        g_fluxnodeCache.mapStartTxTracker.insert(std::make_pair(item.first, item.second));
+        if (!g_fluxnodeCache.mapStartTxHeights.count(item.second.nAddedBlockHeight)) {
+            g_fluxnodeCache.mapStartTxHeights.insert(make_pair(item.second.nAddedBlockHeight, std::set<COutPoint>()));
         }
-        g_zelnodeCache.mapStartTxHeights.at(item.second.nAddedBlockHeight).insert(item.first);
+        g_fluxnodeCache.mapStartTxHeights.at(item.second.nAddedBlockHeight).insert(item.first);
 
-        g_zelnodeCache.setDirtyOutPoint.insert(item.first);
+        g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
     }
 
 
     //! If a start transaction isn't confirmed in time, the OutPoint is added to the dos tracker
     for (auto item : mapStartTxDosTracker) {
-        g_zelnodeCache.mapStartTxDosTracker[item.first] = item.second;
-        g_zelnodeCache.mapStartTxTracker.erase(item.first);
-        g_zelnodeCache.setDirtyOutPoint.insert(item.first);
+        g_fluxnodeCache.mapStartTxDosTracker[item.first] = item.second;
+        g_fluxnodeCache.mapStartTxTracker.erase(item.first);
+        g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
     }
 
     for (auto item : mapStartTxDosHeights) {
-        g_zelnodeCache.mapStartTxDosHeights[item.first] = item.second;
-        g_zelnodeCache.mapStartTxHeights.erase(item.first);
+        g_fluxnodeCache.mapStartTxDosHeights[item.first] = item.second;
+        g_fluxnodeCache.mapStartTxHeights.erase(item.first);
     }
 
     //! After the threshhold is met, remove the DoS OutPoints from being banned
     for (auto item : mapDosExpiredToRemove) {
         for (const auto& data : item.second) {
-            g_zelnodeCache.mapStartTxDosTracker.erase(data);
-            g_zelnodeCache.setDirtyOutPoint.insert(data);
+            g_fluxnodeCache.mapStartTxDosTracker.erase(data);
+            g_fluxnodeCache.setDirtyOutPoint.insert(data);
         }
-        g_zelnodeCache.mapStartTxDosHeights.erase(item.first);
+        g_fluxnodeCache.mapStartTxDosHeights.erase(item.first);
     }
 
     //! If we are undo a block, and we undid a block that had Start transaction in it
     for (const auto& item : mapDoSToUndo) {
         for (const auto& out : item.second) {
-            g_zelnodeCache.mapStartTxDosTracker.erase(out);
+            g_fluxnodeCache.mapStartTxDosTracker.erase(out);
         }
 
-        g_zelnodeCache.mapStartTxDosHeights.erase(item.first);
+        g_fluxnodeCache.mapStartTxDosHeights.erase(item.first);
     }
 
     //! If we are undo a block, and we undid a block that confirmed an Update transaction. We need to undo the update, which just updated the nLastConfirmBlockHeight
-    for (const auto& item : mapConfirmedZelnodeData) {
-        g_zelnodeCache.mapConfirmedZelnodeData[item.first].nLastConfirmedBlockHeight = item.second.nLastConfirmedBlockHeight;
-        g_zelnodeCache.mapConfirmedZelnodeData[item.first].ip = item.second.ip;
-        g_zelnodeCache.setDirtyOutPoint.insert(item.first);
+    for (const auto& item : mapConfirmedFluxnodeData) {
+        g_fluxnodeCache.mapConfirmedFluxnodeData[item.first].nLastConfirmedBlockHeight = item.second.nLastConfirmedBlockHeight;
+        g_fluxnodeCache.mapConfirmedFluxnodeData[item.first].ip = item.second.ip;
+        g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
     }
 
     set<Tier> removedTiers;
     set<Tier> undoExpiredTiers;
     bool fUndoExpiredAddedToList = false;
     for (const auto& item : setUndoExpireConfirm) {
-        g_zelnodeCache.mapConfirmedZelnodeData.insert(std::make_pair(item.collateralIn, item));
-        g_zelnodeCache.setDirtyOutPoint.insert(item.collateralIn);
+        g_fluxnodeCache.mapConfirmedFluxnodeData.insert(std::make_pair(item.collateralIn, item));
+        g_fluxnodeCache.setDirtyOutPoint.insert(item.collateralIn);
 
-        if (g_zelnodeCache.CheckListHas(item)) {
+        if (g_fluxnodeCache.CheckListHas(item)) {
             // already in set, and therefor list. Skip it
             continue;
         } else {
@@ -792,29 +792,29 @@ bool ZelnodeCache::Flush()
 
     //! If we are undo a block, and we undid a block that had Start transaction in it
     for (const auto& item : setUndoStartTx) {
-        g_zelnodeCache.mapStartTxTracker.erase(item);
-        g_zelnodeCache.setDirtyOutPoint.insert(item);
+        g_fluxnodeCache.mapStartTxTracker.erase(item);
+        g_fluxnodeCache.setDirtyOutPoint.insert(item);
     }
 
     if (setUndoStartTxHeight > 0) {
-        g_zelnodeCache.mapStartTxHeights.erase(setUndoStartTxHeight);
+        g_fluxnodeCache.mapStartTxHeights.erase(setUndoStartTxHeight);
     }
 
-    //! Add the data from Zelnodes that got confirmed this block
+    //! Add the data from Fluxnodes that got confirmed this block
     for (const auto& item : setAddToConfirm) {
-        // Take the zelnodedata from the mapStartTxTracker and move it to the mapConfirm
-        if (g_zelnodeCache.mapStartTxTracker.count(item.first)) {
-            ZelnodeCacheData data = g_zelnodeCache.mapStartTxTracker.at(item.first);
+        // Take the fluxnodedata from the mapStartTxTracker and move it to the mapConfirm
+        if (g_fluxnodeCache.mapStartTxTracker.count(item.first)) {
+            FluxnodeCacheData data = g_fluxnodeCache.mapStartTxTracker.at(item.first);
 
             // Remove from Start Tracking
-            g_zelnodeCache.mapStartTxTracker.erase(item.first);
-            if (!g_zelnodeCache.mapStartTxHeights.count(data.nAddedBlockHeight)) {
+            g_fluxnodeCache.mapStartTxTracker.erase(item.first);
+            if (!g_fluxnodeCache.mapStartTxHeights.count(data.nAddedBlockHeight)) {
                 error("%s - %d , Found map:at error", __func__, __LINE__);
             }
-            g_zelnodeCache.mapStartTxHeights.at(data.nAddedBlockHeight).erase(item.first);
+            g_fluxnodeCache.mapStartTxHeights.at(data.nAddedBlockHeight).erase(item.first);
 
             // Update the data (STARTED --> CONFIRM)
-            data.nStatus = ZELNODE_TX_CONFIRMED;
+            data.nStatus = FLUXNODE_TX_CONFIRMED;
             data.nConfirmedBlockHeight = setAddToConfirmHeight;
             data.nLastConfirmedBlockHeight = setAddToConfirmHeight;
 
@@ -822,15 +822,15 @@ bool ZelnodeCache::Flush()
             data.ip = item.second;
 
             // Add the data to the confirm trackers
-            g_zelnodeCache.mapConfirmedZelnodeData.insert(std::make_pair(data.collateralIn, data));
+            g_fluxnodeCache.mapConfirmedFluxnodeData.insert(std::make_pair(data.collateralIn, data));
 
             // Because we don't automatically remove nodes that have expired from the list, to help not sort it as often
             // If this node is already in the list. We wont add it let. We need to wait for the node to be removed from the list.
             // Then we can add it to the list
-            if (!g_zelnodeCache.mapZelnodeList.count((Tier)data.nTier)) {
+            if (!g_fluxnodeCache.mapFluxnodeList.count((Tier)data.nTier)) {
                 error("%s - %d , Found map:at error", __func__, __LINE__);
             }
-            if (g_zelnodeCache.mapZelnodeList.at((Tier)data.nTier).setConfirmedTxInList.count(data.collateralIn)) {
+            if (g_fluxnodeCache.mapFluxnodeList.at((Tier)data.nTier).setConfirmedTxInList.count(data.collateralIn)) {
                 setRemoveFromList.insert(data.collateralIn);
                 removedTiers.insert(Tier(data.nTier));
             }
@@ -840,133 +840,133 @@ bool ZelnodeCache::Flush()
             vecNodesToAdd.emplace_back(data);
             undoExpiredTiers.insert((Tier)data.nTier);
 
-            g_zelnodeCache.setDirtyOutPoint.insert(item.first);
+            g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
         } else {
-            error("%s : This should never happen. When moving from start map to confirm map. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__,  item.first.hash.GetHex());
+            error("%s : This should never happen. When moving from start map to confirm map. FluxnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__,  item.first.hash.GetHex());
         }
     }
 
 
     for (const auto& item : setUndoAddToConfirm) {
-        if (g_zelnodeCache.mapConfirmedZelnodeData.count(item)) {
-            ZelnodeCacheData data = g_zelnodeCache.mapConfirmedZelnodeData.at(item);
+        if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item)) {
+            FluxnodeCacheData data = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item);
 
             // Remove from Confirm Tracking
-            g_zelnodeCache.mapConfirmedZelnodeData.erase(item);
+            g_fluxnodeCache.mapConfirmedFluxnodeData.erase(item);
 
             // adding it to this set, means that it will go and remove the outpoint from the list, and the set if it is in there
             setRemoveFromList.insert(data.collateralIn);
             removedTiers.insert(Tier(data.nTier));
 
             // Update the data (CONFIRM --> STARTED)
-            data.nStatus = ZELNODE_TX_STARTED;
+            data.nStatus = FLUXNODE_TX_STARTED;
             data.nConfirmedBlockHeight = 0;
             data.nLastConfirmedBlockHeight = 0;
             data.nLastPaidHeight = 0;
             data.ip = "";
 
             // Add the data back into the Start tracker
-            g_zelnodeCache.mapStartTxTracker.insert(std::make_pair(item, data));
-            g_zelnodeCache.mapStartTxHeights[data.nAddedBlockHeight].insert(item);
+            g_fluxnodeCache.mapStartTxTracker.insert(std::make_pair(item, data));
+            g_fluxnodeCache.mapStartTxHeights[data.nAddedBlockHeight].insert(item);
 
-            g_zelnodeCache.setDirtyOutPoint.insert(item);
+            g_fluxnodeCache.setDirtyOutPoint.insert(item);
 
-            // IMPORTANT: We don't update the list of zelnodes. Because if we wanted to, we would have to scan through the list until we found the OutPoint that matches
+            // IMPORTANT: We don't update the list of fluxnodes. Because if we wanted to, we would have to scan through the list until we found the OutPoint that matches
             // Instead we leave the list untouched, and when seeing who to pay next. We check the setConfirmedTxInList to verify they are still confirmed
             // If they aren't confirmed, we will just keep poping the top of the list until we find one that is
 
         } else {
-            error("%s : This should never happen. When moving from confirm map to start map. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.hash.GetHex());
+            error("%s : This should never happen. When moving from confirm map to start map. FluxnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.hash.GetHex());
         }
     }
 
-    //! Update the data for Zelnodes that got the confirmed update this block
+    //! Update the data for Fluxnodes that got the confirmed update this block
     for (const auto& item : setAddToUpdateConfirm) {
-        // Take the zelnodedata from the mapStartTxTracker and move it to the mapConfirm
-        if (g_zelnodeCache.mapConfirmedZelnodeData.count(item.first)) {
+        // Take the fluxnodedata from the mapStartTxTracker and move it to the mapConfirm
+        if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.first)) {
 
             // Update the nLastConfirmedBlockHeight
-            g_zelnodeCache.mapConfirmedZelnodeData.at(item.first).nLastConfirmedBlockHeight = setAddToUpdateConfirmHeight;
+            g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first).nLastConfirmedBlockHeight = setAddToUpdateConfirmHeight;
 
             // Update IP address
-            g_zelnodeCache.mapConfirmedZelnodeData.at(item.first).ip = item.second;
+            g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first).ip = item.second;
 
-            g_zelnodeCache.setDirtyOutPoint.insert(item.first);
+            g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
         } else {
-            error("%s : This should never happen. When updating a zelnode from the confirm map. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.first.hash.GetHex());
+            error("%s : This should never happen. When updating a fluxnode from the confirm map. FluxnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.first.hash.GetHex());
         }
     }
 
     //! Expire the confirm transactions that haven't been updated in time
     for (const auto& item : setExpireConfirmOutPoints) {
-        if (g_zelnodeCache.mapConfirmedZelnodeData.count(item)) {
+        if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item)) {
 
             // Erase the data from the map and set
-            g_zelnodeCache.mapConfirmedZelnodeData.erase(item);
+            g_fluxnodeCache.mapConfirmedFluxnodeData.erase(item);
 
             // IMPORTANT:: the item stays in the list and the set. This is because we don't want to have to resort the list everytime something expires.
             // Only when new added in added to the list.
 
             // Add the OutPoint to the dirty set, so it will be erased on database write
-            g_zelnodeCache.setDirtyOutPoint.insert(item);
+            g_fluxnodeCache.setDirtyOutPoint.insert(item);
         } else {
-            error("%s : This should never happen. When expiring a zelnode from the confirm map. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.hash.GetHex());
+            error("%s : This should never happen. When expiring a fluxnode from the confirm map. FluxnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.hash.GetHex());
         }
     }
 
     for (const auto& item : mapPaidNodes) {
         Tier currentTier = (Tier)item.first;
-        if (g_zelnodeCache.mapConfirmedZelnodeData.count(item.second.second)) {
+        if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.second.second)) {
 
             // Set the new last paid height
-            g_zelnodeCache.mapConfirmedZelnodeData.at(item.second.second).nLastPaidHeight = item.second.first;
-            g_zelnodeCache.setDirtyOutPoint.insert(item.second.second);
+            g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.second.second).nLastPaidHeight = item.second.first;
+            g_fluxnodeCache.setDirtyOutPoint.insert(item.second.second);
 
-            if (!g_zelnodeCache.mapZelnodeList.count(currentTier)) {
+            if (!g_fluxnodeCache.mapFluxnodeList.count(currentTier)) {
                 error("%s - %d , Found map:at error", __func__, __LINE__);
             }
 
-            if (g_zelnodeCache.mapZelnodeList.at(currentTier).setConfirmedTxInList.count(item.second.second)) {
-                if (g_zelnodeCache.mapZelnodeList.at(currentTier).listConfirmedZelnodes.front().out == item.second.second) {
-                    g_zelnodeCache.mapZelnodeList.at(currentTier).listConfirmedZelnodes.pop_front();
-                    ZelnodeListData newListData(g_zelnodeCache.mapConfirmedZelnodeData.at(item.second.second));
+            if (g_fluxnodeCache.mapFluxnodeList.at(currentTier).setConfirmedTxInList.count(item.second.second)) {
+                if (g_fluxnodeCache.mapFluxnodeList.at(currentTier).listConfirmedFluxnodes.front().out == item.second.second) {
+                    g_fluxnodeCache.mapFluxnodeList.at(currentTier).listConfirmedFluxnodes.pop_front();
+                    FluxnodeListData newListData(g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.second.second));
 
                     // Put
-                    g_zelnodeCache.mapZelnodeList.at(currentTier).listConfirmedZelnodes.emplace_back(newListData);
+                    g_fluxnodeCache.mapFluxnodeList.at(currentTier).listConfirmedFluxnodes.emplace_back(newListData);
                 } else {
-                    error("%s : This should never happen. When checking the list of a paid node. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.second.second.hash.GetHex());
+                    error("%s : This should never happen. When checking the list of a paid node. FluxnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.second.second.hash.GetHex());
                 }
             } else {
-                error("%s : This should never happen. When adding a paid node. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.second.second.hash.GetHex());
+                error("%s : This should never happen. When adding a paid node. FluxnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.second.second.hash.GetHex());
             }
         }
     }
 
     for (const auto& item : mapUndoPaidNodes) {
-        if (g_zelnodeCache.mapConfirmedZelnodeData.count(item.first)) {
+        if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.first)) {
             // Set the height back to the last value
-            g_zelnodeCache.mapConfirmedZelnodeData.at(item.first).nLastPaidHeight = item.second;
-            g_zelnodeCache.setDirtyOutPoint.insert(item.first);
+            g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first).nLastPaidHeight = item.second;
+            g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
 
-            Tier tier = (Tier)g_zelnodeCache.mapConfirmedZelnodeData.at(item.first).nTier;
+            Tier tier = (Tier)g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first).nTier;
 
             bool fFoundIt = false;
-            if (!g_zelnodeCache.mapZelnodeList.count(tier)) {
+            if (!g_fluxnodeCache.mapFluxnodeList.count(tier)) {
                 error("%s - %d , Found map:at error", __func__, __LINE__);
             }
-            if (g_zelnodeCache.mapZelnodeList.at(tier).setConfirmedTxInList.count(item.first)) {
+            if (g_fluxnodeCache.mapFluxnodeList.at(tier).setConfirmedTxInList.count(item.first)) {
 
-                auto it = g_zelnodeCache.mapZelnodeList.at(tier).listConfirmedZelnodes.end();
-                    while (--it != g_zelnodeCache.mapZelnodeList.at(tier).listConfirmedZelnodes.begin()) {
+                auto it = g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes.end();
+                    while (--it != g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes.begin()) {
 
                         if (it->out == item.first) {
                             // The node that we are undoing the paid height on, should always be near the last node in the list. So, we need
                             // to get the data. Remove the entry from near the back of the list, and put it at the front.
                             // This allows us to not have to sort() the list afterwards. If this was the only change
-                            ZelnodeListData old_data = *it;
-                            g_zelnodeCache.mapZelnodeList.at(tier).listConfirmedZelnodes.erase(it);
+                            FluxnodeListData old_data = *it;
+                            g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes.erase(it);
                             old_data.nLastPaidHeight = item.second;
-                            g_zelnodeCache.mapZelnodeList.at(tier).listConfirmedZelnodes.emplace_front(old_data);
+                            g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes.emplace_front(old_data);
                             fFoundIt = true;
                             break;
                         }
@@ -977,7 +977,7 @@ bool ZelnodeCache::Flush()
                     error("%s : This should never happen. When undoing a paid node. The back most item in the list isn't the correct outpoint. Report this to the dev team to figure out what is happening: %s\n",
                           __func__, item.first.hash.GetHex());
             } else {
-                error("%s : This should never happen. When undoing a paid node. ZelnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
+                error("%s : This should never happen. When undoing a paid node. FluxnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
                       __func__, item.first.hash.GetHex());
             }
     }
@@ -987,14 +987,14 @@ bool ZelnodeCache::Flush()
     if (setRemoveFromList.size()) {
 
         for (const Tier& tier : removedTiers)
-            g_zelnodeCache.EraseFromList(setRemoveFromList, tier);
+            g_fluxnodeCache.EraseFromList(setRemoveFromList, tier);
     }
 
     //! DO ALL ADDS TO THE LIST HERE
     if (vecNodesToAdd.size()) {
-        // Add the list data to the sort zelnode list
+        // Add the list data to the sort fluxnode list
         for (const auto& item : vecNodesToAdd)
-            g_zelnodeCache.InsertIntoList(item);
+            g_fluxnodeCache.InsertIntoList(item);
     }
 
     //! ALWAYS THE LAST CALL IN THE FLUSH COMMAND
@@ -1004,7 +1004,7 @@ bool ZelnodeCache::Flush()
         for (int currentTier = CUMULUS; currentTier != LAST; currentTier++ )
         {
             if (removedTiers.count((Tier)currentTier) || undoExpiredTiers.count((Tier)currentTier) || mapPaidNodes.count((Tier)currentTier))
-                g_zelnodeCache.SortList(currentTier);
+                g_fluxnodeCache.SortList(currentTier);
         }
     }
 
@@ -1012,9 +1012,9 @@ bool ZelnodeCache::Flush()
 }
 
 // Needs to be protected by locking cs before calling
-bool ZelnodeCache::LoadData(ZelnodeCacheData& data)
+bool FluxnodeCache::LoadData(FluxnodeCacheData& data)
 {
-    if (data.nStatus == ZELNODE_TX_STARTED) {
+    if (data.nStatus == FLUXNODE_TX_STARTED) {
         mapStartTxTracker.insert(std::make_pair(data.collateralIn, data));
         if (!mapStartTxHeights.count(data.nAddedBlockHeight))
             mapStartTxHeights[data.nAddedBlockHeight] = std::set<COutPoint>();
@@ -1022,7 +1022,7 @@ bool ZelnodeCache::LoadData(ZelnodeCacheData& data)
         if (mapStartTxHeights.count(data.nAddedBlockHeight)) {
             mapStartTxHeights.at(data.nAddedBlockHeight).insert(data.collateralIn);
         }
-    } else if (data.nStatus == ZELNODE_TX_DOS_PROTECTION) {
+    } else if (data.nStatus == FLUXNODE_TX_DOS_PROTECTION) {
         mapStartTxDosTracker.insert(std::make_pair(data.collateralIn, data));
         if (!mapStartTxDosHeights.count(data.nAddedBlockHeight))
             mapStartTxDosHeights[data.nAddedBlockHeight] = std::set<COutPoint>();
@@ -1030,8 +1030,8 @@ bool ZelnodeCache::LoadData(ZelnodeCacheData& data)
         if (mapStartTxDosHeights.count(data.nAddedBlockHeight)) {
             mapStartTxDosHeights.at(data.nAddedBlockHeight).insert(data.collateralIn);
         }
-    } else if (data.nStatus == ZELNODE_TX_CONFIRMED) {
-        mapConfirmedZelnodeData.insert(std::make_pair(data.collateralIn, data));
+    } else if (data.nStatus == FLUXNODE_TX_CONFIRMED) {
+        mapConfirmedFluxnodeData.insert(std::make_pair(data.collateralIn, data));
         InsertIntoList(data);
     }
 
@@ -1039,22 +1039,22 @@ bool ZelnodeCache::LoadData(ZelnodeCacheData& data)
 }
 
 // Needs to be protected by locking cs before calling
-void ZelnodeCache::SortList(const int& nTier)
+void FluxnodeCache::SortList(const int& nTier)
 {
     if (IsTierValid(nTier)) {
-        if (mapZelnodeList.count((Tier) nTier)) {
-            mapZelnodeList.at((Tier) nTier).listConfirmedZelnodes.sort();
+        if (mapFluxnodeList.count((Tier) nTier)) {
+            mapFluxnodeList.at((Tier) nTier).listConfirmedFluxnodes.sort();
         }
     }
 
 }
 
 // Needs to be protected by locking cs before calling
-bool ZelnodeCache::CheckListHas(const ZelnodeCacheData& p_zelnodeData)
+bool FluxnodeCache::CheckListHas(const FluxnodeCacheData& p_fluxnodeData)
 {
-    if (IsTierValid(p_zelnodeData.nTier)) {
-        if (mapZelnodeList.count((Tier) p_zelnodeData.nTier)) {
-            return mapZelnodeList.at((Tier) p_zelnodeData.nTier).setConfirmedTxInList.count(p_zelnodeData.collateralIn);
+    if (IsTierValid(p_fluxnodeData.nTier)) {
+        if (mapFluxnodeList.count((Tier) p_fluxnodeData.nTier)) {
+            return mapFluxnodeList.at((Tier) p_fluxnodeData.nTier).setConfirmedTxInList.count(p_fluxnodeData.collateralIn);
         }
     }
 
@@ -1062,11 +1062,11 @@ bool ZelnodeCache::CheckListHas(const ZelnodeCacheData& p_zelnodeData)
 }
 
 // Needs to be protected by locking cs before calling
-bool ZelnodeCache::CheckListSet(const COutPoint& p_OutPoint)
+bool FluxnodeCache::CheckListSet(const COutPoint& p_OutPoint)
 {
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-        if (mapZelnodeList.count((Tier) currentTier)) {
-            if (mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.count(p_OutPoint)) {
+        if (mapFluxnodeList.count((Tier) currentTier)) {
+            if (mapFluxnodeList.at((Tier) currentTier).setConfirmedTxInList.count(p_OutPoint)) {
                 return true;
             }
         }
@@ -1075,38 +1075,38 @@ bool ZelnodeCache::CheckListSet(const COutPoint& p_OutPoint)
     return false;
 }
 
-void ZelnodeCache::InsertIntoList(const ZelnodeCacheData& p_zelnodeData)
+void FluxnodeCache::InsertIntoList(const FluxnodeCacheData& p_fluxnodeData)
 {
-    if (IsTierValid(p_zelnodeData.nTier)) {
-        ZelnodeListData listData(p_zelnodeData);
-        if (mapZelnodeList.count((Tier) p_zelnodeData.nTier)) {
-            mapZelnodeList.at((Tier) p_zelnodeData.nTier).setConfirmedTxInList.insert(p_zelnodeData.collateralIn);
-            mapZelnodeList.at((Tier) p_zelnodeData.nTier).listConfirmedZelnodes.emplace_front(listData);
+    if (IsTierValid(p_fluxnodeData.nTier)) {
+        FluxnodeListData listData(p_fluxnodeData);
+        if (mapFluxnodeList.count((Tier) p_fluxnodeData.nTier)) {
+            mapFluxnodeList.at((Tier) p_fluxnodeData.nTier).setConfirmedTxInList.insert(p_fluxnodeData.collateralIn);
+            mapFluxnodeList.at((Tier) p_fluxnodeData.nTier).listConfirmedFluxnodes.emplace_front(listData);
         }
     }
 }
 
-void ZelnodeCache::EraseFromListSet(const COutPoint& p_OutPoint)
+void FluxnodeCache::EraseFromListSet(const COutPoint& p_OutPoint)
 {
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-        if (mapZelnodeList.count((Tier) currentTier)) {
-            if (mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.count(p_OutPoint)) {
-                mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.erase(p_OutPoint);
+        if (mapFluxnodeList.count((Tier) currentTier)) {
+            if (mapFluxnodeList.at((Tier) currentTier).setConfirmedTxInList.count(p_OutPoint)) {
+                mapFluxnodeList.at((Tier) currentTier).setConfirmedTxInList.erase(p_OutPoint);
                 return;
             }
         }
     }
 }
 
-void ZelnodeCache::EraseFromList(const std::set<COutPoint>& setToRemove, const Tier nTier)
+void FluxnodeCache::EraseFromList(const std::set<COutPoint>& setToRemove, const Tier nTier)
 {
-    if (mapZelnodeList.count(nTier)) {
-        std::list<ZelnodeListData>::iterator i = mapZelnodeList.at(nTier).listConfirmedZelnodes.begin();
-        while (i != mapZelnodeList.at(nTier).listConfirmedZelnodes.end()) {
+    if (mapFluxnodeList.count(nTier)) {
+        std::list<FluxnodeListData>::iterator i = mapFluxnodeList.at(nTier).listConfirmedFluxnodes.begin();
+        while (i != mapFluxnodeList.at(nTier).listConfirmedFluxnodes.end()) {
             bool isDataToRemove = setToRemove.count((*i).out);
             if (isDataToRemove) {
-                mapZelnodeList.at(nTier).setConfirmedTxInList.erase((*i).out);
-                mapZelnodeList.at(nTier).listConfirmedZelnodes.erase(i++);  // alternatively, i = items.erase(i);
+                mapFluxnodeList.at(nTier).setConfirmedTxInList.erase((*i).out);
+                mapFluxnodeList.at(nTier).listConfirmedFluxnodes.erase(i++);  // alternatively, i = items.erase(i);
             } else {
                 ++i;
             }
@@ -1114,7 +1114,7 @@ void ZelnodeCache::EraseFromList(const std::set<COutPoint>& setToRemove, const T
     }
 }
 
-void ZelnodeCache::DumpZelnodeCache()
+void FluxnodeCache::DumpFluxnodeCache()
 {
     LOCK(cs);
     bool found = false;
@@ -1122,47 +1122,47 @@ void ZelnodeCache::DumpZelnodeCache()
         found = false;
         if (mapStartTxTracker.count(item)) {
             found = true;
-            pZelnodeDB->WriteZelnodeCacheData(mapStartTxTracker.at(item));
+            pFluxnodeDB->WriteFluxnodeCacheData(mapStartTxTracker.at(item));
         } else if (mapStartTxDosTracker.count(item)) {
             found = true;
-            pZelnodeDB->WriteZelnodeCacheData(mapStartTxDosTracker.at(item));
-        } else if (mapConfirmedZelnodeData.count(item)) {
+            pFluxnodeDB->WriteFluxnodeCacheData(mapStartTxDosTracker.at(item));
+        } else if (mapConfirmedFluxnodeData.count(item)) {
             found = true;
-            pZelnodeDB->WriteZelnodeCacheData(mapConfirmedZelnodeData.at(item));
+            pFluxnodeDB->WriteFluxnodeCacheData(mapConfirmedFluxnodeData.at(item));
         }
 
         if (!found) {
-            pZelnodeDB->EraseZelnodeCacheData(item);
+            pFluxnodeDB->EraseFluxnodeCacheData(item);
         }
     }
 }
 
-bool IsDZelnodeActive()
+bool IsDFluxnodeActive()
 {
-    return chainActive.Height() >= Params().StartZelnodePayments();
+    return chainActive.Height() >= Params().StartFluxnodePayments();
 }
 
-bool IsZelnodeTransactionsActive()
+bool IsFluxnodeTransactionsActive()
 {
     return chainActive.Height() >= Params().GetConsensus().vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight;
 }
 
-std::string ZelnodeLocationToString(int nLocation) {
-    if (nLocation == ZELNODE_TX_ERROR) {
+std::string FluxnodeLocationToString(int nLocation) {
+    if (nLocation == FLUXNODE_TX_ERROR) {
         return "OFFLINE";
-    } else if (nLocation == ZELNODE_TX_STARTED) {
+    } else if (nLocation == FLUXNODE_TX_STARTED) {
         return "STARTED";
-    } else if (nLocation == ZELNODE_TX_DOS_PROTECTION) {
+    } else if (nLocation == FLUXNODE_TX_DOS_PROTECTION) {
         return "DOS";
-    } else if (nLocation == ZELNODE_TX_CONFIRMED) {
+    } else if (nLocation == FLUXNODE_TX_CONFIRMED) {
         return "CONFIRMED";
     } else {
         return "OFFLINE";
     }
 }
 
-void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<int>& vNodeCount) {
-    for (const auto& entry : mapConfirmedZelnodeData) {
+void FluxnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<int>& vNodeCount) {
+    for (const auto& entry : mapConfirmedFluxnodeData) {
         std::string strHost = entry.second.ip;
         CNetAddr node = CNetAddr(strHost, false);
         int nNetwork = node.GetNetwork();
@@ -1179,8 +1179,8 @@ void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<i
         }
 
         for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-            if (mapZelnodeList.count((Tier) currentTier)) {
-                if (mapZelnodeList.at((Tier) currentTier).setConfirmedTxInList.count(entry.first)) {
+            if (mapFluxnodeList.count((Tier) currentTier)) {
+                if (mapFluxnodeList.at((Tier) currentTier).setConfirmedTxInList.count(entry.first)) {
                     vNodeCount[currentTier - 1]++;
                     break;
                 }
@@ -1189,8 +1189,8 @@ void ZelnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<i
     }
 }
 
-void ZelnodeCache::CountMigration(int& nOldTotal, int& nNewTotal, std::vector<int>& vOldNodeCount, std::vector<int>& vNewNodeCount) {
-    for (const auto& entry : mapConfirmedZelnodeData) {
+void FluxnodeCache::CountMigration(int& nOldTotal, int& nNewTotal, std::vector<int>& vOldNodeCount, std::vector<int>& vNewNodeCount) {
+    for (const auto& entry : mapConfirmedFluxnodeData) {
         if (IsMigrationCollateralAmount(entry.second.nCollateral)) {
             vNewNodeCount[entry.second.nTier - 1]++;
             nNewTotal++;
@@ -1201,22 +1201,22 @@ void ZelnodeCache::CountMigration(int& nOldTotal, int& nNewTotal, std::vector<in
     }
 }
 
-int GetZelnodeExpirationCount(const int& p_nHeight)
+int GetFluxnodeExpirationCount(const int& p_nHeight)
 {
-    // Get the status on if Zelnode params1 is activated
+    // Get the status on if Fluxnode params1 is activated
     bool fFluxActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
     bool fHalvingActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
 
     if (fHalvingActive) {
-        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V3;
+        return FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V3;
     } else if (fFluxActive) {
-        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V2;
+        return FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V2;
     } else {
-        return ZELNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V1;
+        return FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V1;
     }
 }
 
-std::string GetZelnodeBenchmarkPublicKey(const CTransaction& tx)
+std::string GetFluxnodeBenchmarkPublicKey(const CTransaction& tx)
 {
     // Get the public keys and timestamps from the chainparams
     std::vector< std::pair<std::string, uint32_t> > vectorPublicKeys = Params().BenchmarkingPublicKeys();
@@ -1286,7 +1286,7 @@ bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet)
     return true;
 }
 
-/** Zelnode Tier functions
+/** Fluxnode Tier functions
  */
 bool IsTierValid(const int& nTier)
 {
@@ -1298,7 +1298,7 @@ int GetNumberOfTiers()
     return LAST - 1;
 }
 
-void ZelnodeCache::LogDebugData(const int& nHeight, const uint256& blockhash, bool fFromDisconnect)
+void FluxnodeCache::LogDebugData(const int& nHeight, const uint256& blockhash, bool fFromDisconnect)
 {
     LOCK(cs);
     std::string printme = "{ \n";
@@ -1308,22 +1308,22 @@ void ZelnodeCache::LogDebugData(const int& nHeight, const uint256& blockhash, bo
     printme = printme + "}";
 
     std::string printme2 = "{ \n";
-    if (g_zelnodeCache.mapStartTxHeights.count(nHeight - ZELNODE_START_TX_EXPIRATION_HEIGHT)) {
-        for (const auto &printitem: g_zelnodeCache.mapStartTxHeights.at(nHeight - ZELNODE_START_TX_EXPIRATION_HEIGHT)) {
+    if (g_fluxnodeCache.mapStartTxHeights.count(nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT)) {
+        for (const auto &printitem: g_fluxnodeCache.mapStartTxHeights.at(nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT)) {
             printme2 = printme2 + printitem.ToFullString() + ",\n";
         }
         printme2 = printme2 + "}";
     }
 
     std::string printme3 = "{ \n";
-    for (const auto &printitem: g_zelnodeCache.mapStartTxDosTracker) {
+    for (const auto &printitem: g_fluxnodeCache.mapStartTxDosTracker) {
         printme3 = printme3 + printitem.first.ToFullString() + "," + printitem.second.ToFullString() + ",\n";
     }
     printme3 = printme3 + "}";
 
     std::string printme4 = "{ \n";
-    if (g_zelnodeCache.mapStartTxDosHeights.count(nHeight - ZELNODE_START_TX_EXPIRATION_HEIGHT)) {
-        for (const auto &printitem: g_zelnodeCache.mapStartTxDosHeights.at(nHeight - ZELNODE_START_TX_EXPIRATION_HEIGHT)) {
+    if (g_fluxnodeCache.mapStartTxDosHeights.count(nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT)) {
+        for (const auto &printitem: g_fluxnodeCache.mapStartTxDosHeights.at(nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT)) {
             printme4 = printme4 + printitem.ToFullString() + ",\n";
         }
         printme4 = printme4 + "}";
@@ -1338,4 +1338,4 @@ void ZelnodeCache::LogDebugData(const int& nHeight, const uint256& blockhash, bo
     }
 
 }
-/** Zelnode Tier code end **/
+/** Fluxnode Tier code end **/
