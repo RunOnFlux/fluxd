@@ -96,6 +96,7 @@ public:
                     CNullifiersMap &mapSproutNullifiers,
                     CNullifiersMap &mapSaplingNullifiers);
     bool GetStats(CCoinsStats &stats) const;
+    bool GetAllBalances(std::map<std::string, CAmount>& mapBalances) const;
 };
 
 /** Access to the block database (blocks/index/) */

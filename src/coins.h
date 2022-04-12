@@ -377,6 +377,8 @@ public:
     //! Calculate statistics about the unspent transaction output set
     virtual bool GetStats(CCoinsStats &stats) const;
 
+    virtual bool GetAllBalances(std::map<std::string, CAmount>& mapBalances) const;
+
     //! As we use CCoinsViews polymorphically, have a virtual destructor
     virtual ~CCoinsView() {}
 };
@@ -407,6 +409,7 @@ public:
                     CNullifiersMap &mapSproutNullifiers,
                     CNullifiersMap &mapSaplingNullifiers);
     bool GetStats(CCoinsStats &stats) const;
+    bool GetAllBalances(std::map<std::string, CAmount> &mapBalances) const;
 };
 
 

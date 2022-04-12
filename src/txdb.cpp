@@ -10,6 +10,7 @@
 #include "main.h"
 #include "pow.h"
 #include "uint256.h"
+#include "key_io.h"
 
 #include <stdint.h>
 
@@ -92,6 +93,41 @@ bool CCoinsViewDB::GetNullifier(const uint256 &nf, ShieldedType type) const {
 
 bool CCoinsViewDB::GetCoins(const uint256 &txid, CCoins &coins) const {
     return db.Read(make_pair(DB_COINS, txid), coins);
+}
+
+bool CCoinsViewDB::GetAllBalances(std::map<std::string, CAmount>& mapBalances) const
+{
+    boost::scoped_ptr<CDBIterator> pcursor(const_cast<CDBWrapper*>(&db)->NewIterator());
+
+    pcursor->Seek(std::make_pair(DB_COINS, uint256()));
+    // Load mapBlockIndex
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+        std::pair<char, uint256> key;
+        if (pcursor->GetKey(key) && key.first == DB_COINS) {
+            CCoins coins;
+            if (pcursor->GetValue(coins)) {
+                for (const auto& item : coins.vout) {
+                    CTxDestination dest;
+                    if (!item.IsNull()) {
+                        if (ExtractDestination(item.scriptPubKey, dest)) {
+                            mapBalances[EncodeDestination(dest)] += item.nValue;
+                        } else {
+                            error("Failed to extract destination from GetAllBalances call - snapshot could be invalid");
+                        }
+                    }
+                }
+
+                pcursor->Next();
+            } else {
+                return error("GetAllBalances() : failed to read value");
+            }
+        } else {
+            break;
+        }
+    }
+
+    return true;
 }
 
 bool CCoinsViewDB::HaveCoins(const uint256 &txid) const {

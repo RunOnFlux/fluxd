@@ -506,6 +506,10 @@ public:
     bool GetStats(CCoinsStats &stats) const {
         return false;
     }
+
+    bool GetAllBalances(std::map<std::string, CAmount> &mapBalances) const {
+        return false;
+    }
 };
 
 double benchmark_connectblock_slow()
