@@ -7,6 +7,7 @@ matrix:
       env: PLATFORM="linux"
     - os: linux
       dist: xenial
+      arch: arm64
       env: PLATFORM="arm"
     - os: linux
       dist: xenial
@@ -43,6 +44,7 @@ before_deploy:
   - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/zelcash-gtest .; fi
   - if [[ "$PLATFORM" == "linux" ]]; then cp ./zcutil/fetch-params.sh .; fi
   - if [[ "$PLATFORM" == "linux" ]]; then tar -cvzf Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx zelcash-gtest fetch-params.sh; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx; fi
   - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/zelcashd .; fi
   - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/zelcash-cli .; fi
   - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/zelcash-tx .; fi
@@ -64,8 +66,8 @@ deploy:
   - provider: releases
     skip_cleanup: true
     draft: true
-    api_key:
-      secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
+    token:
+      secure: nuvepmL9kXw4zeY8YW2wt3LSo9mO6RBEW5IxF8/UwBPxD3q+HrWejOB4cunlejqpIsenz3MRl9g5OrDsFS8NjKvp4Hwdq6cd1VjoPGk7Bfh6aT/gXRPQ43kh/4YK0g8xlQGx7xby7WakoWrDWRjQEWMolDBxXgkQ2UtJqxPi/Af/bk8M3n3b+PojRJa1+lRGKLquBjAT4Qk1taasnO01WIE4BEH58XK0IGmR2G/j6y5wrFTmBmvybrw2/Pqltias/8wpe/rRAEyrMeYn/SImdpsUMJm5QBxYIrPvybPqJfOR0lbRJwrNavFNHuaKg612ImEEwBi3+m2pnK5AlS1ikDMdl7J3eWaXPMi48IL5OKi8pogj1Y4iQDlfbbNTke5BviBdoESG0PuCNo3TUQjnEI5Ue2ZNjBdCn96+9nB3NQbD+WFGhMyHsw/dThqBlzagHo5g2JSITyNArFBlWykd8yOTT3ateu2L+OtuuDmByWx4I/kBpl2Uzy8B8yCmD05Kbl1F3KpapLjUrnWlZ0/il+Y5ZXvfIlZ71OW/S9uCILi9zkklkGciwlZF6JkEm1yxuX1MhNiCzjuNWvhSZmgRRoAIxfMuNf2dkycWb9ihN13gBba6W0uEzC4AyF9SPnoQtfQiexTRCK2BzsSbFQjggFIVnHYmnMnIN49l8fkzNKs=
     file_glob: true
     file:
       - "Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
@@ -75,8 +77,8 @@ deploy:
   - provider: releases
     skip_cleanup: true
     draft: true
-    api_key:
-      secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
+    token:
+      secure: nuvepmL9kXw4zeY8YW2wt3LSo9mO6RBEW5IxF8/UwBPxD3q+HrWejOB4cunlejqpIsenz3MRl9g5OrDsFS8NjKvp4Hwdq6cd1VjoPGk7Bfh6aT/gXRPQ43kh/4YK0g8xlQGx7xby7WakoWrDWRjQEWMolDBxXgkQ2UtJqxPi/Af/bk8M3n3b+PojRJa1+lRGKLquBjAT4Qk1taasnO01WIE4BEH58XK0IGmR2G/j6y5wrFTmBmvybrw2/Pqltias/8wpe/rRAEyrMeYn/SImdpsUMJm5QBxYIrPvybPqJfOR0lbRJwrNavFNHuaKg612ImEEwBi3+m2pnK5AlS1ikDMdl7J3eWaXPMi48IL5OKi8pogj1Y4iQDlfbbNTke5BviBdoESG0PuCNo3TUQjnEI5Ue2ZNjBdCn96+9nB3NQbD+WFGhMyHsw/dThqBlzagHo5g2JSITyNArFBlWykd8yOTT3ateu2L+OtuuDmByWx4I/kBpl2Uzy8B8yCmD05Kbl1F3KpapLjUrnWlZ0/il+Y5ZXvfIlZ71OW/S9uCILi9zkklkGciwlZF6JkEm1yxuX1MhNiCzjuNWvhSZmgRRoAIxfMuNf2dkycWb9ihN13gBba6W0uEzC4AyF9SPnoQtfQiexTRCK2BzsSbFQjggFIVnHYmnMnIN49l8fkzNKs=
     file_glob: true
     file:
       - "Zel-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
@@ -86,8 +88,8 @@ deploy:
   - provider: releases
     skip_cleanup: true
     draft: true
-    api_key:
-      secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
+    token:
+      secure: nuvepmL9kXw4zeY8YW2wt3LSo9mO6RBEW5IxF8/UwBPxD3q+HrWejOB4cunlejqpIsenz3MRl9g5OrDsFS8NjKvp4Hwdq6cd1VjoPGk7Bfh6aT/gXRPQ43kh/4YK0g8xlQGx7xby7WakoWrDWRjQEWMolDBxXgkQ2UtJqxPi/Af/bk8M3n3b+PojRJa1+lRGKLquBjAT4Qk1taasnO01WIE4BEH58XK0IGmR2G/j6y5wrFTmBmvybrw2/Pqltias/8wpe/rRAEyrMeYn/SImdpsUMJm5QBxYIrPvybPqJfOR0lbRJwrNavFNHuaKg612ImEEwBi3+m2pnK5AlS1ikDMdl7J3eWaXPMi48IL5OKi8pogj1Y4iQDlfbbNTke5BviBdoESG0PuCNo3TUQjnEI5Ue2ZNjBdCn96+9nB3NQbD+WFGhMyHsw/dThqBlzagHo5g2JSITyNArFBlWykd8yOTT3ateu2L+OtuuDmByWx4I/kBpl2Uzy8B8yCmD05Kbl1F3KpapLjUrnWlZ0/il+Y5ZXvfIlZ71OW/S9uCILi9zkklkGciwlZF6JkEm1yxuX1MhNiCzjuNWvhSZmgRRoAIxfMuNf2dkycWb9ihN13gBba6W0uEzC4AyF9SPnoQtfQiexTRCK2BzsSbFQjggFIVnHYmnMnIN49l8fkzNKs=
     file_glob: true
     file:
       - "Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
@@ -97,8 +99,8 @@ deploy:
   - provider: releases
     skip_cleanup: true
     draft: true
-    api_key:
-      secure: Ubi7t6oTbET9TH11zP0xNu5cLcF44/mI8VbWZ/N7jI0MgJAYl6LHsYdW8qVel3D1C1JFXtE5/GURXJs8crlGWam1DFgWaxw03WmBru2j073ssQbRaHTZgXANY3PPjiXub9GqPCpgtDr04RGS7JRQNV7T6meSXVAe1yty+tZPFNypNqrm13cQsxbjEtXns/cYb4GTOHAFfrOl/MXohxVp3bIVRfgr96mOAv8Z9gSVb90lMACAY1THmRATm2G4SNgCIAkFawM2l8Lisnlhc6wpmJfZxyyOwRFJ5UKLxfd9k+u5tIuwmepDPbCwXAZpjocKev+KttcodFwv3onHP5vw8DBpm9iG/LRRYPxCRMBREyYq+zsH5GfMLlaO93M3PKXKEZN+mb6o/bjQnJgKOTCJWRxi3kpmSuupChuE6NILSPcLVEHaCOlGOXpBQiZNlwXlnEYtm2BE0LJR+iT7fapQggwHKTrPmc1iACa6UsDLvQoYq3qm0dEfr7vJbmnqLTInI/efAtF0SY1Jf2Q00i+dWB65c7ALs77RN55YrM6wstCSeoEKWqJI9BYcW8QY/4mxLvn6ZCwjW7rDpiCmxKmX9+w1zef8LihT+aMWEVQNU5K1Kc57KQWSUk5tFzOGDw5+luyGGC0n7CnBD9VqUyBi0tOFfdOi3+TLHXFp1cJpGVc=
+    token:
+      secure: nuvepmL9kXw4zeY8YW2wt3LSo9mO6RBEW5IxF8/UwBPxD3q+HrWejOB4cunlejqpIsenz3MRl9g5OrDsFS8NjKvp4Hwdq6cd1VjoPGk7Bfh6aT/gXRPQ43kh/4YK0g8xlQGx7xby7WakoWrDWRjQEWMolDBxXgkQ2UtJqxPi/Af/bk8M3n3b+PojRJa1+lRGKLquBjAT4Qk1taasnO01WIE4BEH58XK0IGmR2G/j6y5wrFTmBmvybrw2/Pqltias/8wpe/rRAEyrMeYn/SImdpsUMJm5QBxYIrPvybPqJfOR0lbRJwrNavFNHuaKg612ImEEwBi3+m2pnK5AlS1ikDMdl7J3eWaXPMi48IL5OKi8pogj1Y4iQDlfbbNTke5BviBdoESG0PuCNo3TUQjnEI5Ue2ZNjBdCn96+9nB3NQbD+WFGhMyHsw/dThqBlzagHo5g2JSITyNArFBlWykd8yOTT3ateu2L+OtuuDmByWx4I/kBpl2Uzy8B8yCmD05Kbl1F3KpapLjUrnWlZ0/il+Y5ZXvfIlZ71OW/S9uCILi9zkklkGciwlZF6JkEm1yxuX1MhNiCzjuNWvhSZmgRRoAIxfMuNf2dkycWb9ihN13gBba6W0uEzC4AyF9SPnoQtfQiexTRCK2BzsSbFQjggFIVnHYmnMnIN49l8fkzNKs=
     file_glob: true
     file:
       - "Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip"
