@@ -7,7 +7,6 @@ matrix:
       env: PLATFORM="linux"
     - os: linux
       dist: xenial
-      arch: arm64
       env: PLATFORM="arm"
     - os: linux
       dist: xenial
@@ -44,7 +43,6 @@ before_deploy:
   - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/zelcash-gtest .; fi
   - if [[ "$PLATFORM" == "linux" ]]; then cp ./zcutil/fetch-params.sh .; fi
   - if [[ "$PLATFORM" == "linux" ]]; then tar -cvzf Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx zelcash-gtest fetch-params.sh; fi
-  - if [[ "$PLATFORM" == "arm" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx; fi
   - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/zelcashd .; fi
   - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/zelcash-cli .; fi
   - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/zelcash-tx .; fi
