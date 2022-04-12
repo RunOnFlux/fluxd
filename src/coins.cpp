@@ -59,6 +59,7 @@ bool CCoinsView::BatchWrite(CCoinsMap &mapCoins,
                             CNullifiersMap &mapSproutNullifiers,
                             CNullifiersMap &mapSaplingNullifiers) { return false; }
 bool CCoinsView::GetStats(CCoinsStats &stats) const { return false; }
+bool CCoinsView::GetAllBalances(std::map<std::string, CAmount> &mapBalances) const { return false; }
 
 
 CCoinsViewBacked::CCoinsViewBacked(CCoinsView *viewIn) : base(viewIn) { }
@@ -80,6 +81,7 @@ bool CCoinsViewBacked::BatchWrite(CCoinsMap &mapCoins,
                                   CNullifiersMap &mapSproutNullifiers,
                                   CNullifiersMap &mapSaplingNullifiers) { return base->BatchWrite(mapCoins, hashBlock, hashSproutAnchor, hashSaplingAnchor, mapSproutAnchors, mapSaplingAnchors, mapSproutNullifiers, mapSaplingNullifiers); }
 bool CCoinsViewBacked::GetStats(CCoinsStats &stats) const { return base->GetStats(stats); }
+bool CCoinsViewBacked::GetAllBalances(std::map<std::string, CAmount> &mapBalances) const { return base->GetAllBalances(mapBalances); }
 
 CCoinsKeyHasher::CCoinsKeyHasher() : salt(GetRandHash()) {}
 

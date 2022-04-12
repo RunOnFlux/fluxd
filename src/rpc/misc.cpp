@@ -453,6 +453,28 @@ UniValue verifymessage(const UniValue& params, bool fHelp)
     return (pubkey.GetID() == *keyID);
 }
 
+UniValue printsnapshot(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+                "printsnapshot \"time\" \n"
+                "\nPrints a snapshot prettylike\n"
+                "\nArguments:\n"
+                "1. \"time\"    (string, required) The Flux address to use for the signature.\n"
+                "\nResult:\n"
+                "[\n"
+                "address : balance,\n"
+                "...\n"
+                "]\n"
+                "\nExamples:\n"
+                + HelpExampleCli("printsnapshot", "256884524")
+                + HelpExampleRpc("printsnapshot", "256884524")
+        );
+
+    int64_t nTime = params[0].get_int64();
+    return PrettyPrintSnapshot(nTime);
+}
+
 UniValue setmocktime(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
@@ -1118,6 +1140,8 @@ static const CRPCCommand commands[] =
     { "util",               "z_validateaddress",      &z_validateaddress,      true  }, /* uses wallet if enabled */
     { "util",               "createmultisig",         &createmultisig,         true  },
     { "util",               "verifymessage",          &verifymessage,          true  },
+
+    { "util",               "printsnapshot",          &printsnapshot,          true  },
 
     // START insightexplorer
     /* Address index */

@@ -71,6 +71,10 @@ public:
     bool GetStats(CCoinsStats &stats) const {
         return false;
     }
+
+    bool GetAllBalances(std::map<std::string, CAmount> &mapBalances) const {
+        return false;
+    }
 };
 
 TEST(TransactionBuilder, TransparentToSapling)

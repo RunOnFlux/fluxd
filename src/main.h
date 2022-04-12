@@ -43,6 +43,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "zelnode/zelnodecachedb.h"
+#include "snapshot/snapshotdb.h"
 
 class CBlockIndex;
 class CBlockTreeDB;
@@ -535,6 +536,9 @@ extern CBlockTreeDB *pblocktree;
 
 /** Global variable that points to the fluxnode database (protected by cs_main) */
 extern CDeterministicFluxnodeDB* pFluxnodeDB;
+
+/** Global variable that points to the snapshot database (protected by cs_main) */
+extern CSnapshotDB* pSnapshotDB;
 
 /**
  * Return the spend height, which is one more than the inputs.GetBestBlock().
