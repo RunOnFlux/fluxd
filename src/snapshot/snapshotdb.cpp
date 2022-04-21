@@ -16,25 +16,25 @@ CSnapshotDB::CSnapshotDB(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapp
 bool CSnapshotDB::WriteFluxSnapshot(const CSnapshot &snapshot)
 {
     LogPrint("snapshot", "Wrote snapshot to database at height %d\n", snapshot.nActualSnapshotHeight);
-    return Write(std::make_pair(DB_SNAPSHOT, snapshot.nSnapshotTime), snapshot);
+    return Write(std::make_pair(DB_SNAPSHOT, snapshot.nSnapshotTimeOrHeight), snapshot);
 }
 
-bool CSnapshotDB::ReadFluxSnapshot(const int64_t& nTime, CSnapshot &snapshot)
+bool CSnapshotDB::ReadFluxSnapshot(const int64_t& nTimeOrHeight, CSnapshot &snapshot)
 {
-    LogPrint("snapshot", "Reading snapshot from database at time %d\n", nTime);
-    return Read(std::make_pair(DB_SNAPSHOT, nTime), snapshot);
+    LogPrint("snapshot", "Reading snapshot from database at height/time = %d\n", nTimeOrHeight);
+    return Read(std::make_pair(DB_SNAPSHOT, nTimeOrHeight), snapshot);
 }
 
-UniValue PrettyPrintSnapshot(const int64_t& nTime)
+UniValue PrettyPrintSnapshot(const int64_t& nTimeOrHeight)
 {
     CSnapshot snapshot;
-    snapshot.nSnapshotTime = nTime;
+    snapshot.nSnapshotTimeOrHeight = nTimeOrHeight;
 
-    if (pSnapshotDB && pSnapshotDB->ReadFluxSnapshot(nTime, snapshot)) {
+    if (pSnapshotDB && pSnapshotDB->ReadFluxSnapshot(nTimeOrHeight, snapshot)) {
         UniValue data(UniValue::VOBJ);
 
-        data.pushKV("timegiven", nTime);
-        data.pushKV("height", snapshot.nActualSnapshotHeight);
+        data.pushKV("timeorheightgiven", nTimeOrHeight);
+        data.pushKV("actualheight", snapshot.nActualSnapshotHeight);
 
         UniValue balances(UniValue::VOBJ);
         for (const auto& pair: snapshot.mapBalances) {
@@ -56,41 +56,52 @@ void CheckForSnapshot(CCoinsViewCache* coinsview)
     }
 
     // Check if snapshot timestamp was set
-    int64_t nSnapshotTime = GetArg("-snapshot", 0);
-    if (nSnapshotTime <= 0) {
+    int64_t nSnapshotArg = GetArg("-snapshot", 0);
+    if (nSnapshotArg <= 0) {
         return;
     }
 
     // Check if snapshot at this timestamp is already completed
-    if (pSnapshotDB->Exists(std::make_pair(DB_SNAPSHOT, nSnapshotTime))) {
+    if (pSnapshotDB->Exists(std::make_pair(DB_SNAPSHOT, nSnapshotArg))) {
         return;
     }
 
     {
         // Locking as we are accessing chainActive
         LOCK(cs_main);
-        int64_t tipTime = chainActive.Tip()->nTime;
-        int64_t nPrevTime = chainActive[chainActive.Height() - 1]->nTime;
 
-        // The snap shot time must be greater than the block two blocks ago but less that the current tip
-        if (nSnapshotTime < nPrevTime) {
-            return;
-        }
+        // nSnapshotTime could be a block height or a timestamp
+        if (nSnapshotArg < 1000000000) {
+            // We are looking at block heights only
+            int64_t nCurrentHeight = chainActive.Height();
+            if (nCurrentHeight != nSnapshotArg) {
+                return;
+            }
+        } else {
+            // We are looking at timestamps only
+            int64_t tipTime = chainActive.Tip()->nTime;
+            int64_t nPrevTime = chainActive[chainActive.Height() - 1]->nTime;
 
-        if (nSnapshotTime > tipTime) {
-            return;
+            // The snap shot time must be greater than the block two blocks ago but less that the current tip
+            if (nSnapshotArg < nPrevTime) {
+                return;
+            }
+
+            if (nSnapshotArg > tipTime) {
+                return;
+            }
         }
     }
 
     // If you made it this far, create the snapshot
-    CreateSnapshot(nSnapshotTime, coinsview);
+    CreateSnapshot(nSnapshotArg, coinsview);
 }
 
-void CreateSnapshot(const int64_t& nTime, CCoinsViewCache* coinsview)
+void CreateSnapshot(const int64_t& nTimeOrHeight, CCoinsViewCache* coinsview)
 {
 
     CSnapshot snapshot;
-    snapshot.nSnapshotTime = nTime;
+    snapshot.nSnapshotTimeOrHeight = nTimeOrHeight;
 
     // Set the block height
     {
