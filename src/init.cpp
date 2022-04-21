@@ -1875,7 +1875,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             MilliSleep(10);
     }
 
-    fFluxnode = GetBoolArg("-fluxnode", false);
+    fFluxnode = GetBoolArg("-zelnode", false);
 
     if ((fFluxnode || fluxnodeConfig.getCount() > -1) && fTxIndex == false) {
         return InitError("Enabling Fluxnode support requires turning on transaction indexing."
@@ -1890,18 +1890,18 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     if (fFluxnode) {
         LogPrintf("IS FLUXNODE\n");
-        strFluxnodeAddr = GetArg("-fluxnodeaddr", "");
+        strFluxnodeAddr = GetArg("-zelnodeaddr", "");
 
         LogPrintf(" addr %s\n", strFluxnodeAddr.c_str());
 
         if (!strFluxnodeAddr.empty()) {
             CService addrTest = CService(strFluxnodeAddr);
             if (!addrTest.IsValid()) {
-                return InitError("Invalid -fluxnodeaddr address: " + strFluxnodeAddr);
+                return InitError("Invalid -zelnodeaddr address: " + strFluxnodeAddr);
             }
         }
 
-        std::string strHash = GetArg("-fluxnodeoutpoint", "");
+        std::string strHash = GetArg("-zelnodeoutpoint", "");
         uint256 hash = uint256S(strHash);
         int index = GetArg("-fluxnodeindex", -1);
 
@@ -1913,7 +1913,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         activeFluxnode.deterministicOutPoint = fluxnodeOutPoint;
 
-        strFluxnodePrivKey = GetArg("-fluxnodeprivkey", "");
+        strFluxnodePrivKey = GetArg("-zelnodeprivkey", "");
         if (!strFluxnodePrivKey.empty()) {
             std::string errorMessage;
 
@@ -1960,14 +1960,14 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         } else {
 
-             if (FindBenchmarkPath("fluxbenchd", strPath)) {
-                  LogPrintf("Found fluxbenchd in %s\n",strPath);
+             if (FindBenchmarkPath("zelbenchd", strPath)) {
+                  LogPrintf("Found zelbenchd in %s\n",strPath);
              } else {
                  return InitError("Failed to find benchmark application");
              }
 
-             if (FindBenchmarkPath("fluxbench-cli", strPath)) {
-                  LogPrintf("Found fluxbench-cli in %s\n",strPath);
+             if (FindBenchmarkPath("zelbench-cli", strPath)) {
+                  LogPrintf("Found zelbench-cli in %s\n",strPath);
              } else {
                  return InitError("Failed to find benchmark cli application");
              }
