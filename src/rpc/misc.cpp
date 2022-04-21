@@ -460,7 +460,7 @@ UniValue printsnapshot(const UniValue& params, bool fHelp)
                 "printsnapshot \"time\" \n"
                 "\nPrints a snapshot prettylike\n"
                 "\nArguments:\n"
-                "1. \"time\"    (string, required) The Flux address to use for the signature.\n"
+                "1. \"timeorheight\"    (string, required) The timestamp or blockheight that the snapshot was created at\n"
                 "\nResult:\n"
                 "[\n"
                 "address : balance,\n"

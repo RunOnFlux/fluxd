@@ -24,25 +24,25 @@ public:
 
     void SetNull()
     {
-        nSnapshotTime = 0;
+        nSnapshotTimeOrHeight = 0;
         nActualSnapshotHeight = 0;
         mapBalances.clear();
     }
 
-    int64_t nSnapshotTime;
+    int64_t nSnapshotTimeOrHeight;
     int32_t nActualSnapshotHeight;
     std::map<std::string,CAmount> mapBalances;
 
     ADD_SERIALIZE_METHODS;
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITE(nSnapshotTime);
+        READWRITE(nSnapshotTimeOrHeight);
         READWRITE(nActualSnapshotHeight);
         READWRITE(mapBalances);
     }
 };
 
-UniValue PrettyPrintSnapshot(const int64_t& nTime);
+UniValue PrettyPrintSnapshot(const int64_t& nTimeOrHeight);
 void CheckForSnapshot(CCoinsViewCache *);
 void CreateSnapshot(const int64_t& nTime, CCoinsViewCache *);
 
