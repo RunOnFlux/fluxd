@@ -42,6 +42,7 @@
 #include "zelnode/zelnode.h"
 #include "zelnode/obfuscation.h"
 #include "zelnode/activezelnode.h"
+#include "snapshot/snapshotdb.h"
 
 #ifdef ENABLE_WALLET
 #include "key_io.h"
@@ -244,6 +245,8 @@ void Shutdown()
         pblocktree = NULL;
         delete pFluxnodeDB;
         pFluxnodeDB = NULL;
+        delete pSnapshotDB;
+        pSnapshotDB = NULL;
     }
 #ifdef ENABLE_WALLET
     if (pwalletMain)
@@ -1502,9 +1505,11 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete pcoinscatcher;
                 delete pblocktree;
                 delete pFluxnodeDB;
+                delete pSnapshotDB;
 
                 /** Fluxnode Database */
                 pFluxnodeDB = new CDeterministicFluxnodeDB(0, false, fReindex);
+                pSnapshotDB = new CSnapshotDB(0, false, false);
 
                 pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);

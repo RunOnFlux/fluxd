@@ -179,6 +179,7 @@ BITCOIN_CORE_H = \
   serialize.h \
   spentindex.h \
   streams.h \
+  snapshot/snapshotdb.h \
   support/allocators/secure.h \
   support/allocators/zeroafterfree.h \
   support/cleanse.h \
@@ -271,6 +272,7 @@ libbitcoin_server_a_SOURCES = \
   rpc/server.cpp \
   rpc/zelnode.cpp \
   script/sigcache.cpp \
+  snapshot/snapshotdb.cpp \
   timedata.cpp \
   torcontrol.cpp \
   txdb.cpp \

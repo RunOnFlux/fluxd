@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <atomic>
 
+#include "snapshot/snapshotdb.h"
 #include "zelnode/zelnodecachedb.h"
 #include "zelnode/obfuscation.h"
 #include "zelnode/activezelnode.h"
@@ -593,6 +594,8 @@ CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& loc
 CCoinsViewCache *pcoinsTip = NULL;
 CBlockTreeDB *pblocktree = NULL;
 CDeterministicFluxnodeDB* pFluxnodeDB = NULL;
+CSnapshotDB* pSnapshotDB = NULL;
+
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -4175,6 +4178,8 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
     mempool.removeWithoutBranchId(
         CurrentEpochBranchId(chainActive.Tip()->nHeight + 1, chainparams.GetConsensus()));
     mempool.check(pcoinsTip);
+
+    CheckForSnapshot(pcoinsTip);
 
     // Callbacks/notifications for a new best chain.
     if (fInvalidFound)
