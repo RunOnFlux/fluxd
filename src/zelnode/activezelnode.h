@@ -1,6 +1,7 @@
 // Copyright (c) 2014-2016 The Dash developers
 // Copyright (c) 2015-2019 The PIVX developers
 // Copyright (c) 2019 The Zel developers
+// Copyright (C) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 

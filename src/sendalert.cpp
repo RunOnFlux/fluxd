@@ -1,4 +1,5 @@
 // Copyright (c) 2019 The Zel developers
+// Copyright (C) 2018-2022 The Flux Developers
 // Copyright (c) 2019 The Zcash developers
 
 // Original code from: https://gist.github.com/laanwj/0e689cfa37b52bcbbb44
