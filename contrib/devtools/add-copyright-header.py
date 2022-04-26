@@ -83,7 +83,7 @@ for extension in extensions:
           #print("Last Copyright: ", datafile[other])
           #print("Next line     : ", datafile[other+1])
           #print(" ")
-          datafile.insert(other+1, "// Copyright (C) 2018-2022 The Flux Developers\n")
+          datafile.insert(other+1, "// Copyright (c) 2018-2022 The Flux Developers\n")
           f = open(filePath, 'w')
           f.writelines(datafile)
           f.close()
