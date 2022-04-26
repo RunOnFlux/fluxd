@@ -1,3 +1,7 @@
+// Copyright (C) 2018-2022 The Flux Developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
+
 #ifndef _BITCOIN_PREVECTOR_H_
 #define _BITCOIN_PREVECTOR_H_
 
