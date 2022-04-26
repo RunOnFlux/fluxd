@@ -1,7 +1,7 @@
 // Copyright (c) 2016 Jack Grigg
 // Copyright (c) 2016 The Zcash developers
 // Copyright (c) 2019 The Zel Developers
-// Copyright (C) 2018-2022 The Flux Developers
+// Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
