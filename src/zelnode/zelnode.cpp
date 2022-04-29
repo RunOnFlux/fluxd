@@ -1137,11 +1137,6 @@ void FluxnodeCache::DumpFluxnodeCache()
     }
 }
 
-bool IsDFluxnodeActive()
-{
-    return chainActive.Height() >= Params().StartFluxnodePayments();
-}
-
 bool IsFluxnodeTransactionsActive()
 {
     return chainActive.Height() >= Params().GetConsensus().vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight;
