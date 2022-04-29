@@ -839,24 +839,25 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getdoslist", "") + HelpExampleRpc("getdoslist", ""));
 
-    if (IsDFluxnodeActive()) {
-        UniValue wholelist(UniValue::VARR);
+    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
-        std::map<int, std::vector<UniValue>> mapOrderedDosList;
+    UniValue wholelist(UniValue::VARR);
 
-        for (const auto& item : g_fluxnodeCache.mapStartTxDosTracker) {
+    std::map<int, std::vector<UniValue>> mapOrderedDosList;
 
-            // Get the data from the item in the map of dox tracking
-            const FluxnodeCacheData data = item.second;
+    for (const auto& item : g_fluxnodeCache.mapStartTxDosTracker) {
 
-            CTxDestination payment_destination;
-            if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
-                GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
-            } else {
-                payment_destination = data.collateralPubkey.GetID();
-            }
+        // Get the data from the item in the map of dox tracking
+        const FluxnodeCacheData data = item.second;
 
-            UniValue info(UniValue::VOBJ);
+        CTxDestination payment_destination;
+        if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+            GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
+        } else {
+            payment_destination = data.collateralPubkey.GetID();
+        }
+
+        UniValue info(UniValue::VOBJ);
 
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
@@ -870,23 +871,20 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
                 info.push_back(std::make_pair("amount", FormatMoney(data.nCollateral)));
             }
 
-            mapOrderedDosList[nEligibleIn].emplace_back(info);
-        }
+        mapOrderedDosList[nEligibleIn].emplace_back(info);
+    }
 
-        if (mapOrderedDosList.size()) {
-            for (int i = 0; i < FLUXNODE_DOS_REMOVE_AMOUNT + 1; i++) {
-                if (mapOrderedDosList.count(i)) {
-                    for (const auto& item : mapOrderedDosList.at(i)) {
-                        wholelist.push_back(item);
-                    }
+    if (mapOrderedDosList.size()) {
+        for (int i = 0; i < FLUXNODE_DOS_REMOVE_AMOUNT + 1; i++) {
+            if (mapOrderedDosList.count(i)) {
+                for (const auto& item : mapOrderedDosList.at(i)) {
+                    wholelist.push_back(item);
                 }
             }
         }
-
-        return wholelist;
     }
 
-    return NullUniValue;
+    return wholelist;
 }
 
 UniValue getstartlist(const UniValue& params, bool fHelp)
@@ -910,31 +908,32 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getstartlist", "") + HelpExampleRpc("getstartlist", ""));
 
-    if (IsDFluxnodeActive()) {
-        UniValue wholelist(UniValue::VARR);
+    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
-        std::map<int, std::vector<UniValue>> mapOrderedStartList;
+    UniValue wholelist(UniValue::VARR);
 
-        for (const auto& item : g_fluxnodeCache.mapStartTxTracker) {
+    std::map<int, std::vector<UniValue>> mapOrderedStartList;
 
-            // Get the data from the item in the map of dox tracking
-            const FluxnodeCacheData data = item.second;
+    for (const auto& item : g_fluxnodeCache.mapStartTxTracker) {
 
-            CTxDestination payment_destination;
-            if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
-                GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
-            } else {
-                payment_destination = data.collateralPubkey.GetID();
-            }
+        // Get the data from the item in the map of dox tracking
+        const FluxnodeCacheData data = item.second;
 
-            UniValue info(UniValue::VOBJ);
+        CTxDestination payment_destination;
+        if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+            GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
+        } else {
+            payment_destination = data.collateralPubkey.GetID();
+        }
+
+        UniValue info(UniValue::VOBJ);
 
             info.push_back(std::make_pair("collateral", data.collateralIn.ToFullString()));
             info.push_back(std::make_pair("added_height", data.nAddedBlockHeight));
             info.push_back(std::make_pair("payment_address", EncodeDestination(payment_destination)));
 
-            int nCurrentHeight = chainActive.Height();
-            int nExpiresIn = FLUXNODE_START_TX_EXPIRATION_HEIGHT - (nCurrentHeight - data.nAddedBlockHeight);
+        int nCurrentHeight = chainActive.Height();
+        int nExpiresIn = FLUXNODE_START_TX_EXPIRATION_HEIGHT - (nCurrentHeight - data.nAddedBlockHeight);
 
             info.push_back(std::make_pair("expires_in",  nExpiresIn));
 
@@ -942,23 +941,20 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
                 info.push_back(std::make_pair("amount", FormatMoney(data.nCollateral)));
             }
 
-            mapOrderedStartList[nExpiresIn].emplace_back(info);
-        }
+        mapOrderedStartList[nExpiresIn].emplace_back(info);
+    }
 
-        if (mapOrderedStartList.size()) {
-            for (int i = 0; i < FLUXNODE_START_TX_EXPIRATION_HEIGHT + 1; i++) {
-                if (mapOrderedStartList.count(i)) {
-                    for (const auto& item : mapOrderedStartList.at(i)) {
-                        wholelist.push_back(item);
-                    }
+    if (mapOrderedStartList.size()) {
+        for (int i = 0; i < FLUXNODE_START_TX_EXPIRATION_HEIGHT + 1; i++) {
+            if (mapOrderedStartList.count(i)) {
+                for (const auto& item : mapOrderedStartList.at(i)) {
+                    wholelist.push_back(item);
                 }
             }
         }
-
-        return wholelist;
     }
 
-    return NullUniValue;
+    return wholelist;
 }
 
 UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
@@ -992,11 +988,10 @@ UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
 
     if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
-    if (IsDFluxnodeActive()) {
-        int nLocation = FLUXNODE_TX_ERROR;
-        auto data = g_fluxnodeCache.GetFluxnodeData(activeFluxnode.deterministicOutPoint, &nLocation);
+    int nLocation = FLUXNODE_TX_ERROR;
+    auto data = g_fluxnodeCache.GetFluxnodeData(activeFluxnode.deterministicOutPoint, &nLocation);
 
-        UniValue info(UniValue::VOBJ);
+    UniValue info(UniValue::VOBJ);
 
         if (data.IsNull()) {
             info.push_back(std::make_pair("status", "expired"));
@@ -1034,11 +1029,7 @@ UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
             }
         }
 
-        return info;
-    }
-
-    return NullUniValue;
-
+    return info;
 }
 
 UniValue getfluxnodestatus (const UniValue& params, bool fHelp)
@@ -1070,8 +1061,9 @@ UniValue fluxnodecurrentwinner (const UniValue& params, bool fHelp, string cmdna
                 "\nExamples:\n" +
                 HelpExampleCli(cmdname, "") + HelpExampleRpc(cmdname, ""));
 
-    if (IsDFluxnodeActive()) {
-        UniValue ret(UniValue::VOBJ);
+    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
+
+    UniValue ret(UniValue::VOBJ);
 
         for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
             CTxDestination dest;
@@ -1092,10 +1084,7 @@ UniValue fluxnodecurrentwinner (const UniValue& params, bool fHelp, string cmdna
             }
         }
 
-        return ret;
-    }
-
-    return NullUniValue;
+    return ret;
 }
 
 UniValue fluxnodecurrentwinner (const UniValue& params, bool fHelp)
@@ -1128,17 +1117,17 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
 
     UniValue obj(UniValue::VOBJ);
 
-    if (IsDFluxnodeActive())
+    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
+
+    int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0;
+    std::vector<int> vNodeCount(GetNumberOfTiers());
     {
-        int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0;
-        std::vector<int> vNodeCount(GetNumberOfTiers());
-        {
-            LOCK(g_fluxnodeCache.cs);
+        LOCK(g_fluxnodeCache.cs);
 
-            g_fluxnodeCache.CountNetworks(ipv4, ipv6, onion, vNodeCount);
+        g_fluxnodeCache.CountNetworks(ipv4, ipv6, onion, vNodeCount);
 
-            nTotal = g_fluxnodeCache.mapConfirmedFluxnodeData.size();
-        }
+        nTotal = g_fluxnodeCache.mapConfirmedFluxnodeData.size();
+    }
 
         obj.push_back(Pair("total", nTotal));
         obj.push_back(Pair("stable", nTotal));
@@ -1167,10 +1156,7 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
         obj.push_back(Pair("ipv6", ipv6));
         obj.push_back(Pair("onion", onion));
 
-        return obj;
-    }
-
-    return NullUniValue;
+    return obj;
 }
 
 UniValue getfluxnodecount (const UniValue& params, bool fHelp)
@@ -1199,21 +1185,21 @@ UniValue getmigrationcount (const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getmigrationcount", "") + HelpExampleRpc("getmigrationcount", ""));
 
-    if (IsDFluxnodeActive())
-    {
-        int nTotalOld = 0;
-        int nTotalNew = 0;
-        std::vector<int> vOldNodeCount(GetNumberOfTiers());
-        std::vector<int> vNewNodeCount(GetNumberOfTiers());
-        {
-            LOCK(g_fluxnodeCache.cs);
-            g_fluxnodeCache.CountMigration(nTotalOld, nTotalNew,vOldNodeCount, vNewNodeCount);
-        }
+    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
-        std::map<int,pair<string,string> > words;
-        words.insert(make_pair(0, make_pair("basic-enabled", "cumulus-enabled")));
-        words.insert(make_pair(1, make_pair("super-enabled", "nimbus-enabled")));
-        words.insert(make_pair(2, make_pair("bamf-enabled", "stratus-enabled")));
+    int nTotalOld = 0;
+    int nTotalNew = 0;
+    std::vector<int> vOldNodeCount(GetNumberOfTiers());
+    std::vector<int> vNewNodeCount(GetNumberOfTiers());
+    {
+        LOCK(g_fluxnodeCache.cs);
+        g_fluxnodeCache.CountMigration(nTotalOld, nTotalNew,vOldNodeCount, vNewNodeCount);
+    }
+
+    std::map<int,pair<string,string> > words;
+    words.insert(make_pair(0, make_pair("basic-enabled", "cumulus-enabled")));
+    words.insert(make_pair(1, make_pair("super-enabled", "nimbus-enabled")));
+    words.insert(make_pair(2, make_pair("bamf-enabled", "stratus-enabled")));
 
         UniValue oldTierCount(UniValue::VOBJ);
         oldTierCount.pushKV("total-old", nTotalOld);
@@ -1235,14 +1221,11 @@ UniValue getmigrationcount (const UniValue& params, bool fHelp)
             }
         }
 
-        UniValue result(UniValue::VARR);
+    UniValue result(UniValue::VARR);
 
-        result.push_back(oldTierCount);
-        result.push_back(newTierCount);
-        return result;
-    }
-
-    return NullUniValue;
+    result.push_back(oldTierCount);
+    result.push_back(newTierCount);
+    return result;
 }
 
 UniValue listfluxnodeconf (const UniValue& params, bool fHelp, string cmdname)
@@ -1291,15 +1274,16 @@ UniValue listfluxnodeconf (const UniValue& params, bool fHelp, string cmdname)
 
     UniValue ret(UniValue::VARR);
 
-    for (FluxnodeConfig::FluxnodeEntry fluxnode : fluxnodeEntries) {
-        if (IsDFluxnodeActive()) {
-            int nIndex;
-            if (!fluxnode.castOutputIndex(nIndex))
-                continue;
-            COutPoint out = COutPoint(uint256S(fluxnode.getTxHash()), uint32_t(nIndex));
+    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
-            int nLocation = FLUXNODE_TX_ERROR;
-            auto data = g_fluxnodeCache.GetFluxnodeData(out, &nLocation);
+    for (FluxnodeConfig::FluxnodeEntry fluxnode : fluxnodeEntries) {
+        int nIndex;
+        if (!fluxnode.castOutputIndex(nIndex))
+            continue;
+        COutPoint out = COutPoint(uint256S(fluxnode.getTxHash()), uint32_t(nIndex));
+
+        int nLocation = FLUXNODE_TX_ERROR;
+        auto data = g_fluxnodeCache.GetFluxnodeData(out, &nLocation);
 
             UniValue info(UniValue::VOBJ);
             info.push_back(Pair("alias", fluxnode.getAlias()));
@@ -1348,8 +1332,6 @@ UniValue listfluxnodeconf (const UniValue& params, bool fHelp, string cmdname)
             ret.push_back(info);
             continue;
         }
-    }
-
     return ret;
 }
 
