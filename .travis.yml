@@ -36,6 +36,7 @@ script:
   - if [[ "$PLATFORM" == "osx" ]]; then ./zcutil/build.sh; fi
   - if [[ "$PLATFORM" == "win" ]]; then ./zcutil/build-win.sh; fi
 before_deploy:
+  - if [[ "$PLATFORM" == "linux" ]]; then ls -l ./src; fi
   - if [[ "$PLATFORM" == "linux" ]]; then strip ./src/fluxd ./src/flux-cli ./src/flux-tx ./src/flux-gtest; fi
   - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/fluxd .; fi
   - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/flux-cli .; fi
