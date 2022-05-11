@@ -231,9 +231,9 @@ AC_ARG_WITH([libs],
 
 AC_ARG_WITH([daemon],
   [AS_HELP_STRING([--with-daemon],
-  [build bitcoind daemon (default=yes)])],
-  [build_bitcoind=$withval],
-  [build_bitcoind=yes])
+  [build fluxd daemon (default=yes)])],
+  [build_fluxd=$withval],
+  [build_fluxd=yes])
 
 use_pkgconfig=yes
 case $host in
