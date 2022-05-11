@@ -1,6 +1,8 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Copyright (c) 2019 The Zelcash Core developers
+// Copyright (c) 2022 The Flux developers
+
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
@@ -482,7 +484,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
             throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Wallet disabled and -mineraddress not set");
         }
 #else
-        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "zelcashd compiled without wallet and -mineraddress not set");
+        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "fluxd compiled without wallet and -mineraddress not set");
 #endif
     }
 
