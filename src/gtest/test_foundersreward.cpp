@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2022 The Flux Developers
+// Copyright (c) 2022 The Flux developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
@@ -19,12 +19,12 @@
 #include "util.h"
 
 // To run tests:
-// ./zelcash-gtest --gtest_filter="founders_reward_test.*"
+// ./flux-gtest --gtest_filter="founders_reward_test.*"
 
 //
 // Enable this test to generate and print 48 testnet 2-of-3 multisig addresses.
 // The output can be copied into chainparams.cpp.
-// The temporary wallet file can be renamed as wallet.dat and used for testing with zelcashd.
+// The temporary wallet file can be renamed as wallet.dat and used for testing with fluxd.
 //
 #if 0
 TEST(founders_reward_test, create_testnet_2of3multisig) {

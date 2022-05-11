@@ -1,6 +1,8 @@
 // Copyright (c) 2019 The Zel developers
 // Copyright (c) 2019 The Zcash developers
-// Copyright (c) 2018-2022 The Flux Developers
+// Copyright (c) 2022 The Flux developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 // Original code from: https://gist.github.com/laanwj/0e689cfa37b52bcbbb44
 
@@ -30,7 +32,7 @@ Modify the alert parameters, id and message found in this file.
 
 Build and run with -sendalert or -printalert.
 
-./zelcashd -printtoconsole -sendalert
+./fluxd -printtoconsole -sendalert
 
 One minute after starting up, the alert will be broadcast. It is then
 flooded through the network until the nRelayUntil time, and will be
