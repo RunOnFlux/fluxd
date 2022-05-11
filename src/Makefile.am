@@ -436,14 +436,14 @@ libbitcoin_cli_a_SOURCES = \
 nodist_libbitcoin_util_a_SOURCES = $(srcdir)/obj/build.h
 #
 
-# bitcoind binary #
-fluxd_SOURCES = bitcoind.cpp
+# fluxd binary #
+fluxd_SOURCES = fluxd.cpp
 fluxd_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 fluxd_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 fluxd_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 if TARGET_WINDOWS
-fluxd_SOURCES += bitcoind-res.rc
+fluxd_SOURCES += fluxd-res.rc
 endif
 
 fluxd_LDADD = \
@@ -472,14 +472,14 @@ fluxd_LDADD += \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBZELCASH_LIBS)
 
-# bitcoin-cli binary #
-flux_cli_SOURCES = bitcoin-cli.cpp
+# flux-cli binary #
+flux_cli_SOURCES = flux-cli.cpp
 flux_cli_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(EVENT_CFLAGS)
 flux_cli_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 flux_cli_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 if TARGET_WINDOWS
-flux_cli_SOURCES += bitcoin-cli-res.rc
+flux_cli_SOURCES += flux-cli-res.rc
 endif
 
 flux_cli_LDADD = \
@@ -496,13 +496,13 @@ flux_cli_LDADD = \
 #
 
 # flux-tx binary #
-flux_tx_SOURCES = bitcoin-tx.cpp
+flux_tx_SOURCES = flux-tx.cpp
 flux_tx_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 flux_tx_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 flux_tx_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 if TARGET_WINDOWS
-flux_tx_SOURCES += bitcoin-tx-res.rc
+flux_tx_SOURCES += flux-tx-res.rc
 endif
 
 # FIXME: Is libzelcash needed for zelcash_tx?
