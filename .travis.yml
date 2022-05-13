@@ -44,7 +44,6 @@ before_deploy:
   - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/flux-gtest .; fi
   - if [[ "$PLATFORM" == "linux" ]]; then cp ./zcutil/fetch-params.sh .; fi
   - if [[ "$PLATFORM" == "linux" ]]; then tar -cvzf Flux-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz fluxd flux-cli flux-tx flux-gtest fetch-params.sh; fi
-  - if [[ "$PLATFORM" == "arm" ]]; then strip ./src/fluxd ./src/flux-cli ./src/flux-tx; fi
   - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/fluxd .; fi
   - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/flux-cli .; fi
   - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/flux-tx .; fi
