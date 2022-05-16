@@ -839,8 +839,7 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getdoslist", "") + HelpExampleRpc("getdoslist", ""));
 
-    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
-
+    
     UniValue wholelist(UniValue::VARR);
 
     std::map<int, std::vector<UniValue>> mapOrderedDosList;
@@ -907,8 +906,6 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
 
                 "\nExamples:\n" +
                 HelpExampleCli("getstartlist", "") + HelpExampleRpc("getstartlist", ""));
-
-    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
     UniValue wholelist(UniValue::VARR);
 
@@ -1061,8 +1058,6 @@ UniValue fluxnodecurrentwinner (const UniValue& params, bool fHelp, string cmdna
                 "\nExamples:\n" +
                 HelpExampleCli(cmdname, "") + HelpExampleRpc(cmdname, ""));
 
-    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
-
     UniValue ret(UniValue::VOBJ);
 
         for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
@@ -1116,8 +1111,6 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
                 HelpExampleCli(cmdname, "") + HelpExampleRpc(cmdname, ""));
 
     UniValue obj(UniValue::VOBJ);
-
-    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
     int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0;
     std::vector<int> vNodeCount(GetNumberOfTiers());
@@ -1184,8 +1177,6 @@ UniValue getmigrationcount (const UniValue& params, bool fHelp)
 
                 "\nExamples:\n" +
                 HelpExampleCli("getmigrationcount", "") + HelpExampleRpc("getmigrationcount", ""));
-
-    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
     int nTotalOld = 0;
     int nTotalNew = 0;
@@ -1273,8 +1264,6 @@ UniValue listfluxnodeconf (const UniValue& params, bool fHelp, string cmdname)
     fluxnodeEntries = fluxnodeConfig.getEntries();
 
     UniValue ret(UniValue::VARR);
-
-    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
     for (FluxnodeConfig::FluxnodeEntry fluxnode : fluxnodeEntries) {
         int nIndex;
