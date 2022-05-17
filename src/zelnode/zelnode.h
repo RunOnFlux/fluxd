@@ -447,7 +447,6 @@ std::string GetP2SHFluxNodePublicKey(const uint32_t& nSigTime);
 std::string GetP2SHFluxNodePublicKey(const CTransaction& tx);
 bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet);
 
-bool IsDFluxnodeActive();
 bool IsFluxnodeTransactionsActive();
 
 
