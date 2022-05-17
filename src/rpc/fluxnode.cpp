@@ -838,54 +838,51 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getdoslist", "") + HelpExampleRpc("getdoslist", ""));
 
-    if (IsDFluxnodeActive()) {
-        UniValue wholelist(UniValue::VARR);
+    
+    UniValue wholelist(UniValue::VARR);
 
-        std::map<int, std::vector<UniValue>> mapOrderedDosList;
+    std::map<int, std::vector<UniValue>> mapOrderedDosList;
 
-        for (const auto& item : g_fluxnodeCache.mapStartTxDosTracker) {
+    for (const auto& item : g_fluxnodeCache.mapStartTxDosTracker) {
 
-            // Get the data from the item in the map of dox tracking
-            const FluxnodeCacheData data = item.second;
+        // Get the data from the item in the map of dox tracking
+        const FluxnodeCacheData data = item.second;
 
-            CTxDestination payment_destination;
-            if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
-                GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
-            } else {
-                payment_destination = data.collateralPubkey.GetID();
-            }
-
-            UniValue info(UniValue::VOBJ);
-
-            info.pushKV("collateral", data.collateralIn.ToFullString());
-            info.pushKV("added_height", data.nAddedBlockHeight);
-            info.pushKV("payment_address", EncodeDestination(payment_destination));
-
-            int nCurrentHeight = chainActive.Height();
-            int nEligibleIn = FLUXNODE_DOS_REMOVE_AMOUNT - (nCurrentHeight - data.nAddedBlockHeight);
-            info.pushKV("eligible_in",  nEligibleIn);
-
-            if (data.nCollateral > 0) {
-                info.pushKV("amount", FormatMoney(data.nCollateral));
-            }
-
-            mapOrderedDosList[nEligibleIn].emplace_back(info);
+        CTxDestination payment_destination;
+        if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+            GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
+        } else {
+            payment_destination = data.collateralPubkey.GetID();
         }
 
-        if (mapOrderedDosList.size()) {
-            for (int i = 0; i < FLUXNODE_DOS_REMOVE_AMOUNT + 1; i++) {
-                if (mapOrderedDosList.count(i)) {
-                    for (const auto& item : mapOrderedDosList.at(i)) {
-                        wholelist.push_back(item);
-                    }
+        UniValue info(UniValue::VOBJ);
+
+        info.pushKV("collateral", data.collateralIn.ToFullString());
+        info.pushKV("added_height", data.nAddedBlockHeight);
+        info.pushKV("payment_address", EncodeDestination(payment_destination));
+
+        int nCurrentHeight = chainActive.Height();
+        int nEligibleIn = FLUXNODE_DOS_REMOVE_AMOUNT - (nCurrentHeight - data.nAddedBlockHeight);
+        info.pushKV("eligible_in",  nEligibleIn);
+
+        if (data.nCollateral > 0) {
+            info.pushKV("amount", FormatMoney(data.nCollateral));
+        }
+
+        mapOrderedDosList[nEligibleIn].emplace_back(info);
+    }
+
+    if (mapOrderedDosList.size()) {
+        for (int i = 0; i < FLUXNODE_DOS_REMOVE_AMOUNT + 1; i++) {
+            if (mapOrderedDosList.count(i)) {
+                for (const auto& item : mapOrderedDosList.at(i)) {
+                    wholelist.push_back(item);
                 }
             }
         }
-
-        return wholelist;
     }
 
-    return NullUniValue;
+    return wholelist;
 }
 
 UniValue getstartlist(const UniValue& params, bool fHelp)
@@ -909,55 +906,51 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getstartlist", "") + HelpExampleRpc("getstartlist", ""));
 
-    if (IsDFluxnodeActive()) {
-        UniValue wholelist(UniValue::VARR);
+    UniValue wholelist(UniValue::VARR);
 
-        std::map<int, std::vector<UniValue>> mapOrderedStartList;
+    std::map<int, std::vector<UniValue>> mapOrderedStartList;
 
-        for (const auto& item : g_fluxnodeCache.mapStartTxTracker) {
+    for (const auto& item : g_fluxnodeCache.mapStartTxTracker) {
 
-            // Get the data from the item in the map of dox tracking
-            const FluxnodeCacheData data = item.second;
+        // Get the data from the item in the map of dox tracking
+        const FluxnodeCacheData data = item.second;
 
-            CTxDestination payment_destination;
-            if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
-                GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
-            } else {
-                payment_destination = data.collateralPubkey.GetID();
-            }
-
-            UniValue info(UniValue::VOBJ);
-
-            info.pushKV("collateral", data.collateralIn.ToFullString());
-            info.pushKV("added_height", data.nAddedBlockHeight);
-            info.pushKV("payment_address", EncodeDestination(payment_destination));
-
-            int nCurrentHeight = chainActive.Height();
-            int nExpiresIn = FLUXNODE_START_TX_EXPIRATION_HEIGHT - (nCurrentHeight - data.nAddedBlockHeight);
-
-            info.pushKV("expires_in",  nExpiresIn);
-
-            if (data.nCollateral > 0) {
-                info.pushKV("amount", FormatMoney(data.nCollateral));
-            }
-
-            mapOrderedStartList[nExpiresIn].emplace_back(info);
+        CTxDestination payment_destination;
+        if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+            GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
+        } else {
+            payment_destination = data.collateralPubkey.GetID();
         }
 
-        if (mapOrderedStartList.size()) {
-            for (int i = 0; i < FLUXNODE_START_TX_EXPIRATION_HEIGHT + 1; i++) {
-                if (mapOrderedStartList.count(i)) {
-                    for (const auto& item : mapOrderedStartList.at(i)) {
-                        wholelist.push_back(item);
-                    }
+        UniValue info(UniValue::VOBJ);
+
+        info.pushKV("collateral", data.collateralIn.ToFullString());
+        info.pushKV("added_height", data.nAddedBlockHeight);
+        info.pushKV("payment_address", EncodeDestination(payment_destination));
+
+        int nCurrentHeight = chainActive.Height();
+        int nExpiresIn = FLUXNODE_START_TX_EXPIRATION_HEIGHT - (nCurrentHeight - data.nAddedBlockHeight);
+
+        info.pushKV("expires_in",  nExpiresIn);
+
+        if (data.nCollateral > 0) {
+            info.pushKV("amount", FormatMoney(data.nCollateral));
+        }
+
+        mapOrderedStartList[nExpiresIn].emplace_back(info);
+    }
+
+    if (mapOrderedStartList.size()) {
+        for (int i = 0; i < FLUXNODE_START_TX_EXPIRATION_HEIGHT + 1; i++) {
+            if (mapOrderedStartList.count(i)) {
+                for (const auto& item : mapOrderedStartList.at(i)) {
+                    wholelist.push_back(item);
                 }
             }
         }
-
-        return wholelist;
     }
 
-    return NullUniValue;
+    return wholelist;
 }
 
 UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
@@ -991,53 +984,48 @@ UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
 
     if (!fFluxnode) throw runtime_error("This is not a Flux Node");
 
-    if (IsDFluxnodeActive()) {
-        int nLocation = FLUXNODE_TX_ERROR;
-        auto data = g_fluxnodeCache.GetFluxnodeData(activeFluxnode.deterministicOutPoint, &nLocation);
+    int nLocation = FLUXNODE_TX_ERROR;
+    auto data = g_fluxnodeCache.GetFluxnodeData(activeFluxnode.deterministicOutPoint, &nLocation);
 
-        UniValue info(UniValue::VOBJ);
+    UniValue info(UniValue::VOBJ);
 
-        if (data.IsNull()) {
-            info.pushKV("status", "expired");
-            info.pushKV("collateral", activeFluxnode.deterministicOutPoint.ToFullString());
-        } else {
-            std::string strTxHash = data.collateralIn.GetTxHash();
-            std::string strHost = data.ip;
-            CNetAddr node = CNetAddr(strHost, false);
-            std::string strNetwork = GetNetworkName(node.GetNetwork());
+    if (data.IsNull()) {
+        info.pushKV("status", "expired");
+        info.pushKV("collateral", activeFluxnode.deterministicOutPoint.ToFullString());
+    } else {
+        std::string strTxHash = data.collateralIn.GetTxHash();
+        std::string strHost = data.ip;
+        CNetAddr node = CNetAddr(strHost, false);
+        std::string strNetwork = GetNetworkName(node.GetNetwork());
 
-            info.pushKV("status", FluxnodeLocationToString(nLocation));
-            info.pushKV("collateral", data.collateralIn.ToFullString());
-            info.pushKV("txhash", strTxHash);
-            info.pushKV("outidx", data.collateralIn.GetTxIndex());
-            info.pushKV("ip", data.ip);
-            info.pushKV("network", strNetwork);
-            info.pushKV("added_height", data.nAddedBlockHeight);
-            info.pushKV("confirmed_height", data.nConfirmedBlockHeight);
-            info.pushKV("last_confirmed_height", data.nLastConfirmedBlockHeight);
-            info.pushKV("last_paid_height", data.nLastPaidHeight);
-            info.pushKV("tier", data.TierToString());
-            info.pushKV("payment_address", EncodeDestination(data.collateralPubkey.GetID()));
-            info.pushKV("pubkey", HexStr(data.pubKey));
-            if (chainActive.Height() >= data.nAddedBlockHeight)
-                info.pushKV("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime));
-            else
-                info.pushKV("activesince", 0);
-            if (chainActive.Height() >= data.nLastPaidHeight)
-                info.pushKV("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime));
-            else
-                info.pushKV("lastpaid", 0);
+        info.pushKV("status", FluxnodeLocationToString(nLocation));
+        info.pushKV("collateral", data.collateralIn.ToFullString());
+        info.pushKV("txhash", strTxHash);
+        info.pushKV("outidx", data.collateralIn.GetTxIndex());
+        info.pushKV("ip", data.ip);
+        info.pushKV("network", strNetwork);
+        info.pushKV("added_height", data.nAddedBlockHeight);
+        info.pushKV("confirmed_height", data.nConfirmedBlockHeight);
+        info.pushKV("last_confirmed_height", data.nLastConfirmedBlockHeight);
+        info.pushKV("last_paid_height", data.nLastPaidHeight);
+        info.pushKV("tier", data.TierToString());
+        info.pushKV("payment_address", EncodeDestination(data.collateralPubkey.GetID()));
+        info.pushKV("pubkey", HexStr(data.pubKey));
+        if (chainActive.Height() >= data.nAddedBlockHeight)
+            info.pushKV("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime));
+        else
+            info.pushKV("activesince", 0);
+        if (chainActive.Height() >= data.nLastPaidHeight)
+            info.pushKV("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime));
+        else
+            info.pushKV("lastpaid", 0);
 
-            if (data.nCollateral > 0) {
-                info.pushKV("amount", FormatMoney(data.nCollateral));
-            }
+        if (data.nCollateral > 0) {
+            info.pushKV("amount", FormatMoney(data.nCollateral));
         }
-
-        return info;
     }
 
-    return NullUniValue;
-
+    return info;
 }
 
 UniValue getfluxnodestatus (const UniValue& params, bool fHelp)
@@ -1069,32 +1057,28 @@ UniValue fluxnodecurrentwinner (const UniValue& params, bool fHelp, string cmdna
                 "\nExamples:\n" +
                 HelpExampleCli(cmdname, "") + HelpExampleRpc(cmdname, ""));
 
-    if (IsDFluxnodeActive()) {
-        UniValue ret(UniValue::VOBJ);
+    UniValue ret(UniValue::VOBJ);
 
-        for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-            CTxDestination dest;
-            COutPoint outpoint;
-            string strWinner = TierToString(currentTier) + " Winner";
-            if (g_fluxnodeCache.GetNextPayment(dest, currentTier, outpoint)) {
-                UniValue obj(UniValue::VOBJ);
-                auto data = g_fluxnodeCache.GetFluxnodeData(outpoint);
-                obj.pushKV("collateral", data.collateralIn.ToFullString());
-                obj.pushKV("ip", data.ip);
-                obj.pushKV("added_height", data.nAddedBlockHeight);
-                obj.pushKV("confirmed_height", data.nConfirmedBlockHeight);
-                obj.pushKV("last_confirmed_height", data.nLastConfirmedBlockHeight);
-                obj.pushKV("last_paid_height", data.nLastPaidHeight);
-                obj.pushKV("tier", TierToString(data.nTier));
-                obj.pushKV("payment_address", EncodeDestination(dest));
-                ret.pushKV(strWinner, obj);
-            }
+    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+        CTxDestination dest;
+        COutPoint outpoint;
+        string strWinner = TierToString(currentTier) + " Winner";
+        if (g_fluxnodeCache.GetNextPayment(dest, currentTier, outpoint)) {
+            UniValue obj(UniValue::VOBJ);
+            auto data = g_fluxnodeCache.GetFluxnodeData(outpoint);
+            obj.pushKV("collateral", data.collateralIn.ToFullString());
+            obj.pushKV("ip", data.ip);
+            obj.pushKV("added_height", data.nAddedBlockHeight);
+            obj.pushKV("confirmed_height", data.nConfirmedBlockHeight);
+            obj.pushKV("last_confirmed_height", data.nLastConfirmedBlockHeight);
+            obj.pushKV("last_paid_height", data.nLastPaidHeight);
+            obj.pushKV("tier", TierToString(data.nTier));
+            obj.pushKV("payment_address", EncodeDestination(dest));
+            ret.pushKV(strWinner, obj);
         }
-
-        return ret;
     }
 
-    return NullUniValue;
+    return ret;
 }
 
 UniValue fluxnodecurrentwinner (const UniValue& params, bool fHelp)
@@ -1127,49 +1111,44 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
 
     UniValue obj(UniValue::VOBJ);
 
-    if (IsDFluxnodeActive())
+    int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0;
+    std::vector<int> vNodeCount(GetNumberOfTiers());
     {
-        int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0;
-        std::vector<int> vNodeCount(GetNumberOfTiers());
-        {
-            LOCK(g_fluxnodeCache.cs);
+        LOCK(g_fluxnodeCache.cs);
 
-            g_fluxnodeCache.CountNetworks(ipv4, ipv6, onion, vNodeCount);
+        g_fluxnodeCache.CountNetworks(ipv4, ipv6, onion, vNodeCount);
 
-            nTotal = g_fluxnodeCache.mapConfirmedFluxnodeData.size();
-        }
-
-        obj.pushKV("total", nTotal);
-        obj.pushKV("stable", nTotal);
-
-        std::map<int,pair<string,string> > words;
-        words.insert(make_pair(0, make_pair("basic-enabled", "cumulus-enabled")));
-        words.insert(make_pair(1, make_pair("super-enabled", "nimbus-enabled")));
-        words.insert(make_pair(2, make_pair("bamf-enabled", "stratus-enabled")));
-        for (int i = 0; i < vNodeCount.size(); i++) {
-            if (words.count(i)) {
-                obj.pushKV(words.at(i).first, vNodeCount[i]);
-            } else {
-                obj.pushKV("unnamed-enabled", vNodeCount[i]);
-            }
-        }
-
-        for (int i = 0; i < vNodeCount.size(); i++) {
-            if (words.count(i)) {
-                obj.pushKV(words.at(i).second, vNodeCount[i]);
-            } else {
-                obj.pushKV("unnamed-enabled", vNodeCount[i]);
-            }
-        }
-
-        obj.pushKV("ipv4", ipv4);
-        obj.pushKV("ipv6", ipv6);
-        obj.pushKV("onion", onion);
-
-        return obj;
+        nTotal = g_fluxnodeCache.mapConfirmedFluxnodeData.size();
     }
 
-    return NullUniValue;
+    obj.pushKV("total", nTotal);
+    obj.pushKV("stable", nTotal);
+
+    std::map<int,pair<string,string> > words;
+    words.insert(make_pair(0, make_pair("basic-enabled", "cumulus-enabled")));
+    words.insert(make_pair(1, make_pair("super-enabled", "nimbus-enabled")));
+    words.insert(make_pair(2, make_pair("bamf-enabled", "stratus-enabled")));
+    for (int i = 0; i < vNodeCount.size(); i++) {
+        if (words.count(i)) {
+            obj.pushKV(words.at(i).first, vNodeCount[i]);
+        } else {
+            obj.pushKV("unnamed-enabled", vNodeCount[i]);
+        }
+    }
+
+    for (int i = 0; i < vNodeCount.size(); i++) {
+        if (words.count(i)) {
+            obj.pushKV(words.at(i).second, vNodeCount[i]);
+        } else {
+            obj.pushKV("unnamed-enabled", vNodeCount[i]);
+        }
+    }
+
+    obj.pushKV("ipv4", ipv4);
+    obj.pushKV("ipv6", ipv6);
+    obj.pushKV("onion", onion);
+
+    return obj;
 }
 
 UniValue getfluxnodecount (const UniValue& params, bool fHelp)
@@ -1198,50 +1177,45 @@ UniValue getmigrationcount (const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getmigrationcount", "") + HelpExampleRpc("getmigrationcount", ""));
 
-    if (IsDFluxnodeActive())
+    int nTotalOld = 0;
+    int nTotalNew = 0;
+    std::vector<int> vOldNodeCount(GetNumberOfTiers());
+    std::vector<int> vNewNodeCount(GetNumberOfTiers());
     {
-        int nTotalOld = 0;
-        int nTotalNew = 0;
-        std::vector<int> vOldNodeCount(GetNumberOfTiers());
-        std::vector<int> vNewNodeCount(GetNumberOfTiers());
-        {
-            LOCK(g_fluxnodeCache.cs);
-            g_fluxnodeCache.CountMigration(nTotalOld, nTotalNew,vOldNodeCount, vNewNodeCount);
-        }
-
-        std::map<int,pair<string,string> > words;
-        words.insert(make_pair(0, make_pair("basic-enabled", "cumulus-enabled")));
-        words.insert(make_pair(1, make_pair("super-enabled", "nimbus-enabled")));
-        words.insert(make_pair(2, make_pair("bamf-enabled", "stratus-enabled")));
-
-        UniValue oldTierCount(UniValue::VOBJ);
-        oldTierCount.pushKV("total-old", nTotalOld);
-        for (int i = 0; i < vOldNodeCount.size(); i++) {
-            if (words.count(i)) {
-                oldTierCount.pushKV(words.at(i).second + "-old", vOldNodeCount[i]);
-            } else {
-                oldTierCount.pushKV("unnamed-enabled-old", vOldNodeCount[i]);
-            }
-        }
-
-        UniValue newTierCount(UniValue::VOBJ);
-        newTierCount.pushKV("total-new", nTotalNew);
-        for (int i = 0; i < vNewNodeCount.size(); i++) {
-            if (words.count(i)) {
-                newTierCount.pushKV(words.at(i).second + "-new", vNewNodeCount[i]);
-            } else {
-                newTierCount.pushKV("unnamed-enabled-new", vNewNodeCount[i]);
-            }
-        }
-
-        UniValue result(UniValue::VARR);
-
-        result.push_back(oldTierCount);
-        result.push_back(newTierCount);
-        return result;
+        LOCK(g_fluxnodeCache.cs);
+        g_fluxnodeCache.CountMigration(nTotalOld, nTotalNew,vOldNodeCount, vNewNodeCount);
     }
 
-    return NullUniValue;
+    std::map<int,pair<string,string> > words;
+    words.insert(make_pair(0, make_pair("basic-enabled", "cumulus-enabled")));
+    words.insert(make_pair(1, make_pair("super-enabled", "nimbus-enabled")));
+    words.insert(make_pair(2, make_pair("bamf-enabled", "stratus-enabled")));
+
+    UniValue oldTierCount(UniValue::VOBJ);
+    oldTierCount.pushKV("total-old", nTotalOld);
+    for (int i = 0; i < vOldNodeCount.size(); i++) {
+        if (words.count(i)) {
+            oldTierCount.pushKV(words.at(i).second + "-old", vOldNodeCount[i]);
+        } else {
+            oldTierCount.pushKV("unnamed-enabled-old", vOldNodeCount[i]);
+        }
+    }
+
+    UniValue newTierCount(UniValue::VOBJ);
+    newTierCount.pushKV("total-new", nTotalNew);
+    for (int i = 0; i < vNewNodeCount.size(); i++) {
+        if (words.count(i)) {
+            newTierCount.pushKV(words.at(i).second + "-new", vNewNodeCount[i]);
+        } else {
+            newTierCount.pushKV("unnamed-enabled-new", vNewNodeCount[i]);
+        }
+    }
+
+    UniValue result(UniValue::VARR);
+
+    result.push_back(oldTierCount);
+    result.push_back(newTierCount);
+    return result;
 }
 
 UniValue listfluxnodeconf (const UniValue& params, bool fHelp, string cmdname)
@@ -1291,62 +1265,59 @@ UniValue listfluxnodeconf (const UniValue& params, bool fHelp, string cmdname)
     UniValue ret(UniValue::VARR);
 
     for (FluxnodeConfig::FluxnodeEntry fluxnode : fluxnodeEntries) {
-        if (IsDFluxnodeActive()) {
-            int nIndex;
-            if (!fluxnode.castOutputIndex(nIndex))
-                continue;
-            COutPoint out = COutPoint(uint256S(fluxnode.getTxHash()), uint32_t(nIndex));
-
-            int nLocation = FLUXNODE_TX_ERROR;
-            auto data = g_fluxnodeCache.GetFluxnodeData(out, &nLocation);
-
-            UniValue info(UniValue::VOBJ);
-            info.pushKV("alias", fluxnode.getAlias());
-            info.pushKV("status", FluxnodeLocationToString(nLocation));
-            info.pushKV("collateral", out.ToFullString());
-            info.pushKV("txHash", fluxnode.getTxHash());
-            info.pushKV("outputIndex", fluxnode.getOutputIndex());
-            info.pushKV("privateKey", fluxnode.getPrivKey());
-            info.pushKV("address", fluxnode.getIp());
-
-            if (data.IsNull()) {
-                info.pushKV("ip", "UNKNOWN");
-                info.pushKV("network", "UNKOWN");
-                info.pushKV("added_height", 0);
-                info.pushKV("confirmed_height", 0);
-                info.pushKV("last_confirmed_height", 0);
-                info.pushKV("last_paid_height", 0);
-                info.pushKV("tier", "UNKNOWN");
-                info.pushKV("payment_address", "UNKNOWN");
-                info.pushKV("activesince", 0);
-                info.pushKV("lastpaid", 0);
-            } else {
-                std::string strHost = data.ip;
-                CNetAddr node = CNetAddr(strHost, false);
-                std::string strNetwork = GetNetworkName(node.GetNetwork());
-                info.pushKV("ip", data.ip);
-                info.pushKV("network", strNetwork);
-                info.pushKV("added_height", data.nAddedBlockHeight);
-                info.pushKV("confirmed_height", data.nConfirmedBlockHeight);
-                info.pushKV("last_confirmed_height", data.nLastConfirmedBlockHeight);
-                info.pushKV("last_paid_height", data.nLastPaidHeight);
-                info.pushKV("tier", TierToString(data.nTier));
-                info.pushKV("payment_address", EncodeDestination(data.collateralPubkey.GetID()));
-                if (chainActive.Height() >= data.nAddedBlockHeight)
-                    info.push_back(
-                            std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
-                else
-                    info.pushKV("activesince", 0);
-                if (chainActive.Height() >= data.nLastPaidHeight)
-                    info.push_back(
-                            std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
-                else
-                    info.pushKV("lastpaid", 0);
-            }
-
-            ret.push_back(info);
+        int nIndex;
+        if (!fluxnode.castOutputIndex(nIndex))
             continue;
+        COutPoint out = COutPoint(uint256S(fluxnode.getTxHash()), uint32_t(nIndex));
+
+        int nLocation = FLUXNODE_TX_ERROR;
+        auto data = g_fluxnodeCache.GetFluxnodeData(out, &nLocation);
+
+        UniValue info(UniValue::VOBJ);
+        info.pushKV("alias", fluxnode.getAlias());
+        info.pushKV("status", FluxnodeLocationToString(nLocation));
+        info.pushKV("collateral", out.ToFullString());
+        info.pushKV("txHash", fluxnode.getTxHash());
+        info.pushKV("outputIndex", fluxnode.getOutputIndex());
+        info.pushKV("privateKey", fluxnode.getPrivKey());
+        info.pushKV("address", fluxnode.getIp());
+
+        if (data.IsNull()) {
+            info.pushKV("ip", "UNKNOWN");
+            info.pushKV("network", "UNKOWN");
+            info.pushKV("added_height", 0);
+            info.pushKV("confirmed_height", 0);
+            info.pushKV("last_confirmed_height", 0);
+            info.pushKV("last_paid_height", 0);
+            info.pushKV("tier", "UNKNOWN");
+            info.pushKV("payment_address", "UNKNOWN");
+            info.pushKV("activesince", 0);
+            info.pushKV("lastpaid", 0);
+        } else {
+            std::string strHost = data.ip;
+            CNetAddr node = CNetAddr(strHost, false);
+            std::string strNetwork = GetNetworkName(node.GetNetwork());
+            info.pushKV("ip", data.ip);
+            info.pushKV("network", strNetwork);
+            info.pushKV("added_height", data.nAddedBlockHeight);
+            info.pushKV("confirmed_height", data.nConfirmedBlockHeight);
+            info.pushKV("last_confirmed_height", data.nLastConfirmedBlockHeight);
+            info.pushKV("last_paid_height", data.nLastPaidHeight);
+            info.pushKV("tier", TierToString(data.nTier));
+            info.pushKV("payment_address", EncodeDestination(data.collateralPubkey.GetID()));
+            if (chainActive.Height() >= data.nAddedBlockHeight)
+                info.push_back(
+                        std::make_pair("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime)));
+            else
+                info.pushKV("activesince", 0);
+            if (chainActive.Height() >= data.nLastPaidHeight)
+                info.push_back(
+                        std::make_pair("lastpaid", std::to_string(chainActive[data.nLastPaidHeight]->nTime)));
+            else
+                info.pushKV("lastpaid", 0);
         }
+        ret.push_back(info);
+        continue;
     }
 
     return ret;
