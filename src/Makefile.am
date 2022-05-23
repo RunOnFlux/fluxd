@@ -270,7 +270,7 @@ libbitcoin_server_a_SOURCES = \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
   rpc/server.cpp \
-  rpc/zelnode.cpp \
+  rpc/fluxnode.cpp \
   script/sigcache.cpp \
   snapshot/snapshotdb.cpp \
   timedata.cpp \
