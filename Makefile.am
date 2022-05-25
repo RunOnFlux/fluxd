@@ -1,3 +1,4 @@
+# Copyright (c) 2018-2022 The Flux Developers
 # Copyright (c) 2016-2019 The Zcash developers
 # Copyright (c) 2013-2019 The Bitcoin Core developers
 # Copyright (c) 2013-2019 Bitcoin Developers
@@ -32,7 +33,7 @@ COVERAGE_INFO = baseline_filtered_combined.info baseline.info \
   leveldb_baseline.info test_bitcoin_filtered.info total_coverage.info \
   baseline_filtered.info \
   leveldb_baseline_filtered.info test_bitcoin_coverage.info test_bitcoin.info \
-  zelcash-gtest.info zelcash-gtest_filtered.info zelcash-gtest_coverage.info
+  flux-gtest.info flux-gtest_filtered.info flux-gtest_coverage.info
 
 dist-hook:
 	-$(MAKE) -C $(top_distdir)/src/leveldb clean
@@ -109,13 +110,13 @@ test_bitcoin_filtered.info: test_bitcoin.info
                       "$(abs_builddir)/src/wallet/test/*" \
                       -o $@
 
-zelcash-gtest.info: baseline_filtered_combined.info
-	$(MAKE) -C src/ zelcash-gtest_check
-	$(LCOV) -c -d $(abs_builddir)/src -t zelcash-gtest -o $@
+flux-gtest.info: baseline_filtered_combined.info
+	$(MAKE) -C src/ flux-gtest_check
+	$(LCOV) -c -d $(abs_builddir)/src -t flux-gtest -o $@
 	$(LCOV) -z -d $(abs_builddir)/src
 	$(LCOV) -z -d $(abs_builddir)/src/leveldb
 
-zelcash-gtest_filtered.info: zelcash-gtest.info
+flux-gtest_filtered.info: flux-gtest.info
 	$(LCOV) -r $< "/usr/include/*" \
                       "$(abs_builddir)/depends/x86_64-unknown-linux-gnu/include/*.h" \
                       "$(abs_builddir)/depends/x86_64-unknown-linux-gnu/include/boost/*" \
@@ -130,27 +131,27 @@ zelcash-gtest_filtered.info: zelcash-gtest.info
 test_bitcoin_coverage.info: baseline_filtered_combined.info test_bitcoin_filtered.info
 	$(LCOV) -a baseline_filtered.info -a leveldb_baseline_filtered.info -a test_bitcoin_filtered.info -o $@
 
-zelcash-gtest_coverage.info: baseline_filtered_combined.info zelcash-gtest_filtered.info
-	$(LCOV) -a baseline_filtered.info -a leveldb_baseline_filtered.info -a zelcash-gtest_filtered.info -o $@
+flux-gtest_coverage.info: baseline_filtered_combined.info flux-gtest_filtered.info
+	$(LCOV) -a baseline_filtered.info -a leveldb_baseline_filtered.info -a flux-gtest_filtered.info -o $@
 
-total_coverage.info:  baseline_filtered_combined.info test_bitcoin_filtered.info zelcash-gtest_filtered.info
-	$(LCOV) -a baseline_filtered.info -a leveldb_baseline_filtered.info -a test_bitcoin_filtered.info -a zelcash-gtest_filtered.info -o $@ | $(GREP) "\%" | $(AWK) '{ print substr($$3,2,50) "/" $$5 }' > coverage_percent.txt
+total_coverage.info:  baseline_filtered_combined.info test_bitcoin_filtered.info flux-gtest_filtered.info
+	$(LCOV) -a baseline_filtered.info -a leveldb_baseline_filtered.info -a test_bitcoin_filtered.info -a flux-gtest_filtered.info -o $@ | $(GREP) "\%" | $(AWK) '{ print substr($$3,2,50) "/" $$5 }' > coverage_percent.txt
 
 test_bitcoin.coverage/.dirstamp:  test_bitcoin_coverage.info
 	$(GENHTML) -s $< -o $(@D)
 	@touch $@
 
-zelcash-gtest.coverage/.dirstamp:  zelcash-gtest_coverage.info
+flux-gtest.coverage/.dirstamp:  flux-gtest_coverage.info
 	$(GENHTML) -s $< -o $(@D)
 	@touch $@
 
-cov-zelcash: zelcash-gtest.coverage/.dirstamp
+cov-flux: flux-gtest.coverage/.dirstamp
 
 total.coverage/.dirstamp: total_coverage.info
 	$(GENHTML) -s $< -o $(@D)
 	@touch $@
 
-cov: test_bitcoin.coverage/.dirstamp cov-zelcash total.coverage/.dirstamp
+cov: test_bitcoin.coverage/.dirstamp cov-flux total.coverage/.dirstamp
 
 endif
 
@@ -167,4 +168,4 @@ install-exec-hook:
 DISTCHECK_CONFIGURE_FLAGS = --enable-man
 
 clean-local:
-	rm -rf test_bitcoin.coverage/ zelcash-gtest.coverage/ total.coverage/
+	rm -rf test_bitcoin.coverage/ flux-gtest.coverage/ total.coverage/

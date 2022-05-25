@@ -80,11 +80,11 @@ noinst_PROGRAMS =
 TESTS =
 
 if BUILD_BITCOIND
-  bin_PROGRAMS += zelcashd
+  bin_PROGRAMS += fluxd
 endif
 
 if BUILD_BITCOIN_UTILS
-  bin_PROGRAMS += zelcash-cli zelcash-tx
+  bin_PROGRAMS += flux-cli flux-tx
 endif
 
 LIBZCELASH_H = \
@@ -237,7 +237,7 @@ obj/build.h: FORCE
 	  $(abs_top_srcdir)
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
-# server: zelcashd
+# server: fluxd
 libbitcoin_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
@@ -306,7 +306,7 @@ libbitcoin_proton_a_SOURCES = \
   amqp/amqppublishnotifier.cpp
 endif
 
-# wallet: zelcashd, but only linked when wallet enabled
+# wallet: fluxd, but only linked when wallet enabled
 libbitcoin_wallet_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_wallet_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_wallet_a_SOURCES = \
@@ -363,7 +363,7 @@ crypto_libbitcoin_crypto_a_SOURCES += \
   ${EQUIHASH_TROMP_SOURCES}
 endif
 
-# common: shared between zelcashd and non-server tools
+# common: shared between fluxd and non-server tools
 libbitcoin_common_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_common_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_common_a_SOURCES = \
@@ -425,7 +425,7 @@ if GLIBC_BACK_COMPAT
 libbitcoin_util_a_SOURCES += compat/glibc_compat.cpp
 endif
 
-# cli: zelcash-cli
+# cli: flux-cli
 libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
@@ -436,17 +436,17 @@ libbitcoin_cli_a_SOURCES = \
 nodist_libbitcoin_util_a_SOURCES = $(srcdir)/obj/build.h
 #
 
-# bitcoind binary #
-zelcashd_SOURCES = bitcoind.cpp
-zelcashd_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
-zelcashd_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-zelcashd_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+# fluxd binary #
+fluxd_SOURCES = fluxd.cpp
+fluxd_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
+fluxd_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+fluxd_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 if TARGET_WINDOWS
-zelcashd_SOURCES += bitcoind-res.rc
+fluxd_SOURCES += fluxd-res.rc
 endif
 
-zelcashd_LDADD = \
+fluxd_LDADD = \
   $(LIBBITCOIN_SERVER) \
   $(LIBBITCOIN_WALLET) \
   $(LIBBITCOIN_COMMON) \
@@ -460,7 +460,7 @@ zelcashd_LDADD = \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
-zelcashd_LDADD += \
+fluxd_LDADD += \
   $(BOOST_LIBS) \
   $(BDB_LIBS) \
   $(SSL_LIBS) \
@@ -472,17 +472,17 @@ zelcashd_LDADD += \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBZELCASH_LIBS)
 
-# bitcoin-cli binary #
-zelcash_cli_SOURCES = bitcoin-cli.cpp
-zelcash_cli_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(EVENT_CFLAGS)
-zelcash_cli_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-zelcash_cli_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+# flux-cli binary #
+flux_cli_SOURCES = flux-cli.cpp
+flux_cli_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(EVENT_CFLAGS)
+flux_cli_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+flux_cli_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 if TARGET_WINDOWS
-zelcash_cli_SOURCES += bitcoin-cli-res.rc
+flux_cli_SOURCES += flux-cli-res.rc
 endif
 
-zelcash_cli_LDADD = \
+flux_cli_LDADD = \
   $(LIBBITCOIN_CLI) \
   $(LIBUNIVALUE) \
   $(LIBBITCOIN_UTIL) \
@@ -495,18 +495,18 @@ zelcash_cli_LDADD = \
   $(LIBZELCASH_LIBS)
 #
 
-# zelcash-tx binary #
-zelcash_tx_SOURCES = bitcoin-tx.cpp
-zelcash_tx_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
-zelcash_tx_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-zelcash_tx_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+# flux-tx binary #
+flux_tx_SOURCES = flux-tx.cpp
+flux_tx_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
+flux_tx_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+flux_tx_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 if TARGET_WINDOWS
-zelcash_tx_SOURCES += bitcoin-tx-res.rc
+flux_tx_SOURCES += flux-tx-res.rc
 endif
 
 # FIXME: Is libzelcash needed for zelcash_tx?
-zelcash_tx_LDADD = \
+flux_tx_LDADD = \
   $(LIBUNIVALUE) \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UTIL) \
@@ -515,7 +515,7 @@ zelcash_tx_LDADD = \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBZELCASH_LIBS)
 
-zelcash_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
+flux_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
 #
 
 # zelcash protocol primitives #

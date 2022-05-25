@@ -24,4 +24,4 @@ cd depends/ && make HOST=$HOST V=1 NO_QT=1 NO_RUST="$RUST_ARG" && cd ../
 CONFIG_SITE=$PWD/depends/x86_64-w64-mingw32/share/config.site CXXFLAGS+=" -fopenmp" ./configure --prefix="${PREFIX}" --host=x86_64-w64-mingw32 --enable-static --disable-zmq --disable-rust "$RUST_ARG"
 sed -i 's/-lboost_system-mt /-lboost_system-mt-s /' configure
 cd src/
-CC="${CC}" CXX="${CXX}" make V=1 zelcashd.exe zelcash-cli.exe zelcash-tx.exe
+CC="${CC}" CXX="${CXX}" make V=1 fluxd.exe flux-cli.exe flux-tx.exe

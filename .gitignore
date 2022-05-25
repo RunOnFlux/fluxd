@@ -11,6 +11,14 @@ src/test/test_bitcoin
 *zelcashTest.pk
 *zelcashTest.vk
 
+src/fluxd
+src/flux-cli
+src/flux-gtest
+src/flux-tx
+
+*fluxTest.pk
+*fluxTest.vk
+
 # autoreconf
 Makefile.in
 aclocal.m4

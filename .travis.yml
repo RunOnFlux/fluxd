@@ -36,30 +36,31 @@ script:
   - if [[ "$PLATFORM" == "osx" ]]; then ./zcutil/build.sh; fi
   - if [[ "$PLATFORM" == "win" ]]; then ./zcutil/build-win.sh; fi
 before_deploy:
-  - if [[ "$PLATFORM" == "linux" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx ./src/zelcash-gtest; fi
-  - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/zelcashd .; fi
-  - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/zelcash-cli .; fi
-  - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/zelcash-tx .; fi
-  - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/zelcash-gtest .; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then ls -l ./src; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then strip ./src/fluxd ./src/flux-cli ./src/flux-tx ./src/flux-gtest; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/fluxd .; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/flux-cli .; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/flux-tx .; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then cp ./src/flux-gtest .; fi
   - if [[ "$PLATFORM" == "linux" ]]; then cp ./zcutil/fetch-params.sh .; fi
-  - if [[ "$PLATFORM" == "linux" ]]; then tar -cvzf Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx zelcash-gtest fetch-params.sh; fi
-  - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/zelcashd .; fi
-  - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/zelcash-cli .; fi
-  - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/zelcash-tx .; fi
+  - if [[ "$PLATFORM" == "linux" ]]; then tar -cvzf Flux-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz fluxd flux-cli flux-tx flux-gtest fetch-params.sh; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/fluxd .; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/flux-cli .; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then cp ./src/flux-tx .; fi
   - if [[ "$PLATFORM" == "arm" ]]; then cp ./zcutil/fetch-params.sh .; fi
-  - if [[ "$PLATFORM" == "arm" ]]; then tar -cvzf Zel-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx fetch-params.sh; fi
-  - if [[ "$PLATFORM" == "osx" ]]; then strip ./src/zelcashd ./src/zelcash-cli ./src/zelcash-tx; fi
-  - if [[ "$PLATFORM" == "osx" ]]; then cp ./src/zelcashd .; fi
-  - if [[ "$PLATFORM" == "osx" ]]; then cp ./src/zelcash-cli .; fi
-  - if [[ "$PLATFORM" == "osx" ]]; then cp ./src/zelcash-tx .; fi
+  - if [[ "$PLATFORM" == "arm" ]]; then tar -cvzf Flux-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz fluxd flux-cli flux-tx fetch-params.sh; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then strip ./src/fluxd ./src/flux-cli ./src/flux-tx; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then cp ./src/fluxd .; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then cp ./src/flux-cli .; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then cp ./src/flux-tx .; fi
   - if [[ "$PLATFORM" == "osx" ]]; then cp ./zcutil/fetch-params.sh .; fi
-  - if [[ "$PLATFORM" == "osx" ]]; then tar -cvzf Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz zelcashd zelcash-cli zelcash-tx fetch-params.sh; fi
-  - if [[ "$PLATFORM" == "win" ]]; then strip ./src/zelcashd.exe ./src/zelcash-cli.exe ./src/zelcash-tx.exe; fi
-  - if [[ "$PLATFORM" == "win" ]]; then cp ./src/zelcashd.exe .; fi
-  - if [[ "$PLATFORM" == "win" ]]; then cp ./src/zelcash-cli.exe .; fi
-  - if [[ "$PLATFORM" == "win" ]]; then cp ./src/zelcash-tx.exe .; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then tar -cvzf Flux-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz fluxd flux-cli flux-tx fetch-params.sh; fi
+  - if [[ "$PLATFORM" == "win" ]]; then strip ./src/fluxd.exe ./src/flux-cli.exe ./src/flux-tx.exe; fi
+  - if [[ "$PLATFORM" == "win" ]]; then cp ./src/fluxd.exe .; fi
+  - if [[ "$PLATFORM" == "win" ]]; then cp ./src/flux-cli.exe .; fi
+  - if [[ "$PLATFORM" == "win" ]]; then cp ./src/flux-tx.exe .; fi
   - if [[ "$PLATFORM" == "win" ]]; then cp ./zcutil/fetch-params.bat .; fi
-  - if [[ "$PLATFORM" == "win" ]]; then zip Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip zelcashd.exe zelcash-cli.exe zelcash-tx.exe fetch-params.bat; fi
+  - if [[ "$PLATFORM" == "win" ]]; then zip Flux-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip fluxd.exe flux-cli.exe flux-tx.exe fetch-params.bat; fi
 deploy:
   - provider: releases
     skip_cleanup: true
@@ -68,7 +69,7 @@ deploy:
       secure: nuvepmL9kXw4zeY8YW2wt3LSo9mO6RBEW5IxF8/UwBPxD3q+HrWejOB4cunlejqpIsenz3MRl9g5OrDsFS8NjKvp4Hwdq6cd1VjoPGk7Bfh6aT/gXRPQ43kh/4YK0g8xlQGx7xby7WakoWrDWRjQEWMolDBxXgkQ2UtJqxPi/Af/bk8M3n3b+PojRJa1+lRGKLquBjAT4Qk1taasnO01WIE4BEH58XK0IGmR2G/j6y5wrFTmBmvybrw2/Pqltias/8wpe/rRAEyrMeYn/SImdpsUMJm5QBxYIrPvybPqJfOR0lbRJwrNavFNHuaKg612ImEEwBi3+m2pnK5AlS1ikDMdl7J3eWaXPMi48IL5OKi8pogj1Y4iQDlfbbNTke5BviBdoESG0PuCNo3TUQjnEI5Ue2ZNjBdCn96+9nB3NQbD+WFGhMyHsw/dThqBlzagHo5g2JSITyNArFBlWykd8yOTT3ateu2L+OtuuDmByWx4I/kBpl2Uzy8B8yCmD05Kbl1F3KpapLjUrnWlZ0/il+Y5ZXvfIlZ71OW/S9uCILi9zkklkGciwlZF6JkEm1yxuX1MhNiCzjuNWvhSZmgRRoAIxfMuNf2dkycWb9ihN13gBba6W0uEzC4AyF9SPnoQtfQiexTRCK2BzsSbFQjggFIVnHYmnMnIN49l8fkzNKs=
     file_glob: true
     file:
-      - "Zel-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
+      - "Flux-Linux-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
     on:
       condition: $PLATFORM = linux
       all_branches: true
@@ -79,7 +80,7 @@ deploy:
       secure: nuvepmL9kXw4zeY8YW2wt3LSo9mO6RBEW5IxF8/UwBPxD3q+HrWejOB4cunlejqpIsenz3MRl9g5OrDsFS8NjKvp4Hwdq6cd1VjoPGk7Bfh6aT/gXRPQ43kh/4YK0g8xlQGx7xby7WakoWrDWRjQEWMolDBxXgkQ2UtJqxPi/Af/bk8M3n3b+PojRJa1+lRGKLquBjAT4Qk1taasnO01WIE4BEH58XK0IGmR2G/j6y5wrFTmBmvybrw2/Pqltias/8wpe/rRAEyrMeYn/SImdpsUMJm5QBxYIrPvybPqJfOR0lbRJwrNavFNHuaKg612ImEEwBi3+m2pnK5AlS1ikDMdl7J3eWaXPMi48IL5OKi8pogj1Y4iQDlfbbNTke5BviBdoESG0PuCNo3TUQjnEI5Ue2ZNjBdCn96+9nB3NQbD+WFGhMyHsw/dThqBlzagHo5g2JSITyNArFBlWykd8yOTT3ateu2L+OtuuDmByWx4I/kBpl2Uzy8B8yCmD05Kbl1F3KpapLjUrnWlZ0/il+Y5ZXvfIlZ71OW/S9uCILi9zkklkGciwlZF6JkEm1yxuX1MhNiCzjuNWvhSZmgRRoAIxfMuNf2dkycWb9ihN13gBba6W0uEzC4AyF9SPnoQtfQiexTRCK2BzsSbFQjggFIVnHYmnMnIN49l8fkzNKs=
     file_glob: true
     file:
-      - "Zel-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
+      - "Flux-arm-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
     on:
       condition: $PLATFORM = arm
       all_branches: true
@@ -90,7 +91,7 @@ deploy:
       secure: nuvepmL9kXw4zeY8YW2wt3LSo9mO6RBEW5IxF8/UwBPxD3q+HrWejOB4cunlejqpIsenz3MRl9g5OrDsFS8NjKvp4Hwdq6cd1VjoPGk7Bfh6aT/gXRPQ43kh/4YK0g8xlQGx7xby7WakoWrDWRjQEWMolDBxXgkQ2UtJqxPi/Af/bk8M3n3b+PojRJa1+lRGKLquBjAT4Qk1taasnO01WIE4BEH58XK0IGmR2G/j6y5wrFTmBmvybrw2/Pqltias/8wpe/rRAEyrMeYn/SImdpsUMJm5QBxYIrPvybPqJfOR0lbRJwrNavFNHuaKg612ImEEwBi3+m2pnK5AlS1ikDMdl7J3eWaXPMi48IL5OKi8pogj1Y4iQDlfbbNTke5BviBdoESG0PuCNo3TUQjnEI5Ue2ZNjBdCn96+9nB3NQbD+WFGhMyHsw/dThqBlzagHo5g2JSITyNArFBlWykd8yOTT3ateu2L+OtuuDmByWx4I/kBpl2Uzy8B8yCmD05Kbl1F3KpapLjUrnWlZ0/il+Y5ZXvfIlZ71OW/S9uCILi9zkklkGciwlZF6JkEm1yxuX1MhNiCzjuNWvhSZmgRRoAIxfMuNf2dkycWb9ihN13gBba6W0uEzC4AyF9SPnoQtfQiexTRCK2BzsSbFQjggFIVnHYmnMnIN49l8fkzNKs=
     file_glob: true
     file:
-      - "Zel-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
+      - "Flux-macOS-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.tar.gz"
     on:
       condition: $PLATFORM = osx
       all_branches: true
@@ -101,7 +102,7 @@ deploy:
       secure: nuvepmL9kXw4zeY8YW2wt3LSo9mO6RBEW5IxF8/UwBPxD3q+HrWejOB4cunlejqpIsenz3MRl9g5OrDsFS8NjKvp4Hwdq6cd1VjoPGk7Bfh6aT/gXRPQ43kh/4YK0g8xlQGx7xby7WakoWrDWRjQEWMolDBxXgkQ2UtJqxPi/Af/bk8M3n3b+PojRJa1+lRGKLquBjAT4Qk1taasnO01WIE4BEH58XK0IGmR2G/j6y5wrFTmBmvybrw2/Pqltias/8wpe/rRAEyrMeYn/SImdpsUMJm5QBxYIrPvybPqJfOR0lbRJwrNavFNHuaKg612ImEEwBi3+m2pnK5AlS1ikDMdl7J3eWaXPMi48IL5OKi8pogj1Y4iQDlfbbNTke5BviBdoESG0PuCNo3TUQjnEI5Ue2ZNjBdCn96+9nB3NQbD+WFGhMyHsw/dThqBlzagHo5g2JSITyNArFBlWykd8yOTT3ateu2L+OtuuDmByWx4I/kBpl2Uzy8B8yCmD05Kbl1F3KpapLjUrnWlZ0/il+Y5ZXvfIlZ71OW/S9uCILi9zkklkGciwlZF6JkEm1yxuX1MhNiCzjuNWvhSZmgRRoAIxfMuNf2dkycWb9ihN13gBba6W0uEzC4AyF9SPnoQtfQiexTRCK2BzsSbFQjggFIVnHYmnMnIN49l8fkzNKs=
     file_glob: true
     file:
-      - "Zel-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip"
+      - "Flux-Windows-$VERSION-$BRANCH-$TRAVIS_BUILD_NUMBER-TravisCI.zip"
     on:
       condition: $PLATFORM = win
       all_branches: true
