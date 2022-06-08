@@ -1,5 +1,6 @@
 // Equihash solver
 // Copyright (c) 2016-2016 John Tromp, The Zcash developers
+// Copyright (c) 2018-2022 The Flux Developers
 
 #include "sodium.h"
 #ifdef __APPLE__

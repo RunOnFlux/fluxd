@@ -1,6 +1,7 @@
 // Copyright (c) 2014-2015 The Dash developers
 // Copyright (c) 2015-2019 The PIVX developers
 // Copyright (c) 2019 The Zel developers
+// Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
@@ -447,7 +448,6 @@ std::string GetP2SHFluxNodePublicKey(const uint32_t& nSigTime);
 std::string GetP2SHFluxNodePublicKey(const CTransaction& tx);
 bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet);
 
-bool IsDFluxnodeActive();
 bool IsFluxnodeTransactionsActive();
 
 
