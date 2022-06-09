@@ -24,7 +24,7 @@
 #define CLIENT_VERSION_REVISION 0
 
 /* Version is release */
-#define COPYRIGHT_YEAR 2019
+#define COPYRIGHT_YEAR 2022
 
 /* Define to 1 to enable mining functions */
 #define ENABLE_MINING 1
@@ -284,16 +284,16 @@
 #define LT_OBJDIR ".libs/"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT "https://github.com/zelcash/zelcash/issues"
+#define PACKAGE_BUGREPORT "https://github.com/RunOnFlux/fluxd/issues"
 
 /* Define to the full name of this package. */
-#define PACKAGE_NAME "Zelcash"
+#define PACKAGE_NAME "Flux"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Zelcash 6.0.0"
+#define PACKAGE_STRING "Flux 6.0.0"
 
 /* Define to the one symbol short name of this package. */
-#define PACKAGE_TARNAME "zelcash"
+#define PACKAGE_TARNAME "flux"
 
 /* Define to the home page for this package. */
 #define PACKAGE_URL ""
