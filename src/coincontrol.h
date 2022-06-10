@@ -16,6 +16,10 @@ public:
     //! If false, allows unselected inputs, but requires all selected inputs be used
     bool fAllowOtherInputs;
 
+    //! Ability to send only from a specific address
+    CTxDestination fromOnlyDest;
+    bool fFromOnlyIsSet;
+
     CCoinControl()
     {
         SetNull();
@@ -24,6 +28,8 @@ public:
     void SetNull()
     {
         destChange = CNoDestination();
+        fromOnlyDest = CNoDestination();
+        fFromOnlyIsSet = false;
         fAllowOtherInputs = false;
         setSelected.clear();
     }

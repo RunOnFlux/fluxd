@@ -2695,7 +2695,7 @@ CAmount CWalletTx::GetImmatureCredit(bool fUseCache) const
     return 0;
 }
 
-CAmount CWalletTx::GetAvailableCredit(bool fUseCache) const
+CAmount CWalletTx::GetAvailableCredit(bool fUseCache, int index) const
 {
     if (pwallet == 0)
         return 0;
@@ -2711,6 +2711,13 @@ CAmount CWalletTx::GetAvailableCredit(bool fUseCache) const
     uint256 hashTx = GetHash();
     for (unsigned int i = 0; i < vout.size(); i++)
     {
+
+        if (index > -1) {
+            if (index != i){
+                continue;
+            }
+        }
+
         if (!pwallet->IsSpent(hashTx, i))
         {
             const CTxOut &txout = vout[i];
@@ -2862,7 +2869,7 @@ void CWallet::ResendWalletTransactions(int64_t nBestBlockTime)
  */
 
 
-CAmount CWallet::GetBalance() const
+CAmount CWallet::GetBalance(const std::string strFrom) const
 {
     CAmount nTotal = 0;
     {
@@ -2870,12 +2877,79 @@ CAmount CWallet::GetBalance() const
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx* pcoin = &(*it).second;
-            if (pcoin->IsTrusted())
-                nTotal += pcoin->GetAvailableCredit();
+            if (pcoin->IsTrusted()) {
+                if (!strFrom.empty()) {
+                    CTxDestination coindest;
+                    for (int i = 0; i < pcoin->vout.size(); i++) {
+                        if (ExtractDestination(pcoin->vout[i].scriptPubKey, coindest)) {
+                            if (coindest == DecodeDestination(strFrom)) {
+                                nTotal += pcoin->GetAvailableCredit(false, i);
+                            }
+                        }
+                    }
+                } else {
+                    nTotal += pcoin->GetAvailableCredit();
+                }
+            }
         }
     }
 
     return nTotal;
+}
+
+void CWallet::SelectUTXOByAddress(CCoinControl& coincontrol, CAmount& nBalance,  const std::string strFrom, const bool fBypassLocked) const
+{
+    LOCK2(cs_main, cs_wallet);
+    int nUTXOSelected = 0;
+    for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
+    {
+        // Hit our maximum we want to send per tx
+        if (nUTXOSelected >= 250) {
+            break;
+        }
+
+        const CWalletTx* pcoin = &(*it).second;
+        if (pcoin->IsTrusted()) {
+            CTxDestination coindest;
+            for (int i = 0; i < pcoin->vout.size(); i++) {
+                if (IsLockedCoin(pcoin->GetHash(), i)) {
+                    continue;
+                }
+                if (ExtractDestination(pcoin->vout[i].scriptPubKey, coindest)) {
+                    if (coindest == DecodeDestination(strFrom)) {
+                        CAmount nAvailableAmount = pcoin->GetAvailableCredit(false, i);
+                        if (nAvailableAmount > 0) {
+                            coincontrol.Select(COutPoint(pcoin->GetHash(), i));
+                            nBalance += nAvailableAmount;
+                            nUTXOSelected++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void CWallet::GetUTXOCountByAddress(std::map<std::string, int>& mapUTXOCount) const
+{
+    LOCK2(cs_main, cs_wallet);
+    for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
+    {
+        const CWalletTx* pcoin = &(*it).second;
+        if (pcoin->IsTrusted()) {
+            CTxDestination coindest;
+            for (int i = 0; i < pcoin->vout.size(); i++) {
+                if (IsLockedCoin(pcoin->GetHash(), i)) {
+                    continue;
+                }
+                if (ExtractDestination(pcoin->vout[i].scriptPubKey, coindest)) {
+                    if (pcoin->GetAvailableCredit(false, i) > 0) {
+                        mapUTXOCount[EncodeDestination(coindest)]++;
+                    }
+                }
+            }
+        }
+    }
 }
 
 CAmount CWallet::GetUnconfirmedBalance() const
@@ -3038,6 +3112,15 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                 if (coinControl && coinControl->HasSelected() && !coinControl->fAllowOtherInputs && !coinControl->IsSelected((*it).first, i))
                     continue;
 
+                if (coinControl && coinControl->fFromOnlyIsSet) {
+                    CTxDestination voutdest;
+                    if (ExtractDestination(pcoin->vout[i].scriptPubKey, voutdest)) {
+                        if (coinControl->fromOnlyDest != voutdest) {
+                            continue;
+                        }
+                    }
+                }
+
                 vCoins.emplace_back(COutput(pcoin, i, nDepth, (mine & ISMINE_SPENDABLE) != ISMINE_NO));
             }
         }
@@ -3194,41 +3277,13 @@ bool CWallet::SelectCoinsMinConf(const CAmount& nTargetValue, int nConfMine, int
 bool CWallet::SelectCoins(const CAmount& nTargetValue, set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet,  bool& fOnlyCoinbaseCoinsRet, bool& fNeedCoinbaseCoinsRet, const CCoinControl* coinControl) const
 {
     // Output parameter fOnlyCoinbaseCoinsRet is set to true when the only available coins are coinbase utxos.
-    vector<COutput> vCoinsNoCoinbase, vCoinsWithCoinbase;
-    AvailableCoins(vCoinsNoCoinbase, true, coinControl, false, false);
+    vector<COutput> vCoinsWithCoinbase;
     AvailableCoins(vCoinsWithCoinbase, true, coinControl, false, true);
-    fOnlyCoinbaseCoinsRet = vCoinsNoCoinbase.size() == 0 && vCoinsWithCoinbase.size() > 0;
-
-    // If coinbase utxos can only be sent to zaddrs, exclude any coinbase utxos from coin selection.
-    bool fluxRebrandActive = NetworkUpgradeActive(chainActive.Height(), Params().GetConsensus(), Consensus::UPGRADE_FLUX);
-    bool fProtectCoinbase = Params().GetConsensus().fCoinbaseMustBeProtected && !fluxRebrandActive;
-    vector<COutput> vCoins = (fProtectCoinbase) ? vCoinsNoCoinbase : vCoinsWithCoinbase;
-
-    // Output parameter fNeedCoinbaseCoinsRet is set to true if coinbase utxos need to be spent to meet target amount
-    if (fProtectCoinbase && vCoinsWithCoinbase.size() > vCoinsNoCoinbase.size()) {
-        CAmount value = 0;
-        for (const COutput& out : vCoinsNoCoinbase) {
-            if (!out.fSpendable) {
-                continue;
-            }
-            value += out.tx->vout[out.i].nValue;
-        }
-        if (value <= nTargetValue) {
-            CAmount valueWithCoinbase = 0;
-            for (const COutput& out : vCoinsWithCoinbase) {
-                if (!out.fSpendable) {
-                    continue;
-                }
-                valueWithCoinbase += out.tx->vout[out.i].nValue;
-            }
-            fNeedCoinbaseCoinsRet = (valueWithCoinbase >= nTargetValue);
-        }
-    }
 
     // coin control -> return all selected outputs (we want all selected to go into the transaction for sure)
     if (coinControl && coinControl->HasSelected() && !coinControl->fAllowOtherInputs)
     {
-        BOOST_FOREACH(const COutput& out, vCoins)
+        BOOST_FOREACH(const COutput& out, vCoinsWithCoinbase)
         {
             if (!out.fSpendable)
                  continue;
@@ -3261,18 +3316,18 @@ bool CWallet::SelectCoins(const CAmount& nTargetValue, set<pair<const CWalletTx*
     }
 
     // remove preset inputs from vCoins
-    for (vector<COutput>::iterator it = vCoins.begin(); it != vCoins.end() && coinControl && coinControl->HasSelected();)
+    for (vector<COutput>::iterator it = vCoinsWithCoinbase.begin(); it != vCoinsWithCoinbase.end() && coinControl && coinControl->HasSelected();)
     {
         if (setPresetCoins.count(make_pair(it->tx, it->i)))
-            it = vCoins.erase(it);
+            it = vCoinsWithCoinbase.erase(it);
         else
             ++it;
     }
 
     bool res = nTargetValue <= nValueFromPresetInputs ||
-        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 6, vCoins, setCoinsRet, nValueRet) ||
-        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 1, vCoins, setCoinsRet, nValueRet) ||
-        (bSpendZeroConfChange && SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1, vCoins, setCoinsRet, nValueRet));
+        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 6, vCoinsWithCoinbase, setCoinsRet, nValueRet) ||
+        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 1, vCoinsWithCoinbase, setCoinsRet, nValueRet) ||
+        (bSpendZeroConfChange && SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1, vCoinsWithCoinbase, setCoinsRet, nValueRet));
 
     // because SelectCoinsMinConf clears the setCoinsRet, we now add the possible inputs to the coinset
     setCoinsRet.insert(setPresetCoins.begin(), setPresetCoins.end());
