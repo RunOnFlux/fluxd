@@ -1909,7 +1909,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         std::string strHash = GetArg("-zelnodeoutpoint", "");
         uint256 hash = uint256S(strHash);
-        int index = GetArg("-fluxnodeindex", -1);
+        int index = GetArg("-zelnodeindex", -1);
 
         fluxnodeOutPoint = COutPoint(hash, index);
 
