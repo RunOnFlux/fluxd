@@ -7229,6 +7229,15 @@ bool ProcessMessages(CNode* pfrom)
             }
             else
             {
+                // This should catch
+                // EXCEPTION: NSt8ios_base7failureB5cxx11E
+                // Unknown transaction format: iostream error
+                // Zelcash in ProcessMessages()
+                // Lets ban for default 24 hours the node that sent us an unprocessable message
+                if (strstr(e.what(), "Unknown transaction format")) {
+                    CNetAddr netaddr(pfrom->addr.ToStringIP());
+                    CNode::Ban(netaddr, 0);
+                }
                 PrintExceptionContinue(&e, "ProcessMessages()");
             }
         }
