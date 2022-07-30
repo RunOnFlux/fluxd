@@ -3,7 +3,7 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 /*
-Zelcash uses SHA256Compress as a PRF for various components
+Flux uses SHA256Compress as a PRF for various components
 within the zkSNARK circuit.
 */
 

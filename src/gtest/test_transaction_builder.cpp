@@ -100,7 +100,7 @@ TEST(TransactionBuilder, TransparentToSapling)
     auto pk = *ivk.address(d);
 
     // Create a shielding transaction from transparent to Sapling
-    // 0.0005 t-ZEL in, 0.0004 z-ZEL out, 0.0001 t-ZEL fee
+    // 0.0005 t-FLUX in, 0.0004 z-FLUX out, 0.0001 t-FLUX fee
     auto builder = TransactionBuilder(consensusParams, 1, expiryDelta, &keystore);
     builder.AddTransparentInput(COutPoint(), scriptPubKey, 50000);
     builder.AddSaplingOutput(fvk_from.ovk, pk, 40000, {});
@@ -132,7 +132,7 @@ TEST(TransactionBuilder, SaplingToSapling) {
     auto testNote = GetTestSaplingNote(pa, 40000);
     
     // Create a Sapling-only transaction
-    // 0.0004 z-ZEL in, 0.00025 z-ZEL out, 0.0001 t-ZEL fee, 0.00005 z-ZEL change
+    // 0.0004 z-FLUX in, 0.00025 z-FLUX out, 0.0001 t-FLUX fee, 0.00005 z-FLUX change
     auto builder = TransactionBuilder(consensusParams, 2, expiryDelta);
     builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
 
@@ -171,9 +171,9 @@ TEST(TransactionBuilder, SaplingToSprout) {
     auto sproutAddr = sproutSk.address();
 
     // Create a Sapling-to-Sprout transaction (reusing the note from above)
-    // - 0.0004 Sapling-ZEL in      - 0.00025 Sprout-ZEL out
-    //                              - 0.00005 Sapling-ZEL change
-    //                              - 0.0001 t-ZEL fee
+    // - 0.0004 Sapling-FLUX in     - 0.00025 Sprout-FLUX out
+    //                              - 0.00005 Sapling-FLUX change
+    //                              - 0.0001 t-FLUX fee
     auto builder = TransactionBuilder(consensusParams, 2, expiryDelta, nullptr, params);
     builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
     builder.AddSproutOutput(sproutAddr, 25000);
@@ -221,11 +221,11 @@ TEST(TransactionBuilder, SproutToSproutAndSapling) {
     CCoinsViewCache view(&fakeDB);
 
     // Create a Sprout-to-[Sprout-and-Sapling] transaction
-    // - 0.00025 Sprout-ZEL in      - 0.00006 Sprout-ZEL out
-    //                              - 0.00004 Sprout-ZEL out
-    //                              - 0.00005 Sprout-ZEL change
-    //                              - 0.00005 Sapling-ZEL out
-    //                              - 0.00005 t-ZEL fee
+    // - 0.00025 Sprout-FLUX in     - 0.00006 Sprout-FLUX out
+    //                              - 0.00004 Sprout-FLUX out
+    //                              - 0.00005 Sprout-FLUX change
+    //                              - 0.00005 Sapling-FLUX out
+    //                              - 0.00005 t-FLUX fee
     auto builder = TransactionBuilder(consensusParams, 2, expiryDelta, nullptr, params, &view);
     builder.SetFee(5000);
     builder.AddSproutInput(sproutSk, sproutNote, sproutWitness);
@@ -318,19 +318,19 @@ TEST(TransactionBuilder, FailsWithNegativeChange)
     auto testNote = GetTestSaplingNote(pa, 59999);
 
     // Fail if there is only a Sapling output
-    // 0.0005 z-ZEL out, 0.0001 t-ZEL fee
+    // 0.0005 z-FLUX out, 0.0001 t-FLUX fee
     auto builder = TransactionBuilder(consensusParams, 1, expiryDelta);
     builder.AddSaplingOutput(fvk.ovk, pa, 50000, {});
     EXPECT_EQ("Change cannot be negative", builder.Build().GetError());
 
     // Fail if there is only a transparent output
-    // 0.0005 t-ZEL out, 0.0001 t-ZEL fee
+    // 0.0005 t-FLUX out, 0.0001 t-FLUX fee
     builder = TransactionBuilder(consensusParams, 1, expiryDelta, &keystore);
     builder.AddTransparentOutput(taddr, 50000);
     EXPECT_EQ("Change cannot be negative", builder.Build().GetError());
 
     // Fails if there is insufficient input
-    // 0.0005 t-ZEL out, 0.0001 t-ZEL fee, 0.00059999 z-ZEL in
+    // 0.0005 t-FLUX out, 0.0001 t-FLUX fee, 0.00059999 z-FLUX in
     builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
     EXPECT_EQ("Change cannot be negative", builder.Build().GetError());
 

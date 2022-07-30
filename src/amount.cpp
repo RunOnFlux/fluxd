@@ -8,7 +8,7 @@
 
 #include "tinyformat.h"
 
-const std::string CURRENCY_UNIT = "ZEL";
+const std::string CURRENCY_UNIT = "ZEL"; // "ZEL" is now known as "FLUX"
 
 CFeeRate::CFeeRate(const CAmount& nFeePaid, size_t nSize)
 {

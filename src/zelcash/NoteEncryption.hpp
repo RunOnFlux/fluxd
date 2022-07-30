@@ -3,8 +3,8 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 /*
-See the Zelcash protocol specification for more information.
-https://github.com/zelcash/zips/blob/master/protocol/protocol.pdf
+See the Flux white paper for more information.
+https://fluxwhitepaper.app.runonflux.io/?_gl=1*egc2l8*_ga*NTM5NTY4MDM1LjE2Mjg5NDE2NDY.*_ga_M3VPBDLWV7*MTY1OTE3NjIxOC43NC4wLjE2NTkxNzYyMTguNjA.
 */
 
 #ifndef ZC_NOTE_ENCRYPTION_H_
