@@ -26,11 +26,11 @@ private:
     // critical section to protect the inner data structures
     mutable CCriticalSection cs;
 
-    /// Get ZEL input that can be used for the Fluxnode
+    /// Get FLUX input that can be used for the Fluxnode
     bool GetFluxNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage);
     bool GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
 
-    /// Get 10000 ZEL input that can be used for the Fluxnode
+    /// Get 10000 FLUX input that can be used for the Fluxnode
     bool GetFluxNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey);
 
 public:
@@ -56,7 +56,7 @@ public:
 
     vector<std::pair<COutput, CAmount>> SelectCoinsFluxnode();
 
-    //Manage my active deterministic zelnode
+    // Manage my active deterministic Fluxnode
     void ManageDeterministricFluxnode();
 
     bool BuildDeterministicStartTx(std::string strKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, CMutableTransaction& mutTransaction);
