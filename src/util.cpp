@@ -456,7 +456,7 @@ static std::string FormatException(const std::exception* pex, const char* pszThr
     char pszModule[MAX_PATH] = "";
     GetModuleFileNameA(NULL, pszModule, sizeof(pszModule));
 #else
-    const char* pszModule = "Zelcash";
+    const char* pszModule = "Zelcash"; // "Zelcash" is now known as "Flux"
 #endif
     if (pex)
         return strprintf(

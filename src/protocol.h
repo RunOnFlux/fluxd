@@ -74,7 +74,7 @@ enum {
     NODE_NETWORK = (1 << 0),
 
     // NODE_BLOOM means the node is capable and willing to handle bloom-filtered connections.
-    // Zelcash nodes used to support this by default, without advertising this bit,
+    // Flux nodes used to support this by default, without advertising this bit,
     // but no longer do as of protocol version 170004 (= NO_BLOOM_VERSION)
     NODE_BLOOM = (1 << 2),
 

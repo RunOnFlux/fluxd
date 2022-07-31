@@ -78,7 +78,7 @@ void ThreadSendAlert()
     CAlert alert;
     alert.nRelayUntil   = GetTime() + 15 * 60;
     alert.nExpiration   = GetTime() + 12 * 30 * 24 * 60 * 60;
-    alert.nID           = 1006;  // use https://github.com/zelcash/zelcash/wiki/specification#assigned-numbers to keep track of alert IDs
+    alert.nID           = 1006;  // use https://github.com/RunOnFlux/fluxd/wiki/specification#assigned-numbers to keep track of alert IDs
     alert.nCancel       = 1005;  // cancels previous messages up to this ID number
 
     // These versions are protocol versions

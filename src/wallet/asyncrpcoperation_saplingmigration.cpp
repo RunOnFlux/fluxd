@@ -87,7 +87,7 @@ bool AsyncRPCOperation_saplingmigration::main_impl() {
     for (const SproutNoteEntry& sproutEntry : sproutEntries) {
         availableFunds += sproutEntry.note.value();
     }
-    // If the remaining amount to be migrated is less than 0.01 ZEL, end the migration.
+    // If the remaining amount to be migrated is less than 0.01 FLUX, end the migration.
     if (availableFunds < CENT) {
         LogPrint("zrpcunsafe", "%s: Available Sprout balance (%s) less than required minimum (%s). Stopping.\n",
             getId(), FormatMoney(availableFunds), FormatMoney(CENT));
@@ -141,8 +141,8 @@ bool AsyncRPCOperation_saplingmigration::main_impl() {
             pwalletMain->GetSproutNoteWitnesses(vOutPoints, vInputWitnesses, inputAnchor);
             builder.AddSproutInput(sproutSk, sproutEntry.note, vInputWitnesses[0].get());
         }
-        // The amount chosen *includes* the 0.0001 ZEL fee for this transaction, i.e.
-        // the value of the Sapling output will be 0.0001 ZEL less.
+        // The amount chosen *includes* the 0.0001 FLUX fee for this transaction, i.e.
+        // the value of the Sapling output will be 0.0001 FLUX less.
         builder.SetFee(FEE);
         builder.AddSaplingOutput(ovkForShieldingFromTaddr(seed), migrationDestAddress, amountToSend - FEE);
         CTransaction tx = builder.Build().GetTxOrThrow();

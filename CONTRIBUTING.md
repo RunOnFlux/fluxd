@@ -1,1 +1,1 @@
-Please read [our Development Guidelines](https://zel.gitbook.io/zelcurrency/development-guidelines).
+Please visit [our Github](https://github.com/runonflux).

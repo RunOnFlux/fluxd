@@ -1253,7 +1253,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         threadGroup.create_thread(&ThreadShowMetricsScreen);
     }
 
-    // Initialize Zelcash circuit parameters
+    // Initialize Flux circuit parameters ("ZC" in function name refers to Zelcash)
     ZC_LoadParams(chainparams);
 
     /* Start the RPC server already.  It will be started in "warmup" mode

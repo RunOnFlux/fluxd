@@ -4798,7 +4798,7 @@ bool ContextualCheckBlock(
     }
 
     // Enforce BIP 34 rule that the coinbase starts with serialized block height.
-    // In Zelcash this has been enforced since launch, except that the genesis
+    // In Flux this has been enforced since launch, except that the genesis
     // block didn't include the height in the coinbase (see Zcash protocol spec
     // section '6.8 Bitcoin Improvement Proposals').
     // Needs to be at least > 16 to satisfy second condition.
