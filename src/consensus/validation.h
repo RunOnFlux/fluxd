@@ -8,6 +8,7 @@
 #define BITCOIN_CONSENSUS_VALIDATION_H
 
 #include <string>
+#include <primitives/transaction.h>
 
 /** "reject" message codes */
 static const unsigned char REJECT_MALFORMED = 0x01;
@@ -31,11 +32,13 @@ private:
     std::string strRejectReason;
     unsigned char chRejectCode;
     bool corruptionPossible;
+    CTransaction txInvalidTx;
+
 public:
-    CValidationState() : mode(MODE_VALID), nDoS(0), chRejectCode(0), corruptionPossible(false) {}
+    CValidationState() : mode(MODE_VALID), nDoS(0), chRejectCode(0), corruptionPossible(false), txInvalidTx(CTransaction()) {}
     virtual bool DoS(int level, bool ret = false,
              unsigned char chRejectCodeIn=0, std::string strRejectReasonIn="",
-             bool corruptionIn=false) {
+             bool corruptionIn=false, CTransaction txInvalid=CTransaction()) {
         chRejectCode = chRejectCodeIn;
         strRejectReason = strRejectReasonIn;
         corruptionPossible = corruptionIn;
@@ -43,6 +46,7 @@ public:
             return ret;
         nDoS += level;
         mode = MODE_INVALID;
+        txInvalidTx = txInvalid;
         return ret;
     }
     virtual bool Invalid(bool ret = false,
@@ -76,6 +80,17 @@ public:
     }
     virtual unsigned char GetRejectCode() const { return chRejectCode; }
     virtual std::string GetRejectReason() const { return strRejectReason; }
+
+    virtual bool IsInvalidTx() const {
+        return txInvalidTx.IsNull() == false;
+    }
+    virtual CTransaction GetInvalidTx() const {
+        return txInvalidTx;
+    }
+
+    virtual void SetInvalidTx(const CTransaction& tx) {
+        txInvalidTx = tx;
+    }
 };
 
 #endif // BITCOIN_CONSENSUS_VALIDATION_H
