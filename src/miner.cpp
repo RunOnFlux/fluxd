@@ -535,8 +535,14 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
 
         CValidationState state;
-        if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
+        if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false)) {
+            if (state.IsInvalidTx()) {
+                LogPrintf("Removing transaction from mempool that is causing block to fail validity check. %s\n", state.GetInvalidTx().GetHash().GetHex());
+                std::list<CTransaction> removed;
+                mempool.remove(state.GetInvalidTx(), removed, false);
+            }
             throw std::runtime_error(strprintf("CreateNewBlock(): TestBlockValidity failed: %s", state.GetRejectReason()));
+        }
     }
 
     return pblocktemplate.release();
