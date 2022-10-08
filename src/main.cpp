@@ -997,7 +997,7 @@ bool ContextualCheckTransaction(
     if (tx.IsFluxnodeTx()) {
         if (!kamataActive) {
             return state.DoS(dosLevel, error("ContextualCheckTransaction(): fluxnodes tx seen before active"),
-                             REJECT_INVALID, "tx-fluxnodes-not-active");
+                             REJECT_INVALID, "tx-fluxnodes-not-active", false, tx);
         }
     }
 
@@ -1210,7 +1210,7 @@ bool ContextualCheckTransaction(
             }
 
             if (fFailure && !fFromAccept) {
-                return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage);
+                return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
             }
         } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
             bool fFailure = false;
@@ -1221,7 +1221,7 @@ bool ContextualCheckTransaction(
             }
 
             if (fFailure && !fFromAccept) {
-                return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage);
+                return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
             }
 
             // Check the signatures. This is a contextual check as it requires the fluxnode pubkey
@@ -1234,12 +1234,15 @@ bool ContextualCheckTransaction(
 
                 if (!obfuScationSigner.VerifyMessage(data.pubKey, tx.sig, strMessage, errorMessage)) {
                     if (!fFromAccept) {
-                        if (!fIsVerifying)
+                        if (!fIsVerifying) {
+                            state.SetInvalidTx(tx);
                             return error("%s - CONFIRM Error: %s", __func__, errorMessage);
+                        }
                     }
                 }
             } else {
                 if (!fFromAccept) {
+                    state.SetInvalidTx(tx);
                     return error("%s - Fluxnode data not found. Not from accept", __func__);
                 }
             }
@@ -1253,7 +1256,7 @@ bool ContextualCheckTransaction(
                 }
 
                 if (fFailure && !fFromAccept) {
-                    return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage);
+                    return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
                 }
             } else if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
                 bool fFailure = false;
@@ -1276,13 +1279,13 @@ bool ContextualCheckTransaction(
                 }
 
                 if (fFailure && !fFromAccept) {
-                    return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage);
+                    return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
                 }
             } else {
-                return state.DoS(100, error("fluxnode-tx-malicious-update-type"), REJECT_INVALID, "fluxnode-tx-malicious-update-type");
+                return state.DoS(100, error("fluxnode-tx-malicious-update-type"), REJECT_INVALID, "fluxnode-tx-malicious-update-type", false, tx);
             }
         } else {
-            return state.DoS(100, error("fluxnode-tx-malicious-type"), REJECT_INVALID, "fluxnode-tx-malicious-type");
+            return state.DoS(100, error("fluxnode-tx-malicious-type"), REJECT_INVALID, "fluxnode-tx-malicious-type", false, tx);
         }
     }
     return true;
@@ -1298,13 +1301,14 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state,
     }
 
     if (!CheckTransactionWithoutProofVerification(tx, state)) {
+        state.SetInvalidTx(tx);
         return false;
     } else {
         // Ensure that zk-SNARKs verify
         BOOST_FOREACH(const JSDescription &joinsplit, tx.vJoinSplit) {
             if (!joinsplit.Verify(*pfluxParams, verifier, tx.joinSplitPubKey)) {
                 return state.DoS(100, error("CheckTransaction(): joinsplit does not verify"),
-                                    REJECT_INVALID, "bad-txns-joinsplit-verification-failed");
+                                    REJECT_INVALID, "bad-txns-joinsplit-verification-failed", false, tx);
             }
         }
         return true;
@@ -3399,13 +3403,13 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 CAmount nCollateralAmount;
                 if (!view.CheckFluxnodeTxInput(tx, pindex->nHeight, nTier, nCollateralAmount))
                     return state.DoS(100, error("ConnectBlock(): fluxnode tx inputs missing/spent"),
-                                     REJECT_INVALID, "bad-txns-fluxnode-tx-inputs-missingorspent");
+                                     REJECT_INVALID, "bad-txns-fluxnode-tx-inputs-missingorspent", false, tx);
 
                 if (tx.nType == FLUXNODE_START_TX_TYPE) {
                     if (p_fluxnodeCache) {
                         if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralOut)) {
                             return state.DoS(100, error("ConnectBlock(): fluxnode tx, failed CheckNewStartTx call"),
-                                             REJECT_INVALID, "bad-txns-fluxnode-tx-check-new-start");
+                                             REJECT_INVALID, "bad-txns-fluxnode-tx-check-new-start", false, tx);
                         }
 
                         // Add new Fluxnode Start Tx into local cache
@@ -3423,7 +3427,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                             if (global_data.IsNull()) {
                                 return state.DoS(100,
                                                  error("ConnectBlock(): fluxnode tx, failed finding data to creating undo data"),
-                                                 REJECT_INVALID, "bad-txns-fluxnode-global-data-not-found");
+                                                 REJECT_INVALID, "bad-txns-fluxnode-global-data-not-found", false, tx);
                             }
 
                             // Add the lastConfirmed and lastIpAddress into the undoblock data
@@ -4662,7 +4666,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
         if (block.vtx[i].IsFluxnodeTx()) {
             if (setFluxnodeTxOuts.count(block.vtx[i].collateralOut))
                 return state.DoS(100, error("CheckBlock(): more than one fluxnodetx with same outpoint"),
-                                 REJECT_INVALID, "bad-fluxnode-tx-multiple");
+                                 REJECT_INVALID, "bad-fluxnode-tx-multiple", false, block.vtx[i]);
             setFluxnodeTxOuts.insert(block.vtx[i].collateralOut);
         }
     }
