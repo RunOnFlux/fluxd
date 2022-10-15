@@ -79,12 +79,12 @@ def authors_in_release_notes(filename):
                     authors[apply_author_aliases(name)] = commits
         return authors
 
-## Sums commits made by contributors in each Zel release note in ./doc/release-notes and writes to authors.md
+## Sums commits made by contributors in each Flux release note in ./doc/release-notes and writes to authors.md
 def document_authors():
     print "Writing contributors documented in release-notes directory to authors.md."
     authors_file = os.path.join(doc_dir, 'authors.md')
     with open(authors_file, 'w') as f:
-        f.write('Zel Contributors\n==================\n\n')
+        f.write('Flux Contributors\n==================\n\n')
         total_contrib = {}
         for notes in os.listdir(os.path.join(doc_dir, 'release-notes')):
             # Commits are duplicated across beta, RC and final release notes,
