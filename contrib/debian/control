@@ -1,22 +1,22 @@
-Source: zelcash
+Source: flux
 Section: utils
 Priority: optional
-Maintainer: Zel Foundation <info@zel.cash>
-Homepage: https://zel.cash
+Maintainer: Flux Foundation <info@runonflux.io>
+Homepage: https://runonflux.io
 Build-Depends: autoconf, automake, bsdmainutils, build-essential,
  git, g++-multilib, libc6-dev, libtool,
  m4, ncurses-dev, pkg-config, python,
  unzip, wget, zlib1g-dev
-Vcs-Git: https://github.com/zelcash/zelcash.git
-Vcs-Browser: https://github.com/zelcash/zelcash
+Vcs-Git: https://github.com/flux/fluxd.git
+Vcs-Browser: https://github.com/flux/fluxd
 
-Package: zelcash
+Package: flux
 Architecture: amd64
 Depends: ${shlibs:Depends}
-Description: Zelcash libraries and tools
+Description: flux libraries and tools
  Based on Bitcoin's code, it intends to offer a far higher standard
  of privacy and anonymity through a sophisticiated zero-knowledge
  proving scheme which preserves confidentiality of transaction metadata.
  Think of it as HTTPS for money.
- This package provides the daemon, zelcashd, and the CLI tool,
- zelcash-cli, to interact with the daemon.
+ This package provides the daemon, fluxd, and the CLI tool,
+ flux-cli, to interact with the daemon.

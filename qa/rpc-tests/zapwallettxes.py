@@ -55,7 +55,7 @@ class ZapWalletTXesTest (BitcoinTestFramework):
         tx3 = self.nodes[0].gettransaction(txid3)
         assert_equal(tx3['txid'], txid3) # tx3 must be available (unconfirmed)
 
-        # restart zelcashd
+        # restart fluxd
         self.nodes[0].stop()
         bitcoind_processes[0].wait()
         self.nodes[0] = start_node(0,self.options.tmpdir)
@@ -66,7 +66,7 @@ class ZapWalletTXesTest (BitcoinTestFramework):
         self.nodes[0].stop()
         bitcoind_processes[0].wait()
 
-        # restart zelcashd with zapwallettxes
+        # restart fluxd with zapwallettxes
         self.nodes[0] = start_node(0,self.options.tmpdir, ["-zapwallettxes=1"])
 
         aException = False

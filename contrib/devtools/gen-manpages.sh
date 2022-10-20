@@ -16,8 +16,8 @@ FLUXVER=$(echo $FLUXVERSTR | awk -F- '{ OFS="-"; NF--; print $0; }')
 FLUXCOMMIT=$(echo $FLUXVERSTR | awk -F- '{ print $NF }')
 
 # Create a footer file with copyright content.
-# This gets autodetected fine for zelcashd if --version-string is not set,
-# but has different outcomes for zelcash-cli.
+# This gets autodetected fine for fluxd if --version-string is not set,
+# but has different outcomes for flux-cli.
 echo "[COPYRIGHT]" > footer.h2m
 $FLUXD --version | sed -n '1!p' >> footer.h2m
 
