@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 #
-# Execute all of the automated tests related to Zelcash.
+# Execute all of the automated tests related to flux.
 #
 
 import argparse
@@ -32,7 +32,7 @@ RE_FORTIFY_USED = re.compile('Binary compiled with FORTIFY_SOURCE support.*Yes')
 
 def test_rpath_runpath(filename):
     output = subprocess.check_output(
-        [repofile('qa/zelcash/checksec.sh'), '--file', repofile(filename)]
+        [repofile('qa/flux/checksec.sh'), '--file', repofile(filename)]
     )
     if RE_RPATH_RUNPATH.search(output):
         print('PASS: %s has no RPATH or RUNPATH.' % filename)
@@ -44,7 +44,7 @@ def test_rpath_runpath(filename):
 
 def test_fortify_source(filename):
     proc = subprocess.Popen(
-        [repofile('qa/zelcash/checksec.sh'), '--fortify-file', repofile(filename)],
+        [repofile('qa/flux/checksec.sh'), '--fortify-file', repofile(filename)],
         stdout=subprocess.PIPE,
     )
     line1 = proc.stdout.readline()
@@ -64,26 +64,26 @@ def check_security_hardening():
     ret &= subprocess.call(['make', '-C', repofile('src'), 'check-security']) == 0
 
     # The remaining checks are only for ELF binaries
-    # Assume that if zelcashd is an ELF binary, they all are
-    with open(repofile('src/zelcashd'), 'rb') as f:
+    # Assume that if fluxd is an ELF binary, they all are
+    with open(repofile('src/fluxd'), 'rb') as f:
         magic = f.read(4)
         if not magic.startswith(b'\x7fELF'):
             return ret
 
-    ret &= test_rpath_runpath('src/zelcashd')
-    ret &= test_rpath_runpath('src/zelcash-cli')
-    ret &= test_rpath_runpath('src/zelcash-gtest')
-    ret &= test_rpath_runpath('src/zelcash-tx')
+    ret &= test_rpath_runpath('src/fluxd')
+    ret &= test_rpath_runpath('src/flux-cli')
+    ret &= test_rpath_runpath('src/flux-gtest')
+    ret &= test_rpath_runpath('src/flux-tx')
     ret &= test_rpath_runpath('src/test/test_bitcoin')
 
 
 
     # NOTE: checksec.sh does not reliably determine whether FORTIFY_SOURCE
     # is enabled for the entire binary. See issue #915.
-    ret &= test_fortify_source('src/zelcashd')
-    ret &= test_fortify_source('src/zelcash-cli')
-    ret &= test_fortify_source('src/zelcash-gtest')
-    ret &= test_fortify_source('src/zelcash-tx')
+    ret &= test_fortify_source('src/fluxd')
+    ret &= test_fortify_source('src/flux-cli')
+    ret &= test_fortify_source('src/flux-gtest')
+    ret &= test_fortify_source('src/flux-tx')
     ret &= test_fortify_source('src/test/test_bitcoin')
     return ret
 
@@ -145,7 +145,7 @@ STAGES = [
 
 STAGE_COMMANDS = {
     'btest': [repofile('src/test/test_bitcoin'), '-p'],
-    'gtest': [repofile('src/zelcash-gtest')],
+    'gtest': [repofile('src/flux-gtest')],
     'sec-hard': check_security_hardening,
     'no-dot-so': ensure_no_dot_so_in_depends,
     'util-test': util_test,

@@ -1,1 +1,1 @@
-dist_man1_MANS=zelcashd.1 zelcash-cli.1 zcash-fetch-params.1 zelcash-tx.1
+dist_man1_MANS=fluxd.1 flux-cli.1 zcash-fetch-params.1 flux-tx.1

@@ -71,7 +71,7 @@ class NodeBloomTest(BitcoinTestFramework):
         nobf_node.wait_for_verack()
         bf_node.wait_for_verack()
 
-        # Verify mininodes are connected to zelcashd nodes
+        # Verify mininodes are connected to fluxd nodes
         peerinfo = self.nodes[0].getpeerinfo()
         versions = [x["version"] for x in peerinfo]
         assert_equal(1, versions.count(SPROUT_PROTO_VERSION))
@@ -79,13 +79,13 @@ class NodeBloomTest(BitcoinTestFramework):
         versions = [x["version"] for x in peerinfo]
         assert_equal(1, versions.count(SPROUT_PROTO_VERSION))
 
-        # Mininodes send filterclear message to zelcashd node.
+        # Mininodes send filterclear message to fluxd node.
         nobf_node.send_message(msg_filterclear())
         bf_node.send_message(msg_filterclear())
 
         time.sleep(3)
 
-        # Verify mininodes are still connected to zelcashd nodes
+        # Verify mininodes are still connected to fluxd nodes
         peerinfo = self.nodes[0].getpeerinfo()
         versions = [x["version"] for x in peerinfo]
         assert_equal(1, versions.count(SPROUT_PROTO_VERSION))
@@ -93,7 +93,7 @@ class NodeBloomTest(BitcoinTestFramework):
         versions = [x["version"] for x in peerinfo]
         assert_equal(1, versions.count(SPROUT_PROTO_VERSION))
 
-        # Mininodes send filteradd message to zelcashd node.
+        # Mininodes send filteradd message to fluxd node.
         nobf_node.send_message(msg_filteradd())
         bf_node.send_message(msg_filteradd())
 

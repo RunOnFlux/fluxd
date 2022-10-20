@@ -49,7 +49,7 @@ class TxExpiringSoonTest(BitcoinTestFramework):
         # Make sure we are synced before sending the mempool message
         testnode.sync_with_ping()
 
-        # Send p2p message "mempool" to receive contents from zelcashd node in "inv" message
+        # Send p2p message "mempool" to receive contents from fluxd node in "inv" message
         with mininode_lock:
             testnode.last_inv = None
             testnode.send_message(msg_mempool())
@@ -92,7 +92,7 @@ class TxExpiringSoonTest(BitcoinTestFramework):
         NetworkThread().start()
         testnode0.wait_for_verack()
 
-        # Verify mininodes are connected to zelcashd nodes
+        # Verify mininodes are connected to fluxd nodes
         peerinfo = self.nodes[0].getpeerinfo()
         versions = [x["version"] for x in peerinfo]
         assert_equal(1, versions.count(OVERWINTER_PROTO_VERSION))
@@ -111,7 +111,7 @@ class TxExpiringSoonTest(BitcoinTestFramework):
         assert_equal(self.nodes[1].getblockcount(), 200)
         assert_equal(self.nodes[2].getblockcount(), 0)
 
-        # Mininodes send expiring soon transaction in "tx" message to zelcashd node
+        # Mininodes send expiring soon transaction in "tx" message to fluxd node
         self.send_transaction(testnode0, coinbase_blocks[0], node_address, 203)
 
         # Assert that the tx is not in the mempool (expiring soon)
@@ -119,7 +119,7 @@ class TxExpiringSoonTest(BitcoinTestFramework):
         assert_equal([], self.nodes[1].getrawmempool())
         assert_equal([], self.nodes[2].getrawmempool())
 
-        # Mininodes send transaction in "tx" message to zelcashd node
+        # Mininodes send transaction in "tx" message to fluxd node
         tx2 = self.send_transaction(testnode0, coinbase_blocks[1], node_address, 204)
 
         # tx2 is not expiring soon
