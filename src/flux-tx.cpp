@@ -51,8 +51,8 @@ static int AppInitRawTx(int argc, char* argv[])
         // First part of help message is specific to this utility
         std::string strUsage = _("Flux flux-tx utility version") + " " + FormatFullVersion() + "\n\n" +
             _("Usage:") + "\n" +
-              "  flux-tx [options] <hex-tx> [commands]  " + _("Update hex-encoded zelcash transaction") + "\n" +
-              "  flux-tx [options] -create [commands]   " + _("Create hex-encoded zelcash transaction") + "\n" +
+              "  flux-tx [options] <hex-tx> [commands]  " + _("Update hex-encoded flux transaction") + "\n" +
+              "  flux-tx [options] -create [commands]   " + _("Create hex-encoded flux transaction") + "\n" +
               "\n";
 
         fprintf(stdout, "%s", strUsage.c_str());

@@ -1,9 +1,9 @@
 #!/usr/bin/env python2
 
 # This script tests that the package mirror at https://download.z.cash/depends-sources/
-# contains all of the packages required to build this version of Zelcash.
+# contains all of the packages required to build this version of Flux.
 #
-# This script assumes you've just built Zelcash, and that as a result of that
+# This script assumes you've just built Flux, and that as a result of that
 # build, all of the dependency packages have been downloaded into the
 # depends/sources directory (inside the root of this repository). The script
 # checks that all of those files are accessible on the mirror.

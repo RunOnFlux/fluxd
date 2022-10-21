@@ -7,8 +7,8 @@ Build-Depends: autoconf, automake, bsdmainutils, build-essential,
  git, g++-multilib, libc6-dev, libtool,
  m4, ncurses-dev, pkg-config, python,
  unzip, wget, zlib1g-dev
-Vcs-Git: https://github.com/flux/fluxd.git
-Vcs-Browser: https://github.com/flux/fluxd
+Vcs-Git: https://github.com/runonflux/fluxd.git
+Vcs-Browser: https://github.com/runonflux/fluxd
 
 Package: flux
 Architecture: amd64
