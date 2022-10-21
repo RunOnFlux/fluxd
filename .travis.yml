@@ -27,7 +27,7 @@ before_install:
   - if [[ "$PLATFORM" == "osx" ]]; then brew install gcc5 --without-multilib; fi
   - if [[ "$PLATFORM" == "win" ]]; then sudo apt-get update; fi
   - if [[ "$PLATFORM" == "win" ]]; then sudo apt-get install -y build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake libtinfo5 mingw-w64 mingw-w64-tools gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 cmake zip; fi
-  - export VERSION=`head -n 1 README.md | cut -c 7-`
+  - export VERSION=`head -n 1 README.md | cut -c 8-`
   - echo $VERSION
   - export BRANCH=$(if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then echo $TRAVIS_BRANCH; else echo $TRAVIS_PULL_REQUEST_BRANCH; fi)
 script:
