@@ -24,7 +24,7 @@ Payment Disclosure is an implementation of the work-in-progress Payment Disclosu
 
 The ZIP describes a method of proving that a payment was sent to a shielded address. In the typical case, this means enabling a sender to present a proof that they transferred funds to a recipient's shielded address. 
 
-[1] https://github.com/flux/zips/pull/119
+[1] https://github.com/runonflux/zips/pull/119
 
 ### Example Use Case
 

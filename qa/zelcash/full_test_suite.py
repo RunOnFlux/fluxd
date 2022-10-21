@@ -32,7 +32,7 @@ RE_FORTIFY_USED = re.compile('Binary compiled with FORTIFY_SOURCE support.*Yes')
 
 def test_rpath_runpath(filename):
     output = subprocess.check_output(
-        [repofile('qa/flux/checksec.sh'), '--file', repofile(filename)]
+        [repofile('qa/zelcash/checksec.sh'), '--file', repofile(filename)]
     )
     if RE_RPATH_RUNPATH.search(output):
         print('PASS: %s has no RPATH or RUNPATH.' % filename)
@@ -44,7 +44,7 @@ def test_rpath_runpath(filename):
 
 def test_fortify_source(filename):
     proc = subprocess.Popen(
-        [repofile('qa/flux/checksec.sh'), '--fortify-file', repofile(filename)],
+        [repofile('qa/zelcash/checksec.sh'), '--fortify-file', repofile(filename)],
         stdout=subprocess.PIPE,
     )
     line1 = proc.stdout.readline()

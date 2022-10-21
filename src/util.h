@@ -141,7 +141,7 @@ void CreatePidFile(const boost::filesystem::path &path, pid_t pid);
 #endif
 class missing_zelcash_conf : public std::runtime_error {
 public:
-    missing_zelcash_conf() : std::runtime_error("Missing zelcash.conf") { }
+    missing_zelcash_conf() : std::runtime_error("Missing flux.conf") { }
 };
 void ReadConfigFile(std::map<std::string, std::string>& mapSettingsRet, std::map<std::string, std::vector<std::string> >& mapMultiSettingsRet);
 #ifdef WIN32

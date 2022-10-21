@@ -1,5 +1,5 @@
 #!/bin/sh
-# preinst script for zelcash
+# preinst script for flux
 #
 # see: dh_installdeb(1)
 

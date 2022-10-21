@@ -477,7 +477,7 @@ string experimentalDisabledHelpMsg(const string& rpc, const string& enableArg)
     return "\nWARNING: " + rpc + " is disabled.\n"
         "To enable it, restart fluxd with the -experimentalfeatures and\n"
         "-" + enableArg + " commandline options, or add these two lines\n"
-        "to the zelcash.conf file:\n\n"
+        "to the flux.conf file:\n\n"
         "experimentalfeatures=1\n"
         + enableArg + "=1\n";
 }

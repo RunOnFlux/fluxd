@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for zelcash
+# postinst script for flux
 #
 # see: dh_installdeb(1)
 

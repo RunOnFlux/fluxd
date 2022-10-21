@@ -1667,7 +1667,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_parameters)
     LOCK(pwalletMain->cs_wallet);
 
     CheckRPCThrows("z_mergetoaddress 1 2",
-        "Error: z_mergetoaddress is disabled. Run './zelcash-cli help z_mergetoaddress' for instructions on how to enable this feature.");
+        "Error: z_mergetoaddress is disabled. Run './flux-cli help z_mergetoaddress' for instructions on how to enable this feature.");
 
     // Set global state required for z_mergetoaddress
     fExperimentalMode = true;

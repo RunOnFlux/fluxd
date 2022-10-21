@@ -10,7 +10,7 @@ Miners, Mining pools, Online wallets
 
 ## Background
 
-The current Zelcash protocol includes a consensus rule that coinbase rewards must be sent to a shielded address.
+The current Flux protocol includes a consensus rule that coinbase rewards must be sent to a shielded address.
 
 ## User Experience Challenges
 

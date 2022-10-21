@@ -173,7 +173,7 @@ function main() {
     || exit_locked_error
 
     cat <<EOF
-Zelcash - fetch-params.sh
+Flux - fetch-params.sh
 
 This script will fetch the Zcash zkSNARK parameters and verify their
 integrity with sha256sum.

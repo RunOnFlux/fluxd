@@ -110,7 +110,7 @@ z_listoperationids <br>| [state] | Return a list of operationids for all operati
 
 ## Asynchronous RPC call Error Codes
 
-Flux error codes are defined in https://github.com/flux/flux/blob/master/src/rpcprotocol.h
+Flux error codes are defined in https://github.com/runonflux/fluxd/blob/master/src/rpcprotocol.h
 
 ### z_sendmany error codes
 
