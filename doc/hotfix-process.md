@@ -16,7 +16,7 @@ Create a hotfix branch from the previous release tag, and push it to the main
 repository:
 
     $ git branch hotfix-<RELEASE> <RELEASE_PREV>
-    $ git push 'git@github.com:zelcash/zelcash' hotfix-<RELEASE>
+    $ git push 'git@github.com:flux/fluxd' hotfix-<RELEASE>
 
 ## Implement hotfix changes
 
@@ -37,7 +37,7 @@ following process should be used to merge:
   pr-merge builder, clicking the "force" button, and entering the following
   values:
 
-  - Repository: https://github.com/<DevUser>/zelcash
+  - Repository: https://github.com/<DevUser>/fluxd
     - <DevUser> must be in the set of "safe" users as-specified in the CI
       config.
   - Branch: name of the hotfix PR branch (not the hotfix release branch).

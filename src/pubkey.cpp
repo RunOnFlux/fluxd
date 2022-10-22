@@ -128,7 +128,7 @@ bool CExtPubKey::Derive(CExtPubKey &out, unsigned int nChild) const {
 /* static */ bool CPubKey::CheckLowS(const std::vector<unsigned char>& vchSig) {
     secp256k1_ecdsa_signature sig;
 
-    /* Zelcash, unlike Bitcoin, has always enforced strict DER signatures. */
+    /* Flux, unlike Bitcoin, has always enforced strict DER signatures. */
     if (!secp256k1_ecdsa_signature_parse_der(secp256k1_context_verify, &sig, &vchSig[0], vchSig.size())) {
         return false;
     }

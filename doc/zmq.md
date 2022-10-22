@@ -5,8 +5,8 @@ connections, inter-process communication, and shared-memory, providing
 various message-oriented semantics such as publish/subscribe,
 request/reply, and push/pull.
 
-The Zelcash daemon can be configured to act as a trusted "border
-router", implementing the zelcash wire protocol and relay, making
+The Flux daemon can be configured to act as a trusted "border
+router", implementing the flux wire protocol and relay, making
 consensus decisions, maintaining the local blockchain database,
 broadcasting locally generated transactions into the network, and
 providing a queryable RPC interface to interact on a polled basis for
@@ -33,7 +33,7 @@ buffering or reassembly.
 
 ## Prerequisites
 
-The ZeroMQ feature in Zelcash requires ZeroMQ API version 4.x or
+The ZeroMQ feature in Flux requires ZeroMQ API version 4.x or
 newer, which you will need to install if you are not using the depends
 system. Typically, it is packaged by distributions as something like
 *libzmq5-dev*. The C++ wrapper for ZeroMQ is *not* needed.
@@ -48,7 +48,7 @@ Enabling this feature even on the loopback interface only (e.g. binding
 it to localhost or 127.0.0.1) will still expose it to the wilds of the
 Internet, because of an attack vector called DNS rebinding. DNS
 rebinding allows an attacker located remotely on the Internet to trick
-applications that you're running on the same computer as Zelcashd to
+applications that you're running on the same computer as Fluxd to
 contact your supposedly localhost-only ZMQ port, then, depending on the
 program they may be able to attempt to attack it.
 
@@ -60,7 +60,7 @@ not vulnerable to this type of attack.
 
 By default, the ZeroMQ feature is automatically compiled in if the
 necessary prerequisites are found.  To disable, use --disable-zmq
-during the *configure* step of building zelcashd:
+during the *configure* step of building fluxd:
 
     $ ./configure --disable-zmq (other options)
 
@@ -81,8 +81,8 @@ address. The same address can be used in more than one notification.
 
 For instance:
 
-    $ zelcashd -zmqpubhashtx=tcp://127.0.0.1:28332 \
-               -zmqpubrawtx=ipc:///tmp/zelcashd.tx.raw
+    $ fluxd -zmqpubhashtx=tcp://127.0.0.1:28332 \
+               -zmqpubrawtx=ipc:///tmp/fluxd.tx.raw
 
 Each PUB notification has a topic and body, where the header
 corresponds to the notification type. For instance, for the
@@ -90,7 +90,7 @@ notification `-zmqpubhashtx` the topic is `hashtx` (no null
 terminator) and the body is the hexadecimal transaction hash (32
 bytes).
 
-These options can also be provided in zelcash.conf.
+These options can also be provided in flux.conf.
 
 ZeroMQ endpoint specifiers for TCP (and others) are documented in the
 [ZeroMQ API](http://api.zeromq.org/4-0:_start).
@@ -102,9 +102,9 @@ arriving. Please see `contrib/zmq/zmq_sub.py` for a working example.
 
 ## Remarks
 
-From the perspective of zelcashd, the ZeroMQ socket is write-only; PUB
+From the perspective of fluxd, the ZeroMQ socket is write-only; PUB
 sockets don't even have a read function. Thus, there is no state
-introduced into zelcashd directly. Furthermore, no information is
+introduced into fluxd directly. Furthermore, no information is
 broadcast that wasn't already received from the public P2P network.
 
 No authentication or authorization is done on connecting clients; it
@@ -117,5 +117,5 @@ retrieve the chain from the last known block to the new tip.
 
 There are several possibilities that ZMQ notification can get lost
 during transmission depending on the communication type your are
-using. Zelcashd appends an up-counting sequence number to each
+using. Fluxd appends an up-counting sequence number to each
 notification which allows listeners to detect lost notifications.

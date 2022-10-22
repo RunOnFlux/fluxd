@@ -122,8 +122,8 @@ bool AppInit(int argc, char* argv[])
                  _("- Source code:  %s\n"
                    "- .deb package: %s\n")).c_str(),
                 GetConfigFile().string().c_str(),
-                "contrib/debian/examples/zelcash.conf",
-                "/usr/share/doc/zelcash/examples/zelcash.conf");
+                "contrib/debian/examples/flux.conf",
+                "/usr/share/doc/flux/examples/flux.conf");
             return false;
         } catch (const std::exception& e) {
             fprintf(stderr,"Error reading configuration file: %s\n", e.what());

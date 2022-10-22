@@ -10,7 +10,7 @@ Miners, Mining pools, Online wallets
 
 ## Background
 
-The current Zelcash protocol includes a consensus rule that coinbase rewards must be sent to a shielded address.
+The current Flux protocol includes a consensus rule that coinbase rewards must be sent to a shielded address.
 
 ## User Experience Challenges
 
@@ -30,19 +30,19 @@ The default fee is 0.0010000 ZEL and the default limit on the maximum number of 
 
 Sweep up coinbase UTXOs from a transparent address you use for mining:
 
-    zelcash-cli z_shieldcoinbase tMyMiningAddress zMyPrivateAddress
+    flux-cli z_shieldcoinbase tMyMiningAddress zMyPrivateAddress
 
 Sweep up coinbase UTXOs from multiple transparent addresses to a shielded address:
 
-    zelcash-cli z_shieldcoinbase "*" zMyPrivateAddress
+    flux-cli z_shieldcoinbase "*" zMyPrivateAddress
 
 Sweep up with a fee of 1.23 ZEL:
 
-    zelcash-cli z_shieldcoinbase tMyMiningAddress zMyPrivateAddress 1.23
+    flux-cli z_shieldcoinbase tMyMiningAddress zMyPrivateAddress 1.23
 
 Sweep up with a fee of 0.1 ZEL and set limit on the maximum number of UTXOs to shield at 25:
 
-    zelcash-cli z_shieldcoinbase "*" zMyPrivateAddress 0.1 25
+    flux-cli z_shieldcoinbase "*" zMyPrivateAddress 0.1 25
 
 ### Asynchronous Call
 
@@ -50,7 +50,7 @@ The `z_shieldcoinbase` RPC call is an asynchronous call, so you can queue up mul
 
 When you invoke
 
-    zelcash-cli z_shieldcoinbase tMyMiningAddress zMyPrivateAddress
+    flux-cli z_shieldcoinbase tMyMiningAddress zMyPrivateAddress
 
 JSON will be returned immediately, with the following data fields populated:
 
@@ -70,7 +70,7 @@ You can use the RPC call `lockunspent` to see which UTXOs have been locked.  You
 
 The number of coinbase UTXOs selected for shielding can be adjusted by setting the limit parameter. The default value is 50.
 
-If the limit parameter is set to zero, the zelcashd `mempooltxinputlimit` option will be used instead, where the default value for `mempooltxinputlimit` is zero, which means no limit.
+If the limit parameter is set to zero, the fluxd `mempooltxinputlimit` option will be used instead, where the default value for `mempooltxinputlimit` is zero, which means no limit.
 
 Any limit is constrained by a hard limit due to the consensus rule defining a maximum transaction size of 100,000 bytes.
 

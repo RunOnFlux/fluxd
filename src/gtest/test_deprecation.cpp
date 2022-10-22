@@ -139,7 +139,7 @@ TEST_F(DeprecationTest, AlertNotify) {
 
     // -alertnotify restricts the message to safe characters.
     auto expectedMsg = strprintf(
-        "This version will be deprecated at block height %d, and will automatically shut down. You should upgrade to the latest version of Zelcash.",
+        "This version will be deprecated at block height %d, and will automatically shut down. You should upgrade to the latest version of Flux.",
         DEPRECATION_HEIGHT);
 
     // Windows built-in echo semantics are different than posixy shells. Quotes and

@@ -15,7 +15,7 @@ from functools import wraps
 
 def main(args=sys.argv[1:]):
     """
-    Perform the final Zelcash release process up to the git tag.
+    Perform the final Flux release process up to the git tag.
     """
     opts = parse_args(args)
     chdir_to_repo(opts.REPO)
@@ -251,7 +251,7 @@ def build():
         'Staging libgmp...',
         'Staging libsodium...',
         "Leaving directory '%s'" % depends_dir,
-        'config.status: creating libzelcashconsensus.pc',
+        'config.status: creating libfluxconsensus.pc',
         "Entering directory '%s'" % src_dir,
         'httpserver.cpp',
         'torcontrol.cpp',
@@ -350,11 +350,11 @@ def patch_gitian_linux_yml(release, releaseprev):
         outf.write(inf.readline())
 
         secondline = inf.readline()
-        assert secondline == 'name: "zelcash-{}"\n'.format(
+        assert secondline == 'name: "flux-{}"\n'.format(
             releaseprev.novtext
         ), repr(secondline)
 
-        outf.write('name: "zelcash-{}"\n'.format(release.novtext))
+        outf.write('name: "flux-{}"\n'.format(release.novtext))
         outf.write(inf.read())
 
 
@@ -380,7 +380,7 @@ def _patch_build_defs(release, path, pattern):
 
 
 def initialize_logging():
-    logname = './zelcash-make-release.log'
+    logname = './flux-make-release.log'
     fmtr = logging.Formatter(
         '%(asctime)s L%(lineno)-4d %(levelname)-5s | %(message)s',
         '%Y-%m-%d %H:%M:%S'
@@ -398,7 +398,7 @@ def initialize_logging():
     root.setLevel(logging.DEBUG)
     root.addHandler(hout)
     root.addHandler(hpath)
-    logging.info('zelcash make-release.py debug log: %r', logname)
+    logging.info('flux make-release.py debug log: %r', logname)
 
 
 def sh_out(*args):

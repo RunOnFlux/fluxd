@@ -367,28 +367,28 @@ BOOST_AUTO_TEST_CASE(rpc_insightexplorer)
 {
     CheckRPCThrows("getaddressmempool \"a\"",
         "Error: getaddressmempool is disabled. "
-        "Run './zelcash-cli help getaddressmempool' for instructions on how to enable this feature.");
+        "Run './flux-cli help getaddressmempool' for instructions on how to enable this feature.");
     CheckRPCThrows("getaddressutxos \"a\"",
         "Error: getaddressutxos is disabled. "
-        "Run './zelcash-cli help getaddressutxos' for instructions on how to enable this feature.");
+        "Run './flux-cli help getaddressutxos' for instructions on how to enable this feature.");
     CheckRPCThrows("getaddressdeltas \"a\"",
         "Error: getaddressdeltas is disabled. "
-        "Run './zelcash-cli help getaddressdeltas' for instructions on how to enable this feature.");
+        "Run './flux-cli help getaddressdeltas' for instructions on how to enable this feature.");
     CheckRPCThrows("getaddressbalance \"a\"",
         "Error: getaddressbalance is disabled. "
-        "Run './zelcash-cli help getaddressbalance' for instructions on how to enable this feature.");
+        "Run './flux-cli help getaddressbalance' for instructions on how to enable this feature.");
     CheckRPCThrows("getaddresstxids \"a\"",
         "Error: getaddresstxids is disabled. "
-        "Run './zelcash-cli help getaddresstxids' for instructions on how to enable this feature.");
+        "Run './flux-cli help getaddresstxids' for instructions on how to enable this feature.");
     CheckRPCThrows("getspentinfo {\"a\":1}",
         "Error: getspentinfo is disabled. "
-        "Run './zelcash-cli help getspentinfo' for instructions on how to enable this feature.");
+        "Run './flux-cli help getspentinfo' for instructions on how to enable this feature.");
     CheckRPCThrows("getblockdeltas \"a\"",
         "Error: getblockdeltas is disabled. "
-        "Run './zelcash-cli help getblockdeltas' for instructions on how to enable this feature.");
+        "Run './flux-cli help getblockdeltas' for instructions on how to enable this feature.");
     CheckRPCThrows("getblockhashes 0 0",
         "Error: getblockhashes is disabled. "
-        "Run './zelcash-cli help getblockhashes' for instructions on how to enable this feature.");
+        "Run './flux-cli help getblockhashes' for instructions on how to enable this feature.");
 
     // During startup of the real system, fInsightExplorer ("-insightexplorer")
     // automatically enables the next three, but not here, must explicitly enable.

@@ -18,9 +18,9 @@ Possible options:
 
 ```
 -h, --help       show this help message and exit
-  --nocleanup      Leave zelcashds and test.* datadir on exit or error
+  --nocleanup      Leave fluxds and test.* datadir on exit or error
   --noshutdown     Don't stop bitcoinds after the test execution
-  --srcdir=SRCDIR  Source directory containing zelcashd/zelcash-cli (default:
+  --srcdir=SRCDIR  Source directory containing fluxd/flux-cli (default:
                    ../../src)
   --tmpdir=TMPDIR  Root directory for datadirs
   --tracerpc       Print out all RPC calls as they are made
@@ -42,5 +42,5 @@ to recover with:
 
 ```bash
 rm -rf cache
-killall zelcashd
+killall fluxd
 ```

@@ -38,7 +38,7 @@ class TxExpiryDoSTest(BitcoinTestFramework):
 
         test_node.wait_for_verack()
 
-        # Verify mininodes are connected to zelcashd nodes
+        # Verify mininodes are connected to fluxd nodes
         peerinfo = self.nodes[0].getpeerinfo()
         versions = [x["version"] for x in peerinfo]
         assert_equal(1, versions.count(OVERWINTER_PROTO_VERSION))
@@ -48,7 +48,7 @@ class TxExpiryDoSTest(BitcoinTestFramework):
         self.nodes[0].generate(100)
         node_address = self.nodes[0].getnewaddress()
 
-        # Mininodes send transaction to zelcashd node.
+        # Mininodes send transaction to fluxd node.
         spendtx = create_transaction(self.nodes[0],
                                      coinbase_blocks[0],
                                      node_address,
