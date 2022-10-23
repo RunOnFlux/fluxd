@@ -1,11 +1,13 @@
-Zel Contributors
+Flux Contributors
 ==================
 
-Jeremy "Blondfrogs" Anderson (122)
-Tadeas Kmenta (57)
+Jeremy "Blondfrogs" Anderson (135)
+Tadeas Kmenta (61)
+Tom Moulton (36)
 Miles Manley (18)
 Cabecinha84 (7)
 Jack Grigg (4)
+johnhanlon86 (2)
 Dimitris Apostolou (2)
 XK4MiLX (1)
 Wilke "Lolliedieb" Trei (1)
