@@ -25,4 +25,3 @@ index 8d47741..641d8bb 100644
 +#    }
      # - GCC on Darwin with -pedantic, suppress unsupported long long warning
      flags darwin.compile OPTIONS $(condition)/<warnings>all : -Wno-long-long ;
-
