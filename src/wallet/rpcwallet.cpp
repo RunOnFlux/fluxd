@@ -576,7 +576,7 @@ UniValue consolidateutxos(const UniValue& params, bool fHelp)
     UniValue data(UniValue::VOBJ);
 
     data.pushKV("transactionid", wtx.GetHash().GetHex());
-    data.pushKV("consolidated", wtx.vin.size());
+    data.pushKV("consolidated", int64_t (wtx.vin.size()));
 
     return data;
 }
