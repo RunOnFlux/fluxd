@@ -12,7 +12,7 @@ matrix:
     #   dist: xenial
     #   env: PLATFORM="win"
     - os: osx
-      osx_image: xcode11.3
+      osx_image: xcode9.4
       env: $PLATFORM="osx"
 # branches:
 #   only:
@@ -23,9 +23,9 @@ before_install:
   - if [[ "$PLATFORM" == "arm" ]]; then sudo apt-get update; fi
   - if [[ "$PLATFORM" == "arm" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake libtinfo5; fi
   - if [[ "$PLATFORM" == "arm" ]]; then sudo apt-get install g++-aarch64-linux-gnu; fi
-  # - if [[ "$PLATFORM" == "osx" ]]; then /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"; fi
   - if [[ "$PLATFORM" == "osx" ]]; then brew update; fi
-  - if [[ "$PLATFORM" == "osx" ]]; then brew install autoconf automake pkgconfig gmp; fi
+  - if [[ "$PLATFORM" == "osx" ]]; then brew install cmake autoconf libtool automake coreutils pkgconfig gmp wget; fi
   - if [[ "$PLATFORM" == "osx" ]]; then brew install gcc5 --without-multilib; fi
   - if [[ "$PLATFORM" == "win" ]]; then sudo apt-get update; fi
   - if [[ "$PLATFORM" == "win" ]]; then sudo apt-get install -y build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake libtinfo5 mingw-w64 mingw-w64-tools gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 cmake zip; fi
