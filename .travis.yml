@@ -23,10 +23,8 @@ before_install:
   - if [[ "$PLATFORM" == "arm" ]]; then sudo apt-get update; fi
   - if [[ "$PLATFORM" == "arm" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake libtinfo5; fi
   - if [[ "$PLATFORM" == "arm" ]]; then sudo apt-get install g++-aarch64-linux-gnu; fi
-  - if [[ "$PLATFORM" == "osx" ]]; then git -C /usr/local/Homebrew/Library/Taps/homebrew/homebrew-core fetch --unshallow; fi
-  - if [[ "$PLATFORM" == "osx" ]]; then git -C /usr/local/Homebrew/Library/Taps/homebrew/homebrew-cask fetch --unshallow; fi
-  - if [[ "$PLATFORM" == "osx" ]]; then /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; fi
-  - if [[ "$PLATFORM" == "osx" ]]; then brew update; fi
+  # - if [[ "$PLATFORM" == "osx" ]]; then /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"; fi
+  # - if [[ "$PLATFORM" == "osx" ]]; then brew update; fi
   - if [[ "$PLATFORM" == "osx" ]]; then brew install cmake autoconf libtool automake coreutils pkgconfig gmp wget; fi
   - if [[ "$PLATFORM" == "osx" ]]; then brew install gcc5 --without-multilib; fi
   - if [[ "$PLATFORM" == "win" ]]; then sudo apt-get update; fi
