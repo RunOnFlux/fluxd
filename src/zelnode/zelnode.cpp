@@ -807,11 +807,90 @@ bool FluxnodeCache::Flush()
         if (g_fluxnodeCache.mapStartTxTracker.count(item.first)) {
             FluxnodeCacheData data = g_fluxnodeCache.mapStartTxTracker.at(item.first);
 
+            // Check for item in the startTxHeight map
+            if (!g_fluxnodeCache.mapStartTxHeights.count(data.nAddedBlockHeight)) {
+                error("%s - %d , Found map:at error - Daemon will crash ", __func__, __LINE__);
+                error("%s - %d , Debug Data - mapStartTxTracker has item: %s. Moving to confirmed list.", __func__, __LINE__, item.first.ToFullString());
+                error("%s - %d , Debug Data - mapStartTxHeights doesn't have item at %d  added block height", __func__, __LINE__, data.nAddedBlockHeight);
+                error("%s - %d , Debug Data - data info:\n %s", __func__, __LINE__, data.ToFullString());
+
+                /// This is for debugging a known bug only.
+                // Check if it is already in the confirmed list:
+                if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.first)) {
+                    error("%s - %d , Debug Data - node already in confirmed list:\n %s", __func__, __LINE__, item.first.ToFullString());
+                } else {
+                    error("%s - %d , Debug Data - node wasn't in confirmed list in confirmed list:\n %s", __func__, __LINE__, item.first.ToFullString());
+                }
+
+                /// This is for debugging a known bug only.
+                // Check if it is already in dos tracker:
+                if (g_fluxnodeCache.mapStartTxDosTracker.count(item.first)) {
+                    error("%s - %d , Debug Data - node already in dos tracker list: %s", __func__, __LINE__, item.first.ToFullString());
+                    error("%s - %d , Debug Data - node data:\n %s", __func__, __LINE__, g_fluxnodeCache.mapStartTxDosTracker.at(item.first).ToFullString());
+                } else {
+                    error("%s - %d , Debug Data - node wasn't in dos tracker list: %s", __func__, __LINE__, item.first.ToFullString());
+                }
+
+                /// This is for debugging a known bug only.
+                // Check if it is already in dos heights tracker:
+                if (g_fluxnodeCache.mapStartTxDosHeights.count(data.nAddedBlockHeight)) {
+                    error("%s - %d , Debug Data - node confirmed height in dos height tracker at height: %d", __func__, __LINE__, data.nAddedBlockHeight);
+                    if (g_fluxnodeCache.mapStartTxDosHeights.at(data.nAddedBlockHeight).count(item.first)) {
+                        error("%s - %d , Debug Data - node collateral: %s found in set of mapStartTxDosHeights at height: %d", __func__, __LINE__, item.first.ToFullString(), data.nAddedBlockHeight);
+                    } else {
+                        error("%s - %d , Debug Data - node collateral: %s not found in the Dos Heights tracker", __func__, __LINE__, item.first.ToFullString());
+                    }
+                } else {
+                    error("%s - %d , Debug Data - height wasn't in dos tracker heights list at height: %d", __func__, __LINE__, data.nAddedBlockHeight);
+                }
+
+                /// This is for debugging a known bug only.
+                // Check all heights above equal to the expiration height (60) trying to find the item
+                for (int i = 1; i < FLUXNODE_START_TX_EXPIRATION_HEIGHT; i++) {
+                    if (g_fluxnodeCache.mapStartTxHeights.count(data.nAddedBlockHeight + i)) {
+                        error("%s - %d , Debug Data - Found heights at block height : %d", __func__, __LINE__,
+                              data.nAddedBlockHeight + i);
+                        if (g_fluxnodeCache.mapStartTxHeights.at(data.nAddedBlockHeight+i).count(item.first)) {
+                            error("%s - %d , Debug Data - Found item: %s in block heights set at block height : %d", __func__, __LINE__,
+                                  item.first.ToFullString(), data.nAddedBlockHeight + i);
+                        } else {
+                            error("%s - %d , Debug Data - Item not in heights : %d", __func__, __LINE__,
+                                  data.nAddedBlockHeight + i);
+                        }
+                    } else {
+                        error("%s - %d , Debug Data - Found no heights at block height : %d", __func__, __LINE__,
+                              data.nAddedBlockHeight + i);
+                    }
+                }
+
+                /// This is for debugging a known bug only.
+                // Check all heights below equal to the expiration height (60) trying to find the item
+                for (int i = FLUXNODE_START_TX_EXPIRATION_HEIGHT; i > 0; i--) {
+                    if (g_fluxnodeCache.mapStartTxHeights.count(data.nAddedBlockHeight - i)) {
+                        error("%s - %d , Debug Data - Found heights at block height : %d", __func__, __LINE__,
+                              data.nAddedBlockHeight - i);
+                        if (g_fluxnodeCache.mapStartTxHeights.at(data.nAddedBlockHeight - i).count(item.first)) {
+                            error("%s - %d , Debug Data - Found item: %s in block heights set at block height : %d", __func__, __LINE__,
+                                  item.first.ToFullString(), data.nAddedBlockHeight - i);
+                        } else {
+                            error("%s - %d , Debug Data - Item not in heights : %d", __func__, __LINE__,
+                                  data.nAddedBlockHeight - i);
+                        }
+                    } else {
+                        error("%s - %d , Debug Data - Found no heights at block height : %d", __func__, __LINE__,
+                              data.nAddedBlockHeight - i);
+                    }
+                }
+
+
+                // Returning false here should cause the assert to trigger on the Flush command crashing the daemon.
+                return false;
+            }
+
             // Remove from Start Tracking
             g_fluxnodeCache.mapStartTxTracker.erase(item.first);
-            if (!g_fluxnodeCache.mapStartTxHeights.count(data.nAddedBlockHeight)) {
-                error("%s - %d , Found map:at error", __func__, __LINE__);
-            }
+
+            /// If the bug happens, this line will cause the daemon to crash. Instead we return false above and cause an asset to trigger.
             g_fluxnodeCache.mapStartTxHeights.at(data.nAddedBlockHeight).erase(item.first);
 
             // Update the data (STARTED --> CONFIRM)
