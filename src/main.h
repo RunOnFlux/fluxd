@@ -72,7 +72,7 @@ static const bool DEFAULT_ALERTS = true;
 static const int ALERT_PRIORITY_SAFE_MODE = 4000;
 /** Maximum reorg length we will accept. */
 static const unsigned int MAX_REORG_LENGTH = 29;
-static const unsigned int MAX_REORG_LENGTH_UPDATED = 5;
+static const unsigned int MAX_REORG_LENGTH_UPDATED = 9;
 static const int64_t MAX_REORG_LENGTH_UPDATED_HEIGHT = 1350000;
 /** Maximum number of signature check operations in an IsStandard() P2SH script */
 static const unsigned int MAX_P2SH_SIGOPS = 15;
