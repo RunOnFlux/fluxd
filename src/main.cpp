@@ -4716,8 +4716,7 @@ bool ContextualCheckBlockHeader(
     const int nHeight = pindexPrev->nHeight + 1;
 
     //If this is a reorg, check that it is not too deep
-    int nMaxReorgDepth = MAX_REORG_LENGTH;
-    bool fGreaterThanMaxReorg = (chainActive.Height() - (nHeight - 1)) >= nMaxReorgDepth;
+    bool fGreaterThanMaxReorg = (chainActive.Height() - (nHeight - 1)) >= GetMaxReorgDepth(chainActive.Height());
     if (fGreaterThanMaxReorg) {
             return state.DoS(10,
                              error("forked chain older than max reorganization depth"),
@@ -5492,7 +5491,7 @@ bool RewindBlockIndex(const CChainParams& chainparams, bool& clearWitnessCaches)
             (networkID == "test" && nHeight == 252500 && *phashFirstInsufValidated ==
              uint256S("0018bd16a9c6f15795a754c498d2b2083ab78f14dae44a66a8d0e90ba8464d9c"));
 
-        clearWitnessCaches = (rewindLength > MAX_REORG_LENGTH && intendedRewind);
+        clearWitnessCaches = (rewindLength > GetMaxReorgDepth(chainActive.Height()) && intendedRewind);
 
         if (clearWitnessCaches) {
             auto msg = strprintf(_(
@@ -5501,13 +5500,13 @@ bool RewindBlockIndex(const CChainParams& chainparams, bool& clearWitnessCaches)
             LogPrintf("*** %s\n", msg);
         }
 
-        if (rewindLength > MAX_REORG_LENGTH && !intendedRewind) {
+        if (rewindLength > GetMaxReorgDepth(chainActive.Height()) && !intendedRewind) {
             auto pindexOldTip = chainActive.Tip();
             auto pindexRewind = chainActive[nHeight - 1];
             auto msg = strprintf(_(
                 "A block chain rewind has been detected that would roll back %d blocks! "
                 "This is larger than the maximum of %d blocks, and so the node is not following this reorganisation."
-                ), rewindLength, MAX_REORG_LENGTH) + "\n\n" +
+                ), rewindLength, GetMaxReorgDepth(chainActive.Height())) + "\n\n" +
                 _("Rewind details") + ":\n" +
                 "- " + strprintf(_("Current tip:   %s, height %d"),
                     pindexOldTip->phashBlock->GetHex(), pindexOldTip->nHeight) + "\n" +
@@ -6115,7 +6114,7 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
                         send = mi->second->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
                             (pindexBestHeader->GetBlockTime() - mi->second->GetBlockTime() < nOneMonth) &&
                             (GetBlockProofEquivalentTime(*pindexBestHeader, *mi->second, *pindexBestHeader, consensusParams) < nOneMonth) && (chainActive.Height() - (mi->second->nHeight-1) <
-                                MAX_REORG_LENGTH);
+                                GetMaxReorgDepth(chainActive.Height()));
                         if (!send) {
                             LogPrintf("%s: ignoring request from peer=%i for old block that isn't in the main chain\n", __func__, pfrom->GetId());
                         }
@@ -7604,4 +7603,11 @@ CMutableTransaction CreateNewContextualCMutableTransaction(const Consensus::Para
         }
     }
     return mtx;
+}
+
+unsigned int GetMaxReorgDepth(const int64_t nHeight) {
+    if (nHeight > MAX_REORG_LENGTH_UPDATED_HEIGHT) {
+        return MAX_REORG_LENGTH_UPDATED;
+    }
+    return MAX_REORG_LENGTH;
 }
