@@ -7605,7 +7605,11 @@ CMutableTransaction CreateNewContextualCMutableTransaction(const Consensus::Para
     return mtx;
 }
 
-unsigned int GetMaxReorgDepth(const int64_t nHeight) {
+/** This must always be a signed int. Because when comparing it to the chainActive.Height()
+we need to compare similar types or i < j will not function correctly
+You must compare (int < int) because (int < unsigned int) can give incorrectly results
+*/
+int64_t GetMaxReorgDepth(const int64_t nHeight) {
     if (nHeight > MAX_REORG_LENGTH_UPDATED_HEIGHT) {
         return MAX_REORG_LENGTH_UPDATED;
     }

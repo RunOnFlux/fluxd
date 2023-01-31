@@ -746,11 +746,15 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         CTxDestination dest;
         ExtractDestination(payout.second.first, dest);
 
-        result.pushKV(std::string(start + "_fluxnode_address"), EncodeDestination(dest));
-        result.pushKV(std::string(start + "_fluxlnode_payout"), payout.second.second);
-
+        /** Only use named (cumulus, nimbus, stratus) when using fluxnode naming scheme */
         result.pushKV(std::string(start_rename + "_fluxnode_address"), EncodeDestination(dest));
         result.pushKV(std::string(start_rename + "_fluxnode_payout"), payout.second.second);
+
+        /** We must keep zelnode here for backwards capabilities so pools don't break when they upgrade to latest releases */
+        result.pushKV(std::string(start + "_zelnode_address"), EncodeDestination(dest));
+        result.pushKV(std::string(start + "_zelnode_payout"), payout.second.second);
+        result.pushKV(std::string(start_rename + "_zelnode_address"), EncodeDestination(dest));
+        result.pushKV(std::string(start_rename + "_zelnode_payout"), payout.second.second);
     }
 
     // These should never be on the same block. So to keep it clean for pools we will use the same
