@@ -315,7 +315,7 @@ public:
     std::map<int, std::set<COutPoint>> mapDoSToUndo;
 
     // Set only used by local cache to inform the global cache when Flushing to move Started Fluxnodes to the Confirm list and updating IP address
-    std::map<COutPoint, std::string> setAddToConfirm;
+    std::map<COutPoint, std::string> mapAddToConfirm;
 
     // Int only used by local cache to inform the global cache when Flushing to set the Started Fluxnodes Confirm Height
     int setAddToConfirmHeight;
@@ -324,7 +324,7 @@ public:
     std::set<COutPoint> setUndoAddToConfirm;
 
     // Set only used by local cache to inform the global cache when Flushing to update the Confirm Fluxnodes nLastConfirmHeight and IP address
-    std::map<COutPoint, std::string> setAddToUpdateConfirm;
+    std::map<COutPoint, std::string> mapAddToUpdateConfirm;
 
     // Int only used by local cache to inform the global cache when Flushing to update the Confirm Fluxnodes nLastConfirmHeight
     int setAddToUpdateConfirmHeight;
@@ -373,10 +373,10 @@ public:
         mapDoSToUndo.clear();
         setUndoStartTx.clear();
         setUndoStartTxHeight = 0;
-        setAddToConfirm.clear();
+        mapAddToConfirm.clear();
         setAddToConfirmHeight = 0;
         mapConfirmedFluxnodeData.clear();
-        setAddToUpdateConfirm.clear();
+        mapAddToUpdateConfirm.clear();
         setAddToUpdateConfirmHeight = 0;
         setUndoAddToConfirm.clear();
 

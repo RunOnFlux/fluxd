@@ -207,7 +207,7 @@ void FluxnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_n
     }
 
     LOCK(cs);
-    mapStartTxTracker.insert(std::make_pair(p_transaction.collateralOut, data));
+    mapStartTxTracker[p_transaction.collateralOut] = data;
     setDirtyOutPoint.insert(p_transaction.collateralOut);
 }
 
@@ -221,7 +221,7 @@ void FluxnodeCache::UndoNewStart(const CTransaction& p_transaction, const int p_
 void FluxnodeCache::AddNewConfirm(const CTransaction& p_transaction, const int p_nHeight)
 {
     LOCK(cs);
-    setAddToConfirm.insert(std::make_pair(p_transaction.collateralOut, p_transaction.ip));
+    mapAddToConfirm[p_transaction.collateralOut] = p_transaction.ip;
     setAddToConfirmHeight = p_nHeight;
 }
 
@@ -234,7 +234,7 @@ void FluxnodeCache::UndoNewConfirm(const CTransaction& p_transaction)
 void FluxnodeCache::AddUpdateConfirm(const CTransaction& p_transaction, const int p_nHeight)
 {
     LOCK(cs);
-    setAddToUpdateConfirm.insert(std::make_pair(p_transaction.collateralOut, p_transaction.ip));
+    mapAddToUpdateConfirm[p_transaction.collateralOut] = p_transaction.ip;
     setAddToUpdateConfirmHeight = p_nHeight;
 }
 
@@ -316,8 +316,8 @@ void FluxnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
     std::set<COutPoint> setNewDosHeights;
     if (g_fluxnodeCache.mapStartTxHeights.count(removalHeight)) {
         for (const auto& item: g_fluxnodeCache.mapStartTxHeights.at(removalHeight)) {
-            // The start transaction might have been confirmed in this block. If it was the outpoint would be in the setAddToConfirm. Skip it
-            if (setAddToConfirm.count(item))
+            // The start transaction might have been confirmed in this block. If it was the outpoint would be in the mapAddToConfirm. Skip it
+            if (mapAddToConfirm.count(item))
                 continue;
 
             // If the item isn't in the mapStartTxTracker. Logs the errors and shutdown for the safety of the node
@@ -366,7 +366,7 @@ void FluxnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
                 StartShutdown();
             }
 
-            mapStartTxTracker.insert(std::make_pair(item, g_fluxnodeCache.mapStartTxDosTracker.at(item)));
+            mapStartTxTracker[item] = g_fluxnodeCache.mapStartTxDosTracker.at(item);
             mapStartTxTracker[item].nStatus = FLUXNODE_TX_STARTED;
             mapStartTxHeights[removalHeight].insert(item);
 
@@ -554,7 +554,7 @@ bool FluxnodeCache::CheckFluxnodePayout(const CTransaction& coinbase, const int 
         if (GetNextPayment(info.dest, currentTier, info.outpoint)) {
             info.script = GetScriptForDestination(info.dest);
             info.amount = GetFluxnodeSubsidy(p_Height, blockValue, currentTier);
-            mapFluxnodePayouts.insert(std::make_pair((Tier)currentTier, info));
+            mapFluxnodePayouts[(Tier)currentTier] = info;
         }
     }
 
@@ -606,7 +606,7 @@ void FillBlockPayeeWithDeterministicPayouts(CMutableTransaction& txNew, CAmount 
             info.foundpayout = false;
             nTotalPayouts--;
         }
-        mapFluxnodePayouts.insert(std::make_pair((Tier)currentTier, info));
+        mapFluxnodePayouts[(Tier)currentTier] = info;
     }
 
     // Resize tx to correct payout sizing
@@ -671,12 +671,12 @@ void FluxnodeCache::AddBackUndoData(const CFluxnodeTxBlockUndo& p_undoData)
     // Undo the expired dos outpoints
     for (const auto& item : p_undoData.vecExpiredDosData) {
         nHeight = item.nAddedBlockHeight;
-        mapStartTxDosTracker.insert(std::make_pair(item.collateralIn, item));
+        mapStartTxDosTracker[item.collateralIn] = item;
         setOutPoint.insert(item.collateralIn);
     }
 
     if (setOutPoint.size()) {
-        mapStartTxDosHeights.insert(std::make_pair(nHeight, setOutPoint));
+        mapStartTxDosHeights[nHeight] = setOutPoint;
     }
 
     // Undo the Confirm Update transactions back to the old LastConfirmHeight
@@ -715,7 +715,7 @@ void FluxnodeCache::AddBackUndoData(const CFluxnodeTxBlockUndo& p_undoData)
     }
 
     for (const auto& item : p_undoData.mapLastPaidHeights) {
-        mapUndoPaidNodes.insert(std::make_pair(item.first, item.second));
+        mapUndoPaidNodes[item.first] = item.second;
     }
 }
 
@@ -728,15 +728,10 @@ bool FluxnodeCache::Flush()
     LOCK2(cs, g_fluxnodeCache.cs);
     //! Add new start transactions to the tracker
     for (auto item : mapStartTxTracker) {
-        g_fluxnodeCache.mapStartTxTracker.insert(std::make_pair(item.first, item.second));
-        if (!g_fluxnodeCache.mapStartTxHeights.count(item.second.nAddedBlockHeight)) {
-            g_fluxnodeCache.mapStartTxHeights.insert(make_pair(item.second.nAddedBlockHeight, std::set<COutPoint>()));
-        }
-        g_fluxnodeCache.mapStartTxHeights.at(item.second.nAddedBlockHeight).insert(item.first);
-
+        g_fluxnodeCache.mapStartTxTracker[item.first] = item.second;
+        g_fluxnodeCache.mapStartTxHeights[item.second.nAddedBlockHeight].insert(item.first);
         g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
     }
-
 
     //! If a start transaction isn't confirmed in time, the OutPoint is added to the dos tracker
     for (auto item : mapStartTxDosTracker) {
@@ -779,7 +774,7 @@ bool FluxnodeCache::Flush()
     set<Tier> undoExpiredTiers;
     bool fUndoExpiredAddedToList = false;
     for (const auto& item : setUndoExpireConfirm) {
-        g_fluxnodeCache.mapConfirmedFluxnodeData.insert(std::make_pair(item.collateralIn, item));
+        g_fluxnodeCache.mapConfirmedFluxnodeData[item.collateralIn] = item;
         g_fluxnodeCache.setDirtyOutPoint.insert(item.collateralIn);
 
         if (g_fluxnodeCache.CheckListHas(item)) {
@@ -802,7 +797,7 @@ bool FluxnodeCache::Flush()
     }
 
     //! Add the data from Fluxnodes that got confirmed this block
-    for (const auto& item : setAddToConfirm) {
+    for (const auto& item : mapAddToConfirm) {
         // Take the fluxnodedata from the mapStartTxTracker and move it to the mapConfirm
         if (g_fluxnodeCache.mapStartTxTracker.count(item.first)) {
             FluxnodeCacheData data = g_fluxnodeCache.mapStartTxTracker.at(item.first);
@@ -812,7 +807,7 @@ bool FluxnodeCache::Flush()
                 error("%s - %d , Found map:at error - Daemon will crash ", __func__, __LINE__);
                 error("%s - %d , Debug Data - mapStartTxTracker has item: %s. Moving to confirmed list.", __func__, __LINE__, item.first.ToFullString());
                 error("%s - %d , Debug Data - mapStartTxHeights doesn't have item at %d  added block height", __func__, __LINE__, data.nAddedBlockHeight);
-                error("%s - %d , Debug Data - data info:\n %s", __func__, __LINE__, data.ToFullString());
+                error("%s - %d , Debug Data - data info: %s", __func__, __LINE__, data.ToFullString());
 
                 /// This is for debugging a known bug only.
                 // Check if it is already in the confirmed list:
@@ -902,7 +897,7 @@ bool FluxnodeCache::Flush()
             data.ip = item.second;
 
             // Add the data to the confirm trackers
-            g_fluxnodeCache.mapConfirmedFluxnodeData.insert(std::make_pair(data.collateralIn, data));
+            g_fluxnodeCache.mapConfirmedFluxnodeData[data.collateralIn] = data;
 
             // Because we don't automatically remove nodes that have expired from the list, to help not sort it as often
             // If this node is already in the list. We wont add it let. We need to wait for the node to be removed from the list.
@@ -946,7 +941,7 @@ bool FluxnodeCache::Flush()
             data.ip = "";
 
             // Add the data back into the Start tracker
-            g_fluxnodeCache.mapStartTxTracker.insert(std::make_pair(item, data));
+            g_fluxnodeCache.mapStartTxTracker[item] = data;
             g_fluxnodeCache.mapStartTxHeights[data.nAddedBlockHeight].insert(item);
 
             g_fluxnodeCache.setDirtyOutPoint.insert(item);
@@ -961,7 +956,7 @@ bool FluxnodeCache::Flush()
     }
 
     //! Update the data for Fluxnodes that got the confirmed update this block
-    for (const auto& item : setAddToUpdateConfirm) {
+    for (const auto& item : mapAddToUpdateConfirm) {
         // Take the fluxnodedata from the mapStartTxTracker and move it to the mapConfirm
         if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.first)) {
 
@@ -985,7 +980,7 @@ bool FluxnodeCache::Flush()
             g_fluxnodeCache.mapConfirmedFluxnodeData.erase(item);
 
             // IMPORTANT:: the item stays in the list and the set. This is because we don't want to have to resort the list everytime something expires.
-            // Only when new added in added to the list.
+            // Only when new added is added to the list.
 
             // Add the OutPoint to the dirty set, so it will be erased on database write
             g_fluxnodeCache.setDirtyOutPoint.insert(item);
@@ -1079,7 +1074,7 @@ bool FluxnodeCache::Flush()
 
     //! ALWAYS THE LAST CALL IN THE FLUSH COMMAND
     // Always the last thing to do in the Flush. Sort the list if any data was added to it
-    if (setAddToConfirm.size() || undoExpiredTiers.size() || removedTiers.size() || setRemoveFromList.size() || mapPaidNodes.size()) {
+    if (mapAddToConfirm.size() || undoExpiredTiers.size() || removedTiers.size() || setRemoveFromList.size() || mapPaidNodes.size()) {
 
         for (int currentTier = CUMULUS; currentTier != LAST; currentTier++ )
         {
@@ -1095,23 +1090,13 @@ bool FluxnodeCache::Flush()
 bool FluxnodeCache::LoadData(FluxnodeCacheData& data)
 {
     if (data.nStatus == FLUXNODE_TX_STARTED) {
-        mapStartTxTracker.insert(std::make_pair(data.collateralIn, data));
-        if (!mapStartTxHeights.count(data.nAddedBlockHeight))
-            mapStartTxHeights[data.nAddedBlockHeight] = std::set<COutPoint>();
-
-        if (mapStartTxHeights.count(data.nAddedBlockHeight)) {
-            mapStartTxHeights.at(data.nAddedBlockHeight).insert(data.collateralIn);
-        }
+        mapStartTxTracker[data.collateralIn] = data;
+        mapStartTxHeights[data.nAddedBlockHeight].insert(data.collateralIn);
     } else if (data.nStatus == FLUXNODE_TX_DOS_PROTECTION) {
-        mapStartTxDosTracker.insert(std::make_pair(data.collateralIn, data));
-        if (!mapStartTxDosHeights.count(data.nAddedBlockHeight))
-            mapStartTxDosHeights[data.nAddedBlockHeight] = std::set<COutPoint>();
-
-        if (mapStartTxDosHeights.count(data.nAddedBlockHeight)) {
-            mapStartTxDosHeights.at(data.nAddedBlockHeight).insert(data.collateralIn);
-        }
+        mapStartTxDosTracker[data.collateralIn] = data;
+        mapStartTxDosHeights[data.nAddedBlockHeight].insert(data.collateralIn);
     } else if (data.nStatus == FLUXNODE_TX_CONFIRMED) {
-        mapConfirmedFluxnodeData.insert(std::make_pair(data.collateralIn, data));
+        mapConfirmedFluxnodeData[data.collateralIn] = data;
         InsertIntoList(data);
     }
 
@@ -1160,8 +1145,8 @@ void FluxnodeCache::InsertIntoList(const FluxnodeCacheData& p_fluxnodeData)
     if (IsTierValid(p_fluxnodeData.nTier)) {
         FluxnodeListData listData(p_fluxnodeData);
         if (mapFluxnodeList.count((Tier) p_fluxnodeData.nTier)) {
-            mapFluxnodeList.at((Tier) p_fluxnodeData.nTier).setConfirmedTxInList.insert(p_fluxnodeData.collateralIn);
-            mapFluxnodeList.at((Tier) p_fluxnodeData.nTier).listConfirmedFluxnodes.emplace_front(listData);
+            mapFluxnodeList[(Tier) p_fluxnodeData.nTier].setConfirmedTxInList.insert(p_fluxnodeData.collateralIn);
+            mapFluxnodeList[(Tier) p_fluxnodeData.nTier].listConfirmedFluxnodes.emplace_front(listData);
         }
     }
 }
@@ -1170,8 +1155,8 @@ void FluxnodeCache::EraseFromListSet(const COutPoint& p_OutPoint)
 {
     for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
         if (mapFluxnodeList.count((Tier) currentTier)) {
-            if (mapFluxnodeList.at((Tier) currentTier).setConfirmedTxInList.count(p_OutPoint)) {
-                mapFluxnodeList.at((Tier) currentTier).setConfirmedTxInList.erase(p_OutPoint);
+            if (mapFluxnodeList[(Tier) currentTier].setConfirmedTxInList.count(p_OutPoint)) {
+                mapFluxnodeList[(Tier) currentTier].setConfirmedTxInList.erase(p_OutPoint);
                 return;
             }
         }

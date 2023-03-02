@@ -3431,8 +3431,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                             }
 
                             // Add the lastConfirmed and lastIpAddress into the undoblock data
-                            fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight.insert(std::make_pair(tx.collateralOut, global_data.nLastConfirmedBlockHeight));
-                            fluxnodeTxBlockUndo.mapLastIpAddress.insert(std::make_pair(tx.collateralOut, global_data.ip));
+                            fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight[tx.collateralOut] =  global_data.nLastConfirmedBlockHeight;
+                            fluxnodeTxBlockUndo.mapLastIpAddress[tx.collateralOut] = global_data.ip;
                         }
                     }
                 }
