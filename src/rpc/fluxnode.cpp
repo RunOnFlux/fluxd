@@ -844,7 +844,7 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
 
     std::map<int, std::vector<UniValue>> mapOrderedDosList;
 
-    for (const auto& item : g_fluxnodeCache.mapStartTxDosTracker) {
+    for (const auto& item : g_fluxnodeCache.mapStartTxDOSTracker) {
 
         // Get the data from the item in the map of dox tracking
         const FluxnodeCacheData data = item.second;

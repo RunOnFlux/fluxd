@@ -65,7 +65,7 @@ bool CDeterministicFluxnodeDB::LoadFluxnodeCacheData()
     }
 
     LogPrint("dfluxnode","%s : Size of mapStartTxTracker: %s\n", __func__, g_fluxnodeCache.mapStartTxTracker.size());
-    LogPrint("dfluxnode", "%s : Size of mapStartTxDosTracker: %s\n", __func__, g_fluxnodeCache.mapStartTxDosTracker.size());
+    LogPrint("dfluxnode", "%s : Size of mapStartTxDOSTracker: %s\n", __func__, g_fluxnodeCache.mapStartTxDOSTracker.size());
     LogPrint("dfluxnode", "%s : Size of mapConfirmedFluxnodeData: %s\n", __func__, g_fluxnodeCache.mapConfirmedFluxnodeData.size());
 
     return true;

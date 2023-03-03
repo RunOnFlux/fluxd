@@ -312,7 +312,7 @@ public:
     std::map<int, std::set<COutPoint>> mapDosExpiredToRemove;
 
     // Map only used by local cache to inform the global cache to undo Fluxnode added to DoS tacker, and put them back into the Started Fluxnode tracking
-    std::map<int, std::set<COutPoint>> mapDoSToUndo;
+    std::map<int, std::set<COutPoint>> mapDOSToUndo;
 
     // Set only used by local cache to inform the global cache when Flushing to move Started Fluxnodes to the Confirm list and updating IP address
     std::map<COutPoint, std::string> mapAddToConfirm;
@@ -344,8 +344,8 @@ public:
     std::map<int, std::set<COutPoint> > mapStartTxHeights;
 
     // Global tracking of DoS Prevention Fluxnode
-    std::map<COutPoint, FluxnodeCacheData> mapStartTxDosTracker;
-    std::map<int, std::set<COutPoint> > mapStartTxDosHeights;
+    std::map<COutPoint, FluxnodeCacheData> mapStartTxDOSTracker;
+    std::map<int, std::set<COutPoint> > mapStartTxDOSHeights;
 
     // Global tracking of Confirmed Fluxnodes
     std::map<COutPoint, FluxnodeCacheData> mapConfirmedFluxnodeData;
@@ -367,10 +367,10 @@ public:
         setDirtyOutPoint.clear();
         mapStartTxTracker.clear();
         mapStartTxHeights.clear();
-        mapStartTxDosTracker.clear();
-        mapStartTxDosHeights.clear();
+        mapStartTxDOSTracker.clear();
+        mapStartTxDOSHeights.clear();
         mapDosExpiredToRemove.clear();
-        mapDoSToUndo.clear();
+        mapDOSToUndo.clear();
         setUndoStartTx.clear();
         setUndoStartTxHeight = 0;
         mapAddToConfirm.clear();

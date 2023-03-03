@@ -3979,7 +3979,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
         assert(fluxnodeCache.Flush());
 
         LogPrint("dfluxnode", "%s : Size of global fluxnodeCache mapStartTxTracker : %u\n", __func__, g_fluxnodeCache.mapStartTxTracker.size());
-        LogPrint("dfluxnode", "%s : Size of global fluxnodeCache mapStartTxDosTrackerTxTracker : %u\n", __func__, g_fluxnodeCache.mapStartTxDosTracker.size());
+        LogPrint("dfluxnode", "%s : Size of global fluxnodeCache mapStartTxDOSTrackerTxTracker : %u\n", __func__, g_fluxnodeCache.mapStartTxDOSTracker.size());
     }
     int64_t nTime4 = GetTimeMicros(); nTimeFlush += nTime4 - nTime3;
     LogPrint("bench", "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
