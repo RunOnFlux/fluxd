@@ -312,10 +312,10 @@ public:
     std::map<int, std::set<COutPoint>> mapDosExpiredToRemove;
 
     // Map only used by local cache to inform the global cache to undo Fluxnode added to DoS tacker, and put them back into the Started Fluxnode tracking
-    std::map<int, std::set<COutPoint>> mapDoSToUndo;
+    std::map<int, std::set<COutPoint>> mapDOSToUndo;
 
     // Set only used by local cache to inform the global cache when Flushing to move Started Fluxnodes to the Confirm list and updating IP address
-    std::map<COutPoint, std::string> setAddToConfirm;
+    std::map<COutPoint, std::string> mapAddToConfirm;
 
     // Int only used by local cache to inform the global cache when Flushing to set the Started Fluxnodes Confirm Height
     int setAddToConfirmHeight;
@@ -324,7 +324,7 @@ public:
     std::set<COutPoint> setUndoAddToConfirm;
 
     // Set only used by local cache to inform the global cache when Flushing to update the Confirm Fluxnodes nLastConfirmHeight and IP address
-    std::map<COutPoint, std::string> setAddToUpdateConfirm;
+    std::map<COutPoint, std::string> mapAddToUpdateConfirm;
 
     // Int only used by local cache to inform the global cache when Flushing to update the Confirm Fluxnodes nLastConfirmHeight
     int setAddToUpdateConfirmHeight;
@@ -344,8 +344,8 @@ public:
     std::map<int, std::set<COutPoint> > mapStartTxHeights;
 
     // Global tracking of DoS Prevention Fluxnode
-    std::map<COutPoint, FluxnodeCacheData> mapStartTxDosTracker;
-    std::map<int, std::set<COutPoint> > mapStartTxDosHeights;
+    std::map<COutPoint, FluxnodeCacheData> mapStartTxDOSTracker;
+    std::map<int, std::set<COutPoint> > mapStartTxDOSHeights;
 
     // Global tracking of Confirmed Fluxnodes
     std::map<COutPoint, FluxnodeCacheData> mapConfirmedFluxnodeData;
@@ -367,16 +367,16 @@ public:
         setDirtyOutPoint.clear();
         mapStartTxTracker.clear();
         mapStartTxHeights.clear();
-        mapStartTxDosTracker.clear();
-        mapStartTxDosHeights.clear();
+        mapStartTxDOSTracker.clear();
+        mapStartTxDOSHeights.clear();
         mapDosExpiredToRemove.clear();
-        mapDoSToUndo.clear();
+        mapDOSToUndo.clear();
         setUndoStartTx.clear();
         setUndoStartTxHeight = 0;
-        setAddToConfirm.clear();
+        mapAddToConfirm.clear();
         setAddToConfirmHeight = 0;
         mapConfirmedFluxnodeData.clear();
-        setAddToUpdateConfirm.clear();
+        mapAddToUpdateConfirm.clear();
         setAddToUpdateConfirmHeight = 0;
         setUndoAddToConfirm.clear();
 
