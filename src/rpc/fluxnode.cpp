@@ -429,10 +429,10 @@ UniValue startfluxnode(const UniValue& params, bool fHelp, string cmdname)
 
         UniValue resultsObj(UniValue::VARR);
 
-        for (FluxnodeConfig::FluxnodeEntry zne : fluxnodeConfig.getEntries()) {
+        for (const auto& entry : fluxnodeConfig.getEntries()) {
             UniValue fluxnodeEntry(UniValue::VOBJ);
 
-            if (fAlias && zne.getAlias() == alias) {
+            if (fAlias && entry.getAlias() == alias) {
                 found = true;
             } else if (fAlias) {
                 continue;
@@ -442,11 +442,11 @@ UniValue startfluxnode(const UniValue& params, bool fHelp, string cmdname)
             CMutableTransaction mutTransaction;
 
             int32_t index;
-            zne.castOutputIndex(index);
-            COutPoint outpoint = COutPoint(uint256S(zne.getTxHash()), index);
+            entry.castOutputIndex(index);
+            COutPoint outpoint = COutPoint(uint256S(entry.getTxHash()), index);
 
             fluxnodeEntry.push_back(Pair("outpoint", outpoint.ToString()));
-            fluxnodeEntry.push_back(Pair("alias", zne.getAlias()));
+            fluxnodeEntry.push_back(Pair("alias", entry.getAlias()));
 
             bool fChecked = false;
             if (mempool.mapFluxnodeTxMempool.count(outpoint)) {
@@ -476,7 +476,7 @@ UniValue startfluxnode(const UniValue& params, bool fHelp, string cmdname)
 
             mutTransaction.nVersion = FLUXNODE_TX_VERSION;
 
-            bool result = activeFluxnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
+            bool result = activeFluxnode.BuildDeterministicStartTx(entry.getPrivKey(), entry.getTxHash(), entry.getOutputIndex(), errorMessage, mutTransaction);
 
             fluxnodeEntry.pushKV("transaction_built", result ? "successful" : "failed");
 

@@ -97,7 +97,7 @@ bool FluxnodeConfig::read(std::string& strErr)
     return true;
 }
 
-bool FluxnodeConfig::FluxnodeEntry::castOutputIndex(int &n)
+bool FluxnodeConfig::FluxnodeEntry::castOutputIndex(int &n) const
 {
     try {
         n = std::stoi(outputIndex);
