@@ -17,6 +17,7 @@
 #include "util.h"
 
 #include <univalue.h>
+#include "rpc/cache.h"
 
 #include <boost/tokenizer.hpp>
 #include <fstream>
@@ -25,6 +26,10 @@
 
 #define MICRO 0.000001
 #define MILLI 0.001
+
+std::string CRPCFluxnodeCache::filter = "";
+int64_t CRPCFluxnodeCache::nHeight = -1;
+UniValue CRPCFluxnodeCache::list = NullUniValue;
 
 UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
     if (fHelp || params.size() > 0)
@@ -685,7 +690,7 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
     int count = -1;
     for (const auto& item : g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes) {
 
-        auto data = g_fluxnodeCache.GetFluxnodeData(item.out);
+        const auto data = g_fluxnodeCache.GetFluxnodeData(item.out);
 
         UniValue info(UniValue::VOBJ);
 
@@ -784,6 +789,11 @@ UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp, strin
     std::string strFilter = "";
     if (params.size() == 1) strFilter = params[0].get_str();
 
+    if (strFilter == CRPCFluxnodeCache::filter && CRPCFluxnodeCache::nHeight == chainActive.Height()) {
+        LogPrintf("%s: Sending cached data\n", __func__);
+        return CRPCFluxnodeCache::list;
+    }
+
     // Create empty list
     UniValue deterministicList(UniValue::VARR);
 
@@ -793,6 +803,7 @@ UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp, strin
         GetDeterministicListData(deterministicList, strFilter, (Tier)currentTier);
     }
 
+    CRPCFluxnodeCache::SetFluxnodeListCache(chainActive.Height(), deterministicList, strFilter);
 
     // Return list
     return deterministicList;
