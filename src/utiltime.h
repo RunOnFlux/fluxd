@@ -13,6 +13,7 @@
 int64_t GetTime();
 int64_t GetTimeMillis();
 int64_t GetTimeMicros();
+int64_t GetMockableTimeMicros();
 void SetMockTime(int64_t nMockTimeIn);
 void MilliSleep(int64_t n);
 
