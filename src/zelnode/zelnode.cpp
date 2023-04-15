@@ -732,7 +732,7 @@ bool FluxnodeCache::Flush()
      * 2. Add the nodes collateral into the map that tracks all collaterals added at its height
      * 3. Mark the collateral as dirty so it can be databased when the daemon shutdowns.
      */
-    for (auto item : mapStartTxTracker) {
+    for (const auto& item : mapStartTxTracker) {
         g_fluxnodeCache.mapStartTxTracker[item.first] = item.second;
         g_fluxnodeCache.mapStartTxHeights[item.second.nAddedBlockHeight].insert(item.first);
         g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
@@ -744,7 +744,7 @@ bool FluxnodeCache::Flush()
      * 2. Remove the node from the start tracker
      * 3. Mark the collateral as dirty so it can be databased when the daemon shutdowns
      */
-    for (auto item : mapStartTxDOSTracker) {
+    for (const auto& item : mapStartTxDOSTracker) {
         g_fluxnodeCache.mapStartTxDOSTracker[item.first] = item.second;
         g_fluxnodeCache.mapStartTxTracker.erase(item.first);
         g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
@@ -755,7 +755,7 @@ bool FluxnodeCache::Flush()
      * 1. Add the nodes info into the Height tracker for DOS nodes at the height
      * 2. Remove the entire set of nodes from the start height tracker
      */
-    for (auto item : mapStartTxDOSHeights) {
+    for (const auto& item : mapStartTxDOSHeights) {
         g_fluxnodeCache.mapStartTxDOSHeights[item.first] = item.second;
 
         // TODO - Remove when not needed
@@ -769,7 +769,7 @@ bool FluxnodeCache::Flush()
      * 2. Mark the removed nodes as dirty so they can be databased when the node shutdowns
      * 3. Remove all entries from the DOS heights tracker at the height they were added at
      */
-    for (auto item : mapDosExpiredToRemove) {
+    for (const auto& item : mapDosExpiredToRemove) {
         for (const auto& data : item.second) {
             g_fluxnodeCache.mapStartTxDOSTracker.erase(data);
             g_fluxnodeCache.setDirtyOutPoint.insert(data);

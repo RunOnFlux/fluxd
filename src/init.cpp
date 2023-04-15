@@ -1941,10 +1941,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         LOCK(pwalletMain->cs_wallet);
         LogPrintf("Locking Fluxnodes:\n");
         uint256 znTxHash;
-        for (FluxnodeConfig::FluxnodeEntry zne : fluxnodeConfig.getEntries()) {
-            LogPrintf("  %s %s\n", zne.getTxHash(), zne.getOutputIndex());
-            znTxHash.SetHex(zne.getTxHash());
-            COutPoint outpoint = COutPoint(znTxHash, (unsigned int) std::stoul(zne.getOutputIndex().c_str()));
+        for (const auto& entry : fluxnodeConfig.getEntries()) {
+            LogPrintf("  %s %s\n", entry.getTxHash(), entry.getOutputIndex());
+            znTxHash.SetHex(entry.getTxHash());
+            COutPoint outpoint = COutPoint(znTxHash, (unsigned int) std::stoul(entry.getOutputIndex().c_str()));
             pwalletMain->LockCoin(outpoint);
         }
     }

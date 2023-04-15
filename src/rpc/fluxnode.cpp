@@ -17,6 +17,7 @@
 #include "util.h"
 
 #include <univalue.h>
+#include "rpc/cache.h"
 
 #include <boost/tokenizer.hpp>
 #include <fstream>
@@ -25,6 +26,10 @@
 
 #define MICRO 0.000001
 #define MILLI 0.001
+
+std::string CRPCFluxnodeCache::filter = "";
+int64_t CRPCFluxnodeCache::nHeight = -1;
+UniValue CRPCFluxnodeCache::list = NullUniValue;
 
 UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
     if (fHelp || params.size() > 0)
@@ -429,10 +434,10 @@ UniValue startfluxnode(const UniValue& params, bool fHelp, string cmdname)
 
         UniValue resultsObj(UniValue::VARR);
 
-        for (FluxnodeConfig::FluxnodeEntry zne : fluxnodeConfig.getEntries()) {
+        for (const auto& entry : fluxnodeConfig.getEntries()) {
             UniValue fluxnodeEntry(UniValue::VOBJ);
 
-            if (fAlias && zne.getAlias() == alias) {
+            if (fAlias && entry.getAlias() == alias) {
                 found = true;
             } else if (fAlias) {
                 continue;
@@ -442,11 +447,11 @@ UniValue startfluxnode(const UniValue& params, bool fHelp, string cmdname)
             CMutableTransaction mutTransaction;
 
             int32_t index;
-            zne.castOutputIndex(index);
-            COutPoint outpoint = COutPoint(uint256S(zne.getTxHash()), index);
+            entry.castOutputIndex(index);
+            COutPoint outpoint = COutPoint(uint256S(entry.getTxHash()), index);
 
             fluxnodeEntry.push_back(Pair("outpoint", outpoint.ToString()));
-            fluxnodeEntry.push_back(Pair("alias", zne.getAlias()));
+            fluxnodeEntry.push_back(Pair("alias", entry.getAlias()));
 
             bool fChecked = false;
             if (mempool.mapFluxnodeTxMempool.count(outpoint)) {
@@ -476,7 +481,7 @@ UniValue startfluxnode(const UniValue& params, bool fHelp, string cmdname)
 
             mutTransaction.nVersion = FLUXNODE_TX_VERSION;
 
-            bool result = activeFluxnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(), zne.getOutputIndex(), errorMessage, mutTransaction);
+            bool result = activeFluxnode.BuildDeterministicStartTx(entry.getPrivKey(), entry.getTxHash(), entry.getOutputIndex(), errorMessage, mutTransaction);
 
             fluxnodeEntry.pushKV("transaction_built", result ? "successful" : "failed");
 
@@ -685,7 +690,7 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
     int count = -1;
     for (const auto& item : g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes) {
 
-        auto data = g_fluxnodeCache.GetFluxnodeData(item.out);
+        const auto data = g_fluxnodeCache.GetFluxnodeData(item.out);
 
         UniValue info(UniValue::VOBJ);
 
@@ -784,6 +789,11 @@ UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp, strin
     std::string strFilter = "";
     if (params.size() == 1) strFilter = params[0].get_str();
 
+    if (strFilter == CRPCFluxnodeCache::filter && CRPCFluxnodeCache::nHeight == chainActive.Height()) {
+        LogPrintf("%s: Sending cached data\n", __func__);
+        return CRPCFluxnodeCache::list;
+    }
+
     // Create empty list
     UniValue deterministicList(UniValue::VARR);
 
@@ -793,6 +803,7 @@ UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp, strin
         GetDeterministicListData(deterministicList, strFilter, (Tier)currentTier);
     }
 
+    CRPCFluxnodeCache::SetFluxnodeListCache(chainActive.Height(), deterministicList, strFilter);
 
     // Return list
     return deterministicList;

@@ -159,7 +159,7 @@ public:
         SetNull();
     }
 
-    bool IsNull() {
+    bool IsNull() const{
         return nType == FLUXNODE_NO_TYPE;
     }
 
@@ -449,6 +449,8 @@ std::string GetP2SHFluxNodePublicKey(const CTransaction& tx);
 bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet);
 
 bool IsFluxnodeTransactionsActive();
+
+
 
 
 

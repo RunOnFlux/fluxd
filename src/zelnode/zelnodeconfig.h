@@ -60,7 +60,7 @@ public:
             return outputIndex;
         }
 
-        bool castOutputIndex(int& n);
+        bool castOutputIndex(int& n) const;
 
         void setOutputIndex(const std::string& outputIndex)
         {
@@ -107,7 +107,7 @@ public:
     bool read(std::string& strErr);
     void add(std::string alias, std::string ip, std::string privKey, std::string txHash, std::string outputIndex);
 
-    std::vector <FluxnodeEntry>& getEntries()
+    std::vector <FluxnodeEntry> getEntries()
     {
         return entries;
     }
