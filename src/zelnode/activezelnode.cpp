@@ -84,11 +84,17 @@ bool ActiveFluxnode::GetFluxNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey
 bool ActiveFluxnode::GetFluxNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage)
 {
     // wait for reindex and/or import to finish
-    if (fImporting || fReindex) return false;
+    if (fImporting || fReindex)  {
+        errorMessage = "Couldn't find Flux Node Vin: Wallet is importing or reindexing";
+        return false;
+    }
 
     // Find possible candidates
     TRY_LOCK(pwalletMain->cs_wallet, fWallet);
-    if (!fWallet) return false;
+    if (!fWallet) {
+        errorMessage = "Couldn't find Flux Node Vin: Couldn't Lock Wallet";
+        return false;
+    }
 
     vector<std::pair<COutput, CAmount>> possibleCoins = SelectCoinsFluxnode();
     COutput* selectedOutput;
@@ -144,7 +150,10 @@ bool ActiveFluxnode::GetFluxNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey
 bool ActiveFluxnode::GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, CKey& secretKey)
 {
     // wait for reindex and/or import to finish
-    if (fImporting || fReindex) return false;
+    if (fImporting || fReindex) {
+        LogPrintf("%s: Couldn't get Vin from Output: Wallet is importing or reindexing\n", __func__);
+        return false;
+    }
 
     CScript pubScript;
     vin = CTxIn(out.tx->GetHash(), out.i);
@@ -182,6 +191,18 @@ bool ActiveFluxnode::GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, 
 // get all possible outputs for running Fluxnode
 vector<std::pair<COutput, CAmount>> ActiveFluxnode::SelectCoinsFluxnode()
 {
+    static vector<std::pair<COutput, CAmount>> vFilteredStatic;
+    static int64_t nLastUpdated;
+    int nCurrentTime = GetTime();
+
+    // With large wallets, we don't need to process the fluxnode list that often.
+    // Processing the list is doing a lot of calls to the wallet, which can lock it up.
+    // For example, starting 100 fluxnodes in the same call with `startfluxnode all false` can cause issues
+    if (nLastUpdated > 0 && nLastUpdated + 300 > nCurrentTime) {
+        LogPrintf("%s : Using Cache\n", __func__);
+        return vFilteredStatic;
+    }
+
     vector<COutput> vCoins;
     vector<std::pair<COutput, CAmount>> filteredCoins;
     vector<COutPoint> confLockedCoins;
@@ -189,13 +210,12 @@ vector<std::pair<COutput, CAmount>> ActiveFluxnode::SelectCoinsFluxnode()
     // Temporary unlock ZN coins from fluxnode.conf
     if (GetBoolArg("-znconflock", true)) {
         uint256 znTxHash;
-        for (FluxnodeConfig::FluxnodeEntry fluxnodeEntry : fluxnodeConfig.getEntries()) {
+        for (const auto& fluxnodeEntry : fluxnodeConfig.getEntries()) {
             znTxHash.SetHex(fluxnodeEntry.getTxHash());
 
             int nIndex;
             if(!fluxnodeEntry.castOutputIndex(nIndex))
                 continue;
-
             COutPoint outpoint = COutPoint(znTxHash, nIndex);
             confLockedCoins.push_back(outpoint);
             pwalletMain->UnlockCoin(outpoint);
@@ -207,7 +227,7 @@ vector<std::pair<COutput, CAmount>> ActiveFluxnode::SelectCoinsFluxnode()
 
     // Lock ZN coins from fluxnode.conf back if they where temporary unlocked
     if (!confLockedCoins.empty()) {
-        for (COutPoint outpoint: confLockedCoins)
+        for (COutPoint& outpoint: confLockedCoins)
             pwalletMain->LockCoin(outpoint);
     }
 
@@ -230,6 +250,10 @@ vector<std::pair<COutput, CAmount>> ActiveFluxnode::SelectCoinsFluxnode()
             filteredCoins.push_back(std::make_pair(out, out.tx->vout[out.i].nValue));
         }
     }
+
+    LogPrintf("%s : Updating Cache\n", __func__);
+    vFilteredStatic = filteredCoins;
+    nLastUpdated = GetTime();
     return filteredCoins;
 }
 

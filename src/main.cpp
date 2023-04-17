@@ -22,6 +22,7 @@
 #include "metrics.h"
 #include "net.h"
 #include "pow.h"
+#include "rpc/cache.h"
 #include "txmempool.h"
 #include "ui_interface.h"
 #include "undo.h"
@@ -3859,6 +3860,7 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
             return error("DisconnectTip(): DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString());
         assert(view.Flush());
         assert(fluxnodeCache.Flush());
+        CRPCFluxnodeCache::ClearFluxnodeListCache();
     }
     LogPrint("bench", "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
     uint256 sproutAnchorAfterDisconnect = pcoinsTip->GetBestAnchor(SPROUT);
@@ -3978,6 +3980,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
         assert(view.Flush());
 
         assert(fluxnodeCache.Flush());
+        CRPCFluxnodeCache::ClearFluxnodeListCache();
 
         LogPrint("dfluxnode", "%s : Size of global fluxnodeCache mapStartTxTracker : %u\n", __func__, g_fluxnodeCache.mapStartTxTracker.size());
         LogPrint("dfluxnode", "%s : Size of global fluxnodeCache mapStartTxDOSTrackerTxTracker : %u\n", __func__, g_fluxnodeCache.mapStartTxDOSTracker.size());
