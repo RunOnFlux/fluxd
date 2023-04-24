@@ -90,12 +90,6 @@ bool ActiveFluxnode::GetFluxNodeVin(CTxIn& vin, CPubKey& pubkey, CKey& secretKey
     }
 
     // Find possible candidates
-    TRY_LOCK(pwalletMain->cs_wallet, fWallet);
-    if (!fWallet) {
-        errorMessage = "Couldn't find Flux Node Vin: Couldn't Lock Wallet";
-        return false;
-    }
-
     vector<std::pair<COutput, CAmount>> possibleCoins = SelectCoinsFluxnode();
     COutput* selectedOutput;
 
