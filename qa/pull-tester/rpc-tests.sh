@@ -48,6 +48,7 @@ testScripts=(
     'mempool_nu_activation.py'
     'mempool_tx_expiry.py'
     'httpbasics.py'
+    'p2p-addr.py'
     'zapwallettxes.py'
     'proxy_test.py'
     'merkle_blocks.py'

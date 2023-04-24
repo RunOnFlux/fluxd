@@ -190,6 +190,10 @@ public:
     double dPingTime;
     double dPingWait;
     std::string addrLocal;
+
+    // Addr rate limit
+    uint64_t nProcessedAddrs;
+    uint64_t nRatelimitedAddrs;
 };
 
 
@@ -288,6 +292,14 @@ public:
     CBloomFilter* pfilter;
     int nRefCount;
     NodeId id;
+
+    /** Number of addresses that can be processed from this peer. */
+    double nAddrTokenBucket;
+    /** When nAddrTokenBucket was last updated, in microseconds */
+    int64_t nAddrTokenTimestamp;
+
+    std::atomic<uint64_t> nProcessedAddrs;
+    std::atomic<uint64_t> nRatelimitedAddrs;
 protected:
 
     // Denial-of-service detection/prevention
