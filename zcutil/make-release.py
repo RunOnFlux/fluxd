@@ -77,7 +77,7 @@ def parse_args(args):
 
 # Top-level flow:
 def main_logged(release, releaseprev, releasefrom, releaseheight, hotfix):
-    verify_tags(releaseprev, releasefrom)
+    # verify_tags(releaseprev, releasefrom)
     verify_version(release, releaseprev, hotfix)
     initialize_git(release, hotfix)
     patch_version_in_files(release, releaseprev)
@@ -184,9 +184,9 @@ def verify_version(release, releaseprev, hotfix):
 
 @phase('Initializing git.')
 def initialize_git(release, hotfix):
-    junk = sh_out('git', 'status', '--porcelain')
-    if junk.strip():
-        raise SystemExit('There are uncommitted changes:\n' + junk)
+    # junk = sh_out('git', 'status', '--porcelain')
+    # if junk.strip():
+    #     raise SystemExit('There are uncommitted changes:\n' + junk)
 
     branch = sh_out('git', 'rev-parse', '--abbrev-ref', 'HEAD').strip()
     if hotfix:
