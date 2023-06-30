@@ -86,7 +86,7 @@ class CMainParams : public CChainParams {
 public:
     CMainParams() {
         strNetworkID = "main";
-        strCurrencyUnits = "ZEL"; // "ZEL" is now known as "FLUX"
+        strCurrencyUnits = "FLUX";
 	    bip44CoinType = 19167;
         consensus.fCoinbaseMustBeProtected = true;
         consensus.nSubsidySlowStartInterval = 5000;

@@ -78,7 +78,7 @@ void ThreadShowMetricsScreen();
  * License: CC BY-SA 3.0
  *
  * Rendering options:
- * Zelcash: img2txt -W 40 -H 20 -f utf8 -d none -g 0.7 Z-yellow.orange-logo.png
+ * Flux: img2txt -W 40 -H 20 -f utf8 -d none -g 0.7 Z-yellow.orange-logo.png
  * Heart: img2txt -W 40 -H 20 -f utf8 -d none 2000px-Heart_corazón.svg.png
  */
 const std::string METRICS_ART = "";

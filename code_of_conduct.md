@@ -43,13 +43,7 @@ is deemed necessary and appropriate to the circumstances. Maintainers are
 obligated to maintain confidentiality with regard to the reporter of an
 incident.
 
-You may send reports to [our Conduct email](mailto:conduct@zel.cash).
-
-If you wish to contact specific maintainers directly, the following have made
-themselves available for conduct issues:
-
-- Daira Hopwood (daira at zel.cash)
-- Sean Bowe (sean at zel.cash)
+You may send reports to [our Conduct email](mailto:info@runonflux.io).
 
 
 This Code of Conduct is adapted from the [Contributor Covenant][homepage],

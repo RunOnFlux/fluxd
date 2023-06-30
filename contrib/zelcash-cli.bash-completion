@@ -20,7 +20,7 @@ _zelcash_rpc() {
 # Add wallet accounts to COMPREPLY
 _zelcash_accounts() {
     local accounts
-    # Accounts are deprecated in Zelcash
+    # Accounts are deprecated in Flux
     #accounts=$(_zelcash_rpc listaccounts | awk -F '"' '{ print $2 }')
     accounts="\\\"\\\""
     COMPREPLY=( "${COMPREPLY[@]}" $( compgen -W "$accounts" -- "$cur" ) )

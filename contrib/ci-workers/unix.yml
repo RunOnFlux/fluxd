@@ -1,6 +1,6 @@
 ---
-- name: Configure a Buildbot worker for Zelcash CI
-  hosts: zelcash-ci-worker-unix
+- name: Configure a Buildbot worker for Flux CI
+  hosts: flux-ci-worker-unix
   become: true
   gather_facts: False
 
@@ -11,7 +11,7 @@
   vars_prompt:
     - name: "buildbot_worker_admin"
       prompt: "Admin details"
-      default: "Zelcash <sysadmin@zel.cash>"
+      default: "Flux <info@runonflux.io>"
     - name: "buildbot_worker_name"
       prompt: "Buildbot worker name (provided by ZECC)"
       private: no

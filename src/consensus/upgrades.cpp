@@ -38,12 +38,12 @@ const struct NUInfo NetworkUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
     {
         /*.nBranchId =*/ 0x76b809bb,
         /*.strName =*/ "Kamiooka",
-        /*.strInfo =*/ "Zel Kamiooka Upgrade, PoW change to ZelHash and update for ZelNodes",
+        /*.strInfo =*/ "Flux Kamiooka Upgrade, PoW change to FluxHash and update for FluxNodes",
     },
     {
         /*.nBranchId =*/ 0x76b809bb,
         /*.strName =*/ "Kamata",
-        /*.strInfo =*/ "Zel Kamata Upgrade, Deterministic ZelNodes and ZelFlux",
+        /*.strInfo =*/ "Flux Kamata Upgrade, Deterministic FluxNode and Flux",
     },
     {
         /*.nBranchId =*/ 0x76b809bb,

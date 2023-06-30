@@ -2,19 +2,19 @@
 
 ## Overview
 
-Backing up your Flux private keys is the best way to be proactive about preventing loss of access to your ZEL.
+Backing up your Flux private keys is the best way to be proactive about preventing loss of access to your FLUX.
 
 Problems resulting from bugs in the code, user error, device failure, etc. may lead to losing access to your wallet (and as a result, the private keys of addresses which are required to spend from them).
 
 No matter what the cause of a corrupted or lost wallet could be, we highly recommend all users backup on a regular basis. Anytime a new address in the wallet is generated, we recommending making a new backup so all private keys for addresses in your wallet are safe.
 
-Note that a backup is a duplicate of data needed to spend ZEL so where you keep your backup(s) is another important consideration. You should not store backups where they would be equally or increasingly susceptible to loss or theft. 
+Note that a backup is a duplicate of data needed to spend FLUX so where you keep your backup(s) is another important consideration. You should not store backups where they would be equally or increasingly susceptible to loss or theft. 
 
 ## Instructions for backing up your wallet and/or private keys
 
 These instructions are specific for the officially supported Flux Linux client. For backing up with third-party wallets, please consult with user guides or support channels provided for those services.
 
-There are multiple ways to make sure you have at least one other copy of the private keys needed to spend your ZEL and view your shielded ZEL.
+There are multiple ways to make sure you have at least one other copy of the private keys needed to spend your FLUX and view your shielded FLUX.
 
 For all methods, you will need to include an export directory setting in your config file (`flux.conf` located in the data directory which is `~/.flux/` unless it's been overridden with `datadir=` setting):
 

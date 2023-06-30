@@ -731,7 +731,7 @@ static void ZC_LoadParams(
         boost::filesystem::exists(sprout_groth16)
     )) {
         uiInterface.ThreadSafeMessageBox(strprintf(
-            _("Cannot find the Zelcash network parameters in the following directory:\n"
+            _("Cannot find the Flux network parameters in the following directory:\n"
               "%s\n"
               "Please run 'flux-fetch-params' or './zcutil/fetch-params.sh' and then restart."),
                 ZC_GetParamsDir()),
@@ -878,7 +878,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     fLogIPs = GetBoolArg("-logips", false);
 
     LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-    LogPrintf("Zelcash version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
+    LogPrintf("Flux version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
 
     // when specifying an explicit binding address, you want to listen on it
     // even when -connect or -proxy is specified
@@ -1190,7 +1190,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Sanity check
     if (!InitSanityCheck())
-        return InitError(_("Initialization sanity check failed. Zelcash is shutting down."));
+        return InitError(_("Initialization sanity check failed. Flux is shutting down."));
 
     std::string strDataDir = GetDataDir().string();
 #ifdef ENABLE_WALLET
@@ -1206,9 +1206,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     try {
         static boost::interprocess::file_lock lock(pathLockFile.string().c_str());
         if (!lock.try_lock())
-            return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zelcash is probably already running."), strDataDir));
+            return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Flux is probably already running."), strDataDir));
     } catch(const boost::interprocess::interprocess_exception& e) {
-        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zelcash is probably already running.") + " %s.", strDataDir, e.what()));
+        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Flux is probably already running.") + " %s.", strDataDir, e.what()));
     }
 
 #ifndef WIN32
@@ -1253,7 +1253,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         threadGroup.create_thread(&ThreadShowMetricsScreen);
     }
 
-    // Initialize Flux circuit parameters ("ZC" in function name refers to Zelcash)
+    // Initialize Flux circuit parameters ("ZC" in function name refers to Flux)
     ZC_LoadParams(chainparams);
 
     /* Start the RPC server already.  It will be started in "warmup" mode
@@ -1683,10 +1683,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 InitWarning(msg);
             }
             else if (nLoadWalletRet == DB_TOO_NEW)
-                strErrors << _("Error loading wallet.dat: Wallet requires newer version of Zelcash") << "\n";
+                strErrors << _("Error loading wallet.dat: Wallet requires newer version of Flux") << "\n";
             else if (nLoadWalletRet == DB_NEED_REWRITE)
             {
-                strErrors << _("Wallet needed to be rewritten: restart Zelcash to complete") << "\n";
+                strErrors << _("Wallet needed to be rewritten: restart Flux to complete") << "\n";
                 LogPrintf("%s", strErrors.str());
                 return InitError(strErrors.str());
             }
@@ -1805,10 +1805,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 #ifdef ENABLE_MINING
  #ifndef ENABLE_WALLET
     if (GetBoolArg("-minetolocalwallet", false)) {
-        return InitError(_("Zelcash was not built with wallet support. Set -minetolocalwallet=0 to use -mineraddress, or rebuild Zelcash with wallet support."));
+        return InitError(_("Flux was not built with wallet support. Set -minetolocalwallet=0 to use -mineraddress, or rebuild Flux with wallet support."));
     }
     if (GetArg("-mineraddress", "").empty() && GetBoolArg("-gen", false)) {
-        return InitError(_("Zelcash was not built with wallet support. Set -mineraddress, or rebuild Zelcash with wallet support."));
+        return InitError(_("Flux was not built with wallet support. Set -mineraddress, or rebuild Flux with wallet support."));
     }
  #endif // !ENABLE_WALLET
 

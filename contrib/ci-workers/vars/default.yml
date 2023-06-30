@@ -11,21 +11,21 @@ fetch_deps:
   - git
   - wget # For zcutil/fetch-params.sh
 
-# Dependencies required to configure Zelcash
+# Dependencies required to configure Flux
 conf_deps:
   - autoconf
   - automake
   - m4
   - pkg-config
 
-# Dependencies required to compile Zelcash
+# Dependencies required to compile Flux
 build_deps:
   - cmake
   - g++
   - gcc
   - make
 
-# Dependencies required to link Zelcash
+# Dependencies required to link Flux
 link_deps:
   - libtool
 
@@ -41,13 +41,13 @@ grind_deps:
 system_modules:
   - virtualenv
 
-# Python modules required for a Zelcash Buildbot worker+
+# Python modules required for a Flux Buildbot worker+
 buildbot_modules:
   - pip # Needs to be updated first so Buildbot installs
   - buildbot-worker
   - pyflakes
 
-# Python modules required to run the Zelcash RPC test suite
+# Python modules required to run the Flux RPC test suite
 rpc_test_modules:
   - pyblake2
   - pyzmq

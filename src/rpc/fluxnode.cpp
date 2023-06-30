@@ -985,7 +985,7 @@ UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
                 "  \"last_confirmed_height\": \"height\",   (string) Last block height when fluxnode was confirmed\n"
                 "  \"last_paid_height\": \"height\",        (string) Last block height when fluxnode was paid\n"
                 "  \"tier\": \"type\",                      (string) Tier (CUMULUS/NIMBUS/STRATUS)\n"
-                "  \"payment_address\": \"xxxx\",           (string) ZEL address for fluxnode payments\n"
+                "  \"payment_address\": \"xxxx\",           (string) Flux address for fluxnode payments\n"
                 "  \"pubkey\": \"key\",                     (string) Fluxnode public key used for message broadcasting\n"
                 "  \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode has been active\n"
                 "  \"lastpaid\": ttt,                       (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode was last paid\n"
@@ -1055,7 +1055,7 @@ UniValue fluxnodecurrentwinner (const UniValue& params, bool fHelp, string cmdna
     if (fHelp || (params.size() != 0))
         throw runtime_error(
                 cmdname + "\n"
-                "\nGet current zelnode winner\n"
+                "\nGet current fluxnode winner\n"
 
                 "\nResult:\n"
                 "{\n"
@@ -1261,7 +1261,7 @@ UniValue listfluxnodeconf (const UniValue& params, bool fHelp, string cmdname)
                 "    \"last_confirmed_height\": \"height\",     (string) Last block height when fluxnode was confirmed\n"
                 "    \"last_paid_height\": \"height\",          (string) Last block height when fluxnode was paid\n"
                 "    \"tier\": \"type\",                        (string) Tier (CUMULUS/NIMBUS/STRATUS)\n"
-                "    \"payment_address\": \"xxxx\",             (string) ZEL address for fluxnode payments\n"
+                "    \"payment_address\": \"xxxx\",             (string) Flux address for fluxnode payments\n"
                 "    \"activesince\": ttt,                      (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode has been active\n"
                 "    \"lastpaid\": ttt,                         (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode was last paid\n"
                 "  }\n"

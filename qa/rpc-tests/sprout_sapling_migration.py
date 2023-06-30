@@ -161,7 +161,7 @@ class SproutSaplingMigration(BitcoinTestFramework):
         assert_equal(sapling_balance, Decimal(status['finalized_migrated_amount']))
 
     def send_to_sprout_zaddr(self, tAddr, sproutAddr):
-        # Send some ZEL to a Sprout address
+        # Send some FLUX to a Sprout address
         opid = self.nodes[0].z_sendmany(tAddr, [{"address": sproutAddr, "amount": Decimal('10')}], 1, 0)
         wait_and_assert_operationid_status(self.nodes[0], opid)
         self.nodes[0].generate(1)

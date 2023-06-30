@@ -3,8 +3,8 @@ exec_prefix=@exec_prefix@
 libdir=@libdir@
 includedir=@includedir@
 
-Name: Zelcash consensus library
-Description: Library for the Zelcash consensus protocol.
+Name: Flux consensus library
+Description: Library for the Flux consensus protocol.
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} -lzelcashconsensus
 Cflags: -I${includedir}

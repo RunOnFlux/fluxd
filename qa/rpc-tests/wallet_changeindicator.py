@@ -26,7 +26,7 @@ class WalletChangeIndicatorTest (BitcoinTestFramework):
         self.nodes[0].sendtoaddress(taddr, Decimal('1.0'))
         self.generate_and_sync()
 
-        # Send 1 ZEL to a zaddr
+        # Send 1 FLUX to a zaddr
         wait_and_assert_operationid_status(self.nodes[1], self.nodes[1].z_sendmany(taddr, [{'address': zaddr1, 'amount': 1.0, 'memo': 'c0ffee01'}], 1, 0))
         self.generate_and_sync()
 

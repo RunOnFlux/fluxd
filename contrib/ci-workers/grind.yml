@@ -3,7 +3,7 @@
 - include: unix.yml
 
 - name: Install grind-specific worker dependencies
-  hosts: zelcash-ci-worker-unix
+  hosts: flux-ci-worker-unix
   become: true
 
   vars_files:

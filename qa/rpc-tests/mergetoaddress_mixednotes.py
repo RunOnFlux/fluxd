@@ -29,7 +29,7 @@ class MergeToAddressMixedNotes(BitcoinTestFramework):
         self.nodes[0].generate(102)
         self.sync_all()
 
-        # Send some ZEL to Sprout/Sapling addresses
+        # Send some FLUX to Sprout/Sapling addresses
         coinbase_addr = get_coinbase_address(self.nodes[0])
         sproutAddr = self.nodes[0].z_getnewaddress('sprout')
         saplingAddr = self.nodes[0].z_getnewaddress('sapling')

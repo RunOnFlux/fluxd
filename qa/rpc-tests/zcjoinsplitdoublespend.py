@@ -42,7 +42,7 @@ class JoinSplitTest(BitcoinTestFramework):
         assert_equal(self.cannot_joinsplit(node, txn), True)
 
     def run_test(self):
-        # All nodes should start with 250 ZEL:
+        # All nodes should start with 250 FLUX:
         starting_balance = 250
         for i in range(4):
             assert_equal(self.nodes[i].getbalance(), starting_balance)

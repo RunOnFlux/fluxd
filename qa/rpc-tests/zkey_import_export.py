@@ -148,7 +148,7 @@ class ZkeyImportExportTest (BitcoinTestFramework):
         bob_fee = Decimal(0)
 
         # Try to reproduce zombie balance reported in #1936
-        # At generated zaddr, receive ZEL, and send ZEL back out. bob -> alice
+        # At generated zaddr, receive FLUX, and send FLUX back out. bob -> alice
         for amount in amounts[:2]:
             print("Sending amount from bob to alice: ", amount)
             z_send(bob, bob_zaddr, alice_zaddr, amount)

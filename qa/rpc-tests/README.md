@@ -31,7 +31,7 @@ If you set the environment variable `PYTHON_DEBUG=1` you will get some debug out
 A 200-block -regtest blockchain and wallets for four nodes
 is created the first time a regression test is run and
 is stored in the cache/ directory.  Each node has the miner
-subsidy from 25 mature blocks (25*10=250 ZEL) in its wallet.
+subsidy from 25 mature blocks (25*10=250 FLUX) in its wallet.
 
 After the first run, the cache/ blockchain and wallets are
 copied into a temporary directory and used as the initial

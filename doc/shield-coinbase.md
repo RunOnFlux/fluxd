@@ -24,7 +24,7 @@ The z_shieldcoinbase call makes it easy to sweep up coinbase rewards from multip
 
     z_shieldcoinbase fromaddress toaddress (fee) (limit)
 
-The default fee is 0.0010000 ZEL and the default limit on the maximum number of UTXOs to shield is 50.
+The default fee is 0.0010000 FLUX and the default limit on the maximum number of UTXOs to shield is 50.
 
 ## Examples
 
@@ -36,11 +36,11 @@ Sweep up coinbase UTXOs from multiple transparent addresses to a shielded addres
 
     flux-cli z_shieldcoinbase "*" zMyPrivateAddress
 
-Sweep up with a fee of 1.23 ZEL:
+Sweep up with a fee of 1.23 FLUX:
 
     flux-cli z_shieldcoinbase tMyMiningAddress zMyPrivateAddress 1.23
 
-Sweep up with a fee of 0.1 ZEL and set limit on the maximum number of UTXOs to shield at 25:
+Sweep up with a fee of 0.1 FLUX and set limit on the maximum number of UTXOs to shield at 25:
 
     flux-cli z_shieldcoinbase "*" zMyPrivateAddress 0.1 25
 

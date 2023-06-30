@@ -2,13 +2,13 @@ flux (6.2.0) stable; urgency=medium
 
   * 6.2.0 release.
 
- -- Zel Foundation <info@zel.cash>  Thu, 04 May 2023 21:37:37 +0800
+ -- Zel Foundation <info@runonflux.io>  Thu, 04 May 2023 21:37:37 +0800
 
 flux (6.1.0) stable; urgency=medium
 
   * 6.1.0 release.
 
- -- Zel Foundation <info@zel.cash>  Sun, 23 Oct 2022 13:24:45 +0800
+ -- Zel Foundation <info@runonflux.io>  Sun, 23 Oct 2022 13:24:45 +0800
 
 flux (6.0.0) stable; urgency=medium
 
@@ -62,91 +62,91 @@ zelcash (4.0.5) stable; urgency=medium
 
   * 4.0.5 release.
 
- -- Zel Foundation <info@zel.cash>  Fri, 18 Dec 2020 03:22:05 +0100
+ -- Zel Foundation <info@runonflux.io>  Fri, 18 Dec 2020 03:22:05 +0100
 
 zelcash (4.0.4) stable; urgency=medium
 
   * 4.0.4 release.
 
- -- Zel Foundation <info@zel.cash>  Thu, 03 Dec 2020 14:50:11 +0100
+ -- Zel Foundation <info@runonflux.io>  Thu, 03 Dec 2020 14:50:11 +0100
 
 zelcash (4.0.3) stable; urgency=medium
 
   * 4.0.3 release.
 
- -- Zel Foundation <info@zel.cash>  Fri, 21 Aug 2020 22:32:29 +0200
+ -- Zel Foundation <info@runonflux.io>  Fri, 21 Aug 2020 22:32:29 +0200
 
 zelcash (4.0.2) stable; urgency=medium
 
   * 4.0.2 release.
 
- -- Zel Foundation <info@zel.cash>  Mon, 13 Jul 2020 19:02:26 +0200
+ -- Zel Foundation <info@runonflux.io>  Mon, 13 Jul 2020 19:02:26 +0200
 
 zelcash (4.0.1) stable; urgency=medium
 
   * 4.0.1 release.
 
- -- Zel Foundation <info@zel.cash>  Fri, 20 Mar 2020 12:00:00 +0000
+ -- Zel Foundation <info@runonflux.io>  Fri, 20 Mar 2020 12:00:00 +0000
 
 zelcash (4.0.0) stable; urgency=medium
 
   * 4.0.0 release.
 
- -- Zel Foundation <info@zel.cash>  Sun, 27 Feb 2020 12:00:00 +0000
+ -- Zel Foundation <info@runonflux.io>  Sun, 27 Feb 2020 12:00:00 +0000
 
 zelcash (3.3.3) stable; urgency=critical
 
   * 3.3.3 release.
 
- -- Zel Foundation <info@zel.cash>  Fri, 8 Nov 2019 12:00:00 +0000
+ -- Zel Foundation <info@runonflux.io>  Fri, 8 Nov 2019 12:00:00 +0000
 
 zelcash (3.3.2) stable; urgency=critical
 
   * 3.3.2 release.
 
- -- Zel Foundation <info@zel.cash>  Tue, 1 Oct 2019 12:00:00 +0900
+ -- Zel Foundation <info@runonflux.io>  Tue, 1 Oct 2019 12:00:00 +0900
 
 zelcash (3.3.1) stable; urgency=medium
 
   * 3.3.1 release.
 
- -- Zel Foundation <info@zel.cash>  Wed, 28 Aug 2019 12:00:00 +0100
+ -- Zel Foundation <info@runonflux.io>  Wed, 28 Aug 2019 12:00:00 +0100
 
 zelcash (3.3.0) stable; urgency=medium
 
   * 3.3.0 release.
 
- -- Zel Foundation <info@zel.cash>  Thu, 4 July 2019 12:00:00 +0100
+ -- Zel Foundation <info@runonflux.io>  Thu, 4 July 2019 12:00:00 +0100
 
 zelcash (3.2.0) stable; urgency=medium
 
   * 3.2.0 release.
 
- -- Zel Foundation <info@zel.cash>  Wed, 5 June 2019 12:00:00 +0100
+ -- Zel Foundation <info@runonflux.io>  Wed, 5 June 2019 12:00:00 +0100
 
 zelcash (3.1.1) stable; urgency=medium
 
   * 3.1.1 release.
 
- -- Zel Foundation <info@zel.cash>  Fri, 5 Apr 2019 12:00:00 +0100
+ -- Zel Foundation <info@runonflux.io>  Fri, 5 Apr 2019 12:00:00 +0100
 
 zelcash (3.1.0) stable; urgency=medium
 
   * 3.1.0 release.
 
- -- Zel Foundation <info@zel.cash>  Fri, 1 Mar 2019 12:00:00 +0100
+ -- Zel Foundation <info@runonflux.io>  Fri, 1 Mar 2019 12:00:00 +0100
 
 zelcash (3.0.0) stable; urgency=medium
 
   * 3.0.0 release.
 
- -- Zel Foundation <info@zel.cash>  Mon, 18 Feb 2019 12:00:00 +0100
+ -- Zel Foundation <info@runonflux.io>  Mon, 18 Feb 2019 12:00:00 +0100
 
 zelcash (2.0.0) stable; urgency=medium
 
   * 2.0.0 release.
 
- -- Zel Foundation <info@zel.cash>  Wed, 5 Dec 2018 12:00:00 +0100
+ -- Zel Foundation <info@runonflux.io>  Wed, 5 Dec 2018 12:00:00 +0100
 
 zcash (2.0.7+2) stable; urgency=medium
 
@@ -308,13 +308,13 @@ Zelcash (1.1.0) Initial stable; urgency=medium
 
   * 1.1.0 release.
 
-  -- Zel Foundation <info@zel.cash>  Fri, 13 Jul 2018 12:00:00 +0000
+  -- Zel Foundation <info@runonflux.io>  Fri, 13 Jul 2018 12:00:00 +0000
 
 Zelcash (1.0.14) Initial stable; urgency=medium
 
   * 1.0.14 release.
 
-  <info@zel.cash>
+  <info@runonflux.io>
 
 zcash (1.0.14) stable; urgency=medium
 
