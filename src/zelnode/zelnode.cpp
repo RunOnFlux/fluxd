@@ -190,6 +190,8 @@ void GetUndoDataForPaidFluxnodes(CFluxnodeTxBlockUndo& fluxnodeTxBlockUndo, Flux
 
 void FluxnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_nHeight, int nTier, const CAmount nCollateral)
 {
+    // TODO - modify the start function to use the version 2 tx after a certain p_nHeight
+
     FluxnodeCacheData data;
     data.nStatus = FLUXNODE_TX_STARTED;
     data.nType = FLUXNODE_START_TX_TYPE;
@@ -787,6 +789,7 @@ bool FluxnodeCache::Flush()
         // Loop through all COutPoints and remove them from the DOS Tracker.
         for (const auto& out : item.second) {
             g_fluxnodeCache.mapStartTxDOSTracker.erase(out);
+            g_fluxnodeCache.setDirtyOutPoint.insert(out);
         }
 
         // Remove all data at the Block Height

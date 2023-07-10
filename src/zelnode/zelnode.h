@@ -139,6 +139,10 @@ public:
     std::string ip;
     int8_t nTier;
 
+    // P2SH Nodes
+    uint32_t nFluxNodeTxVersion;
+    CScript P2SHRedeemScript;
+
     int8_t nStatus;
 
     CAmount nCollateral;
@@ -153,6 +157,8 @@ public:
         nTier = 0;
         nStatus =  FLUXNODE_TX_ERROR;
         nCollateral = 0;
+        nFluxNodeTxVersion = 0;
+        P2SHRedeemScript.clear();
     }
 
     FluxnodeCacheData() {
@@ -213,18 +219,51 @@ public:
     inline void SerializationOp(Stream& s, Operation ser_action)
     {
         READWRITE(nType);
-        READWRITE(collateralIn);
-        READWRITE(collateralPubkey);
-        READWRITE(pubKey);
-        READWRITE(nAddedBlockHeight);
-        READWRITE(nConfirmedBlockHeight);
-        READWRITE(nLastConfirmedBlockHeight);
-        READWRITE(nLastPaidHeight);
-        READWRITE(ip);
-        READWRITE(nTier);
-        READWRITE(nStatus);
-        if (nType & FLUXNODE_HAS_COLLATERAL) {
-            READWRITE(nCollateral);
+
+        // New nType Version Checker
+        if (nType ^ FLUXNODE_TX_VERSION_2  == 0) {
+            READWRITE(nFluxNodeTxVersion);
+            if (nFluxNodeTxVersion == FLUXNODE_TX_VERSION_2_NORMAL_START) {
+                READWRITE(collateralIn);
+                READWRITE(collateralPubkey);
+                READWRITE(pubKey);
+                READWRITE(nAddedBlockHeight);
+                READWRITE(nConfirmedBlockHeight);
+                READWRITE(nLastConfirmedBlockHeight);
+                READWRITE(nLastPaidHeight);
+                READWRITE(ip);
+                READWRITE(nTier);
+                READWRITE(nStatus);
+                READWRITE(nCollateral);
+            } else if (nFluxNodeTxVersion == FLUXNODE_TX_VERSION_2_P2SH_START) {
+                READWRITE(collateralIn);
+                READWRITE(collateralPubkey);
+                READWRITE(pubKey);
+                READWRITE(nAddedBlockHeight);
+                READWRITE(nConfirmedBlockHeight);
+                READWRITE(nLastConfirmedBlockHeight);
+                READWRITE(nLastPaidHeight);
+                READWRITE(ip);
+                READWRITE(nTier);
+                READWRITE(nStatus);
+                READWRITE(nCollateral);
+                READWRITE(P2SHRedeemScript);
+            }
+        } else {
+            // We must retain backwards compatibility with older transactions
+            READWRITE(collateralIn);
+            READWRITE(collateralPubkey);
+            READWRITE(pubKey);
+            READWRITE(nAddedBlockHeight);
+            READWRITE(nConfirmedBlockHeight);
+            READWRITE(nLastConfirmedBlockHeight);
+            READWRITE(nLastPaidHeight);
+            READWRITE(ip);
+            READWRITE(nTier);
+            READWRITE(nStatus);
+            if (nType & FLUXNODE_HAS_COLLATERAL) {
+                READWRITE(nCollateral);
+            }
         }
     }
 };
