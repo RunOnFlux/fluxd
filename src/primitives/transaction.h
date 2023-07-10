@@ -45,6 +45,8 @@ static_assert(SAPLING_TX_VERSION <= SAPLING_MAX_TX_VERSION,
     "Sapling tx version must not be higher than maximum");
 
 static const int32_t FLUXNODE_TX_VERSION = 5;
+static const int32_t FLUXNODE_TX_VERSION_2_NORMAL_START = 1;
+static const int32_t FLUXNODE_TX_VERSION_2_P2SH_START = 2;
 
 /**
  * A shielded input to a transaction. It contains data that describes a Spend transfer.
@@ -515,6 +517,7 @@ enum {
     FLUXNODE_START_TX_TYPE = 1 << 1, // 0010
     FLUXNODE_CONFIRM_TX_TYPE = 1 << 2, // 0100
     FLUXNODE_HAS_COLLATERAL= 1 << 3, // 1000
+    FLUXNODE_TX_VERSION_2 = 3 << 0, // 0011
 
 };
 
@@ -598,6 +601,11 @@ public:
     const uint32_t benchmarkSigTime;
     const int8_t nUpdateType;
 
+    // P2SH Nodes
+    const uint32_t nFluxNodeTxVersion;
+    const CScript P2SHRedeemScript;
+
+
     /** Construct a CTransaction that qualifies as IsNull() */
     CTransaction();
 
@@ -657,6 +665,18 @@ public:
                 if (!(s.GetType() & SER_GETHASH)) {
                     READWRITE(*const_cast<std::vector<unsigned char>*>(&sig));
                     READWRITE(*const_cast<std::vector<unsigned char>*>(&benchmarkSig));
+                }
+            } else  if (nType & FLUXNODE_TX_VERSION_2) {
+                // New Version Transactions can use this
+                READWRITE(*const_cast<uint32_t*>(&nFluxNodeTxVersion));
+                if (nFluxNodeTxVersion == FLUXNODE_TX_VERSION_2_P2SH_START) {
+                    READWRITE(*const_cast<COutPoint*>(&collateralOut));
+                    READWRITE(*const_cast<CPubKey*>(&collateralPubkey));
+                    READWRITE(*const_cast<CPubKey*>(&pubKey));
+                    READWRITE(*const_cast<uint32_t*>(&sigTime));
+                    if (!(s.GetType() & SER_GETHASH))
+                        READWRITE(*const_cast<std::vector<unsigned char>*>(&sig));
+                    READWRITE(*const_cast<CScript*>(&P2SHRedeemScript));
                 }
             }
             if (ser_action.ForRead())
@@ -798,6 +818,12 @@ struct CMutableTransaction
     uint32_t benchmarkSigTime;
     int8_t nUpdateType;
 
+    // P2SH Nodes -> If nType is certain number we introduce a new version that will allow to
+    // customize the code even further.
+    int32_t nFluxNodeTxVersion;
+    CScript P2SHRedeemScript;
+
+
     CMutableTransaction();
     CMutableTransaction(const CTransaction& tx);
 
@@ -836,9 +862,10 @@ struct CMutableTransaction
             throw std::ios_base::failure("Unknown transaction format");
         }
 
+        // We use the operator ^ which is xor. XOR will return 0/false if the numbers match, and true/1 if they don't
         if (nVersion == FLUXNODE_TX_VERSION) {
             READWRITE(nType);
-            if (nType & FLUXNODE_START_TX_TYPE) {
+            if (nType ^ FLUXNODE_START_TX_TYPE == 0) {
                 READWRITE(collateralIn);
                 READWRITE(collateralPubkey);
                 READWRITE(pubKey);
@@ -846,7 +873,7 @@ struct CMutableTransaction
                 if (!(s.GetType() & SER_GETHASH))
                     READWRITE(sig);
 
-            } else if (nType & FLUXNODE_CONFIRM_TX_TYPE) {
+            } else if (nType ^ FLUXNODE_CONFIRM_TX_TYPE == 0) {
                 READWRITE(collateralIn);
                 READWRITE(sigTime);
                 READWRITE(benchmarkTier);
@@ -856,6 +883,18 @@ struct CMutableTransaction
                 if (!(s.GetType() & SER_GETHASH)) {
                     READWRITE(sig);
                     READWRITE(benchmarkSig);
+                }
+            } else  if (nType ^ FLUXNODE_TX_VERSION_2 == 0 ) {
+                // New Version Transactions can use this
+                READWRITE(nFluxNodeTxVersion);
+                if (nFluxNodeTxVersion == FLUXNODE_TX_VERSION_2_P2SH_START) {
+                    READWRITE(collateralIn);
+                    READWRITE(collateralPubkey);
+                    READWRITE(pubKey);
+                    READWRITE(sigTime);
+                    READWRITE(P2SHRedeemScript);
+                    if (!(s.GetType() & SER_GETHASH))
+                        READWRITE(sig);
                 }
             }
             return;

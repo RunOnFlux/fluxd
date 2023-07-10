@@ -239,13 +239,18 @@ void CTransaction::UpdateHash() const
 }
 
 CTransaction::CTransaction() : nVersion(CTransaction::SPROUT_MIN_CURRENT_VERSION), fOverwintered(false), nVersionGroupId(0), nExpiryHeight(0), vin(), vout(), nLockTime(0),
-                               valueBalance(0), vShieldedSpend(), vShieldedOutput(), vJoinSplit(), joinSplitPubKey(), joinSplitSig(), bindingSig(), nType(FLUXNODE_NO_TYPE), collateralOut(), collateralPubkey(), pubKey(), sigTime(0), ip(), sig(), benchmarkTier(0), benchmarkSig(), benchmarkSigTime(0), nUpdateType(0)  { }
+                               valueBalance(0), vShieldedSpend(), vShieldedOutput(), vJoinSplit(), joinSplitPubKey(), joinSplitSig(), bindingSig(), nType(FLUXNODE_NO_TYPE),
+                               collateralOut(), collateralPubkey(), pubKey(), sigTime(0), ip(), sig(), benchmarkTier(0), benchmarkSig(), benchmarkSigTime(0), nUpdateType(0),
+                               nFluxNodeTxVersion(0), P2SHRedeemScript()  { }
 
 CTransaction::CTransaction(const CMutableTransaction &tx) : nVersion(tx.nVersion), fOverwintered(tx.fOverwintered), nVersionGroupId(tx.nVersionGroupId), nExpiryHeight(tx.nExpiryHeight),
                                                             vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime),
                                                             valueBalance(tx.valueBalance), vShieldedSpend(tx.vShieldedSpend), vShieldedOutput(tx.vShieldedOutput),
                                                             vJoinSplit(tx.vJoinSplit), joinSplitPubKey(tx.joinSplitPubKey), joinSplitSig(tx.joinSplitSig),
-                                                            bindingSig(tx.bindingSig), nType(tx.nType), collateralOut(tx.collateralIn), collateralPubkey(tx.collateralPubkey), pubKey(tx.pubKey), sigTime(tx.sigTime), ip(tx.ip), sig(tx.sig), benchmarkTier(tx.benchmarkTier), benchmarkSig(tx.benchmarkSig), benchmarkSigTime(tx.benchmarkSigTime), nUpdateType(tx.nUpdateType)
+                                                            bindingSig(tx.bindingSig), nType(tx.nType), collateralOut(tx.collateralIn), collateralPubkey(tx.collateralPubkey),
+                                                            pubKey(tx.pubKey), sigTime(tx.sigTime), ip(tx.ip), sig(tx.sig), benchmarkTier(tx.benchmarkTier),
+                                                            benchmarkSig(tx.benchmarkSig), benchmarkSigTime(tx.benchmarkSigTime), nUpdateType(tx.nUpdateType),
+                                                            nFluxNodeTxVersion(tx.nFluxNodeTxVersion), P2SHRedeemScript(tx.P2SHRedeemScript)
 {
     UpdateHash();
 }
@@ -258,7 +263,12 @@ CTransaction::CTransaction(
                               vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime),
                               valueBalance(tx.valueBalance), vShieldedSpend(tx.vShieldedSpend), vShieldedOutput(tx.vShieldedOutput),
                               vJoinSplit(tx.vJoinSplit), joinSplitPubKey(tx.joinSplitPubKey), joinSplitSig(tx.joinSplitSig),
-                              bindingSig(tx.bindingSig), nType(tx.nType), collateralOut(tx.collateralIn), collateralPubkey(tx.collateralPubkey), pubKey(tx.pubKey), sigTime(tx.sigTime), ip(tx.ip), sig(tx.sig), benchmarkTier(tx.benchmarkTier), benchmarkSig(tx.benchmarkSig), benchmarkSigTime(tx.benchmarkSigTime), nUpdateType(tx.nUpdateType)
+                              bindingSig(tx.bindingSig), nType(tx.nType), collateralOut(tx.collateralIn),
+                              collateralPubkey(tx.collateralPubkey), pubKey(tx.pubKey), sigTime(tx.sigTime),
+                              ip(tx.ip), sig(tx.sig), benchmarkTier(tx.benchmarkTier),
+                              benchmarkSig(tx.benchmarkSig), benchmarkSigTime(tx.benchmarkSigTime),
+                              nUpdateType(tx.nUpdateType), nFluxNodeTxVersion(tx.nFluxNodeTxVersion),
+                              P2SHRedeemScript(tx.P2SHRedeemScript)
 {
     assert(evilDeveloperFlag);
 }
@@ -269,7 +279,11 @@ CTransaction::CTransaction(CMutableTransaction &&tx) : nVersion(tx.nVersion), fO
                                                        vShieldedSpend(std::move(tx.vShieldedSpend)), vShieldedOutput(std::move(tx.vShieldedOutput)),
                                                        vJoinSplit(std::move(tx.vJoinSplit)),
                                                        joinSplitPubKey(std::move(tx.joinSplitPubKey)), joinSplitSig(std::move(tx.joinSplitSig)),
-                                                       nType(tx.nType), collateralOut(tx.collateralIn), collateralPubkey(tx.collateralPubkey), pubKey(tx.pubKey), sigTime(tx.sigTime), ip(tx.ip), sig(tx.sig), benchmarkTier(tx.benchmarkTier), benchmarkSig(tx.benchmarkSig), benchmarkSigTime(tx.benchmarkSigTime), nUpdateType(tx.nUpdateType)
+                                                       nType(tx.nType), collateralOut(tx.collateralIn), collateralPubkey(tx.collateralPubkey),
+                                                       pubKey(tx.pubKey), sigTime(tx.sigTime), ip(tx.ip),
+                                                       sig(tx.sig), benchmarkTier(tx.benchmarkTier), benchmarkSig(tx.benchmarkSig),
+                                                       benchmarkSigTime(tx.benchmarkSigTime), nUpdateType(tx.nUpdateType), nFluxNodeTxVersion(tx.nFluxNodeTxVersion),
+                                                       P2SHRedeemScript(tx.P2SHRedeemScript)
 {
     UpdateHash();
 }
@@ -303,6 +317,10 @@ CTransaction& CTransaction::operator=(const CTransaction &tx) {
     *const_cast<std::vector<unsigned char>*>(&benchmarkSig) = tx.benchmarkSig;
     *const_cast<uint32_t*>(&benchmarkSigTime) = tx.benchmarkSigTime;
     *const_cast<int8_t*>(&nUpdateType) = tx.nUpdateType;
+
+    // P2SH Nodes
+    *const_cast<uint32_t*>(&nFluxNodeTxVersion) = tx.nFluxNodeTxVersion;
+    *const_cast<CScript*>(&P2SHRedeemScript) = tx.P2SHRedeemScript;
 
 
     return *this;
