@@ -43,13 +43,14 @@ bool IsMigrationCollateralAmount(const CAmount& amount)
 
 bool CheckFluxnodeTxSignatures(const CTransaction&  transaction)
 {
-    if (transaction.nType & FLUXNODE_START_TX_TYPE) {
+    if (transaction.nType == FLUXNODE_START_TX_TYPE) {
         // We need to sign the mutable transaction
 
         std::string errorMessage;
 
         std::string strMessage = transaction.GetHash().GetHex();
 
+        // TODO - Change this to support P2SH Nodes Signature validation using the redeemscript that is provided in the data/start tx
         // If the transaction collateral pubkey matches the chainparams for paytoscripthash signing
         // Verify the signature against it.
         std::string public_key = GetP2SHFluxNodePublicKey(transaction);
@@ -63,13 +64,14 @@ bool CheckFluxnodeTxSignatures(const CTransaction&  transaction)
         }
 
         return true;
-    } else if (transaction.nType & FLUXNODE_CONFIRM_TX_TYPE) {
+    } else if (transaction.nType == FLUXNODE_CONFIRM_TX_TYPE) {
 
-        auto data = g_fluxnodeCache.GetFluxnodeData(transaction.collateralOut);
+        auto data = g_fluxnodeCache.GetFluxnodeData(transaction.collateralIn);
         std::string errorMessage;
 
-        std::string strMessage = transaction.collateralOut.ToString() + std::to_string(transaction.collateralOut.n) + std::to_string(transaction.nUpdateType) + std::to_string(transaction.sigTime);
+        std::string strMessage = transaction.collateralIn.ToString() + std::to_string(transaction.collateralIn.n) + std::to_string(transaction.nUpdateType) + std::to_string(transaction.sigTime);
 
+        // TODO - Change this to support P2SH Nodes Signature validation using the redeemscript that is provided in the data/start tx
         // Someone a node can be kicked on the list. So when we are verifying from the db transaction. we dont have the data.pubKey
         if (!data.IsNull()) {
             if (!obfuScationSigner.VerifyMessage(data.pubKey, transaction.sig, strMessage, errorMessage)) {
@@ -190,53 +192,69 @@ void GetUndoDataForPaidFluxnodes(CFluxnodeTxBlockUndo& fluxnodeTxBlockUndo, Flux
 
 void FluxnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_nHeight, int nTier, const CAmount nCollateral)
 {
-    // TODO - modify the start function to use the version 2 tx after a certain p_nHeight
-
     FluxnodeCacheData data;
-    data.nStatus = FLUXNODE_TX_STARTED;
-    data.nType = FLUXNODE_START_TX_TYPE;
-    data.collateralIn = p_transaction.collateralOut;
-    data.collateralPubkey = p_transaction.collateralPubkey;
-    data.pubKey = p_transaction.pubKey;
-    data.ip = p_transaction.ip;
-    data.nLastPaidHeight = 0;
-    data.nAddedBlockHeight = p_nHeight;
-    data.nTier = nTier;
-    data.nCollateral = nCollateral;
+    if (p_transaction.nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION) {
+        // New object details if the nVersion of the transaction has been set to upgraded version
+        data.nType = FLUXNODE_TX_TYPE_UPGRADED;
+        data.nFluxTxVersion = p_transaction.nFluxTxVersion;
+        data.nTransactionType = FLUXNODE_START_TX_TYPE;
+        data.P2SHRedeemScript = p_transaction.P2SHRedeemScript;
 
-    if (data.nCollateral > 0) {
-        data.nType = FLUXNODE_HAS_COLLATERAL;
+        data.nStatus = FLUXNODE_TX_STARTED;
+        data.collateralIn = p_transaction.collateralIn;
+        data.collateralPubkey = p_transaction.collateralPubkey;
+        data.pubKey = p_transaction.pubKey;
+        data.ip = p_transaction.ip;
+        data.nLastPaidHeight = 0;
+        data.nAddedBlockHeight = p_nHeight;
+        data.nTier = nTier;
+        data.nCollateral = nCollateral;
+    } else {
+        data.nStatus = FLUXNODE_TX_STARTED;
+        data.nType = FLUXNODE_START_TX_TYPE;
+        data.collateralIn = p_transaction.collateralIn;
+        data.collateralPubkey = p_transaction.collateralPubkey;
+        data.pubKey = p_transaction.pubKey;
+        data.ip = p_transaction.ip;
+        data.nLastPaidHeight = 0;
+        data.nAddedBlockHeight = p_nHeight;
+        data.nTier = nTier;
+        data.nCollateral = nCollateral;
+
+        if (data.nCollateral > 0) {
+            data.nType = FLUXNODE_HAS_COLLATERAL;
+        }
     }
 
     LOCK(cs);
-    mapStartTxTracker[p_transaction.collateralOut] = data;
-    setDirtyOutPoint.insert(p_transaction.collateralOut);
+    mapStartTxTracker[p_transaction.collateralIn] = data;
+    setDirtyOutPoint.insert(p_transaction.collateralIn);
 }
 
 void FluxnodeCache::UndoNewStart(const CTransaction& p_transaction, const int p_nHeight)
 {
     LOCK(cs);
-    setUndoStartTx.insert(p_transaction.collateralOut);
+    setUndoStartTx.insert(p_transaction.collateralIn);
     setUndoStartTxHeight = p_nHeight;
 }
 
 void FluxnodeCache::AddNewConfirm(const CTransaction& p_transaction, const int p_nHeight)
 {
     LOCK(cs);
-    mapAddToConfirm[p_transaction.collateralOut] = p_transaction.ip;
+    mapAddToConfirm[p_transaction.collateralIn] = p_transaction.ip;
     setAddToConfirmHeight = p_nHeight;
 }
 
 void FluxnodeCache::UndoNewConfirm(const CTransaction& p_transaction)
 {
     LOCK(cs);
-    setUndoAddToConfirm.insert(p_transaction.collateralOut);
+    setUndoAddToConfirm.insert(p_transaction.collateralIn);
 }
 
 void FluxnodeCache::AddUpdateConfirm(const CTransaction& p_transaction, const int p_nHeight)
 {
     LOCK(cs);
-    mapAddToUpdateConfirm[p_transaction.collateralOut] = p_transaction.ip;
+    mapAddToUpdateConfirm[p_transaction.collateralIn] = p_transaction.ip;
     setAddToUpdateConfirmHeight = p_nHeight;
 }
 
@@ -270,7 +288,7 @@ bool FluxnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const i
     else
         nCurrentHeight = chainActive.Height();
 
-    COutPoint out = p_transaction.collateralOut;
+    COutPoint out = p_transaction.collateralIn;
     if (!p_transaction.IsFluxnodeTx()) {
         return false;
     }
@@ -460,7 +478,7 @@ bool FluxnodeCache::CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_n
 
 FluxnodeCacheData FluxnodeCache::GetFluxnodeData(const CTransaction& tx)
 {
-    return GetFluxnodeData(tx.collateralOut);
+    return GetFluxnodeData(tx.collateralIn);
 }
 
 FluxnodeCacheData FluxnodeCache::GetFluxnodeData(const COutPoint& out, int* nNeedLocation)

@@ -223,7 +223,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             }
 
             if (tx.IsFluxnodeTx()) {
-                const CCoins* coins = view.AccessCoins(tx.collateralOut.hash);
+                const CCoins* coins = view.AccessCoins(tx.collateralIn.hash);
                 if (!coins) {
                     LogPrintf("Remove fluxnode transaction because its collateral is not found. %s\n", tx.GetHash().GetHex());
                     std::list<CTransaction> removed;
@@ -233,7 +233,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
                 if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
                     int nNeedLocation = 0;
-                    auto data = g_fluxnodeCache.GetFluxnodeData(tx.collateralOut, &nNeedLocation);
+                    auto data = g_fluxnodeCache.GetFluxnodeData(tx.collateralIn, &nNeedLocation);
 
                     if (data.IsNull()) {
                         LogPrintf("Remove fluxnode transaction because its confirm isn't ready. %s\n", tx.GetHash().GetHex());
@@ -254,7 +254,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                     if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
                         {
                             LOCK(g_fluxnodeCache.cs);
-                            if (!g_fluxnodeCache.CheckConfirmationHeights(nHeight, tx.collateralOut, tx.ip)) {
+                            if (!g_fluxnodeCache.CheckConfirmationHeights(nHeight, tx.collateralIn, tx.ip)) {
                                 LogPrintf("Remove fluxnode transaction if failed CheckConfirmationHeights %s\n", tx.GetHash().GetHex());
                                 std::list<CTransaction> removed;
                                 mempool.remove(tx, removed, false);

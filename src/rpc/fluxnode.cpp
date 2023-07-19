@@ -147,15 +147,15 @@ UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
                     int nTier = 0;
                     CTransaction get_tx;
                     uint256 block_hash;
-                    if (GetTransaction(tx.collateralOut.hash, get_tx, Params().GetConsensus(), block_hash,
+                    if (GetTransaction(tx.collateralIn.hash, get_tx, Params().GetConsensus(), block_hash,
                                        true)) {
 
-                        if (!GetCoinTierFromAmount(rescanIndex->nHeight, get_tx.vout[tx.collateralOut.n].nValue, nTier)) {
-                            return error("Failed to get tier from amount. This shouldn't happen tx = %s", tx.collateralOut.ToFullString());
+                        if (!GetCoinTierFromAmount(rescanIndex->nHeight, get_tx.vout[tx.collateralIn.n].nValue, nTier)) {
+                            return error("Failed to get tier from amount. This shouldn't happen tx = %s", tx.collateralIn.ToFullString());
                         }
 
                     } else {
-                        return error("Failed to find tx: %s", tx.collateralOut.ToFullString());
+                        return error("Failed to find tx: %s", tx.collateralIn.ToFullString());
                     }
 
                     int64_t nLoop2 = GetTimeMicros(); nLoopFetchTx += nLoop2 - nLoop1;
@@ -163,7 +163,7 @@ UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
                     if (tx.nType == FLUXNODE_START_TX_TYPE) {
 
                         // Add new Fluxnode Start Tx into local cache
-                        fluxnodeCache.AddNewStart(tx, rescanIndex->nHeight, nTier, get_tx.vout[tx.collateralOut.n].nValue);
+                        fluxnodeCache.AddNewStart(tx, rescanIndex->nHeight, nTier, get_tx.vout[tx.collateralIn.n].nValue);
                         int64_t nLoop3 = GetTimeMicros(); nAddStart += nLoop3 - nLoop2;
 
                     } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
@@ -171,17 +171,17 @@ UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
 
                             fluxnodeCache.AddNewConfirm(tx, rescanIndex->nHeight);
                             int64_t nLoop4 = GetTimeMicros(); nAddNewConfirm += nLoop4 - nLoop2;
-                        } else if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
+                        } else if (tx.nUpdateType ^ FluxnodeUpdateType::UPDATE_CONFIRM == 0) {
                             fluxnodeCache.AddUpdateConfirm(tx, rescanIndex->nHeight);
-                            FluxnodeCacheData global_data = g_fluxnodeCache.GetFluxnodeData(tx.collateralOut);
+                            FluxnodeCacheData global_data = g_fluxnodeCache.GetFluxnodeData(tx.collateralIn);
                             if (global_data.IsNull()) {
                                 return error("Failed to find global data on update confirm tx, %s",
                                              tx.GetHash().GetHex());
                             }
                             fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight.insert(
-                                    std::make_pair(tx.collateralOut,
+                                    std::make_pair(tx.collateralIn,
                                                    global_data.nLastConfirmedBlockHeight));
-                            fluxnodeTxBlockUndo.mapLastIpAddress.insert(std::make_pair(tx.collateralOut, global_data.ip));
+                            fluxnodeTxBlockUndo.mapLastIpAddress.insert(std::make_pair(tx.collateralIn, global_data.ip));
                             int64_t nLoop5 = GetTimeMicros(); nAddUpdateConfirm += nLoop5 - nLoop2;
                         }
                     }

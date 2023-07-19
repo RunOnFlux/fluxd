@@ -138,6 +138,11 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nProtocolVersion = 170018;
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight = 1076532; // Around March 12 2022
+        consensus.vUpgrades[Consensus::UPGRADE_HALVING].hashActivationBlock =
+                uint256S("000000111f8643ce24d9753dbc324220877299075a8a6102da61ef4460296325");
+
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight = 2000000; // TODO set this before release
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
@@ -337,6 +342,9 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nProtocolVersion = 170018;
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight = 18000;
 
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight = 20000;
+
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 10;
@@ -515,6 +523,10 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nProtocolVersion = 170018;
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight =
                 Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 
