@@ -301,7 +301,7 @@ void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction>& rem
 
         if (origTx.IsFluxnodeTx()) {
             LogPrint("fluxnode", "%s: Remove fluxnode tx from mempool %s\n", __func__, origTx.GetHash().GetHex());
-            mapFluxnodeTxMempool.erase(origTx.collateralOut);
+            mapFluxnodeTxMempool.erase(origTx.collateralIn);
         }
     }
 }
@@ -449,8 +449,8 @@ void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx, unsigned i
         indexed_transaction_set::iterator i = mapTx.find(hash);
 
         if (tx.IsFluxnodeTx()) {
-            if (mapFluxnodeTxMempool.count(tx.collateralOut)) {
-                i = mapTx.find(mapFluxnodeTxMempool.at(tx.collateralOut));
+            if (mapFluxnodeTxMempool.count(tx.collateralIn)) {
+                i = mapTx.find(mapFluxnodeTxMempool.at(tx.collateralIn));
 
                 if (i != mapTx.end()) {
                     entries.push_back(*i);

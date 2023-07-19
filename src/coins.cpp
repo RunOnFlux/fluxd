@@ -633,7 +633,7 @@ bool CCoinsViewCache::CheckFluxnodeTxInput(const CTransaction& tx, const int& p_
         return false;
     }
 
-    const COutPoint &prevout = tx.collateralOut;
+    const COutPoint &prevout = tx.collateralIn;
     const CCoins* coins = AccessCoins(prevout.hash);
     if (!coins || !coins->IsAvailable(prevout.n)) {
         return false;
@@ -648,6 +648,8 @@ bool CCoinsViewCache::CheckFluxnodeTxInput(const CTransaction& tx, const int& p_
     if (!GetCoinTierFromAmount(p_Height, coins->vout[prevout.n].nValue, nTier)) {
         return false;
     }
+
+    // TODO - Need to modify this to work for all P2SH Scripts when ready P2SH Nodes
 
     if (IsAP2SHFluxNodePublicKey(tx.collateralPubkey)) {
         bool fHalvingActive = NetworkUpgradeActive(p_Height, Params().GetConsensus(), Consensus::UPGRADE_HALVING);

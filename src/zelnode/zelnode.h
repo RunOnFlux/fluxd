@@ -139,9 +139,10 @@ public:
     std::string ip;
     int8_t nTier;
 
-    // P2SH Nodes
-    uint32_t nFluxNodeTxVersion;
+    // New Version Tracking (adding in P2SH node upgrade)
+    int32_t nFluxTxVersion;
     CScript P2SHRedeemScript;
+    int8_t nTransactionType;
 
     int8_t nStatus;
 
@@ -157,8 +158,9 @@ public:
         nTier = 0;
         nStatus =  FLUXNODE_TX_ERROR;
         nCollateral = 0;
-        nFluxNodeTxVersion = 0;
+        nFluxTxVersion = 0;
         P2SHRedeemScript.clear();
+        nTransactionType = FLUXNODE_NO_TYPE;
     }
 
     FluxnodeCacheData() {
@@ -166,6 +168,9 @@ public:
     }
 
     bool IsNull() const{
+        if ((nType ^ FLUXNODE_TX_TYPE_UPGRADED) == 0) {
+            return nTransactionType == FLUXNODE_NO_TYPE;
+        }
         return nType == FLUXNODE_NO_TYPE;
     }
 
@@ -202,7 +207,7 @@ public:
 
     std::string ToFullString() const
     {
-        return strprintf("FluxnodeCacheData Type(%d), %s, nAddedBlockHeight(%d), nConfirmedBlockHeight(%d), nLastConfirmedBlockHeight(%d), nLastPaidHeight(%d), %s", nType,  collateralIn.ToFullString(), nAddedBlockHeight, nConfirmedBlockHeight, nLastConfirmedBlockHeight, nLastPaidHeight, this->TierToString());
+        return strprintf("FluxnodeCacheData Type(%d), FluxnodeCacheData nTransactionType (%d), %s, nAddedBlockHeight(%d), nConfirmedBlockHeight(%d), nLastConfirmedBlockHeight(%d), nLastPaidHeight(%d), %s, RedeemScript(%s)", nType, nTransactionType,  collateralIn.ToFullString(), nAddedBlockHeight, nConfirmedBlockHeight, nLastConfirmedBlockHeight, nLastPaidHeight, this->TierToString(), P2SHRedeemScript.ToString());
     }
 
     friend bool operator<(const FluxnodeCacheData& a, const FluxnodeCacheData& b)
@@ -221,32 +226,24 @@ public:
         READWRITE(nType);
 
         // New nType Version Checker
-        if (nType ^ FLUXNODE_TX_VERSION_2  == 0) {
-            READWRITE(nFluxNodeTxVersion);
-            if (nFluxNodeTxVersion == FLUXNODE_TX_VERSION_2_NORMAL_START) {
-                READWRITE(collateralIn);
-                READWRITE(collateralPubkey);
-                READWRITE(pubKey);
-                READWRITE(nAddedBlockHeight);
-                READWRITE(nConfirmedBlockHeight);
-                READWRITE(nLastConfirmedBlockHeight);
-                READWRITE(nLastPaidHeight);
-                READWRITE(ip);
-                READWRITE(nTier);
-                READWRITE(nStatus);
-                READWRITE(nCollateral);
-            } else if (nFluxNodeTxVersion == FLUXNODE_TX_VERSION_2_P2SH_START) {
-                READWRITE(collateralIn);
-                READWRITE(collateralPubkey);
-                READWRITE(pubKey);
-                READWRITE(nAddedBlockHeight);
-                READWRITE(nConfirmedBlockHeight);
-                READWRITE(nLastConfirmedBlockHeight);
-                READWRITE(nLastPaidHeight);
-                READWRITE(ip);
-                READWRITE(nTier);
-                READWRITE(nStatus);
-                READWRITE(nCollateral);
+        if ((nType ^ FLUXNODE_TX_TYPE_UPGRADED) == 0) {
+            LogPrintf("FLUXNODE_TX_TYPE_UPGRADED Found %d - %s    - nType = %d - TX-Type (%d), result = %d\n", __LINE__, __func__, nType, FLUXNODE_TX_TYPE_UPGRADED, nType ^ FLUXNODE_TX_TYPE_UPGRADED);
+            READWRITE(nFluxTxVersion);
+            READWRITE(nTransactionType);
+
+            // Normal and P2SH data share most fields so for now we can just check at the end for P2SH
+            READWRITE(collateralIn);
+            READWRITE(collateralPubkey);
+            READWRITE(pubKey);
+            READWRITE(nAddedBlockHeight);
+            READWRITE(nConfirmedBlockHeight);
+            READWRITE(nLastConfirmedBlockHeight);
+            READWRITE(nLastPaidHeight);
+            READWRITE(ip);
+            READWRITE(nTier);
+            READWRITE(nStatus);
+            READWRITE(nCollateral);
+            if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
                 READWRITE(P2SHRedeemScript);
             }
         } else {
@@ -261,7 +258,7 @@ public:
             READWRITE(ip);
             READWRITE(nTier);
             READWRITE(nStatus);
-            if (nType & FLUXNODE_HAS_COLLATERAL) {
+            if ((nType ^ FLUXNODE_HAS_COLLATERAL) == 0) {
                 READWRITE(nCollateral);
             }
         }

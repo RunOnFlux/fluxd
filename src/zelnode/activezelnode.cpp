@@ -359,6 +359,8 @@ bool ActiveFluxnode::BuildDeterministicStartTx(std::string strKeyFluxnode, std::
         return false;
     }
 
+    // TODO - P2SH Upgrade - We need to know when to start using the new tx version. Only have a certain height?
+
     mutTransaction.nType = FLUXNODE_START_TX_TYPE;
 
     // Create fluxnode transaction
