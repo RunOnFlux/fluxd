@@ -699,7 +699,10 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
 
 
             CTxDestination payment_destination;
-            if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+            if (data.nTransactionType == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+                CScriptID inner(data.P2SHRedeemScript);
+                payment_destination = inner;
+            } else if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
                 GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
             } else {
                 payment_destination = data.collateralPubkey.GetID();
@@ -861,7 +864,13 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
         const FluxnodeCacheData data = item.second;
 
         CTxDestination payment_destination;
-        if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+
+        // If this is P2SH node, we need to generate the payment destination from the redeemscript
+        if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+            CScriptID innerID(data.P2SHRedeemScript);
+            payment_destination = innerID;
+        } else if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+            // This is needed for backwards compatibility but will no longer be used once P2SH nodes go live.
             GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
         } else {
             payment_destination = data.collateralPubkey.GetID();
@@ -928,7 +937,10 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
         const FluxnodeCacheData data = item.second;
 
         CTxDestination payment_destination;
-        if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+        if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+            CScriptID inner(data.P2SHRedeemScript);
+            payment_destination = inner;
+        } else if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
             GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
         } else {
             payment_destination = data.collateralPubkey.GetID();

@@ -177,8 +177,8 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
         if (tx.nType == FLUXNODE_START_TX_TYPE) {
             entry.pushKV("collateral_pubkey", EncodeBase64(tx.collateralPubkey.begin(), tx.collateralPubkey.size()));
             entry.pushKV("zelnode_pubkey", EncodeBase64(tx.pubKey.begin(), tx.pubKey.size()));
-            if (tx.IsFluxnodeP2SHTx()) {
-                entry.pushKV("redeemscript", EncodeBase64(tx.pubKey.begin(), tx.pubKey.size()));
+            if (tx.IsFluxnodeUpgradedP2SHTx()) {
+                entry.pushKV("redeemscript", tx.P2SHRedeemScript.ToString());
             }
         }
 
