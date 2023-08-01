@@ -755,8 +755,16 @@ public:
         return nVersion == FLUXNODE_TX_VERSION || nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION;
     }
 
-    bool IsFluxnodeP2SHTx() const {
+    bool IsFluxnodeUpgradeTx() const {
         return nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION;
+    }
+
+    bool IsFluxnodeUpgradedNormalTx() const {
+        return IsFluxnodeUpgradeTx() && nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION;
+    }
+
+    bool IsFluxnodeUpgradedP2SHTx() const {
+        return IsFluxnodeUpgradeTx() && nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION;
     }
 
     bool IsNull() const {

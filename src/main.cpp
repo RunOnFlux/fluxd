@@ -1003,7 +1003,7 @@ bool ContextualCheckTransaction(
                              REJECT_INVALID, "tx-fluxnodes-not-active", false, tx);
         }
 
-        if (tx.IsFluxnodeP2SHTx()) {
+        if (tx.IsFluxnodeUpgradeTx()) {
             if (!fluxP2SHNodesActive) {
                 return state.DoS(dosLevel, error("ContextualCheckTransaction(): P2SHNodes tx seen before active"),
                                  REJECT_INVALID, "tx-p2shnodes-not-active", false, tx);
@@ -1200,17 +1200,62 @@ bool ContextualCheckTransaction(
                     strFailMessage = "fluxnode-tx-failed-to-extract-destination";
                 }
 
-                // TODO - We need to change this so it works with P2SH Nodes
                 if (!fFailure && coins.vout[outPoint.n].scriptPubKey.IsPayToScriptHash()) {
-                    // Here we have a node of which the collatoral is stored in a multisig address.
-                    // Only the flux foundation can do this. So lets use the chainparams public key to verify the signature
-                    // This means that the userpubkey is unable to be the same as the destination
-                    std::string public_key = GetP2SHFluxNodePublicKey(tx);
-                    CPubKey pubkey(ParseHex(public_key));
 
-                    if (tx.collateralPubkey != pubkey) {
-                        fFailure = true;
-                        strFailMessage = "fluxnode-tx-p2sh-publickeys-didn't-match";
+                    // This could mean that it is either a flux foundation key or P2SH Nodes is active and this is one of those transactions
+
+                    if (tx.IsFluxnodeUpgradedP2SHTx()) {
+                        txnouttype type;
+                        vector<CTxDestination> addresses;
+                        vector<CPubKey> pubkeys;
+                        int nRequired;
+
+                        /**
+                         * P2SH NODES CORE CHECK 1
+                         * We must check to make sure the collateral pubkey given to us in the transaction is a part
+                         * of the redeem script also provided to us in the transaction. This with the Core Check 2
+                         * below allows us to fully validate the signature of the start transaction.
+                         */
+                        if (ListPubKeysFromMultiSigScript(tx.P2SHRedeemScript, type, addresses, pubkeys, nRequired)) {
+                            bool fFoundKey = false;
+                            for (int i = 0; i < pubkeys.size(); i++) {
+                                if (tx.collateralPubkey == pubkeys[i]) {
+                                    // TODO - P2SH NODES - Remove once tested
+                                    LogPrintf("P2SH Nodes - TODO LOG - We found a matching key from the RedeemScript\n");
+                                    fFoundKey = true;
+                                    break;
+                                }
+                            }
+                            if (!fFoundKey) {
+                                fFailure = true;
+                                strFailMessage = "fluxnode-tx-p2shnodes-key-not-found-in-list";
+                            }
+                        } else {
+                            fFailure = true;
+                            strFailMessage = "fluxnode-tx-p2shnodes-listpubkeys-failed-to-list-keys";
+                        }
+
+                        /**
+                         * P2SH NODES CORE CHECK 2
+                         * We must check to make sure the hash of the redeem script matches the scriptpubkey of the coin
+                         * This check is very important so only owners of the P2SH address can sign the start transaction
+                         */
+                        CScriptID inner(tx.P2SHRedeemScript);
+                        if (EncodeDestination(destination) != EncodeDestination(inner)) {
+                            fFailure = true;
+                            strFailMessage = "fluxnode-tx-p2shnodes-destinations-didn't-match";
+                        }
+                    } else {
+                        // Here we have a node of which the collatoral is stored in a multisig address.
+                        // Only the flux foundation can do this. So lets use the chainparams public key to verify the signature
+                        // This means that the userpubkey is unable to be the same as the destination
+                        std::string public_key = GetP2SHFluxNodePublicKey(tx);
+                        CPubKey pubkey(ParseHex(public_key));
+
+                        if (tx.collateralPubkey != pubkey) {
+                            fFailure = true;
+                            strFailMessage = "fluxnode-tx-p2sh-publickeys-didn't-match";
+                        }
                     }
                 } else {
                     if (!fFailure && EncodeDestination(destination) != EncodeDestination(userpubkey.GetID())) {

@@ -47,17 +47,29 @@ bool CheckFluxnodeTxSignatures(const CTransaction&  transaction)
         // We need to sign the mutable transaction
 
         std::string errorMessage;
-
         std::string strMessage = transaction.GetHash().GetHex();
 
-        // TODO - Change this to support P2SH Nodes Signature validation using the redeemscript that is provided in the data/start tx
+        /**
+         * P2SH NODES CORE CHECK 3
+         * We must verify the signature of the transaction.
+         * This check along with Check 1 & 2 will allow us to know that the signature was signed by a key that is
+         * a part of th redeemscript
+         * Check 1 & 2 are preformed in the ContextualCheckTransaction function
+         */
+        if (transaction.IsFluxnodeUpgradedP2SHTx()) {
+            if (obfuScationSigner.VerifyMessage(transaction.collateralPubkey, transaction.sig, strMessage, errorMessage)) {
+                return true;
+            }
+            return error("%s - P2SHNODES - Signature invalid on START Error: %s", __func__, errorMessage);
+        }
+
         // If the transaction collateral pubkey matches the chainparams for paytoscripthash signing
         // Verify the signature against it.
         std::string public_key = GetP2SHFluxNodePublicKey(transaction);
         CPubKey pubkey(ParseHex(public_key));
         if (transaction.collateralPubkey == pubkey) {
             if (!obfuScationSigner.VerifyMessage(transaction.collateralPubkey, transaction.sig, strMessage, errorMessage))
-                return error("%s - P2SH - START Error: %s", __func__, errorMessage);
+                return error("%s - Foundation P2SH - START Error: %s", __func__, errorMessage);
         } else {
             if (!obfuScationSigner.VerifyMessage(transaction.collateralPubkey, transaction.sig, strMessage,errorMessage))
                 return error("%s - NORMAL START Error: %s", __func__, errorMessage);
@@ -71,7 +83,6 @@ bool CheckFluxnodeTxSignatures(const CTransaction&  transaction)
 
         std::string strMessage = transaction.collateralIn.ToString() + std::to_string(transaction.collateralIn.n) + std::to_string(transaction.nUpdateType) + std::to_string(transaction.sigTime);
 
-        // TODO - Change this to support P2SH Nodes Signature validation using the redeemscript that is provided in the data/start tx
         // Someone a node can be kicked on the list. So when we are verifying from the db transaction. we dont have the data.pubKey
         if (!data.IsNull()) {
             if (!obfuScationSigner.VerifyMessage(data.pubKey, transaction.sig, strMessage, errorMessage)) {
@@ -194,7 +205,15 @@ void FluxnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_n
 {
     FluxnodeCacheData data;
     if (p_transaction.nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION) {
-        // New object details if the nVersion of the transaction has been set to upgraded version
+
+        /**
+         * With the new Upgraded Transaction Version we have to modify the types
+         * If nType is now the new FLUXNODE_TX_TYPE_UPGRADED version. We will have the ability to use new variables
+         * nFluxTxVersion is now set to the nFluxTxVersion of the Transaction
+         * nTransactionType is now set to FLUXNODE_START_TX_TYPE. This used to be what nType was sent to
+         * P2SHRedeemScript is now available from the transaction
+         * nCollateral is now always a part of the Cache
+         */
         data.nType = FLUXNODE_TX_TYPE_UPGRADED;
         data.nFluxTxVersion = p_transaction.nFluxTxVersion;
         data.nTransactionType = FLUXNODE_START_TX_TYPE;
@@ -513,6 +532,15 @@ bool FluxnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPo
                 if (mapFluxnodeList.at((Tier) nTier).listConfirmedFluxnodes.size()) {
                     p_fluxnodeOut = mapFluxnodeList.at((Tier) nTier).listConfirmedFluxnodes.front().out;
                     if (mapConfirmedFluxnodeData.count(p_fluxnodeOut)) {
+
+
+                        // We can get the destination from the Hash of the RedeemScript.
+                        if (mapConfirmedFluxnodeData.at(p_fluxnodeOut).nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+                           CScriptID inner(mapConfirmedFluxnodeData.at(p_fluxnodeOut).P2SHRedeemScript);
+                           dest = inner;
+                           return true;
+                        }
+
                         if (IsAP2SHFluxNodePublicKey(mapConfirmedFluxnodeData.at(p_fluxnodeOut).collateralPubkey)) {
                             CTxDestination payment_destination;
                             if (GetFluxNodeP2SHDestination(pcoinsTip, p_fluxnodeOut, payment_destination)) {

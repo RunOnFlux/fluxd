@@ -271,6 +271,43 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
     return true;
 }
 
+bool ListPubKeysFromMultiSigScript(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, vector<CPubKey>& pubkeysRet, int& nRequiredRet)
+{
+    addressRet.clear();
+    pubkeysRet.clear();
+
+    typeRet = TX_NONSTANDARD;
+
+    vector<valtype> vSolutions;
+    if (!Solver(scriptPubKey, typeRet, vSolutions))
+        return false;
+
+    if (typeRet != TX_MULTISIG) {
+        return false;
+    }
+
+    nRequiredRet = vSolutions.front()[0];
+    for (unsigned int i = 1; i < vSolutions.size()-1; i++)
+    {
+        CPubKey pubKey(vSolutions[i]);
+        if (!pubKey.IsValid())
+            continue;
+
+        pubkeysRet.push_back(pubKey);
+
+        CTxDestination address = pubKey.GetID();
+        addressRet.push_back(address);
+    }
+
+    if (addressRet.empty())
+        return false;
+
+    if (pubkeysRet.empty())
+        return false;
+
+    return true;
+}
+
 namespace
 {
 class CScriptVisitor : public boost::static_visitor<bool>

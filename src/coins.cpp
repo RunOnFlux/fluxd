@@ -649,12 +649,18 @@ bool CCoinsViewCache::CheckFluxnodeTxInput(const CTransaction& tx, const int& p_
         return false;
     }
 
-    // TODO - Need to modify this to work for all P2SH Scripts when ready P2SH Nodes
-
     if (IsAP2SHFluxNodePublicKey(tx.collateralPubkey)) {
         bool fHalvingActive = NetworkUpgradeActive(p_Height, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
         if (!fHalvingActive) {
-            error("Using P2SH collateral key before it is actives");
+            error("Using P2SH collateral key before it is active");
+            return false;
+        }
+    }
+
+    if (tx.IsFluxnodeUpgradeTx()) {
+        bool fP2SHNodesActive = NetworkUpgradeActive(p_Height, Params().GetConsensus(), Consensus::UPGRADE_P2SHNODES);
+        if (!fP2SHNodesActive) {
+            error("Using P2SH nodes before it is active");
             return false;
         }
     }
