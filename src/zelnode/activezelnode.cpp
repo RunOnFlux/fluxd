@@ -359,7 +359,8 @@ bool ActiveFluxnode::BuildDeterministicStartTx(std::string strKeyFluxnode, std::
         return false;
     }
 
-    // TODO - P2SH Upgrade - We need to know when to start using the new tx version. Only have a certain height?
+    // When we should move to upgraded version for fluxnode transactions
+    bool fP2SHNodesActive = NetworkUpgradeActive(chainActive.Height(), Params().GetConsensus(), Consensus::UPGRADE_P2SHNODES);
 
     mutTransaction.nType = FLUXNODE_START_TX_TYPE;
 
@@ -368,6 +369,14 @@ bool ActiveFluxnode::BuildDeterministicStartTx(std::string strKeyFluxnode, std::
         mutTransaction.collateralIn = vin.prevout;
         mutTransaction.collateralPubkey = pubKeyCollateralAddress;
         mutTransaction.pubKey = pubKeyFluxnode;
+
+        // We can upgrade to v6 transaction which mean the following
+        // nVersion = 6
+        // nFluxTxVersion = Normal Tx Version Value of 1
+        if (fP2SHNodesActive) {
+            mutTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
+            mutTransaction.nFluxTxVersion = FLUXNODE_INTERNAL_NORMAL_TX_VERSION;
+        }
     } else if (mutTransaction.nType == FLUXNODE_CONFIRM_TX_TYPE) {
         mutTransaction.collateralIn = vin.prevout;
         if (mutTransaction.nUpdateType != FluxnodeUpdateType::UPDATE_CONFIRM)

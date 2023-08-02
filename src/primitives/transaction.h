@@ -699,7 +699,7 @@ public:
                     READWRITE(*const_cast<COutPoint *>(&collateralIn));
                     READWRITE(*const_cast<CPubKey *>(&collateralPubkey));
                     READWRITE(*const_cast<CPubKey *>(&pubKey));
-                    READWRITE(*const_cast<CScript *>(&P2SHRedeemScript)); // New Addition to Tx
+                    READWRITE(*const_cast<CScriptBase *>((CScriptBase*)(&P2SHRedeemScript))); // New Addition to Tx
                     READWRITE(*const_cast<uint32_t *>(&sigTime));
                     if (!(s.GetType() & SER_GETHASH))
                         READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
@@ -966,7 +966,7 @@ struct CMutableTransaction
                     READWRITE(collateralIn);
                     READWRITE(collateralPubkey);
                     READWRITE(pubKey);
-                    READWRITE(P2SHRedeemScript);
+                    READWRITE(*(CScriptBase*)(&P2SHRedeemScript));
                     READWRITE(sigTime);
                     if (!(s.GetType() & SER_GETHASH))
                         READWRITE(sig);
