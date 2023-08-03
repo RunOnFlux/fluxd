@@ -1875,14 +1875,16 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                 // Check to make sure the input is not spent and meets the criteria of a fluxnode input
                 int nTier;
                 CAmount nCollateralAmount;
-                if (!view.CheckFluxnodeTxInput(tx, nextBlockHeight, nTier, nCollateralAmount)) {
-                    return state.DoS(10, error("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-fluxnode-inputs-invalid-spent-or-bad-value");
+                std::string errorMessage;
+                if (!view.CheckFluxnodeTxInput(tx, nextBlockHeight, nTier, nCollateralAmount, errorMessage)) {
+                    return state.DoS(10, error("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, strprintf("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value-%s", errorMessage));
                 }
             } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
                 int nTier;
                 CAmount nCollateralAmount;
-                if (!view.CheckFluxnodeTxInput(tx, nextBlockHeight, nTier, nCollateralAmount)) {
-                    return state.DoS(10, error("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-fluxnode-inputs-invalid-spent-or-bad-value");
+                std::string errorMessage;
+                if (!view.CheckFluxnodeTxInput(tx, nextBlockHeight, nTier, nCollateralAmount, errorMessage)) {
+                    return state.DoS(10, error("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, strprintf("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value-%s", errorMessage));
                 }
             }
         }
@@ -3474,9 +3476,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             if (tx.IsFluxnodeTx()) {
                 int nTier = 0;
                 CAmount nCollateralAmount;
-                if (!view.CheckFluxnodeTxInput(tx, pindex->nHeight, nTier, nCollateralAmount))
+                std::string errorMessage;
+                if (!view.CheckFluxnodeTxInput(tx, pindex->nHeight, nTier, nCollateralAmount, errorMessage))
                     return state.DoS(100, error("ConnectBlock(): fluxnode tx inputs missing/spent"),
-                                     REJECT_INVALID, "bad-txns-fluxnode-tx-inputs-missingorspent", false, tx);
+                                     REJECT_INVALID, strprintf("bad-txns-fluxnode-tx-inputs-missingorspent-%s", errorMessage), false, tx);
 
                 if (tx.nType == FLUXNODE_START_TX_TYPE) {
                     if (p_fluxnodeCache) {
