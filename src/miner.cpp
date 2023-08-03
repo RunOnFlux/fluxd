@@ -370,7 +370,8 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             if (tx.IsFluxnodeTx()) {
                 int nTier;
                 CAmount nCollateralAmount;
-                if (!view.CheckFluxnodeTxInput(tx, pindexPrev->nHeight + 1, nTier, nCollateralAmount))
+                std::string errorMessage;
+                if (!view.CheckFluxnodeTxInput(tx, pindexPrev->nHeight + 1, nTier, nCollateralAmount, errorMessage))
                     continue;
             }
 
