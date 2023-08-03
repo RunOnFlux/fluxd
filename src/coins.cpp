@@ -630,22 +630,26 @@ bool CCoinsViewCache::HaveInputs(const CTransaction& tx) const
 bool CCoinsViewCache::CheckFluxnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier, CAmount& nCollateralAmount) const
 {
     if (!tx.IsFluxnodeTx()) {
+        error("Not a Fluxnode Tx");
         return false;
     }
 
     const COutPoint &prevout = tx.collateralIn;
     const CCoins* coins = AccessCoins(prevout.hash);
     if (!coins || !coins->IsAvailable(prevout.n)) {
+        error("Coins not available");
         return false;
     }
 
     // Check for minimum height requirement
     if (p_Height - coins->nHeight < FLUXNODE_MIN_CONFIRMATION_DETERMINISTIC) {
+        error("Minimum height requirement not met");
         return false;
     }
 
     // Get the tier from the amount if possible
     if (!GetCoinTierFromAmount(p_Height, coins->vout[prevout.n].nValue, nTier)) {
+        error("Couldn't get coin tier from amount");
         return false;
     }
 

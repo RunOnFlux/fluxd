@@ -514,20 +514,20 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight =
-                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+                Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
 
 
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight =
-                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+                Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
 
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nProtocolVersion = 170018;
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight =
-                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+                Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
 
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight =
-                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+                Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
 
 
         // The best chain should have at least this much work.
@@ -611,14 +611,14 @@ public:
         nSwapPoolInterval = 10;
         nSwapPoolMaxTimes = 5;
 
-        nBeginCumulusTransition = 999999999;
-        nEndCumulusTransition = 999999999;
+        nBeginCumulusTransition = 0;
+        nEndCumulusTransition = 1000;
 
-        nBeginNimbusTransition = 999999999;
-        nEndNimbusTransition = 999999999;
+        nBeginNimbusTransition = 0;
+        nEndNimbusTransition = 1000;
 
-        nBeginStratusTransition = 999999999;
-        nEndStratusTransition = 999999999;
+        nBeginStratusTransition = 0;
+        nEndStratusTransition = 100;
 
         vecP2SHPublicKeys.resize(1);
         vecP2SHPublicKeys[0] = std::make_pair("04276f105ff36a670a56e75c2462cff05a4a7864756e6e1af01022e32752d6fe57b1e13cab4f2dbe3a6a51b4e0de83a5c4627345f5232151867850018c9a3c3a1d", 0);

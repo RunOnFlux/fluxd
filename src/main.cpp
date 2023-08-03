@@ -1200,10 +1200,24 @@ bool ContextualCheckTransaction(
                     strFailMessage = "fluxnode-tx-failed-to-extract-destination";
                 }
 
+                // enforce New V6 Tx Versions to only allow certain scripts per
+                if (!fFailure && tx.IsFluxnodeUpgradedNormalTx()) {
+                    if (coins.vout[outPoint.n].scriptPubKey.IsPayToScriptHash()) {
+                        fFailure = true;
+                        strFailMessage = "fluxnode-tx-normal-version-not-normal-script";
+                    }
+                }
+
+                // enforce New V6 Tx Versions to only allow certain scripts per
+                if (!fFailure && tx.IsFluxnodeUpgradedP2SHTx()) {
+                    if (!coins.vout[outPoint.n].scriptPubKey.IsPayToScriptHash()) {
+                        fFailure = true;
+                        strFailMessage = "fluxnode-tx-p2sh-version-not-p2sh-script";
+                    }
+                }
+
                 if (!fFailure && coins.vout[outPoint.n].scriptPubKey.IsPayToScriptHash()) {
-
                     // This could mean that it is either a flux foundation key or P2SH Nodes is active and this is one of those transactions
-
                     if (tx.IsFluxnodeUpgradedP2SHTx()) {
                         txnouttype type;
                         vector<CTxDestination> addresses;
