@@ -1175,6 +1175,156 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
     return obj;
 }
 
+// TODO - Remove this RPC call after testing is completed
+UniValue createp2shtx (const UniValue& params, bool fHelp)
+{
+    if (fHelp || (params.size() > 0))
+        throw runtime_error(
+                "createp2shtx \n"
+                          "\nGet fluxnode count values\n"
+
+                          "\nExamples:\n" +
+                HelpExampleCli("createp2shtx", "") + HelpExampleRpc("createp2shtx", ""));
+
+    UniValue obj(UniValue::VOBJ);
+
+    // Redeem Script Creation
+    std::string redeemScriptStr = "522103fbf6d13722d9347ce0daac19f8c8fecc164ced8b4e6b2fab38f2e916ae59fd5a210371b40b6462a858af3989226d80dfc8d93653a2f3c6535877e228e211cdbbcbad52ae"; // From Script Data
+    std::vector<unsigned char> redeemScriptData = ParseHex( redeemScriptStr);
+    CScript redeemScript(redeemScriptData.begin(), redeemScriptData.end());
+
+    // Collateral PubKey Creation
+    std::string collateralPubKeyStr = "0371b40b6462a858af3989226d80dfc8d93653a2f3c6535877e228e211cdbbcbad";
+    std::vector<unsigned char> collateralPubKeyData = ParseHex( collateralPubKeyStr);
+    CPubKey collateralPubKey(collateralPubKeyData);
+
+    // VPS PrivateKey Creation
+    std::string vpsPrivKeyStr = "cW47tjzJGK7HbxnYxLML5hwZ5pFTzcxDg5Furi4ikn3i1axvut3n";
+    CPubKey vpsPubKey;
+    CKey vpsKey;
+    std::string errorMessage;
+
+    // Test the VPS PrivateKey
+    if(!obfuScationSigner.SetKey(vpsPrivKeyStr, errorMessage, vpsKey, vpsPubKey)) {
+        return "VPS Key Failed to Set";
+    }
+
+    // Collateral In Creation
+    COutPoint collateralIn(uint256S("d984e4ae7edd3ceb145ade47a8b3656e87ae2e68cc5a9744df89b5ea4a9b044e"), 0);
+
+    // Collateral Key Creation that matches the collateral PubKey
+    CKey collateralKey;
+    CPubKey collateralPubKeyTemp;
+    std::string collateralPrivStr = "cR7qzVg8C14haxPmoLBudHtZraGaW4u1gLVVoaZq6yyqBgj6HuHg";
+
+    if(!obfuScationSigner.SetKey(collateralPrivStr, errorMessage, collateralKey, collateralPubKeyTemp)) {
+        return "Collateral Key Failed to Set";
+    }
+
+    if(!collateralKey.IsValid()) {
+        return "Collateral Key Not Valid";
+    }
+
+    // Create the transaction
+    CMutableTransaction mutableTransaction;
+
+    // Set the data for the P2SH Node Transaction
+    mutableTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
+    mutableTransaction.nFluxTxVersion = FLUXNODE_INTERNAL_P2SH_TX_VERSION;
+    mutableTransaction.nType = FLUXNODE_START_TX_TYPE;
+    mutableTransaction.collateralPubkey = collateralPubKey;
+    mutableTransaction.collateralIn = collateralIn;
+    mutableTransaction.P2SHRedeemScript = redeemScript;
+    mutableTransaction.pubKey = vpsPubKey;
+
+    CObfuScationSigner Signer;
+    std::string strMessage;
+    bool fFoundKey = false;
+
+    txnouttype type;
+    std::vector<CTxDestination> addresses;
+    std::vector<CPubKey> pubkeys;
+    int nRequired;
+
+    CScriptID inner;
+    CTxDestination destination;
+
+    //---------------------------- ACTUAL TESTS ----------------------------------------------------------
+
+    // Core Check 1 (Collateral PubKey is in the RedeemScript)
+    {
+        if(!ListPubKeysFromMultiSigScript(mutableTransaction.P2SHRedeemScript, type, addresses, pubkeys, nRequired)) {
+            return "Failed to Get PubKeys from multisig script";
+        }
+
+        fFoundKey = false;
+        for (int i = 0; i < pubkeys.size(); i++) {
+            if (mutableTransaction.collateralPubkey == pubkeys[i]) {
+                fFoundKey = true;
+                break;
+            }
+        }
+        if (!fFoundKey) {
+            return "Failed to find a collateral pubkey matching in the multisig script";
+        }
+    }
+
+    // Core Check 2 (The redeem script hash is the same as the address)
+    {
+        inner = CScriptID(mutableTransaction.P2SHRedeemScript);
+
+        CCoinsViewCache &view = *pcoinsTip;
+        const CCoins* existingCoins = view.AccessCoins(collateralIn.hash);
+        if (!existingCoins) {
+            return "Failed to find existing coins";
+        }
+
+       if (!ExtractDestination(existingCoins->vout[collateralIn.n].scriptPubKey, destination)) {
+           return "Failed to extract destinations";
+       }
+
+        if (EncodeDestination(destination) != EncodeDestination(inner)) {
+            return "Failed Addresses didn't match.";
+        }
+    }
+
+    // Core Check 3 (Signature Sign and Verify)
+    {
+        // Sign & Verify the transaction
+        mutableTransaction.sigTime = GetTime();
+
+        strMessage = mutableTransaction.GetHash().GetHex();
+
+        if (!Signer.SignMessage(strMessage, errorMessage, mutableTransaction.sig, collateralKey)) {
+            return "Failed to Sign Messasge";
+        }
+
+        if (!Signer.VerifyMessage(mutableTransaction.collateralPubkey, mutableTransaction.sig, strMessage, errorMessage)) {
+            return "Failed to Verify Message";
+        }
+    }
+
+    CTransaction tx(mutableTransaction);
+    CValidationState state;
+    bool fMissingInputs;
+    bool fOverrideFees;
+
+    if (!AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, !fOverrideFees)) {
+        if (state.IsInvalid()) {
+            throw JSONRPCError(RPC_TRANSACTION_REJECTED, strprintf("%i: %s", state.GetRejectCode(), state.GetRejectReason()));
+        } else {
+            if (fMissingInputs) {
+                throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
+            }
+            throw JSONRPCError(RPC_TRANSACTION_ERROR, state.GetRejectReason());
+        }
+    }
+
+    RelayTransaction(tx);
+
+    return tx.GetHash().GetHex();
+}
+
 UniValue getfluxnodecount (const UniValue& params, bool fHelp)
 {
     return getfluxnodecount(params, fHelp, __func__);
@@ -1476,6 +1626,7 @@ static const CRPCCommand commands[] =
                 { "fluxnode",   "getfluxnodestatus",      &getfluxnodestatus,      false  },
                 { "fluxnode",   "listfluxnodeconf",       &listfluxnodeconf,       false  },
                 { "hidden",     "rebuildfluxnodedb",      &rebuildfluxnodedb,      false  },
+                { "fluxnode",   "createp2shtx",      &createp2shtx,      false  },
 
                 { "fluxnode",   "startdeterministicfluxnode", &startdeterministicfluxnode, false },
                 { "fluxnode",   "viewdeterministicfluxnodelist", &viewdeterministicfluxnodelist, false },

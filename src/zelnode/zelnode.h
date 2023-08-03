@@ -230,7 +230,6 @@ public:
             LogPrintf("FLUXNODE_TX_TYPE_UPGRADED Found %d - %s    - nType = %d - TX-Type (%d), result = %d\n", __LINE__, __func__, nType, FLUXNODE_TX_TYPE_UPGRADED, nType ^ FLUXNODE_TX_TYPE_UPGRADED);
             READWRITE(nFluxTxVersion);
             READWRITE(nTransactionType);
-
             // Normal and P2SH data share most fields so for now we can just check at the end for P2SH
             READWRITE(collateralIn);
             READWRITE(collateralPubkey);
@@ -244,7 +243,7 @@ public:
             READWRITE(nStatus);
             READWRITE(nCollateral);
             if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
-                READWRITE(P2SHRedeemScript);
+                READWRITE(*(CScriptBase*)(&P2SHRedeemScript));
             }
         } else {
             // We must retain backwards compatibility with older transactions
