@@ -515,11 +515,11 @@ static constexpr uint32_t SAPLING_VERSION_GROUP_ID = 0x892F2085;
 static_assert(SAPLING_VERSION_GROUP_ID != 0, "version group id must be non-zero as specified in ZIP 202");
 
 enum {
-    FLUXNODE_NO_TYPE = 1 << 0, // 0001
-    FLUXNODE_START_TX_TYPE = 1 << 1, // 0010
-    FLUXNODE_CONFIRM_TX_TYPE = 1 << 2, // 0100
-    FLUXNODE_HAS_COLLATERAL= 1 << 3, // 1000
-    FLUXNODE_TX_TYPE_UPGRADED = 15, // 1111
+    FLUXNODE_NO_TYPE = 1 << 0, // 00000001
+    FLUXNODE_START_TX_TYPE = 1 << 1, // 00000010
+    FLUXNODE_CONFIRM_TX_TYPE = 1 << 2, // 00000100
+    FLUXNODE_HAS_COLLATERAL= 1 << 3, // 00001000
+    FLUXNODE_TX_TYPE_UPGRADED = 1 << 7, // 10000000
 };
 
 struct CMutableTransaction;
@@ -647,7 +647,7 @@ public:
         }
         if (nVersion == FLUXNODE_TX_VERSION) {
             READWRITE(*const_cast<int8_t *>(&nType));
-            if ((nType ^ FLUXNODE_START_TX_TYPE) == 0) {
+            if (nType == FLUXNODE_START_TX_TYPE) {
                 READWRITE(*const_cast<COutPoint *>(&collateralIn));
                 READWRITE(*const_cast<CPubKey *>(&collateralPubkey));
                 READWRITE(*const_cast<CPubKey *>(&pubKey));
@@ -655,7 +655,7 @@ public:
                 if (!(s.GetType() & SER_GETHASH))
                     READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
 
-            } else if ((nType ^ FLUXNODE_CONFIRM_TX_TYPE) == 0) {
+            } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
                 READWRITE(*const_cast<COutPoint *>(&collateralIn));
                 READWRITE(*const_cast<uint32_t *>(&sigTime));
                 READWRITE(*const_cast<int8_t *>(&benchmarkTier));
@@ -675,14 +675,14 @@ public:
             READWRITE(*const_cast<int8_t*>(&nType)); // Start, Confirm
             READWRITE(*const_cast<int32_t*>(&nFluxTxVersion)); // Normal or P2SH
             if (nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION) {
-                if ((nType ^ FLUXNODE_START_TX_TYPE) == 0) {
+                if (nType == FLUXNODE_START_TX_TYPE) {
                     READWRITE(*const_cast<COutPoint *>(&collateralIn));
                     READWRITE(*const_cast<CPubKey *>(&collateralPubkey));
                     READWRITE(*const_cast<CPubKey *>(&pubKey));
                     READWRITE(*const_cast<uint32_t *>(&sigTime));
                     if (!(s.GetType() & SER_GETHASH))
                         READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
-                } else if ((nType ^ FLUXNODE_CONFIRM_TX_TYPE) == 0) {
+                } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
                     READWRITE(*const_cast<COutPoint *>(&collateralIn));
                     READWRITE(*const_cast<uint32_t *>(&sigTime));
                     READWRITE(*const_cast<int8_t *>(&benchmarkTier));
@@ -695,7 +695,7 @@ public:
                     }
                 }
             } else if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
-                if ((nType ^ FLUXNODE_START_TX_TYPE) == 0) {
+                if (nType == FLUXNODE_START_TX_TYPE) {
                     READWRITE(*const_cast<COutPoint *>(&collateralIn));
                     READWRITE(*const_cast<CPubKey *>(&collateralPubkey));
                     READWRITE(*const_cast<CPubKey *>(&pubKey));
@@ -703,7 +703,7 @@ public:
                     READWRITE(*const_cast<uint32_t *>(&sigTime));
                     if (!(s.GetType() & SER_GETHASH))
                         READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
-                } else if ((nType ^ FLUXNODE_CONFIRM_TX_TYPE) == 0) {
+                } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
                     READWRITE(*const_cast<COutPoint *>(&collateralIn));
                     READWRITE(*const_cast<uint32_t *>(&sigTime));
                     READWRITE(*const_cast<int8_t *>(&benchmarkTier));
@@ -916,7 +916,7 @@ struct CMutableTransaction
         // We use the operator ^ which is xor. XOR will return 0/false if the numbers match, and true/1 if they don't
         if (nVersion == FLUXNODE_TX_VERSION) {
             READWRITE(nType);
-            if ((nType ^ FLUXNODE_START_TX_TYPE) == 0) {
+            if (nType == FLUXNODE_START_TX_TYPE) {
                 READWRITE(collateralIn);
                 READWRITE(collateralPubkey);
                 READWRITE(pubKey);
@@ -924,7 +924,7 @@ struct CMutableTransaction
                 if (!(s.GetType() & SER_GETHASH))
                     READWRITE(sig);
 
-            } else if ((nType ^ FLUXNODE_CONFIRM_TX_TYPE) == 0) {
+            } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
                 READWRITE(collateralIn);
                 READWRITE(sigTime);
                 READWRITE(benchmarkTier);
@@ -941,7 +941,7 @@ struct CMutableTransaction
             READWRITE(nType);
             READWRITE(nFluxTxVersion);
             if (nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION) {
-                if ((nType ^ FLUXNODE_START_TX_TYPE) == 0) {
+                if (nType == FLUXNODE_START_TX_TYPE) {
                     READWRITE(collateralIn);
                     READWRITE(collateralPubkey);
                     READWRITE(pubKey);
@@ -949,7 +949,7 @@ struct CMutableTransaction
                     if (!(s.GetType() & SER_GETHASH))
                         READWRITE(sig);
 
-                } else if ((nType ^ FLUXNODE_CONFIRM_TX_TYPE) == 0) {
+                } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
                     READWRITE(collateralIn);
                     READWRITE(sigTime);
                     READWRITE(benchmarkTier);
@@ -962,7 +962,7 @@ struct CMutableTransaction
                     }
                 }
             } else if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
-                if ((nType ^ FLUXNODE_START_TX_TYPE) == 0) {
+                if (nType == FLUXNODE_START_TX_TYPE) {
                     READWRITE(collateralIn);
                     READWRITE(collateralPubkey);
                     READWRITE(pubKey);
@@ -971,7 +971,7 @@ struct CMutableTransaction
                     if (!(s.GetType() & SER_GETHASH))
                         READWRITE(sig);
 
-                } else if ((nType ^ FLUXNODE_CONFIRM_TX_TYPE) == 0) {
+                } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
                     READWRITE(collateralIn);
                     READWRITE(sigTime);
                     READWRITE(benchmarkTier);
