@@ -243,7 +243,8 @@ public:
             (1040000, uint256S("0x00000007f3b465bd4b0e161e43c05a3d946144330e33ea3a91cb952e6ef86b7d"))
             (1040577, uint256S("0x000000071fe89682ac260bc0a49621344eb28ae01659c9e7ce86e3762e45f52d"))
             (1042126, uint256S("0x0000000295e4663178fd9e533787e74206645910a2bfb61938db5f67796eaad0"))
-            (1060000, uint256S("0x0000000fd721d8d381c4b24a4f78fc036955d7a0f98d2765b8c7badad8b66c1b")),
+            (1060000, uint256S("0x0000000fd721d8d381c4b24a4f78fc036955d7a0f98d2765b8c7badad8b66c1b"))
+            (1442798, uint256S("0x0000000cc561fecb2ecfd22ba7af09450ca8cf270f407ce8b948195ff2aa0d13")),
             1645201099,     // * UNIX timestamp of last checkpoint block
             17772234,              // * total number of transactions between genesis and last checkpoint
                             //   (the tx=... number in the SetBestChain debug.log lines)
@@ -340,18 +341,17 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 420;
 
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nProtocolVersion = 170018;
-        consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight = 18000;
+        consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight = 520;
 
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
-        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight = 20000;
-
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight = 600;
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 10;
 
         eh_epoch_1 = eh48_5;
         eh_epoch_2 = eh48_5;
-        eh_epoch_3 = zelHash;
+        eh_epoch_3 = eh48_5;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
