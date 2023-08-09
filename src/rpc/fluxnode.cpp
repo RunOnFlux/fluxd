@@ -23,6 +23,7 @@
 #include <fstream>
 #include <consensus/validation.h>
 #include <undo.h>
+#include "core_io.h"
 
 #define MICRO 0.000001
 #define MILLI 0.001
@@ -1176,11 +1177,11 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
 }
 
 // TODO - Remove this RPC call after testing is completed
-UniValue createp2shtx (const UniValue& params, bool fHelp)
+UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 {
-    if (fHelp || (params.size() > 0))
+    if (fHelp || (params.size() != 5))
         throw runtime_error(
-                "createp2shtx \n"
+                "createp2shstarttx \n"
                           "\nGet fluxnode count values\n"
 
                           "\nExamples:\n" +
@@ -1188,42 +1189,27 @@ UniValue createp2shtx (const UniValue& params, bool fHelp)
 
     UniValue obj(UniValue::VOBJ);
 
-    // Redeem Script Creation
-    std::string redeemScriptStr = "522103fbf6d13722d9347ce0daac19f8c8fecc164ced8b4e6b2fab38f2e916ae59fd5a210371b40b6462a858af3989226d80dfc8d93653a2f3c6535877e228e211cdbbcbad52ae"; // From Script Data
-    std::vector<unsigned char> redeemScriptData = ParseHex( redeemScriptStr);
+
+    // Get data from the parameters
+    std::string strRedeemScript = params[0].get_str();
+    std::string strCollateralPubKey = params[1].get_str();
+    std::string strVpsPubKey = params[2].get_str();
+    std::string strCollateralTransactionHash = params[3].get_str();
+    int nCollateralIndex = params[4].get_int();
+
+
+    // Process data into useable objects
+    std::vector<unsigned char> redeemScriptData = ParseHex( strRedeemScript);
     CScript redeemScript(redeemScriptData.begin(), redeemScriptData.end());
 
-    // Collateral PubKey Creation
-    std::string collateralPubKeyStr = "0371b40b6462a858af3989226d80dfc8d93653a2f3c6535877e228e211cdbbcbad";
-    std::vector<unsigned char> collateralPubKeyData = ParseHex( collateralPubKeyStr);
+    std::vector<unsigned char> collateralPubKeyData = ParseHex( strCollateralPubKey);
     CPubKey collateralPubKey(collateralPubKeyData);
 
-    // VPS PrivateKey Creation
-    std::string vpsPrivKeyStr = "cW47tjzJGK7HbxnYxLML5hwZ5pFTzcxDg5Furi4ikn3i1axvut3n";
-    CPubKey vpsPubKey;
-    CKey vpsKey;
-    std::string errorMessage;
+    // Collateral PubKey Creation
+    std::vector<unsigned char> vpsPubKeyData = ParseHex( strVpsPubKey);
+    CPubKey vpsPubKey(vpsPubKeyData);
 
-    // Test the VPS PrivateKey
-    if(!obfuScationSigner.SetKey(vpsPrivKeyStr, errorMessage, vpsKey, vpsPubKey)) {
-        return "VPS Key Failed to Set";
-    }
-
-    // Collateral In Creation
-    COutPoint collateralIn(uint256S("d984e4ae7edd3ceb145ade47a8b3656e87ae2e68cc5a9744df89b5ea4a9b044e"), 0);
-
-    // Collateral Key Creation that matches the collateral PubKey
-    CKey collateralKey;
-    CPubKey collateralPubKeyTemp;
-    std::string collateralPrivStr = "cR7qzVg8C14haxPmoLBudHtZraGaW4u1gLVVoaZq6yyqBgj6HuHg";
-
-    if(!obfuScationSigner.SetKey(collateralPrivStr, errorMessage, collateralKey, collateralPubKeyTemp)) {
-        return "Collateral Key Failed to Set";
-    }
-
-    if(!collateralKey.IsValid()) {
-        return "Collateral Key Not Valid";
-    }
+    COutPoint collateralIn(uint256S(strCollateralTransactionHash), nCollateralIndex);
 
     // Create the transaction
     CMutableTransaction mutableTransaction;
@@ -1237,19 +1223,14 @@ UniValue createp2shtx (const UniValue& params, bool fHelp)
     mutableTransaction.P2SHRedeemScript = redeemScript;
     mutableTransaction.pubKey = vpsPubKey;
 
-    CObfuScationSigner Signer;
-    std::string strMessage;
-    bool fFoundKey = false;
-
+    // Variables needed for List PubKeys Call
     txnouttype type;
     std::vector<CTxDestination> addresses;
     std::vector<CPubKey> pubkeys;
     int nRequired;
 
-    CScriptID inner;
-    CTxDestination destination;
-
-    //---------------------------- ACTUAL TESTS ----------------------------------------------------------
+    std::string strMessage;
+    bool fFoundKey = false;
 
     // Core Check 1 (Collateral PubKey is in the RedeemScript)
     {
@@ -1265,9 +1246,13 @@ UniValue createp2shtx (const UniValue& params, bool fHelp)
             }
         }
         if (!fFoundKey) {
-            return "Failed to find a collateral pubkey matching in the multisig script";
+            return "Collateral Pubkey not found in the RedeemScript";
         }
     }
+
+    // Variables needed for scripthash check
+    CScriptID inner;
+    CTxDestination destination;
 
     // Core Check 2 (The redeem script hash is the same as the address)
     {
@@ -1276,17 +1261,77 @@ UniValue createp2shtx (const UniValue& params, bool fHelp)
         CCoinsViewCache &view = *pcoinsTip;
         const CCoins* existingCoins = view.AccessCoins(collateralIn.hash);
         if (!existingCoins) {
-            return "Failed to find existing coins";
+            return "Coins not found in chain. Double check your inputs";
         }
 
-       if (!ExtractDestination(existingCoins->vout[collateralIn.n].scriptPubKey, destination)) {
-           return "Failed to extract destinations";
-       }
+        if (!ExtractDestination(existingCoins->vout[collateralIn.n].scriptPubKey, destination)) {
+            return "Failed to extract destination from coins";
+        }
 
         if (EncodeDestination(destination) != EncodeDestination(inner)) {
-            return "Failed Addresses didn't match.";
+            return "Address didn't match the RedeemScript Hash";
         }
     }
+
+    return EncodeHexTx(mutableTransaction);
+}
+
+UniValue signp2shstarttx(const UniValue& params, bool fHelp)
+{
+    if (fHelp || (params.size() != 2))
+        throw runtime_error(
+                "signp2shstarttx \n"
+                "\nGet fluxnode count values\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("signp2shstarttx", "") + HelpExampleRpc("signp2shstarttx", ""));
+
+    std::string strRawTx = params[0].get_str();
+    std::string strPrivateKey = params[1].get_str();
+
+    CTransaction tx;
+    DecodeHexTx(tx, strRawTx);
+
+    CPubKey pubKey;
+    CKey key;
+    std::string errorMessage;
+
+    // Test the VPS PrivateKey
+    if(!obfuScationSigner.SetKey(strPrivateKey, errorMessage, key, pubKey)) {
+        return "Private Key Invalid";
+    }
+
+    CMutableTransaction mutableTransaction(tx);
+    CObfuScationSigner Signer;
+
+    txnouttype type;
+    std::vector<CTxDestination> addresses;
+    std::vector<CPubKey> pubkeys;
+    int nRequired;
+
+    std::string strMessage;
+    bool fFoundKey = false;
+
+    // Core Check 1 (Collateral PubKey is in the RedeemScript)
+    {
+        if(!ListPubKeysFromMultiSigScript(mutableTransaction.P2SHRedeemScript, type, addresses, pubkeys, nRequired)) {
+            return "signp2shstarttx - Failed to Get PubKeys from multisig script";
+        }
+
+        fFoundKey = false;
+        for (int i = 0; i < pubkeys.size(); i++) {
+            if (mutableTransaction.collateralPubkey == pubkeys[i]) {
+                fFoundKey = true;
+                break;
+            }
+        }
+        if (!fFoundKey) {
+            return "signp2shstarttx - Collateral Pubkey not found in the RedeemScript";
+        }
+    }
+
+    // TODO - we could do core check 2 here, but if we want to be able
+    // TODO - to sign on a node that isn't synced to the tip of the chain we can skip it
 
     // Core Check 3 (Signature Sign and Verify)
     {
@@ -1295,7 +1340,7 @@ UniValue createp2shtx (const UniValue& params, bool fHelp)
 
         strMessage = mutableTransaction.GetHash().GetHex();
 
-        if (!Signer.SignMessage(strMessage, errorMessage, mutableTransaction.sig, collateralKey)) {
+        if (!Signer.SignMessage(strMessage, errorMessage, mutableTransaction.sig, key)) {
             return "Failed to Sign Messasge";
         }
 
@@ -1304,7 +1349,51 @@ UniValue createp2shtx (const UniValue& params, bool fHelp)
         }
     }
 
-    CTransaction tx(mutableTransaction);
+    return EncodeHexTx(mutableTransaction);
+}
+
+UniValue sendp2shstarttx(const UniValue& params, bool fHelp)
+{
+    if (fHelp || (params.size() != 1))
+        throw runtime_error(
+                "sendp2shstarttx \n"
+                "\nGet fluxnode count values\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("sendp2shstarttx", "") + HelpExampleRpc("sendp2shstarttx", ""));
+
+    std::string strRawTx = params[0].get_str();
+
+    CTransaction tx;
+    DecodeHexTx(tx, strRawTx);
+
+    txnouttype type;
+    std::vector<CTxDestination> addresses;
+    std::vector<CPubKey> pubkeys;
+    int nRequired;
+
+    std::string strMessage;
+    bool fFoundKey = false;
+
+    // Core Check 1 (Collateral PubKey is in the RedeemScript)
+    {
+        if(!ListPubKeysFromMultiSigScript(tx.P2SHRedeemScript, type, addresses, pubkeys, nRequired)) {
+            return "sendp2shstarttx - Failed to Get PubKeys from multisig script";
+        }
+
+        fFoundKey = false;
+        for (int i = 0; i < pubkeys.size(); i++) {
+            if (tx.collateralPubkey == pubkeys[i]) {
+                fFoundKey = true;
+                break;
+            }
+        }
+        if (!fFoundKey) {
+            return "sendp2shstarttx - Collateral Pubkey not found in the RedeemScript";
+        }
+    }
+
+
     CValidationState state;
     bool fMissingInputs;
     bool fOverrideFees;
@@ -1626,7 +1715,9 @@ static const CRPCCommand commands[] =
                 { "fluxnode",   "getfluxnodestatus",      &getfluxnodestatus,      false  },
                 { "fluxnode",   "listfluxnodeconf",       &listfluxnodeconf,       false  },
                 { "hidden",     "rebuildfluxnodedb",      &rebuildfluxnodedb,      false  },
-                { "fluxnode",   "createp2shtx",      &createp2shtx,      false  },
+                { "fluxnode",   "createp2shstarttx",      &createp2shstarttx,      false  },
+                { "fluxnode",   "signp2shstarttx",      &signp2shstarttx,      false  },
+                { "fluxnode",   "sendp2shstarttx",      &sendp2shstarttx,      false  },
 
                 { "fluxnode",   "startdeterministicfluxnode", &startdeterministicfluxnode, false },
                 { "fluxnode",   "viewdeterministicfluxnodelist", &viewdeterministicfluxnodelist, false },
