@@ -24,6 +24,7 @@
 #include <consensus/validation.h>
 #include <undo.h>
 #include "core_io.h"
+#include "boost/assign/list_of.hpp"
 
 #define MICRO 0.000001
 #define MILLI 0.001
@@ -1176,18 +1177,38 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
     return obj;
 }
 
-// TODO - Remove this RPC call after testing is completed
 UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 {
     if (fHelp || (params.size() != 5))
         throw runtime_error(
-                "createp2shstarttx \n"
-                          "\nGet fluxnode count values\n"
+                "createp2shstarttx \"redeemscript\" \"collateralpubkey\" \"vpspubkey\" \"txid\" index\n"
+                "\nCreate a transaction spending the given inputs and sending to the given addresses.\n"
+                "Returns hex-encoded raw transaction.\n"
+                "Note that the transaction's inputs are not signed, and\n"
+                "it is not stored in the wallet or transmitted to the network.\n"
 
-                          "\nExamples:\n" +
-                HelpExampleCli("createp2shtx", "") + HelpExampleRpc("createp2shtx", ""));
+                "\nArguments:\n"
+                "1. \"redeemscript\"        (string, required) The redeemscript of the multisig address that hold the collateral for the fluxnode\n"
+                "2. \"collateralpubkey\"    (string, required) The pubkey that belongs to the redeemscript that you will be signing this fluxnode start transaction with\n"
+                "3. \"vpspubkey\"           (string, required) The pubkey the the fluxnode server will use to confirm fluxnode transactions\n"
+                "4. \"txid\"                (string, required) the transaction hash of the collateral input\n"
+                "5. \"index\"               (number, required) the index of the transaction collateral input\n"
 
-    UniValue obj(UniValue::VOBJ);
+                "\nResult:\n"
+                "\"transaction\"            (string) hex string of the transaction\n"
+
+                "\nExamples\n"
+                + HelpExampleCli("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
+                                                      " \"0359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9\""
+                                                      " \"02d8ada61e8847722e91cc652082174e8b6b2844661d518e0eb78e65790f3b451c\""
+                                                      " \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\" 0")
+                + HelpExampleRpc("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
+                                                      " \"0359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9\""
+                                                      " \"02d8ada61e8847722e91cc652082174e8b6b2844661d518e0eb78e65790f3b451c\""
+                                                      " \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\" 0"));
+
+
+    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR)(UniValue::VSTR)(UniValue::VSTR)(UniValue::VNUM), false);
 
 
     // Get data from the parameters
@@ -1235,7 +1256,7 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
     // Core Check 1 (Collateral PubKey is in the RedeemScript)
     {
         if(!ListPubKeysFromMultiSigScript(mutableTransaction.P2SHRedeemScript, type, addresses, pubkeys, nRequired)) {
-            return "Failed to Get PubKeys from multisig script";
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Failed to get pubkeys from redeemscript");
         }
 
         fFoundKey = false;
@@ -1246,7 +1267,7 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
             }
         }
         if (!fFoundKey) {
-            return "Collateral Pubkey not found in the RedeemScript";
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Collateral pubkey not in Redeemscript");
         }
     }
 
@@ -1261,15 +1282,15 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
         CCoinsViewCache &view = *pcoinsTip;
         const CCoins* existingCoins = view.AccessCoins(collateralIn.hash);
         if (!existingCoins) {
-            return "Coins not found in chain. Double check your inputs";
+            throw JSONRPCError(RPC_VERIFY_ERROR, "Coins not found in chain");
         }
 
         if (!ExtractDestination(existingCoins->vout[collateralIn.n].scriptPubKey, destination)) {
-            return "Failed to extract destination from coins";
+            throw JSONRPCError(RPC_VERIFY_ERROR, "Couldn't extract destination from coins");
         }
 
         if (EncodeDestination(destination) != EncodeDestination(inner)) {
-            return "Address didn't match the RedeemScript Hash";
+            throw JSONRPCError(RPC_VERIFY_ERROR, "Address not matching Redeemscript hash");
         }
     }
 
@@ -1278,44 +1299,76 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 
 UniValue signp2shstarttx(const UniValue& params, bool fHelp)
 {
-    if (fHelp || (params.size() != 2))
+    if (fHelp || (params.size() < 1 || params.size() > 2))
         throw runtime_error(
                 "signp2shstarttx \n"
-                "\nGet fluxnode count values\n"
+                "\nSign a Multisig Fluxnode Start Transaction\n"
+                "\nArguments:\n"
+                "1. rawtxhex         (string, required) The raw hex for the multisig Fluxnode start transaction\n"
+                "2. privatekey  (string, optional) The privatekey that will sign the transaction if not owned by the local wallet\n"
+
+                "\nResult:\n"
+                "\"SignedTx\"     (string) The raw hex of the signed transaction\n"
 
                 "\nExamples:\n" +
-                HelpExampleCli("signp2shstarttx", "") + HelpExampleRpc("signp2shstarttx", ""));
+                HelpExampleCli("signp2shstarttx", "\"rawtransactionhex\" \"privatekey\"") + HelpExampleRpc("signp2shstarttx", ""));
+
+#ifdef ENABLE_WALLET
+    LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
+#else
+    LOCK(cs_main);
+#endif
+    if (params.size() == 1) {
+        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR), false);
+    } else {
+        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR), false);
+    }
 
     std::string strRawTx = params[0].get_str();
-    std::string strPrivateKey = params[1].get_str();
 
     CTransaction tx;
-    DecodeHexTx(tx, strRawTx);
+    bool fTx = DecodeHexTx(tx, strRawTx);
 
-    CPubKey pubKey;
+    if (!fTx) {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+    }
+
+    bool fGivenKeys = false;
     CKey key;
-    std::string errorMessage;
 
-    // Test the VPS PrivateKey
-    if(!obfuScationSigner.SetKey(strPrivateKey, errorMessage, key, pubKey)) {
-        return "Private Key Invalid";
+    // If key is provided
+    if (params.size() > 1) {
+        fGivenKeys = true;
+        key = DecodeSecret(params[1].get_str());
+        if (!key.IsValid())
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
+    } else {
+
+#ifdef ENABLE_WALLET
+        if (pwalletMain)
+            EnsureWalletIsUnlocked();
+#endif
+        // If key isn't provided, see if our wallet owns it
+        const CKeyID keyID = tx.collateralPubkey.GetID();
+
+        if (!pwalletMain->GetKey(keyID, key)) {
+            throw JSONRPCError(RPC_WALLET_ERROR, "Private key not available");
+        }
     }
 
     CMutableTransaction mutableTransaction(tx);
-    CObfuScationSigner Signer;
 
     txnouttype type;
     std::vector<CTxDestination> addresses;
     std::vector<CPubKey> pubkeys;
     int nRequired;
 
-    std::string strMessage;
     bool fFoundKey = false;
 
     // Core Check 1 (Collateral PubKey is in the RedeemScript)
     {
         if(!ListPubKeysFromMultiSigScript(mutableTransaction.P2SHRedeemScript, type, addresses, pubkeys, nRequired)) {
-            return "signp2shstarttx - Failed to Get PubKeys from multisig script";
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Failed to get pubkeys from redeemscript");
         }
 
         fFoundKey = false;
@@ -1326,7 +1379,7 @@ UniValue signp2shstarttx(const UniValue& params, bool fHelp)
             }
         }
         if (!fFoundKey) {
-            return "signp2shstarttx - Collateral Pubkey not found in the RedeemScript";
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Collateral pubkey not in Redeemscript");
         }
     }
 
@@ -1335,17 +1388,21 @@ UniValue signp2shstarttx(const UniValue& params, bool fHelp)
 
     // Core Check 3 (Signature Sign and Verify)
     {
+        std::string strMessage;
+        std::string errorMessage;
+        CObfuScationSigner Signer;
+
         // Sign & Verify the transaction
         mutableTransaction.sigTime = GetTime();
 
         strMessage = mutableTransaction.GetHash().GetHex();
 
         if (!Signer.SignMessage(strMessage, errorMessage, mutableTransaction.sig, key)) {
-            return "Failed to Sign Messasge";
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Failed to sign transaction");
         }
 
         if (!Signer.VerifyMessage(mutableTransaction.collateralPubkey, mutableTransaction.sig, strMessage, errorMessage)) {
-            return "Failed to Verify Message";
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Signature Verify Failed");
         }
     }
 
@@ -1357,10 +1414,17 @@ UniValue sendp2shstarttx(const UniValue& params, bool fHelp)
     if (fHelp || (params.size() != 1))
         throw runtime_error(
                 "sendp2shstarttx \n"
-                "\nGet fluxnode count values\n"
+                "\nBroadcast a Multisig Fluxnode Start Transaction\n"
+                "\nArguments:\n"
+                "1. rawtx         (string, required) The raw hex for the multisig Fluxnode start transaction\n"
+
+                "\nResult:\n"
+                "\"txhash\"     (string) The hash of the transaction that is broadcast to the network\n"
 
                 "\nExamples:\n" +
-                HelpExampleCli("sendp2shstarttx", "") + HelpExampleRpc("sendp2shstarttx", ""));
+                HelpExampleCli("sendp2shstarttx", "\"rawtransactionhex\"") + HelpExampleRpc("sendp2shstarttx", "\"rawtransactionhex\""));
+
+    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR), false);
 
     std::string strRawTx = params[0].get_str();
 
@@ -1378,7 +1442,7 @@ UniValue sendp2shstarttx(const UniValue& params, bool fHelp)
     // Core Check 1 (Collateral PubKey is in the RedeemScript)
     {
         if(!ListPubKeysFromMultiSigScript(tx.P2SHRedeemScript, type, addresses, pubkeys, nRequired)) {
-            return "sendp2shstarttx - Failed to Get PubKeys from multisig script";
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Failed to get pubkeys from redeemscript");
         }
 
         fFoundKey = false;
@@ -1389,7 +1453,7 @@ UniValue sendp2shstarttx(const UniValue& params, bool fHelp)
             }
         }
         if (!fFoundKey) {
-            return "sendp2shstarttx - Collateral Pubkey not found in the RedeemScript";
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Collateral pubkey not found in redeemscript");
         }
     }
 

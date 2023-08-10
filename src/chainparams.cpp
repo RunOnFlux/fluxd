@@ -441,14 +441,14 @@ public:
         nSwapPoolInterval = 100;
         nSwapPoolMaxTimes = 10;
 
-        nBeginCumulusTransition = 18000;
-        nEndCumulusTransition = 24000;
+        nBeginCumulusTransition = 420;
+        nEndCumulusTransition = 520;
 
-        nBeginNimbusTransition = 22000;
-        nEndNimbusTransition = 28000;
+        nBeginNimbusTransition = 420;
+        nEndNimbusTransition = 520;
 
-        nBeginStratusTransition = 26000;
-        nEndStratusTransition = 32000;
+        nBeginStratusTransition = 420;
+        nEndStratusTransition = 520;
 
         vecP2SHPublicKeys.resize(1);
         vecP2SHPublicKeys[0] = std::make_pair("04276f105ff36a670a56e75c2462cff05a4a7864756e6e1af01022e32752d6fe57b1e13cab4f2dbe3a6a51b4e0de83a5c4627345f5232151867850018c9a3c3a1d", 0);
