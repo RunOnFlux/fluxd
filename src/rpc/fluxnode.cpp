@@ -173,7 +173,7 @@ UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
 
                             fluxnodeCache.AddNewConfirm(tx, rescanIndex->nHeight);
                             int64_t nLoop4 = GetTimeMicros(); nAddNewConfirm += nLoop4 - nLoop2;
-                        } else if (tx.nUpdateType ^ FluxnodeUpdateType::UPDATE_CONFIRM == 0) {
+                        } else if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
                             fluxnodeCache.AddUpdateConfirm(tx, rescanIndex->nHeight);
                             FluxnodeCacheData global_data = g_fluxnodeCache.GetFluxnodeData(tx.collateralIn);
                             if (global_data.IsNull()) {
