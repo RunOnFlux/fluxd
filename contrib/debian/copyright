@@ -81,7 +81,7 @@ Copyright: 2008, Steven G. Johnson <stevenj@alum.mit.edu>
  2011, Daniel Richard G. <skunk@iSKUNK.ORG>
 License: GPLv3-or-later-with-Autoconf-exception
 
-Files: qa/zelcash/checksec.sh
+Files: qa/flux/checksec.sh
 Copyright: 2009-2011, Tobias Klein
 License: BSD-3clause-Tobias-Klein
 

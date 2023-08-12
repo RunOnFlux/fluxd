@@ -10,8 +10,8 @@
 #include "amount.h"
 #include "primitives/transaction.h"
 #include "transaction_builder.h"
-#include "zelcash/JoinSplit.hpp"
-#include "zelcash/Address.hpp"
+#include "flux/JoinSplit.hpp"
+#include "flux/Address.hpp"
 #include "wallet.h"
 #include "wallet/paymentdisclosure.h"
 

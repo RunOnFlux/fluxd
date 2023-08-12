@@ -8,7 +8,7 @@
 #include "consensus/validation.h"
 #include "main.h"
 #include "utiltest.h"
-#include "zelcash/Proof.hpp"
+#include "flux/Proof.hpp"
 
 class MockCValidationState : public CValidationState {
 public:

@@ -10,8 +10,8 @@
 #include "serialize.h"
 #include "streams.h"
 #include "support/allocators/secure.h"
-#include "zelcash/Address.hpp"
-#include "zelcash/zip32.h"
+#include "flux/Address.hpp"
+#include "flux/zip32.h"
 
 class uint256;
 

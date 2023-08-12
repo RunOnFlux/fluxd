@@ -14,7 +14,7 @@
 #include "serialize.h"
 
 #include "Zelcash.h"
-#include "zelcash/util.h"
+#include "flux/util.h"
 
 namespace libflux {
 

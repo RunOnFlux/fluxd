@@ -9,7 +9,7 @@
 #include "streams.h"
 #include <librustzcash.h>
 
-const unsigned char ZELCASH_SAPLING_FVFP_PERSONALIZATION[crypto_generichash_blake2b_PERSONALBYTES] =
+const unsigned char FLUX_SAPLING_FVFP_PERSONALIZATION[crypto_generichash_blake2b_PERSONALBYTES] =
     {'Z', 'e', 'l','c', 'a', 's', 'h', 'A', 'c', 'a', 'd', 'i', 'a', 'F', 'V', 'F'};
 
 namespace libflux {
@@ -81,7 +81,7 @@ bool SaplingFullViewingKey::is_valid() const {
 }
 
 uint256 SaplingFullViewingKey::GetFingerprint() const {
-    CBLAKE2bWriter ss(SER_GETHASH, 0, ZELCASH_SAPLING_FVFP_PERSONALIZATION);
+    CBLAKE2bWriter ss(SER_GETHASH, 0, FLUX_SAPLING_FVFP_PERSONALIZATION);
     ss << *this;
     return ss.GetHash();
 }

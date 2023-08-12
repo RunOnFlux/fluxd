@@ -15,9 +15,9 @@
 #include "transaction_builder.h"
 #include "utiltest.h"
 #include "wallet/wallet.h"
-#include "zelcash/JoinSplit.hpp"
-#include "zelcash/Note.hpp"
-#include "zelcash/NoteEncryption.hpp"
+#include "flux/JoinSplit.hpp"
+#include "flux/Note.hpp"
+#include "flux/NoteEncryption.hpp"
 
 #include <boost/filesystem.hpp>
 

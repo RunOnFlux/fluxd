@@ -12,8 +12,8 @@ https://fluxwhitepaper.app.runonflux.io/?_gl=1*egc2l8*_ga*NTM5NTY4MDM1LjE2Mjg5ND
 
 #include "uint256.h"
 #include "uint252.h"
-#include "zelcash/Zelcash.h"
-#include "zelcash/Address.hpp"
+#include "flux/Zelcash.h"
+#include "flux/Address.hpp"
 
 #include <array>
 

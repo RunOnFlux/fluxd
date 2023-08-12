@@ -5,7 +5,7 @@
 
 #include <utilstrencodings.h>
 #include <test/test_bitcoin.h>
-#include <zelcash/NoteEncryption.hpp>
+#include <flux/NoteEncryption.hpp>
 
 #include <boost/test/unit_test.hpp>
 

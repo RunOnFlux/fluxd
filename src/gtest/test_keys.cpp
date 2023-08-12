@@ -4,8 +4,8 @@
 
 #include <chainparams.h>
 #include <key_io.h>
-#include <zelcash/Address.hpp>
-#include <zelcash/zip32.h>
+#include <flux/Address.hpp>
+#include <flux/zip32.h>
 
 #include "utiltest.h"
 

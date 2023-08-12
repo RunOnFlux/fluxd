@@ -11,7 +11,7 @@
 #include "rpc/protocol.h"
 #include "transaction_builder.h"
 #include "utiltest.h"
-#include "zelcash/Address.hpp"
+#include "flux/Address.hpp"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

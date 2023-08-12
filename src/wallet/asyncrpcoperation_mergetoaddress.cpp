@@ -26,7 +26,7 @@
 #include "wallet.h"
 #include "walletdb.h"
 #include "wallet/paymentdisclosuredb.h"
-#include "zelcash/IncrementalMerkleTree.hpp"
+#include "flux/IncrementalMerkleTree.hpp"
 
 #include <chrono>
 #include <iostream>

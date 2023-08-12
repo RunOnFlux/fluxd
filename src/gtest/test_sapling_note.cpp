@@ -4,8 +4,8 @@
 
 #include <gtest/gtest.h>
 
-#include "zelcash/Address.hpp"
-#include "zelcash/Note.hpp"
+#include "flux/Address.hpp"
+#include "flux/Note.hpp"
 
 #include "amount.h"
 #include "random.h"

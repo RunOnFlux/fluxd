@@ -8,10 +8,10 @@
 #include <array>
 #include <stdexcept>
 
-#include "zelcash/Note.hpp"
-#include "zelcash/NoteEncryption.hpp"
-#include "zelcash/prf.h"
-#include "zelcash/Address.hpp"
+#include "flux/Note.hpp"
+#include "flux/NoteEncryption.hpp"
+#include "flux/prf.h"
+#include "flux/Address.hpp"
 #include "crypto/sha256.h"
 #include "librustzcash.h"
 

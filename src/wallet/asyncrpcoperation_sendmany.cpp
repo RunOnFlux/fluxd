@@ -24,7 +24,7 @@
 #include "walletdb.h"
 #include "script/interpreter.h"
 #include "utiltime.h"
-#include "zelcash/IncrementalMerkleTree.hpp"
+#include "flux/IncrementalMerkleTree.hpp"
 #include "sodium.h"
 #include "miner.h"
 #include "wallet/paymentdisclosuredb.h"

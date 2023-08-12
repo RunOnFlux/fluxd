@@ -11,8 +11,8 @@
 #include "wallet/db.h"
 #include "key.h"
 #include "keystore.h"
-#include "zelcash/Address.hpp"
-#include "zelcash/zip32.h"
+#include "flux/Address.hpp"
+#include "flux/zip32.h"
 
 #include <list>
 #include <stdint.h>

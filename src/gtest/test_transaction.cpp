@@ -5,8 +5,8 @@
 #include <gtest/gtest.h>
 
 #include "primitives/transaction.h"
-#include "zelcash/Note.hpp"
-#include "zelcash/Address.hpp"
+#include "flux/Note.hpp"
+#include "flux/Address.hpp"
 #include "utilstrencodings.h"
 #include "key.h"
 #include "key_io.h"

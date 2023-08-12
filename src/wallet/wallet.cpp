@@ -23,10 +23,10 @@
 #include "script/sign.h"
 #include "timedata.h"
 #include "utilmoneystr.h"
-#include "zelcash/Note.hpp"
+#include "flux/Note.hpp"
 #include "crypter.h"
 #include "wallet/asyncrpcoperation_saplingmigration.h"
-#include "zelcash/zip32.h"
+#include "flux/zip32.h"
 
 #include <assert.h>
 

@@ -21,10 +21,10 @@
 #include <netbase.h>
 #include <pubkey.h>
 
-#include "zelcash/NoteEncryption.hpp"
-#include "zelcash/Zelcash.h"
-#include "zelcash/JoinSplit.hpp"
-#include "zelcash/Proof.hpp"
+#include "flux/NoteEncryption.hpp"
+#include "flux/Zelcash.h"
+#include "flux/JoinSplit.hpp"
+#include "flux/Proof.hpp"
 
 #define JOINSPLIT_SIZE GetSerializeSize(JSDescription(), SER_NETWORK, PROTOCOL_VERSION)
 #define OUTPUTDESCRIPTION_SIZE GetSerializeSize(OutputDescription(), SER_NETWORK, PROTOCOL_VERSION)

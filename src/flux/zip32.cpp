@@ -9,7 +9,7 @@
 #include "random.h"
 #include "streams.h"
 #include "version.h"
-#include "zelcash/prf.h"
+#include "flux/prf.h"
 
 #include <librustzcash.h>
 #include <sodium.h>

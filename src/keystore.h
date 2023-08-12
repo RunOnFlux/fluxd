@@ -12,9 +12,9 @@
 #include "script/script.h"
 #include "script/standard.h"
 #include "sync.h"
-#include "zelcash/Address.hpp"
-#include "zelcash/NoteEncryption.hpp"
-#include "zelcash/zip32.h"
+#include "flux/Address.hpp"
+#include "flux/NoteEncryption.hpp"
+#include "flux/zip32.h"
 
 #include <boost/signals2/signal.hpp>
 #include <boost/variant.hpp>

@@ -3,7 +3,7 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include <gtest/gtest.h>
-#include "zelcash/util.h"
+#include "flux/util.h"
 
 TEST(libflux_utils, convertBytesVectorToVector)
 {
