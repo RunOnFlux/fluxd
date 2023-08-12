@@ -46,7 +46,7 @@ public:
 // This is not part of ZIP 32, but is here because it's linked to the HD seed.
 uint256 ovkForShieldingFromTaddr(HDSeed& seed);
 
-namespace libzelcash {
+namespace libflux {
 
 typedef blob88 diversifier_index_t;
 
@@ -55,7 +55,7 @@ struct SaplingExtendedFullViewingKey {
     uint32_t parentFVKTag;
     uint32_t childIndex;
     uint256 chaincode;
-    libzelcash::SaplingFullViewingKey fvk;
+    libflux::SaplingFullViewingKey fvk;
     uint256 dk;
 
     ADD_SERIALIZE_METHODS;
@@ -75,10 +75,10 @@ struct SaplingExtendedFullViewingKey {
     // Returns the first index starting from j that generates a valid
     // payment address, along with the corresponding address. Returns
     // an error if the diversifier space is exhausted.
-    boost::optional<std::pair<diversifier_index_t, libzelcash::SaplingPaymentAddress>>
+    boost::optional<std::pair<diversifier_index_t, libflux::SaplingPaymentAddress>>
         Address(diversifier_index_t j) const;
 
-    libzelcash::SaplingPaymentAddress DefaultAddress() const;
+    libflux::SaplingPaymentAddress DefaultAddress() const;
 
     friend inline bool operator==(const SaplingExtendedFullViewingKey& a, const SaplingExtendedFullViewingKey& b) {
         return (
@@ -101,7 +101,7 @@ struct SaplingExtendedSpendingKey {
     uint32_t parentFVKTag;
     uint32_t childIndex;
     uint256 chaincode;
-    libzelcash::SaplingExpandedSpendingKey expsk;
+    libflux::SaplingExpandedSpendingKey expsk;
     uint256 dk;
 
     ADD_SERIALIZE_METHODS;
@@ -122,7 +122,7 @@ struct SaplingExtendedSpendingKey {
 
     SaplingExtendedFullViewingKey ToXFVK() const;
 
-    libzelcash::SaplingPaymentAddress DefaultAddress() const;
+    libflux::SaplingPaymentAddress DefaultAddress() const;
 
     friend bool operator==(const SaplingExtendedSpendingKey& a, const SaplingExtendedSpendingKey& b)
     {
@@ -140,6 +140,6 @@ typedef boost::variant<InvalidEncoding, SproutSpendingKey, SaplingExtendedSpendi
 }
 
 /** Check whether a SpendingKey is not an InvalidEncoding. */
-bool IsValidSpendingKey(const libzelcash::SpendingKey& zkey);
+bool IsValidSpendingKey(const libflux::SpendingKey& zkey);
 
 #endif // ZCASH_ZIP32_H

@@ -60,16 +60,16 @@ TEST(keystore_tests, sapling_keys) {
         nk.SetHex(sapling_keys[i][5].getValStr());
         ivk.SetHex(sapling_keys[i][6].getValStr());
         
-        libzelcash::diversifier_t default_d;
+        libflux::diversifier_t default_d;
         std::copy_n(ParseHex(sapling_keys[i][7].getValStr()).begin(), 11, default_d.begin());
         
         uint256 default_pk_d;
         default_pk_d.SetHex(sapling_keys[i][8].getValStr());
         
-        auto sk = libzelcash::SaplingSpendingKey(skSeed);
+        auto sk = libflux::SaplingSpendingKey(skSeed);
         
         // Check that expanded spending key from primitives and from sk are the same
-        auto exp_sk_2 = libzelcash::SaplingExpandedSpendingKey(ask, nsk, ovk);
+        auto exp_sk_2 = libflux::SaplingExpandedSpendingKey(ask, nsk, ovk);
         auto exp_sk = sk.expanded_spending_key();
         EXPECT_EQ(exp_sk, exp_sk_2);
             
@@ -78,12 +78,12 @@ TEST(keystore_tests, sapling_keys) {
         EXPECT_EQ(full_viewing_key, exp_sk.full_viewing_key());
         
         // Check that full viewing key from primitives and from sk are the same
-        auto full_viewing_key_2 = libzelcash::SaplingFullViewingKey(ak, nk, ovk);
+        auto full_viewing_key_2 = libflux::SaplingFullViewingKey(ak, nk, ovk);
         EXPECT_EQ(full_viewing_key, full_viewing_key_2);
             
         // Check that incoming viewing key from primitives and from sk are the same
         auto in_viewing_key = full_viewing_key.in_viewing_key();
-        auto in_viewing_key_2 = libzelcash::SaplingIncomingViewingKey(ivk);
+        auto in_viewing_key_2 = libflux::SaplingIncomingViewingKey(ivk);
         EXPECT_EQ(in_viewing_key, in_viewing_key_2);
         
         // Check that the default address from primitives and from sk method are the same
@@ -93,7 +93,7 @@ TEST(keystore_tests, sapling_keys) {
         auto default_addr_2 = addrOpt2.value();
         EXPECT_EQ(default_addr, default_addr_2);
         
-        auto default_addr_3 = libzelcash::SaplingPaymentAddress(default_d, default_pk_d);
+        auto default_addr_3 = libflux::SaplingPaymentAddress(default_d, default_pk_d);
         EXPECT_EQ(default_addr_2, default_addr_3);
         EXPECT_EQ(default_addr, default_addr_3);
     }
@@ -101,13 +101,13 @@ TEST(keystore_tests, sapling_keys) {
 
 TEST(keystore_tests, store_and_retrieve_spending_key) {
     CBasicKeyStore keyStore;
-    libzelcash::SproutSpendingKey skOut;
+    libflux::SproutSpendingKey skOut;
 
-    std::set<libzelcash::SproutPaymentAddress> addrs;
+    std::set<libflux::SproutPaymentAddress> addrs;
     keyStore.GetSproutPaymentAddresses(addrs);
     EXPECT_EQ(0, addrs.size());
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     auto addr = sk.address();
 
     // Sanity-check: we can't get a key we haven't added
@@ -128,7 +128,7 @@ TEST(keystore_tests, store_and_retrieve_note_decryptor) {
     CBasicKeyStore keyStore;
     ZCNoteDecryption decOut;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     auto addr = sk.address();
 
     EXPECT_FALSE(keyStore.GetNoteDecryptor(addr, decOut));
@@ -140,11 +140,11 @@ TEST(keystore_tests, store_and_retrieve_note_decryptor) {
 
 TEST(keystore_tests, StoreAndRetrieveViewingKey) {
     CBasicKeyStore keyStore;
-    libzelcash::SproutViewingKey vkOut;
-    libzelcash::SproutSpendingKey skOut;
+    libflux::SproutViewingKey vkOut;
+    libflux::SproutSpendingKey skOut;
     ZCNoteDecryption decOut;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     auto vk = sk.viewing_key();
     auto addr = sk.address();
 
@@ -158,7 +158,7 @@ TEST(keystore_tests, StoreAndRetrieveViewingKey) {
     EXPECT_FALSE(keyStore.GetNoteDecryptor(addr, decOut));
 
     // and we can't find it in our list of addresses
-    std::set<libzelcash::SproutPaymentAddress> addresses;
+    std::set<libflux::SproutPaymentAddress> addresses;
     keyStore.GetSproutPaymentAddresses(addresses);
     EXPECT_FALSE(addresses.count(addr));
 
@@ -198,13 +198,13 @@ TEST(keystore_tests, StoreAndRetrieveViewingKey) {
 // Sapling
 TEST(keystore_tests, StoreAndRetrieveSaplingSpendingKey) {
     CBasicKeyStore keyStore;
-    libzelcash::SaplingExtendedSpendingKey skOut;
-    libzelcash::SaplingFullViewingKey fvkOut;
-    libzelcash::SaplingIncomingViewingKey ivkOut;
+    libflux::SaplingExtendedSpendingKey skOut;
+    libflux::SaplingFullViewingKey fvkOut;
+    libflux::SaplingIncomingViewingKey ivkOut;
 
     std::vector<unsigned char, secure_allocator<unsigned char>> rawSeed(32);
     HDSeed seed(rawSeed);
-    auto sk = libzelcash::SaplingExtendedSpendingKey::Master(seed);
+    auto sk = libflux::SaplingExtendedSpendingKey::Master(seed);
     auto fvk = sk.expsk.full_viewing_key();
     auto ivk = fvk.in_viewing_key();
     auto addr = sk.DefaultAddress();
@@ -285,7 +285,7 @@ TEST(keystore_tests, StoreAndRetrieveHDSeedInEncryptedStore) {
     TestCCryptoKeyStore keyStore2;
 
     // Add a Sprout address so the wallet has something to test when decrypting
-    ASSERT_TRUE(keyStore2.AddSproutSpendingKey(libzelcash::SproutSpendingKey::random()));
+    ASSERT_TRUE(keyStore2.AddSproutSpendingKey(libflux::SproutSpendingKey::random()));
 
     ASSERT_TRUE(keyStore2.EncryptKeys(vMasterKey));
     ASSERT_TRUE(keyStore2.Unlock(vMasterKey));
@@ -304,12 +304,12 @@ TEST(keystore_tests, store_and_retrieve_spending_key_in_encrypted_store) {
     TestCCryptoKeyStore keyStore;
     uint256 r {GetRandHash()};
     CKeyingMaterial vMasterKey (r.begin(), r.end());
-    libzelcash::SproutSpendingKey keyOut;
+    libflux::SproutSpendingKey keyOut;
     ZCNoteDecryption decOut;
-    std::set<libzelcash::SproutPaymentAddress> addrs;
+    std::set<libflux::SproutPaymentAddress> addrs;
 
     // 1) Test adding a key to an unencrypted key store, then encrypting it
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     auto addr = sk.address();
     EXPECT_FALSE(keyStore.GetNoteDecryptor(addr, decOut));
 
@@ -346,7 +346,7 @@ TEST(keystore_tests, store_and_retrieve_spending_key_in_encrypted_store) {
     ASSERT_EQ(1, addrs.count(addr));
 
     // 2) Test adding a spending key to an already-encrypted key store
-    auto sk2 = libzelcash::SproutSpendingKey::random();
+    auto sk2 = libflux::SproutSpendingKey::random();
     auto addr2 = sk2.address();
     EXPECT_FALSE(keyStore.GetNoteDecryptor(addr2, decOut));
 

@@ -89,14 +89,14 @@ TEST(TransactionBuilder, TransparentToSapling)
     CKey tsk = AddTestCKeyToKeyStore(keystore);
     auto scriptPubKey = GetScriptForDestination(tsk.GetPubKey().GetID());
 
-    auto sk_from = libzelcash::SaplingSpendingKey::random();
+    auto sk_from = libflux::SaplingSpendingKey::random();
     auto fvk_from = sk_from.full_viewing_key();
 
-    auto sk = libzelcash::SaplingSpendingKey::random();
+    auto sk = libflux::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
     auto fvk = sk.full_viewing_key();
     auto ivk = fvk.in_viewing_key();
-    libzelcash::diversifier_t d = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    libflux::diversifier_t d = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     auto pk = *ivk.address(d);
 
     // Create a shielding transaction from transparent to Sapling
@@ -124,7 +124,7 @@ TEST(TransactionBuilder, TransparentToSapling)
 TEST(TransactionBuilder, SaplingToSapling) {
     auto consensusParams = RegtestActivateAcadia();
 
-    auto sk = libzelcash::SaplingSpendingKey::random();
+    auto sk = libflux::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
     auto fvk = sk.full_viewing_key();
     auto pa = sk.default_address();
@@ -161,13 +161,13 @@ TEST(TransactionBuilder, SaplingToSapling) {
 TEST(TransactionBuilder, SaplingToSprout) {
     auto consensusParams = RegtestActivateAcadia();
 
-    auto sk = libzelcash::SaplingSpendingKey::random();
+    auto sk = libflux::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
     auto pa = sk.default_address();
 
     auto testNote = GetTestSaplingNote(pa, 40000);
 
-    auto sproutSk = libzelcash::SproutSpendingKey::random();
+    auto sproutSk = libflux::SproutSpendingKey::random();
     auto sproutAddr = sproutSk.address();
 
     // Create a Sapling-to-Sprout transaction (reusing the note from above)
@@ -199,11 +199,11 @@ TEST(TransactionBuilder, SaplingToSprout) {
 TEST(TransactionBuilder, SproutToSproutAndSapling) {
     auto consensusParams = RegtestActivateAcadia();
 
-    auto sk = libzelcash::SaplingSpendingKey::random();
+    auto sk = libflux::SaplingSpendingKey::random();
     auto fvk = sk.full_viewing_key();
     auto pa = sk.default_address();
 
-    auto sproutSk = libzelcash::SproutSpendingKey::random();
+    auto sproutSk = libflux::SproutSpendingKey::random();
     auto sproutAddr = sproutSk.address();
 
     auto wtx = GetValidSproutReceive(*params, sproutSk, 25000, true);
@@ -260,7 +260,7 @@ TEST(TransactionBuilder, SproutToSproutAndSapling) {
 TEST(TransactionBuilder, ThrowsOnSproutOutputWithoutParams)
 {
     auto consensusParams = Params().GetConsensus();
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     auto addr = sk.address();
 
     auto builder = TransactionBuilder(consensusParams, 1, expiryDelta);
@@ -303,7 +303,7 @@ TEST(TransactionBuilder, FailsWithNegativeChange)
     auto consensusParams = RegtestActivateAcadia();
 
     // Generate dummy Sapling address
-    auto sk = libzelcash::SaplingSpendingKey::random();
+    auto sk = libflux::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
     auto fvk = sk.full_viewing_key();
     auto pa = sk.default_address();
@@ -347,14 +347,14 @@ TEST(TransactionBuilder, ChangeOutput)
     auto consensusParams = RegtestActivateAcadia();
 
     // Generate dummy Sapling address
-    auto sk = libzelcash::SaplingSpendingKey::random();
+    auto sk = libflux::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
     auto pa = sk.default_address();
 
     auto testNote = GetTestSaplingNote(pa, 25000);
 
     // Generate change Sapling address
-    auto sk2 = libzelcash::SaplingSpendingKey::random();
+    auto sk2 = libflux::SaplingSpendingKey::random();
     auto fvkOut = sk2.full_viewing_key();
     auto zChangeAddr = sk2.default_address();
 
@@ -427,7 +427,7 @@ TEST(TransactionBuilder, SetFee)
     auto consensusParams = RegtestActivateAcadia();
 
     // Generate dummy Sapling address
-    auto sk = libzelcash::SaplingSpendingKey::random();
+    auto sk = libflux::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
     auto fvk = sk.full_viewing_key();
     auto pa = sk.default_address();
@@ -475,7 +475,7 @@ TEST(TransactionBuilder, CheckSaplingTxVersion)
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     auto consensusParams = Params().GetConsensus();
 
-    auto sk = libzelcash::SaplingSpendingKey::random();
+    auto sk = libflux::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
     auto pk = sk.default_address();
 
@@ -490,7 +490,7 @@ TEST(TransactionBuilder, CheckSaplingTxVersion)
     }
 
     // Cannot add Sapling spends to a non-Sapling transaction
-    libzelcash::SaplingNote note(pk, 50000);
+    libflux::SaplingNote note(pk, 50000);
     SaplingMerkleTree tree;
     try {
         builder.AddSaplingSpend(expsk, note, uint256(), tree.witness());

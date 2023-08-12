@@ -12,7 +12,7 @@
 #include <array>
 #include <boost/optional.hpp>
 
-namespace libzelcash {
+namespace libflux {
 
 class BaseNote {
 protected:

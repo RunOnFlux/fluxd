@@ -254,10 +254,10 @@ public:
 uint256 appendRandomSproutCommitment(SproutMerkleTree &tree)
 {
 
-    libzelcash::SproutSpendingKey k = libzelcash::SproutSpendingKey::random();
-    libzelcash::SproutPaymentAddress addr = k.address();
+    libflux::SproutSpendingKey k = libflux::SproutSpendingKey::random();
+    libflux::SproutPaymentAddress addr = k.address();
 
-    libzelcash::SproutNote note(addr.a_pk, 0, uint256(), uint256());
+    libflux::SproutNote note(addr.a_pk, 0, uint256(), uint256());
 
     auto cm = note.cm();
     tree.append(cm);

@@ -125,7 +125,7 @@ TEST(paymentdisclosure, mainnet) {
         PaymentDisclosureInfo info;
         info.esk = random_uint256();
         info.joinSplitPrivKey = joinSplitPrivKey;
-        info.zaddr = libzelcash::SproutSpendingKey::random().address();
+        info.zaddr = libflux::SproutSpendingKey::random().address();
 
         ASSERT_TRUE(mydb.Put(key, info));
 
@@ -137,7 +137,7 @@ TEST(paymentdisclosure, mainnet) {
         // Modify this local variable and confirm it no longer matches
         info2.esk = random_uint256();
         info2.joinSplitPrivKey = random_uint256();
-        info2.zaddr = libzelcash::SproutSpendingKey::random().address();        
+        info2.zaddr = libflux::SproutSpendingKey::random().address();
         ASSERT_NE(info, info2);
 
         // Using the payment info object, let's create a dummy payload

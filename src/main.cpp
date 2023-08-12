@@ -1363,7 +1363,7 @@ bool ContextualCheckTransaction(
 
 
 bool CheckTransaction(const CTransaction& tx, CValidationState &state,
-                      libzelcash::ProofVerifier& verifier)
+                      libflux::ProofVerifier& verifier)
 {
     // Don't count coinbase transactions because mining skews the count
     if (!tx.IsCoinBase()) {
@@ -1756,7 +1756,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
     }
 
-    auto verifier = libzelcash::ProofVerifier::Strict();
+    auto verifier = libflux::ProofVerifier::Strict();
     if (!CheckTransaction(tx, state, verifier))
         return error("AcceptToMemoryPool: CheckTransaction failed");
 
@@ -2089,7 +2089,7 @@ bool AcceptableInputs(CTxMemPool& pool, CValidationState& state, const CTransact
     if (pfMissingInputs)
         *pfMissingInputs = false;
 
-    auto verifier = libzelcash::ProofVerifier::Strict();
+    auto verifier = libflux::ProofVerifier::Strict();
     if (!CheckTransaction(tx, state, verifier))
         return error("AcceptableInputs: : CheckTransaction failed");
 
@@ -3330,8 +3330,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     }
 
 
-    auto verifier = libzelcash::ProofVerifier::Strict();
-    auto disabledVerifier = libzelcash::ProofVerifier::Disabled();
+    auto verifier = libflux::ProofVerifier::Strict();
+    auto disabledVerifier = libflux::ProofVerifier::Disabled();
 
     // Check it again to verify JoinSplit proofs, and in case a previous version let a bad block in
     if (!CheckBlock(block, state, chainparams, fExpensiveChecks ? verifier : disabledVerifier, !fJustCheck, !fJustCheck))
@@ -4695,7 +4695,7 @@ bool CheckBlockHeader(
 
 bool CheckBlock(const CBlock& block, CValidationState& state,
                 const CChainParams& chainparams,
-                libzelcash::ProofVerifier& verifier,
+                libflux::ProofVerifier& verifier,
                 bool fCheckPOW, bool fCheckMerkleRoot)
 {
     // These are checks that are independent of context.
@@ -4976,7 +4976,7 @@ static bool AcceptBlock(const CBlock& block, CValidationState& state, const CCha
     }
 
     // See method docstring for why this is always disabled
-    auto verifier = libzelcash::ProofVerifier::Disabled();
+    auto verifier = libflux::ProofVerifier::Disabled();
     if ((!CheckBlock(block, state, chainparams, verifier)) || !ContextualCheckBlock(block, state, chainparams, pindex->pprev, true)) {
         if (state.IsInvalid() && !state.CorruptionPossible()) {
             pindex->nStatus |= BLOCK_FAILED_VALID;
@@ -5026,7 +5026,7 @@ static bool IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned 
 bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, const CNode* pfrom, const CBlock* pblock, bool fForceProcessing, CDiskBlockPos* dbp)
 {
     // Preliminary checks
-    auto verifier = libzelcash::ProofVerifier::Disabled();
+    auto verifier = libflux::ProofVerifier::Disabled();
     bool checked = CheckBlock(*pblock, state, chainparams, verifier);
 
     {
@@ -5069,7 +5069,7 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev->nHeight + 1;
     // JoinSplit proofs are verified in ConnectBlock
-    auto verifier = libzelcash::ProofVerifier::Disabled();
+    auto verifier = libflux::ProofVerifier::Disabled();
 
     // NOTE: CheckBlockHeader is called by CheckBlock
     if (!ContextualCheckBlockHeader(block, state, chainparams, pindexPrev))
@@ -5461,7 +5461,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
     int nGoodTransactions = 0;
     CValidationState state;
     // No need to verify JoinSplits twice
-    auto verifier = libzelcash::ProofVerifier::Disabled();
+    auto verifier = libflux::ProofVerifier::Disabled();
     for (CBlockIndex* pindex = chainActive.Tip(); pindex && pindex->pprev; pindex = pindex->pprev)
     {
         boost::this_thread::interruption_point();

@@ -40,7 +40,7 @@ flux_gtest_SOURCES += \
 	gtest/test_upgrades.cpp \
 	gtest/test_validation.cpp \
 	gtest/test_txid.cpp \
-	gtest/test_libzelcash_utils.cpp \
+	gtest/test_libflux_utils.cpp \
 	gtest/test_pedersen_hash.cpp \
 	gtest/test_checkblock.cpp \
 	gtest/test_zip32.cpp
@@ -62,7 +62,7 @@ if ENABLE_WALLET
 flux_gtest_LDADD += $(LIBBITCOIN_WALLET)
 endif
 
-flux_gtest_LDADD += $(LIBZELCASH_CONSENSUS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(LIBZELCASH) $(LIBZELCASH_LIBS)
+flux_gtest_LDADD += $(LIBFLUX_CONSENSUS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(LIBFLUX) $(LIBFLUX_LIBS)
 
 if ENABLE_PROTON
 flux_gtest_LDADD += $(LIBBITCOIN_PROTON) $(PROTON_LIBS)

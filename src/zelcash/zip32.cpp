@@ -58,7 +58,7 @@ uint256 ovkForShieldingFromTaddr(HDSeed& seed) {
     return PRF_ovk(intermediate_L);
 }
 
-namespace libzelcash {
+namespace libflux {
 
 boost::optional<SaplingExtendedFullViewingKey> SaplingExtendedFullViewingKey::Derive(uint32_t i) const
 {
@@ -81,7 +81,7 @@ boost::optional<SaplingExtendedFullViewingKey> SaplingExtendedFullViewingKey::De
     }
 }
 
-boost::optional<std::pair<diversifier_index_t, libzelcash::SaplingPaymentAddress>>
+boost::optional<std::pair<diversifier_index_t, libflux::SaplingPaymentAddress>>
     SaplingExtendedFullViewingKey::Address(diversifier_index_t j) const
 {
     CDataStream ss_xfvk(SER_NETWORK, PROTOCOL_VERSION);
@@ -89,13 +89,13 @@ boost::optional<std::pair<diversifier_index_t, libzelcash::SaplingPaymentAddress
     CSerializeData xfvk_bytes(ss_xfvk.begin(), ss_xfvk.end());
 
     diversifier_index_t j_ret;
-    CSerializeData addr_bytes(libzelcash::SerializedSaplingPaymentAddressSize);
+    CSerializeData addr_bytes(libflux::SerializedSaplingPaymentAddressSize);
     if (librustzcash_zip32_xfvk_address(
         reinterpret_cast<unsigned char*>(xfvk_bytes.data()),
         j.begin(), j_ret.begin(),
         reinterpret_cast<unsigned char*>(addr_bytes.data()))) {
         CDataStream ss_addr(addr_bytes, SER_NETWORK, PROTOCOL_VERSION);
-        libzelcash::SaplingPaymentAddress addr;
+        libflux::SaplingPaymentAddress addr;
         ss_addr >> addr;
         return std::make_pair(j_ret, addr);
     } else {
@@ -103,7 +103,7 @@ boost::optional<std::pair<diversifier_index_t, libzelcash::SaplingPaymentAddress
     }
 }
 
-libzelcash::SaplingPaymentAddress SaplingExtendedFullViewingKey::DefaultAddress() const
+libflux::SaplingPaymentAddress SaplingExtendedFullViewingKey::DefaultAddress() const
 {
     diversifier_index_t j0;
     auto addr = Address(j0);
@@ -159,13 +159,13 @@ SaplingExtendedFullViewingKey SaplingExtendedSpendingKey::ToXFVK() const
     return ret;
 }
 
-libzelcash::SaplingPaymentAddress SaplingExtendedSpendingKey::DefaultAddress() const
+libflux::SaplingPaymentAddress SaplingExtendedSpendingKey::DefaultAddress() const
 {
     return ToXFVK().DefaultAddress();
 }
 
 }
 
-bool IsValidSpendingKey(const libzelcash::SpendingKey& zkey) {
+bool IsValidSpendingKey(const libflux::SpendingKey& zkey) {
     return zkey.which() != 0;
 }

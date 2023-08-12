@@ -12,7 +12,7 @@
 
 #include <boost/variant.hpp>
 
-namespace libzelcash {
+namespace libflux {
 class InvalidEncoding {
 public:
     friend bool operator==(const InvalidEncoding &a, const InvalidEncoding &b) { return true; }
@@ -227,9 +227,9 @@ typedef boost::variant<InvalidEncoding, SproutViewingKey> ViewingKey;
 }
 
 /** Check whether a PaymentAddress is not an InvalidEncoding. */
-bool IsValidPaymentAddress(const libzelcash::PaymentAddress& zaddr);
+bool IsValidPaymentAddress(const libflux::PaymentAddress& zaddr);
 
 /** Check whether a ViewingKey is not an InvalidEncoding. */
-bool IsValidViewingKey(const libzelcash::ViewingKey& vk);
+bool IsValidViewingKey(const libflux::ViewingKey& vk);
 
 #endif // ZC_ADDRESS_H_

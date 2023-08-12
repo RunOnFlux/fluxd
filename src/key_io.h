@@ -30,14 +30,14 @@ CTxDestination DecodeDestination(const std::string& str);
 bool IsValidDestinationString(const std::string& str);
 bool IsValidDestinationString(const std::string& str, const CChainParams& params);
 
-std::string EncodePaymentAddress(const libzelcash::PaymentAddress& zaddr);
-libzelcash::PaymentAddress DecodePaymentAddress(const std::string& str);
+std::string EncodePaymentAddress(const libflux::PaymentAddress& zaddr);
+libflux::PaymentAddress DecodePaymentAddress(const std::string& str);
 bool IsValidPaymentAddressString(const std::string& str);
 
-std::string EncodeViewingKey(const libzelcash::ViewingKey& vk);
-libzelcash::ViewingKey DecodeViewingKey(const std::string& str);
+std::string EncodeViewingKey(const libflux::ViewingKey& vk);
+libflux::ViewingKey DecodeViewingKey(const std::string& str);
 
-std::string EncodeSpendingKey(const libzelcash::SpendingKey& zkey);
-libzelcash::SpendingKey DecodeSpendingKey(const std::string& str);
+std::string EncodeSpendingKey(const libflux::SpendingKey& zkey);
+libflux::SpendingKey DecodeSpendingKey(const std::string& str);
 
 #endif // BITCOIN_KEYIO_H

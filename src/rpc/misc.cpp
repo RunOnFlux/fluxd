@@ -211,9 +211,9 @@ UniValue validateaddress(const UniValue& params, bool fHelp)
 class DescribePaymentAddressVisitor : public boost::static_visitor<UniValue>
 {
 public:
-    UniValue operator()(const libzelcash::InvalidEncoding &zaddr) const { return UniValue(UniValue::VOBJ); }
+    UniValue operator()(const libflux::InvalidEncoding &zaddr) const { return UniValue(UniValue::VOBJ); }
 
-    UniValue operator()(const libzelcash::SproutPaymentAddress &zaddr) const {
+    UniValue operator()(const libflux::SproutPaymentAddress &zaddr) const {
         UniValue obj(UniValue::VOBJ);
         obj.pushKV("type", "sprout");
         obj.pushKV("payingkey", zaddr.a_pk.GetHex());
@@ -226,15 +226,15 @@ public:
         return obj;
     }
 
-    UniValue operator()(const libzelcash::SaplingPaymentAddress &zaddr) const {
+    UniValue operator()(const libflux::SaplingPaymentAddress &zaddr) const {
         UniValue obj(UniValue::VOBJ);
         obj.pushKV("type", "sapling");
         obj.pushKV("diversifier", HexStr(zaddr.d));
         obj.pushKV("diversifiedtransmissionkey", zaddr.pk_d.GetHex());
 #ifdef ENABLE_WALLET
         if (pwalletMain) {
-            libzelcash::SaplingIncomingViewingKey ivk;
-            libzelcash::SaplingFullViewingKey fvk;
+            libflux::SaplingIncomingViewingKey ivk;
+            libflux::SaplingFullViewingKey fvk;
             bool isMine = pwalletMain->GetSaplingIncomingViewingKey(zaddr, ivk) &&
                 pwalletMain->GetSaplingFullViewingKey(ivk, fvk) &&
                 pwalletMain->HaveSaplingSpendingKey(fvk);

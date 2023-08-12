@@ -22,7 +22,7 @@
 
 #include <array>
 
-using namespace libzelcash;
+using namespace libflux;
 
 extern ZCJoinSplit* params;
 
@@ -46,7 +46,7 @@ bool verifySproutProof(
         const uint256& joinSplitPubKey
 )
 {
-    auto verifier = libzelcash::ProofVerifier::Strict();
+    auto verifier = libflux::ProofVerifier::Strict();
     return jsdesc.Verify(js, verifier, joinSplitPubKey);
 }
 
@@ -54,7 +54,7 @@ bool verifySproutProof(
 void test_full_api(ZCJoinSplit* js)
 {
     // Create verification context.
-    auto verifier = libzelcash::ProofVerifier::Strict();
+    auto verifier = libflux::ProofVerifier::Strict();
 
     // The recipient's information.
     SproutSpendingKey recipient_key = SproutSpendingKey::random();
