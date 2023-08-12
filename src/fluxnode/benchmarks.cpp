@@ -11,7 +11,7 @@
 #include <core_io.h>
 #include <boost/filesystem.hpp>
 
-#include "zelnode/zelnode.h"
+#include "fluxnode/fluxnode.h"
 #include "benchmarks.h"
 
 #if defined(__linux)

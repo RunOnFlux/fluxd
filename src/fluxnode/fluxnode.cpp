@@ -8,13 +8,13 @@
 #include <consensus/validation.h>
 #include <undo.h>
 #include <utilmoneystr.h>
-#include "zelnode/zelnode.h"
+#include "fluxnode/fluxnode.h"
 #include "addrman.h"
-#include "zelnode/obfuscation.h"
+#include "fluxnode/obfuscation.h"
 #include "sync.h"
 #include "util.h"
 #include "key_io.h"
-#include "zelnode/activezelnode.h"
+#include "fluxnode/activefluxnode.h"
 
 FluxnodeCache g_fluxnodeCache;
 

@@ -13,7 +13,7 @@
 #include "util.h"
 #include "httpserver.h"
 #include "httprpc.h"
-#include "zelnode/zelnodeconfig.h"
+#include "fluxnode/fluxnodeconfig.h"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>

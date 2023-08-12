@@ -37,9 +37,9 @@
 #include <atomic>
 
 #include "snapshot/snapshotdb.h"
-#include "zelnode/zelnodecachedb.h"
-#include "zelnode/obfuscation.h"
-#include "zelnode/activezelnode.h"
+#include "fluxnode/fluxnodecachedb.h"
+#include "fluxnode/obfuscation.h"
+#include "fluxnode/activefluxnode.h"
 
 #include <sstream>
 

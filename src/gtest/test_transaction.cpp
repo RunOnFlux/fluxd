@@ -10,7 +10,7 @@
 #include "utilstrencodings.h"
 #include "key.h"
 #include "key_io.h"
-#include "zelnode/obfuscation.h"
+#include "fluxnode/obfuscation.h"
 
 #include <array>
 

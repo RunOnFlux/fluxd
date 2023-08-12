@@ -5,15 +5,15 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
-#include "zelnode/activezelnode.h"
+#include "fluxnode/activefluxnode.h"
 #include "db.h"
 #include "init.h"
 #include "main.h"
-#include "zelnode/zelnodeconfig.h"
+#include "fluxnode/fluxnodeconfig.h"
 #include "rpc/server.h"
 #include "utilmoneystr.h"
 #include "key_io.h"
-#include "zelnode/benchmarks.h"
+#include "fluxnode/benchmarks.h"
 #include "util.h"
 
 #include <univalue.h>

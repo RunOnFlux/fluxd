@@ -14,7 +14,7 @@
 #include "consensus/consensus.h"
 #include "consensus/upgrades.h"
 #include "consensus/validation.h"
-#include "zelnode/zelnode.h"
+#include "fluxnode/fluxnode.h"
 
 #ifdef ENABLE_MINING
 #include "crypto/equihash.h"
