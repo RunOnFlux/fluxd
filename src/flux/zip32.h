@@ -9,7 +9,7 @@
 #include "serialize.h"
 #include "support/allocators/secure.h"
 #include "uint256.h"
-#include "zelcash/Address.hpp"
+#include "flux/Address.hpp"
 
 #include <boost/optional.hpp>
 

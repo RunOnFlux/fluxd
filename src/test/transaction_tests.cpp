@@ -36,9 +36,9 @@
 
 #include <univalue.h>
 
-#include "zelcash/Note.hpp"
-#include "zelcash/Address.hpp"
-#include "zelcash/Proof.hpp"
+#include "flux/Note.hpp"
+#include "flux/Address.hpp"
+#include "flux/Proof.hpp"
 
 using namespace std;
 

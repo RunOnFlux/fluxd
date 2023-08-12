@@ -6,7 +6,7 @@ and tests weren't explicitly disabled.
 
 There are two scripts for running tests:
 
-* ``qa/zelcash/full-test-suite.py``, to run the main test suite
+* ``qa/flux/full-test-suite.py``, to run the main test suite
 * ``qa/pull-tester/rpc-tests.sh``, to run the RPC tests.
 
 The main test suite uses two different testing frameworks. Tests using the Boost

@@ -88,16 +88,16 @@ if BUILD_BITCOIN_UTILS
 endif
 
 LIBFLUX_H = \
-  zelcash/IncrementalMerkleTree.hpp \
-  zelcash/NoteEncryption.hpp \
-  zelcash/Address.hpp \
-  zelcash/JoinSplit.hpp \
-  zelcash/Note.hpp \
-  zelcash/prf.h \
-  zelcash/Proof.hpp \
-  zelcash/util.h \
-  zelcash/Zelcash.h \
-  zelcash/zip32.h
+  flux/IncrementalMerkleTree.hpp \
+  flux/NoteEncryption.hpp \
+  flux/Address.hpp \
+  flux/JoinSplit.hpp \
+  flux/Note.hpp \
+  flux/prf.h \
+  flux/Proof.hpp \
+  flux/util.h \
+  flux/Zelcash.h \
+  flux/zip32.h
 
 .PHONY: FORCE check-symbols check-security
 # bitcoin core #
@@ -522,15 +522,15 @@ flux_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
 
 # zelcash protocol primitives #
 libflux_a_SOURCES = \
-  zelcash/IncrementalMerkleTree.cpp \
-  zelcash/NoteEncryption.cpp \
-  zelcash/Address.cpp \
-  zelcash/JoinSplit.cpp \
-  zelcash/Proof.cpp \
-  zelcash/Note.cpp \
-  zelcash/prf.cpp \
-  zelcash/util.cpp \
-  zelcash/zip32.cpp
+  flux/IncrementalMerkleTree.cpp \
+  flux/NoteEncryption.cpp \
+  flux/Address.cpp \
+  flux/JoinSplit.cpp \
+  flux/Proof.cpp \
+  flux/Note.cpp \
+  flux/prf.cpp \
+  flux/util.cpp \
+  flux/zip32.cpp
 
 libflux_a_CPPFLAGS = $(AM_CPPFLAGS) $(PIC_FLAGS) -DBINARY_OUTPUT -DCURVE_ALT_BN128 -DBOOST_SPIRIT_THREADSAFE -fvisibility=hidden -DSTATIC $(BITCOIN_INCLUDES)
 libflux_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)

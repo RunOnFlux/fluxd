@@ -8,7 +8,7 @@
 #include "main.h"
 #include "test/test_bitcoin.h"
 #include "utiltime.h"
-#include "zelcash/Proof.hpp"
+#include "flux/Proof.hpp"
 
 #include <cstdio>
 

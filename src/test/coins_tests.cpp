@@ -19,7 +19,7 @@
 #include <map>
 
 #include <boost/test/unit_test.hpp>
-#include "zelcash/IncrementalMerkleTree.hpp"
+#include "flux/IncrementalMerkleTree.hpp"
 
 namespace
 {

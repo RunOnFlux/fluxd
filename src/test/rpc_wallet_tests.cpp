@@ -12,7 +12,7 @@
 
 #include "test/test_bitcoin.h"
 
-#include "zelcash/Address.hpp"
+#include "flux/Address.hpp"
 
 #include "asyncrpcqueue.h"
 #include "asyncrpcoperation.h"

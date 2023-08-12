@@ -15,7 +15,7 @@
 #include "util.h"
 #include "utiltime.h"
 #include "wallet/wallet.h"
-#include "zelcash/Proof.hpp"
+#include "flux/Proof.hpp"
 
 #include <boost/filesystem.hpp>
 #include <boost/foreach.hpp>

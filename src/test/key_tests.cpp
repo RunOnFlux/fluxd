@@ -14,7 +14,7 @@
 #include "utiltest.h"
 #include "test/test_bitcoin.h"
 
-#include "zelcash/Address.hpp"
+#include "flux/Address.hpp"
 
 #include <string>
 #include <vector>

@@ -10,7 +10,7 @@
 #include "version.h"
 #include "streams.h"
 
-#include "zelcash/util.h"
+#include "flux/util.h"
 #include "librustzcash.h"
 
 using namespace libflux;

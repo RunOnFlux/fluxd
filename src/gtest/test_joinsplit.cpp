@@ -9,16 +9,16 @@
 #include <boost/foreach.hpp>
 #include <boost/variant/get.hpp>
 
-#include "zelcash/prf.h"
+#include "flux/prf.h"
 #include "util.h"
 #include "streams.h"
 #include "version.h"
 #include "serialize.h"
 #include "primitives/transaction.h"
-#include "zelcash/JoinSplit.hpp"
-#include "zelcash/Note.hpp"
-#include "zelcash/NoteEncryption.hpp"
-#include "zelcash/IncrementalMerkleTree.hpp"
+#include "flux/JoinSplit.hpp"
+#include "flux/Note.hpp"
+#include "flux/NoteEncryption.hpp"
+#include "flux/IncrementalMerkleTree.hpp"
 
 #include <array>
 

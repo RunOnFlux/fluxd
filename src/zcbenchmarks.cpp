@@ -32,9 +32,9 @@
 
 #include "zcbenchmarks.h"
 
-#include "zelcash/Zelcash.h"
-#include "zelcash/IncrementalMerkleTree.hpp"
-#include "zelcash/Note.hpp"
+#include "flux/Zelcash.h"
+#include "flux/IncrementalMerkleTree.hpp"
+#include "flux/Note.hpp"
 #include "librustzcash.h"
 
 using namespace libflux;

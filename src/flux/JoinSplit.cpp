@@ -6,7 +6,7 @@
 #include "prf.h"
 #include "sodium.h"
 
-#include "zelcash/util.h"
+#include "flux/util.h"
 
 #include <memory>
 

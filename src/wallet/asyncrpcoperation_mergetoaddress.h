@@ -12,8 +12,8 @@
 #include "transaction_builder.h"
 #include "wallet.h"
 #include "wallet/paymentdisclosure.h"
-#include "zelcash/Address.hpp"
-#include "zelcash/JoinSplit.hpp"
+#include "flux/Address.hpp"
+#include "flux/JoinSplit.hpp"
 
 #include <array>
 #include <tuple>

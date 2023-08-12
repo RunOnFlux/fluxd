@@ -9,7 +9,7 @@
 
 #include <string>
 
-#include "zelcash/JoinSplit.hpp"
+#include "flux/JoinSplit.hpp"
 
 class CScheduler;
 class CWallet;

@@ -13,11 +13,11 @@
 #include "script/script.h"
 #include "script/standard.h"
 #include "uint256.h"
-#include "zelcash/Address.hpp"
-#include "zelcash/IncrementalMerkleTree.hpp"
-#include "zelcash/JoinSplit.hpp"
-#include "zelcash/Note.hpp"
-#include "zelcash/NoteEncryption.hpp"
+#include "flux/Address.hpp"
+#include "flux/IncrementalMerkleTree.hpp"
+#include "flux/JoinSplit.hpp"
+#include "flux/Note.hpp"
+#include "flux/NoteEncryption.hpp"
 
 #include <boost/optional.hpp>
 

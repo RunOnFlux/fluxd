@@ -9,10 +9,10 @@
 
 #include "key_io.h"
 #include "wallet/wallet.h"
-#include "zelcash/JoinSplit.hpp"
-#include "zelcash/Note.hpp"
-#include "zelcash/NoteEncryption.hpp"
-#include "zelcash/zip32.h"
+#include "flux/JoinSplit.hpp"
+#include "flux/Note.hpp"
+#include "flux/NoteEncryption.hpp"
+#include "flux/zip32.h"
 
 // Sprout
 CWalletTx GetValidSproutReceive(ZCJoinSplit& params,

@@ -25,7 +25,7 @@
 
 #include <univalue.h>
 
-#include "zelcash/Address.hpp"
+#include "flux/Address.hpp"
 
 using namespace std;
 

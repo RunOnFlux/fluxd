@@ -24,8 +24,8 @@
 #include "wallet/wallet_ismine.h"
 #include "wallet/walletdb.h"
 #include "wallet/rpcwallet.h"
-#include "zelcash/Address.hpp"
-#include "zelcash/zip32.h"
+#include "flux/Address.hpp"
+#include "flux/zip32.h"
 #include "base58.h"
 
 #include <algorithm>

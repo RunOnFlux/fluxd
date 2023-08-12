@@ -10,7 +10,7 @@
 #include <boost/signals2/signal.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include "zelcash/IncrementalMerkleTree.hpp"
+#include "flux/IncrementalMerkleTree.hpp"
 
 class CBlock;
 class CBlockIndex;

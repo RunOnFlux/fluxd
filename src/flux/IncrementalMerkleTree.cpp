@@ -6,9 +6,9 @@
 
 #include <boost/foreach.hpp>
 
-#include "zelcash/IncrementalMerkleTree.hpp"
+#include "flux/IncrementalMerkleTree.hpp"
 #include "crypto/sha256.h"
-#include "zelcash/util.h"
+#include "flux/util.h"
 #include "librustzcash.h"
 
 namespace libflux {
