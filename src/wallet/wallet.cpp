@@ -33,7 +33,7 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
-#include <zelnode/zelnode.h>
+#include <fluxnode/fluxnode.h>
 
 using namespace std;
 using namespace libflux;

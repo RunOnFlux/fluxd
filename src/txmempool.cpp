@@ -4,7 +4,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
-#include <zelnode/zelnode.h>
+#include <fluxnode/fluxnode.h>
 #include "txmempool.h"
 
 #include "clientversion.h"

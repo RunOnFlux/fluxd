@@ -43,7 +43,7 @@
 
 #include <boost/unordered_map.hpp>
 
-#include "zelnode/zelnodecachedb.h"
+#include "fluxnode/fluxnodecachedb.h"
 #include "snapshot/snapshotdb.h"
 
 class CBlockIndex;

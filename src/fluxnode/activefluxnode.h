@@ -11,9 +11,9 @@
 
 #include "init.h"
 #include "key.h"
-#include "zelnode/zelnode.h"
+#include "fluxnode/fluxnode.h"
 #include "net.h"
-#include "zelnode/obfuscation.h"
+#include "fluxnode/obfuscation.h"
 #include "sync.h"
 #include "wallet/wallet.h"
 

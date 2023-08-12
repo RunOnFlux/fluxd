@@ -215,7 +215,7 @@ public:
 
         networkID = CBaseChainParams::Network::MAIN;
 
-        nStartFluxnodePaymentsHeight = 560000; // Start paying deterministic zelnodes on height
+        nStartFluxnodePaymentsHeight = 560000; // Start paying deterministic fluxnodes on height
 
         // These are the benchmarking public keys, if you are adding a key, you must increase the resize integer
         vecBenchmarkingPublicKeys.resize(3);

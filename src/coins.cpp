@@ -11,7 +11,7 @@
 #include "policy/fees.h"
 
 #include <assert.h>
-#include <zelnode/zelnode.h>
+#include <fluxnode/fluxnode.h>
 
 /**
  * calculate number of bytes for the bitmask, and its number of non-zero bytes
@@ -734,7 +734,7 @@ CCoinsModifier::~CCoinsModifier()
 }
 
 /** Coins Tier code
- * Any changes to this code needs to be also made to the code in zelnode.h and zelnode.cpp
+ * Any changes to this code needs to be also made to the code in fluxnode.h and zelnode.cpp
  * We are unable to use the same code because of build/linking restrictions
  */
 std::map<int, double> mapCoinTierPercentages;

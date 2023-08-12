@@ -5,14 +5,14 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
-#include "activezelnode.h"
+#include "activefluxnode.h"
 #include "addrman.h"
-#include "zelnode/zelnode.h"
-#include "zelnode/zelnodeconfig.h"
+#include "fluxnode/fluxnode.h"
+#include "fluxnode/fluxnodeconfig.h"
 #include "protocol.h"
 
 #include "key_io.h"
-#include "zelnode/benchmarks.h"
+#include "fluxnode/benchmarks.h"
 
 
 void ActiveFluxnode::ManageDeterministricFluxnode()

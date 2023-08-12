@@ -594,7 +594,7 @@ private:
 
 
 /** Coins Tier code
- * Any changes to this code needs to be also made to the code in zelnode.h and zelnode.cpp
+ * Any changes to this code needs to be also made to the code in fluxnode.h and fluxnode.cpp
  * We are unable to use the same code because of build/linking restrictions
  */
 extern std::map<int, double> mapCoinTierPercentages;

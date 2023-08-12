@@ -220,12 +220,12 @@ BITCOIN_CORE_H = \
   wallet/wallet.h \
   wallet/wallet_ismine.h \
   wallet/walletdb.h \
-  zelnode/activezelnode.h \
-  zelnode/benchmarks.h \
-  zelnode/obfuscation.h \
-  zelnode/zelnode.h \
-  zelnode/zelnodeconfig.h \
-  zelnode/zelnodecachedb.h \
+  fluxnode/activefluxnode.h \
+  fluxnode/benchmarks.h \
+  fluxnode/obfuscation.h \
+  fluxnode/fluxnode.h \
+  fluxnode/fluxnodeconfig.h \
+  fluxnode/fluxnodecachedb.h \
   zmq/zmqabstractnotifier.h \
   zmq/zmqconfig.h\
   zmq/zmqnotificationinterface.h \
@@ -281,12 +281,12 @@ libbitcoin_server_a_SOURCES = \
   mempool_limit.cpp \
   txmempool.cpp \
   validationinterface.cpp \
-  zelnode/activezelnode.cpp \
-  zelnode/benchmarks.cpp \
-  zelnode/obfuscation.cpp \
-  zelnode/zelnode.cpp \
-  zelnode/zelnodeconfig.cpp \
-  zelnode/zelnodecachedb.cpp \
+  fluxnode/activefluxnode.cpp \
+  fluxnode/benchmarks.cpp \
+  fluxnode/obfuscation.cpp \
+  fluxnode/fluxnode.cpp \
+  fluxnode/fluxnodeconfig.cpp \
+  fluxnode/fluxnodecachedb.cpp \
   $(BITCOIN_CORE_H) \
   $(LIBFLUX_H)
 

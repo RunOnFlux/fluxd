@@ -21,7 +21,7 @@
 #include "script/sign.h"
 #include "script/standard.h"
 #include "uint256.h"
-#include "zelnode/zelnode.h"
+#include "fluxnode/fluxnode.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif

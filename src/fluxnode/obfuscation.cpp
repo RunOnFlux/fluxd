@@ -5,7 +5,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
-#include "zelnode/obfuscation.h"
+#include "fluxnode/obfuscation.h"
 #include "coincontrol.h"
 #include "init.h"
 #include "main.h"
@@ -13,7 +13,7 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "key_io.h"
-#include "activezelnode.h"
+#include "activefluxnode.h"
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
