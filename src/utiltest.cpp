@@ -13,7 +13,7 @@
 
 // Sprout
 CMutableTransaction GetValidSproutReceiveTransaction(ZCJoinSplit& params,
-                                const libzelcash::SproutSpendingKey& sk,
+                                const libflux::SproutSpendingKey& sk,
                                 CAmount value,
                                 bool randomInputs,
                                 uint32_t versionGroupId, /* = SAPLING_VERSION_GROUP_ID */
@@ -42,14 +42,14 @@ CMutableTransaction GetValidSproutReceiveTransaction(ZCJoinSplit& params,
     crypto_sign_keypair(joinSplitPubKey.begin(), joinSplitPrivKey);
     mtx.joinSplitPubKey = joinSplitPubKey;
 
-    std::array<libzelcash::JSInput, 2> inputs = {
-        libzelcash::JSInput(), // dummy input
-        libzelcash::JSInput() // dummy input
+    std::array<libflux::JSInput, 2> inputs = {
+        libflux::JSInput(), // dummy input
+        libflux::JSInput() // dummy input
     };
 
-    std::array<libzelcash::JSOutput, 2> outputs = {
-        libzelcash::JSOutput(sk.address(), value),
-        libzelcash::JSOutput(sk.address(), value)
+    std::array<libflux::JSOutput, 2> outputs = {
+        libflux::JSOutput(sk.address(), value),
+        libflux::JSOutput(sk.address(), value)
     };
 
     // Prepare JoinSplits
@@ -83,7 +83,7 @@ CMutableTransaction GetValidSproutReceiveTransaction(ZCJoinSplit& params,
 }
 
 CWalletTx GetValidSproutReceive(ZCJoinSplit& params,
-                                const libzelcash::SproutSpendingKey& sk,
+                                const libflux::SproutSpendingKey& sk,
                                 CAmount value,
                                 bool randomInputs,
                                 uint32_t versionGroupId, /* = SAPLING_VERSION_GROUP_ID */
@@ -98,7 +98,7 @@ CWalletTx GetValidSproutReceive(ZCJoinSplit& params,
 }
 
 CWalletTx GetInvalidCommitmentSproutReceive(ZCJoinSplit& params,
-                                const libzelcash::SproutSpendingKey& sk,
+                                const libflux::SproutSpendingKey& sk,
                                 CAmount value,
                                 bool randomInputs,
                                 uint32_t versionGroupId, /* = SAPLING_VERSION_GROUP_ID */
@@ -114,12 +114,12 @@ CWalletTx GetInvalidCommitmentSproutReceive(ZCJoinSplit& params,
     return wtx;
 }
 
-libzelcash::SproutNote GetSproutNote(ZCJoinSplit& params,
-                                   const libzelcash::SproutSpendingKey& sk,
+libflux::SproutNote GetSproutNote(ZCJoinSplit& params,
+                                   const libflux::SproutSpendingKey& sk,
                                    const CTransaction& tx, size_t js, size_t n) {
     ZCNoteDecryption decryptor {sk.receiving_key()};
     auto hSig = tx.vJoinSplit[js].h_sig(params, tx.joinSplitPubKey);
-    auto note_pt = libzelcash::SproutNotePlaintext::decrypt(
+    auto note_pt = libflux::SproutNotePlaintext::decrypt(
         decryptor,
         tx.vJoinSplit[js].ciphertexts[n],
         tx.vJoinSplit[js].ephemeralKey,
@@ -129,8 +129,8 @@ libzelcash::SproutNote GetSproutNote(ZCJoinSplit& params,
 }
 
 CWalletTx GetValidSproutSpend(ZCJoinSplit& params,
-                              const libzelcash::SproutSpendingKey& sk,
-                              const libzelcash::SproutNote& note,
+                              const libflux::SproutSpendingKey& sk,
+                              const libflux::SproutNote& note,
                               CAmount value) {
     CMutableTransaction mtx;
     mtx.fOverwintered = true;
@@ -149,33 +149,33 @@ CWalletTx GetValidSproutSpend(ZCJoinSplit& params,
     // Fake tree for the unused witness
     SproutMerkleTree tree;
 
-    libzelcash::JSOutput dummyout;
-    libzelcash::JSInput dummyin;
+    libflux::JSOutput dummyout;
+    libflux::JSInput dummyin;
 
     {
         if (note.value() > value) {
-            libzelcash::SproutSpendingKey dummykey = libzelcash::SproutSpendingKey::random();
-            libzelcash::SproutPaymentAddress dummyaddr = dummykey.address();
-            dummyout = libzelcash::JSOutput(dummyaddr, note.value() - value);
+            libflux::SproutSpendingKey dummykey = libflux::SproutSpendingKey::random();
+            libflux::SproutPaymentAddress dummyaddr = dummykey.address();
+            dummyout = libflux::JSOutput(dummyaddr, note.value() - value);
         } else if (note.value() < value) {
-            libzelcash::SproutSpendingKey dummykey = libzelcash::SproutSpendingKey::random();
-            libzelcash::SproutPaymentAddress dummyaddr = dummykey.address();
-            libzelcash::SproutNote dummynote(dummyaddr.a_pk, (value - note.value()), uint256(), uint256());
+            libflux::SproutSpendingKey dummykey = libflux::SproutSpendingKey::random();
+            libflux::SproutPaymentAddress dummyaddr = dummykey.address();
+            libflux::SproutNote dummynote(dummyaddr.a_pk, (value - note.value()), uint256(), uint256());
             tree.append(dummynote.cm());
-            dummyin = libzelcash::JSInput(tree.witness(), dummynote, dummykey);
+            dummyin = libflux::JSInput(tree.witness(), dummynote, dummykey);
         }
     }
 
     tree.append(note.cm());
 
-    std::array<libzelcash::JSInput, 2> inputs = {
-        libzelcash::JSInput(tree.witness(), note, sk),
+    std::array<libflux::JSInput, 2> inputs = {
+        libflux::JSInput(tree.witness(), note, sk),
         dummyin
     };
 
-    std::array<libzelcash::JSOutput, 2> outputs = {
+    std::array<libflux::JSOutput, 2> outputs = {
         dummyout, // dummy output
-        libzelcash::JSOutput() // dummy output
+        libflux::JSOutput() // dummy output
     };
 
     // Prepare JoinSplits
@@ -213,10 +213,10 @@ void RegtestDeactivateAcadia() {
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
 }
 
-libzelcash::SaplingExtendedSpendingKey GetTestMasterSaplingSpendingKey() {
+libflux::SaplingExtendedSpendingKey GetTestMasterSaplingSpendingKey() {
     std::vector<unsigned char, secure_allocator<unsigned char>> rawSeed(32);
     HDSeed seed(rawSeed);
-    return libzelcash::SaplingExtendedSpendingKey::Master(seed);
+    return libflux::SaplingExtendedSpendingKey::Master(seed);
 }
 
 CKey AddTestCKeyToKeyStore(CBasicKeyStore& keyStore) {
@@ -225,9 +225,9 @@ CKey AddTestCKeyToKeyStore(CBasicKeyStore& keyStore) {
     return tsk;
 }
 
-TestSaplingNote GetTestSaplingNote(const libzelcash::SaplingPaymentAddress& pa, CAmount value) {
+TestSaplingNote GetTestSaplingNote(const libflux::SaplingPaymentAddress& pa, CAmount value) {
     // Generate dummy Sapling note
-    libzelcash::SaplingNote note(pa, value);
+    libflux::SaplingNote note(pa, value);
     uint256 cm = note.cm().get();
     SaplingMerkleTree tree;
     tree.append(cm);
@@ -236,7 +236,7 @@ TestSaplingNote GetTestSaplingNote(const libzelcash::SaplingPaymentAddress& pa, 
 
 CWalletTx GetValidSaplingReceive(const Consensus::Params& consensusParams,
                                  CBasicKeyStore& keyStore,
-                                 const libzelcash::SaplingExtendedSpendingKey &sk,
+                                 const libflux::SaplingExtendedSpendingKey &sk,
                                  CAmount value) {
     // From taddr
     CKey tsk = AddTestCKeyToKeyStore(keyStore);

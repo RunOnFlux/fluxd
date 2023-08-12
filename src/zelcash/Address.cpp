@@ -12,7 +12,7 @@
 const unsigned char ZELCASH_SAPLING_FVFP_PERSONALIZATION[crypto_generichash_blake2b_PERSONALBYTES] =
     {'Z', 'e', 'l','c', 'a', 's', 'h', 'A', 'c', 'a', 'd', 'i', 'a', 'F', 'V', 'F'};
 
-namespace libzelcash {
+namespace libflux {
 
 
 uint256 SproutPaymentAddress::GetHash() const {
@@ -115,10 +115,10 @@ SaplingPaymentAddress SaplingSpendingKey::default_address() const {
 
 }
 
-bool IsValidPaymentAddress(const libzelcash::PaymentAddress& zaddr) {
+bool IsValidPaymentAddress(const libflux::PaymentAddress& zaddr) {
     return zaddr.which() != 0;
 }
 
-bool IsValidViewingKey(const libzelcash::ViewingKey& vk) {
+bool IsValidViewingKey(const libflux::ViewingKey& vk) {
     return vk.which() != 0;
 }

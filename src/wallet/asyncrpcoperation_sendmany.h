@@ -24,7 +24,7 @@
 // Default transaction fee if caller does not specify one.
 #define ASYNC_RPC_OPERATION_DEFAULT_MINERS_FEE   10000
 
-using namespace libzelcash;
+using namespace libflux;
 
 // A recipient is a tuple of address, amount, memo (optional if zaddr)
 typedef std::tuple<std::string, CAmount, std::string> SendManyRecipient;

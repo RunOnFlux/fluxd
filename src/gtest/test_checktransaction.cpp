@@ -183,8 +183,8 @@ TEST(checktransaction_tests, BadTxnsOversize) {
         mtx.nVersion = SAPLING_TX_VERSION;
 
         // Change the proof types (which requires re-signing the JoinSplit data)
-        mtx.vJoinSplit[0].proof = libzelcash::GrothProof();
-        mtx.vJoinSplit[1].proof = libzelcash::GrothProof();
+        mtx.vJoinSplit[0].proof = libflux::GrothProof();
+        mtx.vJoinSplit[1].proof = libflux::GrothProof();
         CreateJoinSplitSignature(mtx, NetworkUpgradeInfo[Consensus::UPGRADE_ACADIA].nBranchId);
 
         CTransaction tx(mtx);
@@ -208,8 +208,8 @@ TEST(checktransaction_tests, OversizeSaplingTxns) {
     mtx.nVersion = SAPLING_TX_VERSION;
 
     // Change the proof types (which requires re-signing the JoinSplit data)
-    mtx.vJoinSplit[0].proof = libzelcash::GrothProof();
-    mtx.vJoinSplit[1].proof = libzelcash::GrothProof();
+    mtx.vJoinSplit[0].proof = libflux::GrothProof();
+    mtx.vJoinSplit[1].proof = libflux::GrothProof();
     CreateJoinSplitSignature(mtx, NetworkUpgradeInfo[Consensus::UPGRADE_ACADIA].nBranchId);
 
     // Transaction just under the limit
@@ -732,13 +732,13 @@ TEST(checktransaction_tests, SaplingSproutInputSumsTooLarge) {
         // create JSDescription
         uint256 rt;
         uint256 joinSplitPubKey;
-        std::array<libzelcash::JSInput, ZC_NUM_JS_INPUTS> inputs = {
-            libzelcash::JSInput(),
-            libzelcash::JSInput()
+        std::array<libflux::JSInput, ZC_NUM_JS_INPUTS> inputs = {
+            libflux::JSInput(),
+            libflux::JSInput()
         };
-        std::array<libzelcash::JSOutput, ZC_NUM_JS_OUTPUTS> outputs = {
-            libzelcash::JSOutput(),
-            libzelcash::JSOutput()
+        std::array<libflux::JSOutput, ZC_NUM_JS_OUTPUTS> outputs = {
+            libflux::JSOutput(),
+            libflux::JSOutput()
         };
         std::array<size_t, ZC_NUM_JS_INPUTS> inputMap;
         std::array<size_t, ZC_NUM_JS_OUTPUTS> outputMap;

@@ -22,7 +22,7 @@
 #include "streams.h"
 #include "version.h"
 
-namespace libzelcash {
+namespace libflux {
 
 static CCriticalSection cs_ParamsIO;
 

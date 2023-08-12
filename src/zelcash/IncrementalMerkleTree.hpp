@@ -16,7 +16,7 @@
 #include "Zelcash.h"
 #include "zelcash/util.h"
 
-namespace libzelcash {
+namespace libflux {
 
 class MerklePath {
 public:
@@ -247,19 +247,19 @@ public:
 template<size_t Depth, typename Hash>
 EmptyMerkleRoots<Depth, Hash> IncrementalMerkleTree<Depth, Hash>::emptyroots;
 
-} // end namespace `libzelcash`
+} // end namespace `libflux`
 
 
-typedef libzelcash::IncrementalMerkleTree<INCREMENTAL_MERKLE_TREE_DEPTH, libzelcash::SHA256Compress> SproutMerkleTree;
-typedef libzelcash::IncrementalMerkleTree<INCREMENTAL_MERKLE_TREE_DEPTH_TESTING, libzelcash::SHA256Compress> SproutTestingMerkleTree;
+typedef libflux::IncrementalMerkleTree<INCREMENTAL_MERKLE_TREE_DEPTH, libflux::SHA256Compress> SproutMerkleTree;
+typedef libflux::IncrementalMerkleTree<INCREMENTAL_MERKLE_TREE_DEPTH_TESTING, libflux::SHA256Compress> SproutTestingMerkleTree;
 
-typedef libzelcash::IncrementalWitness<INCREMENTAL_MERKLE_TREE_DEPTH, libzelcash::SHA256Compress> SproutWitness;
-typedef libzelcash::IncrementalWitness<INCREMENTAL_MERKLE_TREE_DEPTH_TESTING, libzelcash::SHA256Compress> SproutTestingWitness;
+typedef libflux::IncrementalWitness<INCREMENTAL_MERKLE_TREE_DEPTH, libflux::SHA256Compress> SproutWitness;
+typedef libflux::IncrementalWitness<INCREMENTAL_MERKLE_TREE_DEPTH_TESTING, libflux::SHA256Compress> SproutTestingWitness;
 
-typedef libzelcash::IncrementalMerkleTree<SAPLING_INCREMENTAL_MERKLE_TREE_DEPTH, libzelcash::PedersenHash> SaplingMerkleTree;
-typedef libzelcash::IncrementalMerkleTree<INCREMENTAL_MERKLE_TREE_DEPTH_TESTING, libzelcash::PedersenHash> SaplingTestingMerkleTree;
+typedef libflux::IncrementalMerkleTree<SAPLING_INCREMENTAL_MERKLE_TREE_DEPTH, libflux::PedersenHash> SaplingMerkleTree;
+typedef libflux::IncrementalMerkleTree<INCREMENTAL_MERKLE_TREE_DEPTH_TESTING, libflux::PedersenHash> SaplingTestingMerkleTree;
 
-typedef libzelcash::IncrementalWitness<SAPLING_INCREMENTAL_MERKLE_TREE_DEPTH, libzelcash::PedersenHash> SaplingWitness;
-typedef libzelcash::IncrementalWitness<INCREMENTAL_MERKLE_TREE_DEPTH_TESTING, libzelcash::PedersenHash> SaplingTestingWitness;
+typedef libflux::IncrementalWitness<SAPLING_INCREMENTAL_MERKLE_TREE_DEPTH, libflux::PedersenHash> SaplingWitness;
+typedef libflux::IncrementalWitness<INCREMENTAL_MERKLE_TREE_DEPTH_TESTING, libflux::PedersenHash> SaplingTestingWitness;
 
 #endif /* ZC_INCREMENTALMERKLETREE_H_ */

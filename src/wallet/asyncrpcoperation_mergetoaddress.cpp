@@ -33,7 +33,7 @@
 #include <string>
 #include <thread>
 
-using namespace libzelcash;
+using namespace libflux;
 
 int mta_find_output(UniValue obj, int n)
 {
@@ -338,7 +338,7 @@ bool AsyncRPCOperation_mergetoaddress::main_impl()
             std::string zaddr = std::get<0>(recipient_);
             std::string memo = std::get<1>(recipient_);
             std::array<unsigned char, ZC_MEMO_SIZE> hexMemo = get_memo_from_hex_string(memo);
-            auto saplingPaymentAddress = boost::get<libzelcash::SaplingPaymentAddress>(&toPaymentAddress_);
+            auto saplingPaymentAddress = boost::get<libflux::SaplingPaymentAddress>(&toPaymentAddress_);
             if (saplingPaymentAddress == nullptr) {
                 // This should never happen as we have already determined that the payment is to sapling
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Could not get Sapling payment address.");
@@ -411,7 +411,7 @@ bool AsyncRPCOperation_mergetoaddress::main_impl()
         info.vpub_old = sendAmount;
         info.vpub_new = 0;
 
-        JSOutput jso = JSOutput(boost::get<libzelcash::SproutPaymentAddress>(toPaymentAddress_), sendAmount);
+        JSOutput jso = JSOutput(boost::get<libflux::SproutPaymentAddress>(toPaymentAddress_), sendAmount);
         if (hexMemo.size() > 0) {
             jso.memo = get_memo_from_hex_string(hexMemo);
         }
@@ -695,7 +695,7 @@ bool AsyncRPCOperation_mergetoaddress::main_impl()
             // If this is the final output, set the target and memo
             if (isToZaddr_ && vpubNewProcessed) {
                 outputType = "target";
-                jso.addr = boost::get<libzelcash::SproutPaymentAddress>(toPaymentAddress_);
+                jso.addr = boost::get<libflux::SproutPaymentAddress>(toPaymentAddress_);
                 if (!hexMemo.empty()) {
                     jso.memo = get_memo_from_hex_string(hexMemo);
                 }
@@ -796,8 +796,8 @@ UniValue AsyncRPCOperation_mergetoaddress::perform_joinsplit(
              FormatMoney(info.vjsout[0].value), FormatMoney(info.vjsout[1].value));
 
     // Generate the proof, this can take over a minute.
-    std::array<libzelcash::JSInput, ZC_NUM_JS_INPUTS> inputs{info.vjsin[0], info.vjsin[1]};
-    std::array<libzelcash::JSOutput, ZC_NUM_JS_OUTPUTS> outputs{info.vjsout[0], info.vjsout[1]};
+    std::array<libflux::JSInput, ZC_NUM_JS_INPUTS> inputs{info.vjsin[0], info.vjsin[1]};
+    std::array<libflux::JSOutput, ZC_NUM_JS_OUTPUTS> outputs{info.vjsout[0], info.vjsout[1]};
     std::array<size_t, ZC_NUM_JS_INPUTS> inputMap;
     std::array<size_t, ZC_NUM_JS_OUTPUTS> outputMap;
 
@@ -817,7 +817,7 @@ UniValue AsyncRPCOperation_mergetoaddress::perform_joinsplit(
         !this->testmode,
         &esk); // parameter expects pointer to esk, so pass in address
     {
-        auto verifier = libzelcash::ProofVerifier::Strict();
+        auto verifier = libflux::ProofVerifier::Strict();
         if (!(jsdesc.Verify(*pfluxParams, verifier, joinSplitPubKey_))) {
             throw std::runtime_error("error verifying joinsplit");
         }
@@ -893,7 +893,7 @@ UniValue AsyncRPCOperation_mergetoaddress::perform_joinsplit(
         // placeholder for txid will be filled in later when tx has been finalized and signed.
         PaymentDisclosureKey pdKey = {placeholder, js_index, mapped_index};
         JSOutput output = outputs[mapped_index];
-        libzelcash::SproutPaymentAddress zaddr = output.addr; // randomized output
+        libflux::SproutPaymentAddress zaddr = output.addr; // randomized output
         PaymentDisclosureInfo pdInfo = {PAYMENT_DISCLOSURE_VERSION_EXPERIMENTAL, esk, joinSplitPrivKey, zaddr};
         paymentDisclosureData_.push_back(PaymentDisclosureKeyInfo(pdKey, pdInfo));
 

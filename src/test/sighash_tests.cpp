@@ -186,7 +186,7 @@ void static RandomTransaction(CMutableTransaction &tx, bool fSingle, uint32_t co
             randombytes_buf(jsdesc.ciphertexts[0].begin(), jsdesc.ciphertexts[0].size());
             randombytes_buf(jsdesc.ciphertexts[1].begin(), jsdesc.ciphertexts[1].size());
             {
-                libzelcash::GrothProof zkproof;
+                libflux::GrothProof zkproof;
                 randombytes_buf(zkproof.begin(), zkproof.size());
                 jsdesc.proof = zkproof;
             }

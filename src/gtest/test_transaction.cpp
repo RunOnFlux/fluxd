@@ -22,10 +22,10 @@ TEST(Transaction, JSDescriptionRandomized) {
     // construct a merkle tree
     SproutMerkleTree merkleTree;
 
-    libzelcash::SproutSpendingKey k = libzelcash::SproutSpendingKey::random();
-    libzelcash::SproutPaymentAddress addr = k.address();
+    libflux::SproutSpendingKey k = libflux::SproutSpendingKey::random();
+    libflux::SproutPaymentAddress addr = k.address();
 
-    libzelcash::SproutNote note(addr.a_pk, 100, uint256(), uint256());
+    libflux::SproutNote note(addr.a_pk, 100, uint256(), uint256());
 
     // commitment from coin
     uint256 commitment = note.cm();
@@ -40,13 +40,13 @@ TEST(Transaction, JSDescriptionRandomized) {
 
     // create JSDescription
     uint256 joinSplitPubKey;
-    std::array<libzelcash::JSInput, ZC_NUM_JS_INPUTS> inputs = {
-        libzelcash::JSInput(witness, note, k),
-        libzelcash::JSInput() // dummy input of zero value
+    std::array<libflux::JSInput, ZC_NUM_JS_INPUTS> inputs = {
+        libflux::JSInput(witness, note, k),
+        libflux::JSInput() // dummy input of zero value
     };
-    std::array<libzelcash::JSOutput, ZC_NUM_JS_OUTPUTS> outputs = {
-        libzelcash::JSOutput(addr, 50),
-        libzelcash::JSOutput(addr, 50)
+    std::array<libflux::JSOutput, ZC_NUM_JS_OUTPUTS> outputs = {
+        libflux::JSOutput(addr, 50),
+        libflux::JSOutput(addr, 50)
     };
     std::array<size_t, ZC_NUM_JS_INPUTS> inputMap;
     std::array<size_t, ZC_NUM_JS_OUTPUTS> outputMap;

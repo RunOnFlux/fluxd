@@ -28,7 +28,7 @@
 #include "zelcash/NoteEncryption.hpp"
 
 using namespace std;
-using namespace libzelcash;
+using namespace libflux;
 
 // Function declaration for function implemented in wallet/rpcwallet.cpp
 bool EnsureWalletIsAvailable(bool avoidException);

@@ -23,7 +23,7 @@
 // Default transaction fee if caller does not specify one.
 #define SHIELD_COINBASE_DEFAULT_MINERS_FEE   10000
 
-using namespace libzelcash;
+using namespace libflux;
 
 struct ShieldCoinbaseUTXO {
     uint256 txid;
@@ -105,9 +105,9 @@ public:
     ShieldToAddress(AsyncRPCOperation_shieldcoinbase *op, CAmount sendAmount) :
         m_op(op), sendAmount(sendAmount) {}
 
-    bool operator()(const libzelcash::SproutPaymentAddress &zaddr) const;
-    bool operator()(const libzelcash::SaplingPaymentAddress &zaddr) const;
-    bool operator()(const libzelcash::InvalidEncoding& no) const;
+    bool operator()(const libflux::SproutPaymentAddress &zaddr) const;
+    bool operator()(const libflux::SaplingPaymentAddress &zaddr) const;
+    bool operator()(const libflux::InvalidEncoding& no) const;
 };
 
 

@@ -62,7 +62,7 @@ public:
     uint256 anchor;                //!< A Merkle root of the Sapling note commitment tree at some block height in the past.
     uint256 nullifier;             //!< The nullifier of the input note.
     uint256 rk;                    //!< The randomized public key for spendAuthSig.
-    libzelcash::GrothProof zkproof;  //!< A zero-knowledge proof using the spend circuit.
+    libflux::GrothProof zkproof;  //!< A zero-knowledge proof using the spend circuit.
     spend_auth_sig_t spendAuthSig; //!< A signature authorizing this spend.
 
     SpendDescription() { }
@@ -106,9 +106,9 @@ public:
     uint256 cv;                     //!< A value commitment to the value of the output note.
     uint256 cm;                     //!< The note commitment for the output note.
     uint256 ephemeralKey;           //!< A Jubjub public key.
-    libzelcash::SaplingEncCiphertext encCiphertext; //!< A ciphertext component for the encrypted output note.
-    libzelcash::SaplingOutCiphertext outCiphertext; //!< A ciphertext component for the encrypted output note.
-    libzelcash::GrothProof zkproof;   //!< A zero-knowledge proof using the output circuit.
+    libflux::SaplingEncCiphertext encCiphertext; //!< A ciphertext component for the encrypted output note.
+    libflux::SaplingOutCiphertext outCiphertext; //!< A ciphertext component for the encrypted output note.
+    libflux::GrothProof zkproof;   //!< A zero-knowledge proof using the output circuit.
 
     OutputDescription() { }
 
@@ -151,7 +151,7 @@ class SproutProofSerializer : public boost::static_visitor<>
 public:
     SproutProofSerializer(Stream& s, bool useGroth) : s(s), useGroth(useGroth) {}
 
-    void operator()(const libzelcash::PHGRProof& proof) const
+    void operator()(const libflux::PHGRProof& proof) const
     {
         if (useGroth) {
             throw std::ios_base::failure("Invalid Sprout proof for transaction format (expected GrothProof, found PHGRProof)");
@@ -159,7 +159,7 @@ public:
         ::Serialize(s, proof);
     }
 
-    void operator()(const libzelcash::GrothProof& proof) const
+    void operator()(const libflux::GrothProof& proof) const
     {
         if (!useGroth) {
             throw std::ios_base::failure("Invalid Sprout proof for transaction format (expected PHGRProof, found GrothProof)");
@@ -179,11 +179,11 @@ template<typename Stream, typename T>
 inline void SerReadWriteSproutProof(Stream& s, T& proof, bool useGroth, CSerActionUnserialize ser_action)
 {
     if (useGroth) {
-        libzelcash::GrothProof grothProof;
+        libflux::GrothProof grothProof;
         ::Unserialize(s, grothProof);
         proof = grothProof;
     } else {
-        libzelcash::PHGRProof pghrProof;
+        libflux::PHGRProof pghrProof;
         ::Unserialize(s, pghrProof);
         proof = pghrProof;
     }
@@ -235,7 +235,7 @@ public:
 
     // JoinSplit proof
     // This is a zk-SNARK which ensures that this JoinSplit is valid.
-    libzelcash::SproutProof proof;
+    libflux::SproutProof proof;
 
     JSDescription(): vpub_old(0), vpub_new(0) { }
 
@@ -243,8 +243,8 @@ public:
             ZCJoinSplit& params,
             const uint256& joinSplitPubKey,
             const uint256& rt,
-            const std::array<libzelcash::JSInput, ZC_NUM_JS_INPUTS>& inputs,
-            const std::array<libzelcash::JSOutput, ZC_NUM_JS_OUTPUTS>& outputs,
+            const std::array<libflux::JSInput, ZC_NUM_JS_INPUTS>& inputs,
+            const std::array<libflux::JSOutput, ZC_NUM_JS_OUTPUTS>& outputs,
             CAmount vpub_old,
             CAmount vpub_new,
             bool computeProof = true, // Set to false in some tests
@@ -256,8 +256,8 @@ public:
             const uint256& joinSplitPubKey,
             const uint256& rt,
 
-            std::array<libzelcash::JSInput, ZC_NUM_JS_INPUTS>& inputs,
-            std::array<libzelcash::JSOutput, ZC_NUM_JS_OUTPUTS>& outputs,
+            std::array<libflux::JSInput, ZC_NUM_JS_INPUTS>& inputs,
+            std::array<libflux::JSOutput, ZC_NUM_JS_OUTPUTS>& outputs,
             std::array<size_t, ZC_NUM_JS_INPUTS>& inputMap,
             std::array<size_t, ZC_NUM_JS_OUTPUTS>& outputMap,
 
@@ -271,7 +271,7 @@ public:
     // Verifies that the JoinSplit proof is correct.
     bool Verify(
         ZCJoinSplit& params,
-        libzelcash::ProofVerifier& verifier,
+        libflux::ProofVerifier& verifier,
         const uint256& joinSplitPubKey
     ) const;
 

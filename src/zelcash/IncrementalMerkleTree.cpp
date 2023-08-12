@@ -11,7 +11,7 @@
 #include "zelcash/util.h"
 #include "librustzcash.h"
 
-namespace libzelcash {
+namespace libflux {
 
 PedersenHash PedersenHash::combine(
     const PedersenHash& a,
@@ -1152,4 +1152,4 @@ template class IncrementalMerkleTree<INCREMENTAL_MERKLE_TREE_DEPTH_TESTING, Pede
 template class IncrementalWitness<SAPLING_INCREMENTAL_MERKLE_TREE_DEPTH, PedersenHash>;
 template class IncrementalWitness<INCREMENTAL_MERKLE_TREE_DEPTH_TESTING, PedersenHash>;
 
-} // end namespace `libzelcash`
+} // end namespace `libflux`

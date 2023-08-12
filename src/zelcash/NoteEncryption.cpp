@@ -103,7 +103,7 @@ void KDF(unsigned char K[NOTEENCRYPTION_CIPHER_KEYSIZE],
     }
 }
 
-namespace libzelcash {
+namespace libflux {
 
 boost::optional<SaplingNoteEncryption> SaplingNoteEncryption::FromDiversifier(diversifier_t d) {
     uint256 epk;

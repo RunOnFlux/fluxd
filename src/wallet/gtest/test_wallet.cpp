@@ -76,7 +76,7 @@ public:
 };
 
 CWalletTx GetValidSproutReceive(
-    const libzelcash::SproutSpendingKey& sk,
+    const libflux::SproutSpendingKey& sk,
     CAmount value,
     bool randomInputs,
     int32_t versionGroupId = SAPLING_VERSION_GROUP_ID,
@@ -86,7 +86,7 @@ CWalletTx GetValidSproutReceive(
 }
 
 CWalletTx GetInvalidCommitmentSproutReceive(
-    const libzelcash::SproutSpendingKey& sk,
+    const libflux::SproutSpendingKey& sk,
     CAmount value,
     bool randomInputs,
     int32_t versionGroupId = SAPLING_VERSION_GROUP_ID,
@@ -95,13 +95,13 @@ CWalletTx GetInvalidCommitmentSproutReceive(
     return GetInvalidCommitmentSproutReceive(*params, sk, value, randomInputs, versionGroupId, version);
 }
 
-libzelcash::SproutNote GetSproutNote(const libzelcash::SproutSpendingKey& sk,
+libflux::SproutNote GetSproutNote(const libflux::SproutSpendingKey& sk,
                        const CTransaction& tx, size_t js, size_t n) {
     return GetSproutNote(*params, sk, tx, js, n);
 }
 
-CWalletTx GetValidSproutSpend(const libzelcash::SproutSpendingKey& sk,
-                        const libzelcash::SproutNote& note, CAmount value) {
+CWalletTx GetValidSproutSpend(const libflux::SproutSpendingKey& sk,
+                        const libflux::SproutNote& note, CAmount value) {
     return GetValidSproutSpend(*params, sk, note, value);
 }
 
@@ -116,7 +116,7 @@ std::vector<SaplingOutPoint> SetSaplingNoteData(CWalletTx& wtx) {
 }
 
 std::pair<JSOutPoint, SaplingOutPoint> CreateValidBlock(TestWallet& wallet,
-                            const libzelcash::SproutSpendingKey& sk,
+                            const libflux::SproutSpendingKey& sk,
                             const CBlockIndex& index,
                             CBlock& block,
                             SproutMerkleTree& sproutTree,
@@ -161,7 +161,7 @@ TEST(WalletTests, SetupDatadirLocationRunAsFirstTest) {
 }
 
 TEST(WalletTests, SproutNoteDataSerialisation) {
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     auto wtx = GetValidSproutReceive(sk, 10, true);
     auto note = GetSproutNote(sk, wtx, 0, 1);
     auto nullifier = note.nullifier(sk);
@@ -189,7 +189,7 @@ TEST(WalletTests, FindUnspentSproutNotes) {
     auto consensusParams = RegtestActivateAcadia();
 
     CWallet wallet;
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     auto wtx = GetValidSproutReceive(sk, 10, true);
@@ -363,7 +363,7 @@ TEST(WalletTests, FindUnspentSproutNotes) {
 
 
 TEST(WalletTests, SetSproutNoteAddrsInCWalletTx) {
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     auto wtx = GetValidSproutReceive(sk, 10, true);
     auto note = GetSproutNote(sk, wtx, 0, 1);
     auto nullifier = note.nullifier(sk);
@@ -389,7 +389,7 @@ TEST(WalletTests, SetSaplingNoteAddrsInCWalletTx) {
     auto ivk = fvk.in_viewing_key();
     auto pk = sk.DefaultAddress();
 
-    libzelcash::SaplingNote note(pk, 50000);
+    libflux::SaplingNote note(pk, 50000);
     auto cm = note.cm().get();
     SaplingMerkleTree tree;
     tree.append(cm);
@@ -437,7 +437,7 @@ TEST(WalletTests, SetSproutInvalidNoteAddrsInCWalletTx) {
     EXPECT_EQ(0, wtx.mapSproutNoteData.size());
 
     mapSproutNoteData_t noteData;
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     JSOutPoint jsoutpt {wtx.GetHash(), 0, 1};
     SproutNoteData nd {sk.address(), uint256()};
     noteData[jsoutpt] = nd;
@@ -464,7 +464,7 @@ TEST(WalletTests, SetInvalidSaplingNoteDataInCWalletTx) {
 TEST(WalletTests, CheckSproutNoteCommitmentAgainstNotePlaintext) {
     CWallet wallet;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     auto address = sk.address();
     auto dec = ZCNoteDecryption(sk.receiving_key());
 
@@ -479,13 +479,13 @@ TEST(WalletTests, CheckSproutNoteCommitmentAgainstNotePlaintext) {
         wtx.vJoinSplit[0],
         address,
         dec,
-        hSig, 1), libzelcash::note_decryption_failed);
+        hSig, 1), libflux::note_decryption_failed);
 }
 
 TEST(WalletTests, GetSproutNoteNullifier) {
     CWallet wallet;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     auto address = sk.address();
     auto dec = ZCNoteDecryption(sk.receiving_key());
 
@@ -551,8 +551,8 @@ TEST(WalletTests, FindMySaplingNotes) {
 TEST(WalletTests, FindMySproutNotes) {
     CWallet wallet;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
-    auto sk2 = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
+    auto sk2 = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk2);
 
     auto wtx = GetValidSproutReceive(sk, 10, true);
@@ -578,7 +578,7 @@ TEST(WalletTests, FindMySproutNotesInEncryptedWallet) {
     uint256 r {GetRandHash()};
     CKeyingMaterial vMasterKey (r.begin(), r.end());
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     ASSERT_TRUE(wallet.EncryptKeys(vMasterKey));
@@ -606,7 +606,7 @@ TEST(WalletTests, FindMySproutNotesInEncryptedWallet) {
 TEST(WalletTests, GetConflictedSproutNotes) {
     CWallet wallet;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     auto wtx = GetValidSproutReceive(sk, 10, true);
@@ -651,7 +651,7 @@ TEST(WalletTests, GetConflictedSaplingNotes) {
     ASSERT_TRUE(wallet.HaveSaplingSpendingKey(fvk));
 
     // Generate note A
-    libzelcash::SaplingNote note(pk, 50000);
+    libflux::SaplingNote note(pk, 50000);
     auto cm = note.cm().get();
     SaplingMerkleTree saplingTree;
     saplingTree.append(cm);
@@ -694,7 +694,7 @@ TEST(WalletTests, GetConflictedSaplingNotes) {
     wtx = wallet.mapWallet[hash];
 
     // Decrypt output note B
-    auto maybe_pt = libzelcash::SaplingNotePlaintext::decrypt(
+    auto maybe_pt = libflux::SaplingNotePlaintext::decrypt(
             wtx.vShieldedOutput[0].encCiphertext,
             ivk,
             wtx.vShieldedOutput[0].ephemeralKey,
@@ -755,7 +755,7 @@ TEST(WalletTests, GetConflictedSaplingNotes) {
 TEST(WalletTests, SproutNullifierIsSpent) {
     CWallet wallet;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     auto wtx = GetValidSproutReceive(sk, 10, true);
@@ -852,7 +852,7 @@ TEST(WalletTests, SaplingNullifierIsSpent) {
 TEST(WalletTests, NavigateFromSproutNullifierToNote) {
     CWallet wallet;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     auto wtx = GetValidSproutReceive(sk, 10, true);
@@ -970,7 +970,7 @@ TEST(WalletTests, NavigateFromSaplingNullifierToNote) {
 TEST(WalletTests, SpentSproutNoteIsFromMe) {
     CWallet wallet;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     auto wtx = GetValidSproutReceive(sk, 10, true);
@@ -1009,7 +1009,7 @@ TEST(WalletTests, SpentSaplingNoteIsFromMe) {
     auto pk = sk.DefaultAddress();
 
     // Generate Sapling note A
-    libzelcash::SaplingNote note(pk, 50000);
+    libflux::SaplingNote note(pk, 50000);
     auto cm = note.cm().get();
     SaplingMerkleTree saplingTree;
     saplingTree.append(cm);
@@ -1065,7 +1065,7 @@ TEST(WalletTests, SpentSaplingNoteIsFromMe) {
     ASSERT_FALSE(wallet.mapSaplingNullifiersToNotes.count(nf.get()));
 
     // Decrypt note B
-    auto maybe_pt = libzelcash::SaplingNotePlaintext::decrypt(
+    auto maybe_pt = libflux::SaplingNotePlaintext::decrypt(
         wtx.vShieldedOutput[0].encCiphertext,
         ivk,
         wtx.vShieldedOutput[0].ephemeralKey,
@@ -1139,7 +1139,7 @@ TEST(WalletTests, SpentSaplingNoteIsFromMe) {
 TEST(WalletTests, CachedWitnessesEmptyChain) {
     TestWallet wallet;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     auto wtx = GetValidSproutReceive(sk, 10, true);
@@ -1202,7 +1202,7 @@ TEST(WalletTests, CachedWitnessesChainTip) {
     SproutMerkleTree sproutTree;
     SaplingMerkleTree saplingTree;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     {
@@ -1302,7 +1302,7 @@ TEST(WalletTests, CachedWitnessesDecrementFirst) {
     SproutMerkleTree sproutTree;
     SaplingMerkleTree saplingTree;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     {
@@ -1392,7 +1392,7 @@ TEST(WalletTests, CachedWitnessesCleanIndex) {
     std::vector<boost::optional<SproutWitness>> sproutWitnesses;
     std::vector<boost::optional<SaplingWitness>> saplingWitnesses;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     // Generate a chain
@@ -1467,7 +1467,7 @@ TEST(WalletTests, CachedWitnessesCleanIndex) {
 TEST(WalletTests, ClearNoteWitnessCache) {
     TestWallet wallet;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     auto wtx = GetValidSproutReceive(sk, 10, true);
@@ -1527,7 +1527,7 @@ TEST(WalletTests, WriteWitnessCache) {
     MockWalletDB walletdb;
     CBlockLocator loc;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     auto wtx = GetValidSproutReceive(sk, 10, true);
@@ -1619,7 +1619,7 @@ TEST(WalletTests, SetBestChainIgnoresTxsWithoutShieldedData) {
     auto scriptPubKey = GetScriptForDestination(tsk.GetPubKey().GetID());
 
     // Set up a Sprout address
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     // Generate a transparent transaction that is ours
@@ -1637,7 +1637,7 @@ TEST(WalletTests, SetBestChainIgnoresTxsWithoutShieldedData) {
     wallet.AddToWallet(wtxSprout, true, nullptr);
 
     // Generate a Sprout transaction that only involves our transparent address
-    auto sk2 = libzelcash::SproutSpendingKey::random();
+    auto sk2 = libflux::SproutSpendingKey::random();
     auto wtxInput = GetValidSproutReceive(sk2, 10, true);
     auto note = GetSproutNote(sk2, wtxInput, 0, 0);
     auto wtxTmp = GetValidSproutSpend(sk2, note, 5);
@@ -1652,7 +1652,7 @@ TEST(WalletTests, SetBestChainIgnoresTxsWithoutShieldedData) {
     mtxSapling.nVersion = SAPLING_TX_VERSION;
     mtxSapling.nVersionGroupId = SAPLING_VERSION_GROUP_ID;
     mtxSapling.vShieldedOutput.resize(1);
-    mtxSapling.vShieldedOutput[0].cv = libzelcash::random_uint256();
+    mtxSapling.vShieldedOutput[0].cv = libflux::random_uint256();
     CWalletTx wtxSapling {nullptr, mtxSapling};
     SetSaplingNoteData(wtxSapling);
     wallet.AddToWallet(wtxSapling, true, nullptr);
@@ -1663,7 +1663,7 @@ TEST(WalletTests, SetBestChainIgnoresTxsWithoutShieldedData) {
     mtxSaplingTransparent.nVersion = SAPLING_TX_VERSION;
     mtxSaplingTransparent.nVersionGroupId = SAPLING_VERSION_GROUP_ID;
     mtxSaplingTransparent.vShieldedOutput.resize(1);
-    mtxSaplingTransparent.vShieldedOutput[0].cv = libzelcash::random_uint256();
+    mtxSaplingTransparent.vShieldedOutput[0].cv = libflux::random_uint256();
     CWalletTx wtxSaplingTransparent {nullptr, mtxSaplingTransparent};
     wallet.AddToWallet(wtxSaplingTransparent, true, nullptr);
 
@@ -1693,7 +1693,7 @@ TEST(WalletTests, UpdateSproutNullifierNoteMap) {
     uint256 r {GetRandHash()};
     CKeyingMaterial vMasterKey (r.begin(), r.end());
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
     
     ASSERT_TRUE(wallet.EncryptKeys(vMasterKey));
@@ -1726,7 +1726,7 @@ TEST(WalletTests, UpdateSproutNullifierNoteMap) {
 TEST(WalletTests, UpdatedSproutNoteData) {
     TestWallet wallet;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     auto wtx = GetValidSproutReceive(sk, 10, true);
@@ -1883,7 +1883,7 @@ TEST(WalletTests, UpdatedSaplingNoteData) {
 TEST(WalletTests, MarkAffectedSproutTransactionsDirty) {
     TestWallet wallet;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     auto wtx = GetValidSproutReceive(sk, 10, true);
@@ -1977,7 +1977,7 @@ TEST(WalletTests, MarkAffectedSaplingTransactionsDirty) {
     wtx = wallet.mapWallet[hash];
 
     // Prepare to spend the note that was just created
-    auto maybe_pt = libzelcash::SaplingNotePlaintext::decrypt(
+    auto maybe_pt = libflux::SaplingNotePlaintext::decrypt(
             tx1.vShieldedOutput[0].encCiphertext, ivk, tx1.vShieldedOutput[0].ephemeralKey, tx1.vShieldedOutput[0].cm);
     ASSERT_EQ(static_cast<bool>(maybe_pt), true);
     auto maybe_note = maybe_pt.get().note(ivk);
@@ -2025,7 +2025,7 @@ TEST(WalletTests, MarkAffectedSaplingTransactionsDirty) {
 TEST(WalletTests, SproutNoteLocking) {
     TestWallet wallet;
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sk);
 
     auto wtx = GetValidSproutReceive(sk, 10, true);

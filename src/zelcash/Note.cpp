@@ -13,7 +13,7 @@
 #include "zelcash/util.h"
 #include "librustzcash.h"
 
-using namespace libzelcash;
+using namespace libflux;
 
 SproutNote::SproutNote() {
     a_pk = random_uint256();

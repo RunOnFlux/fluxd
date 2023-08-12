@@ -37,7 +37,7 @@
 #include "zelcash/Note.hpp"
 #include "librustzcash.h"
 
-using namespace libzelcash;
+using namespace libflux;
 // This method is based on Shutdown from init.cpp
 void pre_wallet_load()
 {
@@ -113,7 +113,7 @@ double benchmark_create_joinsplit()
                          0);
     double ret = timer_stop(tv_start);
 
-    auto verifier = libzelcash::ProofVerifier::Strict();
+    auto verifier = libflux::ProofVerifier::Strict();
     assert(jsdesc.Verify(*pfluxParams, verifier, joinSplitPubKey));
     return ret;
 }
@@ -144,7 +144,7 @@ double benchmark_verify_joinsplit(const JSDescription &joinsplit)
     struct timeval tv_start;
     timer_start(tv_start);
     uint256 joinSplitPubKey;
-    auto verifier = libzelcash::ProofVerifier::Strict();
+    auto verifier = libflux::ProofVerifier::Strict();
     joinsplit.Verify(*pfluxParams, verifier, joinSplitPubKey);
     return timer_stop(tv_start);
 }
@@ -274,11 +274,11 @@ double benchmark_try_decrypt_sprout_notes(size_t nKeys)
 {
     CWallet wallet;
     for (int i = 0; i < nKeys; i++) {
-        auto sk = libzelcash::SproutSpendingKey::random();
+        auto sk = libflux::SproutSpendingKey::random();
         wallet.AddSproutSpendingKey(sk);
     }
 
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
     auto tx = GetValidSproutReceive(*pfluxParams, sk, 10, true);
 
     struct timeval tv_start;
@@ -314,7 +314,7 @@ double benchmark_try_decrypt_sapling_notes(size_t nKeys)
     return timer_stop(tv_start);
 }
 
-CWalletTx CreateSproutTxWithNoteData(const libzelcash::SproutSpendingKey& sk) {
+CWalletTx CreateSproutTxWithNoteData(const libflux::SproutSpendingKey& sk) {
     auto wtx = GetValidSproutReceive(*pfluxParams, sk, 10, true);
     auto note = GetSproutNote(*pfluxParams, sk, wtx, 0, 1);
     auto nullifier = note.nullifier(sk);
@@ -337,7 +337,7 @@ double benchmark_increment_sprout_note_witnesses(size_t nTxs)
     SproutMerkleTree sproutTree;
     SaplingMerkleTree saplingTree;
 
-    auto sproutSpendingKey = libzelcash::SproutSpendingKey::random();
+    auto sproutSpendingKey = libflux::SproutSpendingKey::random();
     wallet.AddSproutSpendingKey(sproutSpendingKey);
 
     // First block
@@ -374,7 +374,7 @@ double benchmark_increment_sprout_note_witnesses(size_t nTxs)
 
 CWalletTx CreateSaplingTxWithNoteData(const Consensus::Params& consensusParams,
                                       CBasicKeyStore& keyStore,
-                                      const libzelcash::SaplingExtendedSpendingKey &sk) {
+                                      const libflux::SaplingExtendedSpendingKey &sk) {
     auto wtx = GetValidSaplingReceive(consensusParams, keyStore, sk, 10);
     auto testNote = GetTestSaplingNote(sk.DefaultAddress(), 10);
     auto fvk = sk.expsk.full_viewing_key();
@@ -597,7 +597,7 @@ double benchmark_listunspent()
 
 double benchmark_create_sapling_spend()
 {
-    auto sk = libzelcash::SaplingSpendingKey::random();
+    auto sk = libflux::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
     auto address = sk.default_address();
     SaplingNote note(address, GetRand(MAX_MONEY));
@@ -648,13 +648,13 @@ double benchmark_create_sapling_spend()
 
 double benchmark_create_sapling_output()
 {
-    auto sk = libzelcash::SaplingSpendingKey::random();
+    auto sk = libflux::SaplingSpendingKey::random();
     auto address = sk.default_address();
 
     std::array<unsigned char, ZC_MEMO_SIZE> memo;
     SaplingNote note(address, GetRand(MAX_MONEY));
 
-    libzelcash::SaplingNotePlaintext notePlaintext(note, memo);
+    libflux::SaplingNotePlaintext notePlaintext(note, memo);
     auto res = notePlaintext.encrypt(note.pk_d);
     if (!res) {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "SaplingNotePlaintext::encrypt() failed");

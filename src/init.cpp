@@ -1103,8 +1103,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Check Sapling migration address if set and is a valid Sapling address
     if (mapArgs.count("-migrationdestaddress")) {
         std::string migrationDestAddress = mapArgs["-migrationdestaddress"];
-        libzelcash::PaymentAddress address = DecodePaymentAddress(migrationDestAddress);
-        if (boost::get<libzelcash::SaplingPaymentAddress>(&address) == nullptr) {
+        libflux::PaymentAddress address = DecodePaymentAddress(migrationDestAddress);
+        if (boost::get<libflux::SaplingPaymentAddress>(&address) == nullptr) {
             return InitError(_("-migrationdestaddress must be a valid Sapling address."));
         }
     }

@@ -97,7 +97,7 @@ bool AsyncRPCOperation_saplingmigration::main_impl() {
 
     HDSeed seed = pwalletMain->GetHDSeedForRPC();
     bool fTemp = false;
-    libzelcash::SaplingPaymentAddress migrationDestAddress = getMigrationDestAddress(seed, fTemp);
+    libflux::SaplingPaymentAddress migrationDestAddress = getMigrationDestAddress(seed, fTemp);
 
     auto consensusParams = Params().GetConsensus();
 
@@ -130,7 +130,7 @@ bool AsyncRPCOperation_saplingmigration::main_impl() {
                 FormatMoney(sproutEntry.note.value()),
                 HexStr(data).substr(0, 10)
                 );
-            libzelcash::SproutSpendingKey sproutSk;
+            libflux::SproutSpendingKey sproutSk;
             pwalletMain->GetSproutSpendingKey(sproutEntry.address, sproutSk);
             std::vector<JSOutPoint> vOutPoints = {sproutEntry.jsop};
             // Each migration transaction SHOULD specify an anchor at height N-10
@@ -190,18 +190,18 @@ CAmount AsyncRPCOperation_saplingmigration::chooseAmount(const CAmount& availabl
 }
 
 // Unless otherwise specified, the migration destination address is the address for Sapling account 0
-libzelcash::SaplingPaymentAddress AsyncRPCOperation_saplingmigration::getMigrationDestAddress(const HDSeed& seed, bool& fFailed) {
+libflux::SaplingPaymentAddress AsyncRPCOperation_saplingmigration::getMigrationDestAddress(const HDSeed& seed, bool& fFailed) {
     if (mapArgs.count("-migrationdestaddress")) {
         fFailed = false;
         std::string migrationDestAddress = mapArgs["-migrationdestaddress"];
         auto address = DecodePaymentAddress(migrationDestAddress);
-        auto saplingAddress = boost::get<libzelcash::SaplingPaymentAddress>(&address);
+        auto saplingAddress = boost::get<libflux::SaplingPaymentAddress>(&address);
         assert(saplingAddress != nullptr); // This is checked in init.cpp
         return *saplingAddress;
     }
 
     fFailed = true;
-    libzelcash::SaplingPaymentAddress toAddress;
+    libflux::SaplingPaymentAddress toAddress;
 
     return toAddress;
 
