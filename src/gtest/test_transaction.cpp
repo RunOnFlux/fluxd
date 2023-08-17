@@ -156,7 +156,9 @@ TEST(Transaction, FluxNodeP2SHStartTransaction) {
     mutableTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
     mutableTransaction.nFluxTxVersion = FLUXNODE_INTERNAL_P2SH_TX_VERSION;
     mutableTransaction.nType = FLUXNODE_START_TX_TYPE;
-    mutableTransaction.collateralPubkey = collateralPubKey;
+
+    // TODO - Testing removal of collateralpobkey if p2sh tx
+    // mutableTransaction.collateralPubkey = collateralPubKey;
     mutableTransaction.collateralIn = collateralIn;
     mutableTransaction.P2SHRedeemScript = redeemScript;
     mutableTransaction.pubKey = vpsPubKey;
@@ -175,18 +177,19 @@ TEST(Transaction, FluxNodeP2SHStartTransaction) {
 
     //---------------------------- ACTUAL TESTS ----------------------------------------------------------
 
-    // Core Check 1 (Collateral PubKey is in the RedeemScript)
-    {
-        EXPECT_TRUE(ListPubKeysFromMultiSigScript(mutableTransaction.P2SHRedeemScript, type, addresses, pubkeys, nRequired));
-        fFoundKey = false;
-        for (int i = 0; i < pubkeys.size(); i++) {
-            if (mutableTransaction.collateralPubkey == pubkeys[i]) {
-                fFoundKey = true;
-                break;
-            }
-        }
-        EXPECT_TRUE(fFoundKey);
-    }
+    // TODO - Testing removal of collateralpobkey if p2sh tx
+//    // Core Check 1 (Collateral PubKey is in the RedeemScript)
+//    {
+//        EXPECT_TRUE(ListPubKeysFromMultiSigScript(mutableTransaction.P2SHRedeemScript, type, addresses, pubkeys, nRequired));
+//        fFoundKey = false;
+//        for (int i = 0; i < pubkeys.size(); i++) {
+//            if (mutableTransaction.collateralPubkey == pubkeys[i]) {
+//                fFoundKey = true;
+//                break;
+//            }
+//        }
+//        EXPECT_TRUE(fFoundKey);
+//    }
 
     // Core Check 2 (The redeem script hash is the same as the address)
     {
@@ -204,41 +207,52 @@ TEST(Transaction, FluxNodeP2SHStartTransaction) {
         strMessage = mutableTransaction.GetHash().GetHex();
 
         EXPECT_TRUE(Signer.SignMessage(strMessage, errorMessage, mutableTransaction.sig, collateralKey));
-        EXPECT_TRUE(Signer.VerifyMessage(mutableTransaction.collateralPubkey, mutableTransaction.sig, strMessage, errorMessage));
+        // Get the Keys from the RedeemScript.
+        std::vector<CPubKey> pubkeys;
+        EXPECT_TRUE(ListPubKeysFromMultiSigScript(mutableTransaction.P2SHRedeemScript, pubkeys));
+
+        bool fValidatedSignature = false;
+        for (const auto& pubkey: pubkeys) {
+            if (Signer.VerifyMessage(pubkey, mutableTransaction.sig, strMessage, errorMessage)) {
+                fValidatedSignature = true;
+            }
+        }
+
+        EXPECT_TRUE(fValidatedSignature);
     }
 
 
-    // Core Check 3 with the wrong public collateral key set in the transaction. Signature Verify should fail
+    // Core Check 3 with the wrong public collateral key. Signature Verify should fail
     {
         // Collateral PubKey Creation
         collateralPubKeyStr = "0348cb791eb9b13b7c2e9873a8caadfc0994b0e68969dd9b387d641cf945406121"; // From Script Data -> Pair 1
         collateralPubKeyData = ParseHex( collateralPubKeyStr);
         collateralPubKey = CPubKey(collateralPubKeyData);
-        mutableTransaction.collateralPubkey = collateralPubKey;
 
         strMessage = mutableTransaction.GetHash().GetHex();
 
         EXPECT_TRUE(Signer.SignMessage(strMessage, errorMessage, mutableTransaction.sig, collateralKey));
-        EXPECT_FALSE(Signer.VerifyMessage(mutableTransaction.collateralPubkey, mutableTransaction.sig, strMessage, errorMessage));
+        EXPECT_FALSE(Signer.VerifyMessage(collateralPubKey, mutableTransaction.sig, strMessage, errorMessage));
     }
 
-    // Core Check 2 with the wrong public collateral key
-    {
-        collateralPubKeyStr = "02b7da05c6b7b2e2fd18b9ad60ac9f8c8751ff0a0687c3f866ae3c7841ac9fb561"; // From Script Data -> VPS Key (Wrong Key Should Fail)
-        collateralPubKeyData = ParseHex( collateralPubKeyStr);
-        collateralPubKey = CPubKey(collateralPubKeyData);
-        mutableTransaction.collateralPubkey = collateralPubKey;
-
-        EXPECT_TRUE(ListPubKeysFromMultiSigScript(mutableTransaction.P2SHRedeemScript, type, addresses, pubkeys, nRequired));
-        fFoundKey = false;
-        for (int i = 0; i < pubkeys.size(); i++) {
-            if (mutableTransaction.collateralPubkey == pubkeys[i]) {
-                fFoundKey = true;
-                break;
-            }
-        }
-        EXPECT_FALSE(fFoundKey);
-    }
+    // TODO - remove check once we know the collateral pbukey removal doesn't break things
+//    // Core Check 2 with the wrong public collateral key
+//    {
+//        collateralPubKeyStr = "02b7da05c6b7b2e2fd18b9ad60ac9f8c8751ff0a0687c3f866ae3c7841ac9fb561"; // From Script Data -> VPS Key (Wrong Key Should Fail)
+//        collateralPubKeyData = ParseHex( collateralPubKeyStr);
+//        collateralPubKey = CPubKey(collateralPubKeyData);
+//        mutableTransaction.collateralPubkey = collateralPubKey;
+//
+//        EXPECT_TRUE(ListPubKeysFromMultiSigScript(mutableTransaction.P2SHRedeemScript, type, addresses, pubkeys, nRequired));
+//        fFoundKey = false;
+//        for (int i = 0; i < pubkeys.size(); i++) {
+//            if (mutableTransaction.collateralPubkey == pubkeys[i]) {
+//                fFoundKey = true;
+//                break;
+//            }
+//        }
+//        EXPECT_FALSE(fFoundKey);
+//    }
 
     // Core Check 1 with wrong address but correct redeemscript
     {

@@ -673,47 +673,36 @@ public:
         } else if (nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION) { // Support P2SH and Normal Fluxnode Tx
             LogPrintf("FLUXNODE_TX_UPGRADEABLE_VERSION Found------------------------- %d\n", nVersion);
             READWRITE(*const_cast<int8_t*>(&nType)); // Start, Confirm
-            READWRITE(*const_cast<int32_t*>(&nFluxTxVersion)); // Normal or P2SH
-            if (nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION) {
-                if (nType == FLUXNODE_START_TX_TYPE) {
+
+            if (nType == FLUXNODE_START_TX_TYPE) {
+                READWRITE(*const_cast<int32_t *>(&nFluxTxVersion)); // Normal or P2SH
+                if (nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION) {
                     READWRITE(*const_cast<COutPoint *>(&collateralIn));
                     READWRITE(*const_cast<CPubKey *>(&collateralPubkey));
                     READWRITE(*const_cast<CPubKey *>(&pubKey));
                     READWRITE(*const_cast<uint32_t *>(&sigTime));
                     if (!(s.GetType() & SER_GETHASH))
                         READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
-                } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
+                } else if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
                     READWRITE(*const_cast<COutPoint *>(&collateralIn));
+                    // TODO - Testing removal of collateralpobkey if p2sh tx
+                    // READWRITE(*const_cast<CPubKey *>(&collateralPubkey));
+                    READWRITE(*const_cast<CPubKey *>(&pubKey));
+                    READWRITE(*const_cast<CScriptBase *>((CScriptBase *) (&P2SHRedeemScript))); // New Addition to Tx
                     READWRITE(*const_cast<uint32_t *>(&sigTime));
-                    READWRITE(*const_cast<int8_t *>(&benchmarkTier));
-                    READWRITE(*const_cast<uint32_t *>(&benchmarkSigTime));
-                    READWRITE(*const_cast<int8_t *>(&nUpdateType));
-                    READWRITE(*const_cast<std::string *>(&ip));
-                    if (!(s.GetType() & SER_GETHASH)) {
+                    if (!(s.GetType() & SER_GETHASH))
                         READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
-                        READWRITE(*const_cast<std::vector<unsigned char> *>(&benchmarkSig));
-                    }
                 }
-            } else if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
-                if (nType == FLUXNODE_START_TX_TYPE) {
-                    READWRITE(*const_cast<COutPoint *>(&collateralIn));
-                    READWRITE(*const_cast<CPubKey *>(&collateralPubkey));
-                    READWRITE(*const_cast<CPubKey *>(&pubKey));
-                    READWRITE(*const_cast<CScriptBase *>((CScriptBase*)(&P2SHRedeemScript))); // New Addition to Tx
-                    READWRITE(*const_cast<uint32_t *>(&sigTime));
-                    if (!(s.GetType() & SER_GETHASH))
-                        READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
-                } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
-                    READWRITE(*const_cast<COutPoint *>(&collateralIn));
-                    READWRITE(*const_cast<uint32_t *>(&sigTime));
-                    READWRITE(*const_cast<int8_t *>(&benchmarkTier));
-                    READWRITE(*const_cast<uint32_t *>(&benchmarkSigTime));
-                    READWRITE(*const_cast<int8_t *>(&nUpdateType));
-                    READWRITE(*const_cast<std::string *>(&ip));
-                    if (!(s.GetType() & SER_GETHASH)) {
-                        READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
-                        READWRITE(*const_cast<std::vector<unsigned char> *>(&benchmarkSig));
-                    }
+            } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
+                READWRITE(*const_cast<COutPoint *>(&collateralIn));
+                READWRITE(*const_cast<uint32_t *>(&sigTime));
+                READWRITE(*const_cast<int8_t *>(&benchmarkTier));
+                READWRITE(*const_cast<uint32_t *>(&benchmarkSigTime));
+                READWRITE(*const_cast<int8_t *>(&nUpdateType));
+                READWRITE(*const_cast<std::string *>(&ip));
+                if (!(s.GetType() & SER_GETHASH)) {
+                    READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
+                    READWRITE(*const_cast<std::vector<unsigned char> *>(&benchmarkSig));
                 }
             }
             if (ser_action.ForRead())
@@ -939,49 +928,34 @@ struct CMutableTransaction
             return;
         } else if (nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION) {
             READWRITE(nType);
-            READWRITE(nFluxTxVersion);
-            if (nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION) {
-                if (nType == FLUXNODE_START_TX_TYPE) {
+            if (nType == FLUXNODE_START_TX_TYPE) {
+                READWRITE(nFluxTxVersion);
+                if (nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION) {
                     READWRITE(collateralIn);
                     READWRITE(collateralPubkey);
                     READWRITE(pubKey);
                     READWRITE(sigTime);
                     if (!(s.GetType() & SER_GETHASH))
                         READWRITE(sig);
-
-                } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
+                } else if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
                     READWRITE(collateralIn);
-                    READWRITE(sigTime);
-                    READWRITE(benchmarkTier);
-                    READWRITE(benchmarkSigTime);
-                    READWRITE(nUpdateType);
-                    READWRITE(ip);
-                    if (!(s.GetType() & SER_GETHASH)) {
-                        READWRITE(sig);
-                        READWRITE(benchmarkSig);
-                    }
-                }
-            } else if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
-                if (nType == FLUXNODE_START_TX_TYPE) {
-                    READWRITE(collateralIn);
-                    READWRITE(collateralPubkey);
+                   // READWRITE(collateralPubkey);
                     READWRITE(pubKey);
                     READWRITE(*(CScriptBase*)(&P2SHRedeemScript));
                     READWRITE(sigTime);
                     if (!(s.GetType() & SER_GETHASH))
                         READWRITE(sig);
-
-                } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
-                    READWRITE(collateralIn);
-                    READWRITE(sigTime);
-                    READWRITE(benchmarkTier);
-                    READWRITE(benchmarkSigTime);
-                    READWRITE(nUpdateType);
-                    READWRITE(ip);
-                    if (!(s.GetType() & SER_GETHASH)) {
-                        READWRITE(sig);
-                        READWRITE(benchmarkSig);
-                    }
+                }
+            } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
+                READWRITE(collateralIn);
+                READWRITE(sigTime);
+                READWRITE(benchmarkTier);
+                READWRITE(benchmarkSigTime);
+                READWRITE(nUpdateType);
+                READWRITE(ip);
+                if (!(s.GetType() & SER_GETHASH)) {
+                    READWRITE(sig);
+                    READWRITE(benchmarkSig);
                 }
             }
             return;

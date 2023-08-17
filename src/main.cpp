@@ -1202,9 +1202,9 @@ bool ContextualCheckTransaction(
 
                 // enforce New V6 Tx Versions to only allow certain scripts per
                 if (!fFailure && tx.IsFluxnodeUpgradedNormalTx()) {
-                    if (coins.vout[outPoint.n].scriptPubKey.IsPayToScriptHash()) {
+                    if (!coins.vout[outPoint.n].scriptPubKey.IsPayToPublicKeyHash()) {
                         fFailure = true;
-                        strFailMessage = "fluxnode-tx-normal-version-not-normal-script";
+                        strFailMessage = "fluxnode-tx-normal-version-not-p2pkh-script";
                     }
                 }
 
@@ -1230,24 +1230,25 @@ bool ContextualCheckTransaction(
                          * of the redeem script also provided to us in the transaction. This with the Core Check 2
                          * below allows us to fully validate the signature of the start transaction.
                          */
-                        if (ListPubKeysFromMultiSigScript(tx.P2SHRedeemScript, type, addresses, pubkeys, nRequired)) {
-                            bool fFoundKey = false;
-                            for (int i = 0; i < pubkeys.size(); i++) {
-                                if (tx.collateralPubkey == pubkeys[i]) {
-                                    // TODO - P2SH NODES - Remove once tested
-                                    LogPrintf("P2SH Nodes - TODO LOG - We found a matching key from the RedeemScript\n");
-                                    fFoundKey = true;
-                                    break;
-                                }
-                            }
-                            if (!fFoundKey) {
-                                fFailure = true;
-                                strFailMessage = "fluxnode-tx-p2shnodes-key-not-found-in-list";
-                            }
-                        } else {
-                            fFailure = true;
-                            strFailMessage = "fluxnode-tx-p2shnodes-listpubkeys-failed-to-list-keys";
-                        }
+                         // TODO - Remove collateralpubkey from - so this check isn't needed anymore
+//                        if (ListPubKeysFromMultiSigScript(tx.P2SHRedeemScript, type, addresses, pubkeys, nRequired)) {
+//                            bool fFoundKey = false;
+//                            for (int i = 0; i < pubkeys.size(); i++) {
+//                                if (tx.collateralPubkey == pubkeys[i]) {
+//                                    // TODO - P2SH NODES - Remove once tested
+//                                    LogPrintf("P2SH Nodes - TODO LOG - We found a matching key from the RedeemScript\n");
+//                                    fFoundKey = true;
+//                                    break;
+//                                }
+//                            }
+//                            if (!fFoundKey) {
+//                                fFailure = true;
+//                                strFailMessage = "fluxnode-tx-p2shnodes-key-not-found-in-list";
+//                            }
+//                        } else {
+//                            fFailure = true;
+//                            strFailMessage = "fluxnode-tx-p2shnodes-listpubkeys-failed-to-list-keys";
+//                        }
 
                         /**
                          * P2SH NODES CORE CHECK 2

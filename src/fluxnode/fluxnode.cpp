@@ -57,10 +57,20 @@ bool CheckFluxnodeTxSignatures(const CTransaction&  transaction)
          * Check 1 & 2 are preformed in the ContextualCheckTransaction function
          */
         if (transaction.IsFluxnodeUpgradedP2SHTx()) {
-            if (obfuScationSigner.VerifyMessage(transaction.collateralPubkey, transaction.sig, strMessage, errorMessage)) {
-                return true;
+            // We need to loop through all pubkeys and see if they verify the message.
+
+            vector<CPubKey> pubkeys;
+            if (!ListPubKeysFromMultiSigScript(transaction.P2SHRedeemScript, pubkeys)) {
+                return error("fluxnode-tx-p2shnodes-listpubkeys-failed-to-list-keys");
             }
-            return error("%s - P2SHNODES - Signature invalid on START Error: %s", __func__, errorMessage);
+
+            for (const auto& pubkey: pubkeys) {
+                if (obfuScationSigner.VerifyMessage(pubkey, transaction.sig, strMessage, errorMessage)) {
+                    return true;
+                }
+            }
+
+            return error("%s - P2SHNODES - Signature invalid on START Tx - %s", __func__, transaction.GetHash().GetHex());
         }
 
         // If the transaction collateral pubkey matches the chainparams for paytoscripthash signing
