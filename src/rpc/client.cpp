@@ -147,7 +147,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "z_setmigration", 0},
     { "spork", 1},
     { "printsnapshot", 0},
-    { "createp2shstarttx", 4}
+    { "createp2shstarttx", 3}
 };
 
 class CRPCConvertTable

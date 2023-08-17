@@ -25,7 +25,6 @@ void ActiveFluxnode::ManageDeterministricFluxnode()
 
     // Start confirm transaction
     CMutableTransaction mutTx;
-    mutTx.nVersion = FLUXNODE_TX_VERSION;
 
     // Get the current height
     int nHeight = chainActive.Height();
@@ -388,8 +387,17 @@ bool ActiveFluxnode::BuildDeterministicStartTx(std::string strKeyFluxnode, std::
 
 void ActiveFluxnode::BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType)
 {
+    // When we should move to upgraded version for fluxnode transactions
+    bool fP2SHNodesActive = NetworkUpgradeActive(chainActive.Height(), Params().GetConsensus(), Consensus::UPGRADE_P2SHNODES);
+
     CKey keyCollateralAddress;
     CKey keyFluxnode;
+    mutTransaction.nVersion = FLUXNODE_TX_VERSION;
+
+    if (fP2SHNodesActive) {
+        // Use upgraded version once active
+        mutTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
+    }
 
     mutTransaction.nType = FLUXNODE_CONFIRM_TX_TYPE;
     mutTransaction.collateralIn = deterministicOutPoint;

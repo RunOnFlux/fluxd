@@ -271,6 +271,14 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
     return true;
 }
 
+bool ListPubKeysFromMultiSigScript(const CScript& scriptPubKey, std::vector<CPubKey>& pubkeysRet)
+{
+    std::vector<CTxDestination> addresses;
+    int nRequired;
+    txnouttype type;
+    return ListPubKeysFromMultiSigScript(scriptPubKey, type, addresses, pubkeysRet, nRequired);
+}
+
 bool ListPubKeysFromMultiSigScript(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, vector<CPubKey>& pubkeysRet, int& nRequiredRet)
 {
     addressRet.clear();
