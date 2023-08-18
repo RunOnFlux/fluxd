@@ -314,7 +314,7 @@ public:
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
-        consensus.nPowTargetSpacing = 15;
+        consensus.nPowTargetSpacing = 60;
 
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
@@ -353,7 +353,7 @@ public:
 
         eh_epoch_1 = eh48_5;
         eh_epoch_2 = eh48_5;
-        eh_epoch_3 = eh48_5;
+        eh_epoch_3 = zelHash;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
