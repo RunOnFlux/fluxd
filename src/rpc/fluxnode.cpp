@@ -1181,7 +1181,7 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 {
     if (fHelp || (params.size() != 4))
         throw runtime_error(
-                "createp2shstarttx \"redeemscript\" \"collateralpubkey\" \"vpspubkey\" \"txid\" index\n"
+                "createp2shstarttx \"redeemscript\" \"vpspubkey\" \"txid\" index\n"
                 "\nCreate a transaction spending the given inputs and sending to the given addresses.\n"
                 "Returns hex-encoded raw transaction.\n"
                 "Note that the transaction's inputs are not signed, and\n"
@@ -1189,7 +1189,6 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 
                 "\nArguments:\n"
                 "1. \"redeemscript\"        (string, required) The redeemscript of the multisig address that hold the collateral for the fluxnode\n"
-                "2. \"collateralpubkey\"    (string, required) The pubkey that belongs to the redeemscript that you will be signing this fluxnode start transaction with\n"
                 "3. \"vpspubkey\"           (string, required) The pubkey the the fluxnode server will use to confirm fluxnode transactions\n"
                 "4. \"txid\"                (string, required) the transaction hash of the collateral input\n"
                 "5. \"index\"               (number, required) the index of the transaction collateral input\n"
@@ -1199,11 +1198,9 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 
                 "\nExamples\n"
                 + HelpExampleCli("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
-                                                      " \"0359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9\""
                                                       " \"02d8ada61e8847722e91cc652082174e8b6b2844661d518e0eb78e65790f3b451c\""
                                                       " \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\" 0")
                 + HelpExampleRpc("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
-                                                      " \"0359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9\""
                                                       " \"02d8ada61e8847722e91cc652082174e8b6b2844661d518e0eb78e65790f3b451c\""
                                                       " \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\" 0"));
 
@@ -1213,7 +1210,6 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 
     // Get data from the parameters
     std::string strRedeemScript = params[0].get_str();
-//    std::string strCollateralPubKey = params[1].get_str();
     std::string strVpsPubKey = params[1].get_str();
     std::string strCollateralTransactionHash = params[2].get_str();
     int nCollateralIndex = params[3].get_int();
@@ -1223,8 +1219,6 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
     std::vector<unsigned char> redeemScriptData = ParseHex( strRedeemScript);
     CScript redeemScript(redeemScriptData.begin(), redeemScriptData.end());
 
-//    std::vector<unsigned char> collateralPubKeyData = ParseHex( strCollateralPubKey);
-//    CPubKey collateralPubKey(collateralPubKeyData);
 
     // Collateral PubKey Creation
     std::vector<unsigned char> vpsPubKeyData = ParseHex( strVpsPubKey);
@@ -1239,8 +1233,6 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
     mutableTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
     mutableTransaction.nFluxTxVersion = FLUXNODE_INTERNAL_P2SH_TX_VERSION;
     mutableTransaction.nType = FLUXNODE_START_TX_TYPE;
-    // TODO - Testing removal of collateralpobkey if p2sh tx
-    // mutableTransaction.collateralPubkey = collateralPubKey;
     mutableTransaction.collateralIn = collateralIn;
     mutableTransaction.P2SHRedeemScript = redeemScript;
     mutableTransaction.pubKey = vpsPubKey;
@@ -1253,25 +1245,6 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 
     std::string strMessage;
     bool fFoundKey = false;
-
-    // TODO - Testing removal of collateralpobkey if p2sh tx
-//    // Core Check 1 (Collateral PubKey is in the RedeemScript)
-//    {
-//        if(!ListPubKeysFromMultiSigScript(mutableTransaction.P2SHRedeemScript, type, addresses, pubkeys, nRequired)) {
-//            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Failed to get pubkeys from redeemscript");
-//        }
-//
-//        fFoundKey = false;
-//        for (int i = 0; i < pubkeys.size(); i++) {
-//            if (mutableTransaction.collateralPubkey == pubkeys[i]) {
-//                fFoundKey = true;
-//                break;
-//            }
-//        }
-//        if (!fFoundKey) {
-//            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Collateral pubkey not in Redeemscript");
-//        }
-//    }
 
     // Variables needed for scripthash check
     CScriptID inner;
@@ -1376,29 +1349,6 @@ UniValue signp2shstarttx(const UniValue& params, bool fHelp)
 
     CMutableTransaction mutableTransaction(tx);
 
-
-    // TODO - remove collateral pubkey so this check isn't needed
-//    // Core Check 1 (Collateral PubKey is in the RedeemScript)
-//    {
-//        if(!ListPubKeysFromMultiSigScript(mutableTransaction.P2SHRedeemScript, type, addresses, pubkeys, nRequired)) {
-//            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Failed to get pubkeys from redeemscript");
-//        }
-//
-//        fFoundKey = false;
-//        for (int i = 0; i < pubkeys.size(); i++) {
-//            if (mutableTransaction.collateralPubkey == pubkeys[i]) {
-//                fFoundKey = true;
-//                break;
-//            }
-//        }
-//        if (!fFoundKey) {
-//            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Collateral pubkey not in Redeemscript");
-//        }
-//    }
-
-    // TODO - we could do core check 2 here, but if we want to be able
-    // TODO - to sign on a node that isn't synced to the tip of the chain we can skip it
-
     // Core Check 3 (Signature Sign and Verify)
     {
         std::string strMessage;
@@ -1465,26 +1415,6 @@ UniValue sendp2shstarttx(const UniValue& params, bool fHelp)
 
     std::string strMessage;
     bool fFoundKey = false;
-
-    // TODO - removing collateral pubkey from script. so this check isn't needed.
-//    // Core Check 1 (Collateral PubKey is in the RedeemScript)
-//    {
-//        if(!ListPubKeysFromMultiSigScript(tx.P2SHRedeemScript, type, addresses, pubkeys, nRequired)) {
-//            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Failed to get pubkeys from redeemscript");
-//        }
-//
-//        fFoundKey = false;
-//        for (int i = 0; i < pubkeys.size(); i++) {
-//            if (tx.collateralPubkey == pubkeys[i]) {
-//                fFoundKey = true;
-//                break;
-//            }
-//        }
-//        if (!fFoundKey) {
-//            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Collateral pubkey not found in redeemscript");
-//        }
-//    }
-
 
     CValidationState state;
     bool fMissingInputs;

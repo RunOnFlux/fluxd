@@ -157,8 +157,6 @@ TEST(Transaction, FluxNodeP2SHStartTransaction) {
     mutableTransaction.nFluxTxVersion = FLUXNODE_INTERNAL_P2SH_TX_VERSION;
     mutableTransaction.nType = FLUXNODE_START_TX_TYPE;
 
-    // TODO - Testing removal of collateralpobkey if p2sh tx
-    // mutableTransaction.collateralPubkey = collateralPubKey;
     mutableTransaction.collateralIn = collateralIn;
     mutableTransaction.P2SHRedeemScript = redeemScript;
     mutableTransaction.pubKey = vpsPubKey;

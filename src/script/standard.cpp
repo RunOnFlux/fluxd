@@ -271,6 +271,17 @@ bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vecto
     return true;
 }
 
+bool IsMultiSigRedeemScript(const CScript& scriptPubKey)
+{
+    txnouttype type = TX_NONSTANDARD;
+
+    vector<valtype> vSolutions;
+    if (!Solver(scriptPubKey, type, vSolutions))
+        return false;
+
+    return type == TX_MULTISIG;
+}
+
 bool ListPubKeysFromMultiSigScript(const CScript& scriptPubKey, std::vector<CPubKey>& pubkeysRet)
 {
     std::vector<CTxDestination> addresses;

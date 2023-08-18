@@ -1225,32 +1225,6 @@ bool ContextualCheckTransaction(
                         int nRequired;
 
                         /**
-                         * P2SH NODES CORE CHECK 1
-                         * We must check to make sure the collateral pubkey given to us in the transaction is a part
-                         * of the redeem script also provided to us in the transaction. This with the Core Check 2
-                         * below allows us to fully validate the signature of the start transaction.
-                         */
-                         // TODO - Remove collateralpubkey from - so this check isn't needed anymore
-//                        if (ListPubKeysFromMultiSigScript(tx.P2SHRedeemScript, type, addresses, pubkeys, nRequired)) {
-//                            bool fFoundKey = false;
-//                            for (int i = 0; i < pubkeys.size(); i++) {
-//                                if (tx.collateralPubkey == pubkeys[i]) {
-//                                    // TODO - P2SH NODES - Remove once tested
-//                                    LogPrintf("P2SH Nodes - TODO LOG - We found a matching key from the RedeemScript\n");
-//                                    fFoundKey = true;
-//                                    break;
-//                                }
-//                            }
-//                            if (!fFoundKey) {
-//                                fFailure = true;
-//                                strFailMessage = "fluxnode-tx-p2shnodes-key-not-found-in-list";
-//                            }
-//                        } else {
-//                            fFailure = true;
-//                            strFailMessage = "fluxnode-tx-p2shnodes-listpubkeys-failed-to-list-keys";
-//                        }
-
-                        /**
                          * P2SH NODES CORE CHECK 2
                          * We must check to make sure the hash of the redeem script matches the scriptpubkey of the coin
                          * This check is very important so only owners of the P2SH address can sign the start transaction
@@ -1463,6 +1437,21 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
         if (tx.collateralIn.IsNull()) {
             return state.DoS(10, error("CheckTransaction(): Is Fluxnode Tx, with null collateralIn prevout"),
                              REJECT_INVALID, "bad-txns-fluxnode-tx-null-prevout");
+        }
+
+        // We do this before checking the signatures as they would use the Redeemscript.
+        if (tx.IsFluxnodeUpgradedP2SHTx()) {
+            if (tx.P2SHRedeemScript.size() > MAX_SCRIPT_SIZE) {
+                return state.DoS(10, error("CheckTransaction(): P2SH RedeemScript to large. Maximum %d Bytes", MAX_SCRIPT_SIZE),
+                                 REJECT_INVALID, "bad-txns-fluxnode-tx-redeemscript-to-large");
+            }
+        }
+
+        if (tx.IsFluxnodeUpgradedP2SHTx()) {
+            if (!IsMultiSigRedeemScript(tx.P2SHRedeemScript)) {
+                return state.DoS(10, error("CheckTransaction(): P2SH RedeemScript is not multisig"),
+                                 REJECT_INVALID, "bad-txns-fluxnode-tx-redeemscript-not-multisig");
+            }
         }
 
         if (!CheckFluxnodeTxSignatures(tx)) {
