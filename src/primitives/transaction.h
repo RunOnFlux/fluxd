@@ -685,8 +685,6 @@ public:
                         READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
                 } else if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
                     READWRITE(*const_cast<COutPoint *>(&collateralIn));
-                    // TODO - Testing removal of collateralpobkey if p2sh tx
-                    // READWRITE(*const_cast<CPubKey *>(&collateralPubkey));
                     READWRITE(*const_cast<CPubKey *>(&pubKey));
                     READWRITE(*const_cast<CScriptBase *>((CScriptBase *) (&P2SHRedeemScript))); // New Addition to Tx
                     READWRITE(*const_cast<uint32_t *>(&sigTime));
@@ -939,7 +937,6 @@ struct CMutableTransaction
                         READWRITE(sig);
                 } else if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
                     READWRITE(collateralIn);
-                   // READWRITE(collateralPubkey);
                     READWRITE(pubKey);
                     READWRITE(*(CScriptBase*)(&P2SHRedeemScript));
                     READWRITE(sigTime);
