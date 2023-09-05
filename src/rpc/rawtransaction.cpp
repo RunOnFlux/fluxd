@@ -175,11 +175,22 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
         */
 
         if (tx.nType == FLUXNODE_START_TX_TYPE) {
-            entry.pushKV("collateral_pubkey", EncodeBase64(tx.collateralPubkey.begin(), tx.collateralPubkey.size()));
-            entry.pushKV("zelnode_pubkey", EncodeBase64(tx.pubKey.begin(), tx.pubKey.size()));
-            if (tx.IsFluxnodeUpgradedP2SHTx()) {
-                entry.pushKV("redeemscript", tx.P2SHRedeemScript.ToString());
+            if (tx.IsFluxnodeUpgradeTx()) {
+                entry.pushKV("fluxnode_upgraded_tx_version", tx.nFluxTxVersion);
+                if (tx.IsFluxnodeUpgradedNormalTx()) {
+                    entry.pushKV("collateral_pubkey", EncodeBase64(tx.collateralPubkey.begin(), tx.collateralPubkey.size()));
+                }
+                if (tx.IsFluxnodeUpgradedP2SHTx()) {
+                    entry.pushKV("redeemscript", tx.P2SHRedeemScript.ToString());
+                }
+            } else {
+                // Needed only if not upgraded and not p2sh
+                entry.pushKV("collateral_pubkey",
+                             EncodeBase64(tx.collateralPubkey.begin(), tx.collateralPubkey.size()));
             }
+            // Always needed
+            entry.pushKV("zelnode_pubkey", EncodeBase64(tx.pubKey.begin(), tx.pubKey.size()));
+
         }
 
         if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
