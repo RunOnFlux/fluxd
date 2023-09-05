@@ -10,7 +10,7 @@
  * network protocol versioning
  */
 
-static const int PROTOCOL_VERSION = 170018;
+static const int PROTOCOL_VERSION = 170019;
 
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
@@ -42,5 +42,7 @@ static const int MIN_PEER_PROTO_VERSION_FLUXNODE = 170009;
 
 //! protocol version that means they support deterministic fluxnodes, not used as of now, usage of UPGRADE_KAMATA
 static const int DETERMINISTIC_FLUXNODES = 170016;
+
+static const int P2SH_NODES = 170019;
 
 #endif // BITCOIN_VERSION_H
