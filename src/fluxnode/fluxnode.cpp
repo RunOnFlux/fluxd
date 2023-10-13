@@ -129,11 +129,9 @@ void GetUndoDataForExpiredFluxnodeDosScores(CFluxnodeTxBlockUndo& p_fluxnodeTxUn
     LOCK(g_fluxnodeCache.cs);
     int nUndoHeight = p_nHeight - FLUXNODE_DOS_REMOVE_AMOUNT;
 
-    if (g_fluxnodeCache.mapStartTxDOSHeights.count(nUndoHeight)) {
-        for (const auto& item : g_fluxnodeCache.mapStartTxDOSHeights.at(nUndoHeight)) {
-            if (g_fluxnodeCache.mapStartTxDOSTracker.count(item)) {
-                p_fluxnodeTxUndoData.vecExpiredDosData.emplace_back(g_fluxnodeCache.mapStartTxDOSTracker.at(item));
-            }
+    for (const auto& item: g_fluxnodeCache.mapStartTxDOSTracker) {
+        if (item.second.nAddedBlockHeight == nUndoHeight) {
+            p_fluxnodeTxUndoData.vecExpiredDosData.emplace_back(item.second);
         }
     }
 }
@@ -264,11 +262,6 @@ void FluxnodeCache::UndoNewStart(const CTransaction& p_transaction, const int p_
 {
     LOCK(cs);
     setUndoStartTx.insert(p_transaction.collateralIn);
-    if (setUndoStartTxHeight && p_nHeight != setUndoStartTxHeight) {
-        LogPrintf("%s: Setting the start height to a different height: setUndoStartTxHeight:%d - height:%d\n", __func__, setUndoStartTxHeight, p_nHeight);
-    }
-    LogPrintf("%s: Undoing start transaction at height:%d, setUndoStartTxHeight:%d \n", __func__, p_nHeight, setUndoStartTxHeight);
-    setUndoStartTxHeight = p_nHeight;
 }
 
 void FluxnodeCache::AddNewConfirm(const CTransaction& p_transaction, const int p_nHeight)
@@ -376,12 +369,7 @@ void FluxnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
             FluxnodeCacheData data = object.second;
             data.nStatus = FLUXNODE_TX_DOS_PROTECTION;
             mapStartTxDOSTracker[object.first] = data;
-
-            setNewDosHeights.insert(object.first);
         }
-
-        if (setNewDosHeights.size())
-            mapStartTxDOSHeights[removalHeight] = setNewDosHeights;
     }
 
     LogPrint("dfluxnode", "%s : Size of mapStartTxTracker: %s\n", __func__, g_fluxnodeCache.mapStartTxTracker.size());
@@ -394,24 +382,12 @@ void FluxnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
     LOCK2(cs, g_fluxnodeCache.cs);
     int removalHeight = p_nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT;
 
-    if (g_fluxnodeCache.mapStartTxDOSHeights.count(removalHeight)) {
-        for (const auto& item : g_fluxnodeCache.mapStartTxDOSHeights.at(removalHeight)) {
+    for (const auto& item : g_fluxnodeCache.mapStartTxDOSTracker) {
+        if (item.second.nAddedBlockHeight == removalHeight) {
+            mapStartTxTracker[item.first] = item.second;
+            mapStartTxTracker[item.first].nStatus = FLUXNODE_TX_STARTED;
 
-            // If the item isn't in the mapStartTxDOSTracker. Logs the errors and shutdown for the safety of the node
-            if (!g_fluxnodeCache.mapStartTxDOSTracker.count(item)) {
-                error("Map:at -> Map Start Tx Dos Tracker doesn't have item: %s", item.ToFullString());
-                if (g_fluxnodeCache.mapStartTxTracker.count(item)) {
-                    error("Map::at error would of occured. pIndexHeight=%d, itemHeight=%d\n", p_nHeight, g_fluxnodeCache.mapStartTxTracker.at(item).nAddedBlockHeight);
-                } else {
-                    error("Map Start Dos Tx Tracker doesn't have item - and mapStartTxTracker didn't have item. %s", item.ToFullString());
-                }
-                StartShutdown();
-            }
-
-            mapStartTxTracker[item] = g_fluxnodeCache.mapStartTxDOSTracker.at(item);
-            mapStartTxTracker[item].nStatus = FLUXNODE_TX_STARTED;
-
-            mapDOSToUndo[removalHeight].insert(item);
+            mapDOSToUndo[removalHeight].insert(item.first);
         }
     }
 
@@ -722,18 +698,12 @@ void FluxnodeCache::AddBackUndoData(const CFluxnodeTxBlockUndo& p_undoData)
     // Locking local cache (p_fluxnodecache)
     LOCK(cs);
 
-    std::set<COutPoint> setOutPoint;
     int nHeight = 0;
 
     // Undo the expired dos outpoints
     for (const auto& item : p_undoData.vecExpiredDosData) {
         nHeight = item.nAddedBlockHeight;
         mapStartTxDOSTracker[item.collateralIn] = item;
-        setOutPoint.insert(item.collateralIn);
-    }
-
-    if (setOutPoint.size()) {
-        mapStartTxDOSHeights[nHeight] = setOutPoint;
     }
 
     // Undo the Confirm Update transactions back to the old LastConfirmHeight
@@ -807,15 +777,6 @@ bool FluxnodeCache::Flush()
     }
 
     /**
-     * When a node is added to the DOS tracker we must also add it in the DOS Height tracker.
-     * 1. Add the nodes info into the Height tracker for DOS nodes at the height
-     * 2. Remove the entire set of nodes from the start height tracker
-     */
-    for (const auto& item : mapStartTxDOSHeights) {
-        g_fluxnodeCache.mapStartTxDOSHeights[item.first] = item.second;
-    }
-
-    /**
      * When a node has been on the DOS list for the required threshold, we need to do the following:
      * 1. Remove the node from the DOS Tracker.
      * 2. Mark the removed nodes as dirty so they can be databased when the node shutdowns
@@ -826,7 +787,6 @@ bool FluxnodeCache::Flush()
             g_fluxnodeCache.mapStartTxDOSTracker.erase(data);
             g_fluxnodeCache.setDirtyOutPoint.insert(data);
         }
-        g_fluxnodeCache.mapStartTxDOSHeights.erase(item.first);
     }
 
     /**
@@ -841,9 +801,6 @@ bool FluxnodeCache::Flush()
             g_fluxnodeCache.mapStartTxDOSTracker.erase(out);
             g_fluxnodeCache.setDirtyOutPoint.insert(out);
         }
-
-        // Remove all data at the Block Height
-        g_fluxnodeCache.mapStartTxDOSHeights.erase(item.first);
     }
 
     /**
@@ -1109,9 +1066,6 @@ bool FluxnodeCache::Flush()
             }
     }
 
-    // Reset the setUndoStartTxHeight variable after each Flush(), which on a disconnectblock should happen after ever block.
-    setUndoStartTxHeight = 0;
-
     //! DO ALL REMOVAL FROM THE ITEMS IN THE LIST HERE (using iterators so we can remove items while going over the list a single time
     // Currently only have to do this when moving from CONFIRM->START (undo blocks only)
     if (setRemoveFromList.size()) {
@@ -1144,16 +1098,19 @@ bool FluxnodeCache::Flush()
 // Needs to be protected by locking cs before calling
 bool FluxnodeCache::LoadData(FluxnodeCacheData& data)
 {
-    if (data.nStatus == FLUXNODE_TX_STARTED) {
-        mapStartTxTracker[data.collateralIn] = data;
-    } else if (data.nStatus == FLUXNODE_TX_DOS_PROTECTION) {
-        mapStartTxDOSTracker[data.collateralIn] = data;
-        mapStartTxDOSHeights[data.nAddedBlockHeight].insert(data.collateralIn);
-    } else if (data.nStatus == FLUXNODE_TX_CONFIRMED) {
-        mapConfirmedFluxnodeData[data.collateralIn] = data;
-        InsertIntoList(data);
-    }
 
+    switch(data.nStatus) {
+        case FLUXNODE_TX_STARTED:
+            mapStartTxTracker[data.collateralIn] = data;
+            break;
+        case FLUXNODE_TX_DOS_PROTECTION:
+            mapStartTxDOSTracker[data.collateralIn] = data;
+            break;
+        case FLUXNODE_TX_CONFIRMED:
+            mapConfirmedFluxnodeData[data.collateralIn] = data;
+            InsertIntoList(data);
+        default: return true;
+    }
     return true;
 }
 
@@ -1427,20 +1384,12 @@ void FluxnodeCache::LogDebugData(const int& nHeight, const uint256& blockhash, b
     }
     printme3 = printme3 + "}";
 
-    std::string printme4 = "{ \n";
-    if (g_fluxnodeCache.mapStartTxDOSHeights.count(nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT)) {
-        for (const auto &printitem: g_fluxnodeCache.mapStartTxDOSHeights.at(nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT)) {
-            printme4 = printme4 + printitem.ToFullString() + ",\n";
-        }
-        printme4 = printme4 + "}";
-    }
-
     if (fFromDisconnect) {
-        LogPrintf("Disconnecting - printing after block=%d, hash=%s\n, mapStart=%s\n\n, mapStartTxDOSTracker=%s\n\n, mapStartTxDOSHeights=%s\n\n",
-                  nHeight, blockhash.GetHex(), printme, printme3, printme4);
+        LogPrintf("Disconnecting - printing after block=%d, hash=%s\n, mapStart=%s\n\n, mapStartTxDOSTracker=%s\n\n",
+                  nHeight, blockhash.GetHex(), printme, printme3);
     } else {
-        LogPrintf("printing after block=%d, hash=%s\n, mapStart=%s\n\n, mapStartTxDOSTracker=%s\n\n, mapStartTxDOSHeights=%s\n\n",
-                  nHeight, blockhash.GetHex(), printme, printme3, printme4);
+        LogPrintf("printing after block=%d, hash=%s\n, mapStart=%s\n\n, mapStartTxDOSTracker=%s\n\n",
+                  nHeight, blockhash.GetHex(), printme, printme3);
     }
 
 }

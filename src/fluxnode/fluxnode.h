@@ -340,9 +340,6 @@ public:
     // Set only used by local cache to inform the global cache when Flushing to remove Started Fluxnode from being tracked
     std::set<COutPoint> setUndoStartTx;
 
-    // Int only used by local cache to inform the global cache when Flushing to remove all Started Outpoint at this height from being tracked
-    int setUndoStartTxHeight;
-
     // Map only used by local cache to inform the global cache when Flushing to expire DoS Fluxnode from being tracked
     std::map<int, std::set<COutPoint>> mapDosExpiredToRemove;
 
@@ -374,13 +371,11 @@ public:
     std::map<COutPoint, int> mapUndoPaidNodes;
 
     //! GLOBAL CACHE ITEMS ONLY
-    // Global tracking of Started Fluxnode
+    // Global tracking of Started Fluxnodes
     std::map<COutPoint, FluxnodeCacheData> mapStartTxTracker;
-    std::map<int, std::set<COutPoint> > mapStartTxHeights;
 
-    // Global tracking of DoS Prevention Fluxnode
+    // Global tracking of DoS Prevention Fluxnodes
     std::map<COutPoint, FluxnodeCacheData> mapStartTxDOSTracker;
-    std::map<int, std::set<COutPoint> > mapStartTxDOSHeights;
 
     // Global tracking of Confirmed Fluxnodes
     std::map<COutPoint, FluxnodeCacheData> mapConfirmedFluxnodeData;
@@ -402,11 +397,9 @@ public:
         setDirtyOutPoint.clear();
         mapStartTxTracker.clear();
         mapStartTxDOSTracker.clear();
-        mapStartTxDOSHeights.clear();
         mapDosExpiredToRemove.clear();
         mapDOSToUndo.clear();
         setUndoStartTx.clear();
-        setUndoStartTxHeight = 0;
         mapAddToConfirm.clear();
         setAddToConfirmHeight = 0;
         mapConfirmedFluxnodeData.clear();
@@ -483,10 +476,5 @@ std::string GetP2SHFluxNodePublicKey(const CTransaction& tx);
 bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet);
 
 bool IsFluxnodeTransactionsActive();
-
-
-
-
-
 
 #endif //ZELCASHNODES_FLUXNODE_H
