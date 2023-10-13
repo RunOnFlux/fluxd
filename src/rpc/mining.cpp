@@ -542,8 +542,8 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     if (vNodes.empty())
         throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Flux is not connected!");
 
-    if (IsInitialBlockDownload(Params()))
-        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Flux is downloading blocks...");
+//    if (IsInitialBlockDownload(Params()))
+//        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Flux is downloading blocks...");
 
     static unsigned int nTransactionsUpdatedLast;
 

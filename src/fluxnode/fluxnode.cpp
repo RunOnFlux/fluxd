@@ -264,6 +264,10 @@ void FluxnodeCache::UndoNewStart(const CTransaction& p_transaction, const int p_
 {
     LOCK(cs);
     setUndoStartTx.insert(p_transaction.collateralIn);
+    if (setUndoStartTxHeight && p_nHeight != setUndoStartTxHeight) {
+        LogPrintf("%s: Setting the start height to a different height: setUndoStartTxHeight:%d - height:%d\n", __func__, setUndoStartTxHeight, p_nHeight);
+    }
+    LogPrintf("%s: Undoing start transaction at height:%d, setUndoStartTxHeight:%d \n", __func__, p_nHeight, setUndoStartTxHeight);
     setUndoStartTxHeight = p_nHeight;
 }
 
@@ -363,28 +367,17 @@ void FluxnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
 
     std::vector<COutPoint> vecOutPoints;
     std::set<COutPoint> setNewDosHeights;
-    if (g_fluxnodeCache.mapStartTxHeights.count(removalHeight)) {
-        for (const auto& item: g_fluxnodeCache.mapStartTxHeights.at(removalHeight)) {
+    for (const auto& object: g_fluxnodeCache.mapStartTxTracker) {
+        if (object.second.nAddedBlockHeight == removalHeight) {
             // The start transaction might have been confirmed in this block. If it was the outpoint would be in the mapAddToConfirm. Skip it
-            if (mapAddToConfirm.count(item))
+            if (mapAddToConfirm.count(object.first))
                 continue;
 
-            // If the item isn't in the mapStartTxTracker. Logs the errors and shutdown for the safety of the node
-            if (!g_fluxnodeCache.mapStartTxTracker.count(item)) {
-                error("Map:at -> Map Start Tx Tracker doesn't have item: %s", item.ToFullString());
-                if (g_fluxnodeCache.mapStartTxDOSTracker.count(item)) {
-                    error("Map::at error would of occured. pIndexHeight=%d, itemHeight=%d\n", p_nHeight, g_fluxnodeCache.mapStartTxDOSTracker.at(item).nAddedBlockHeight);
-                } else {
-                    error("Map Start Tx Tracker doesn't have item - and mapStartTxDostracker didn't have item. %s", item.ToFullString());
-                }
-                StartShutdown();
-            }
-
-            FluxnodeCacheData data = g_fluxnodeCache.mapStartTxTracker.at(item);
+            FluxnodeCacheData data = object.second;
             data.nStatus = FLUXNODE_TX_DOS_PROTECTION;
-            mapStartTxDOSTracker[item] = data;
+            mapStartTxDOSTracker[object.first] = data;
 
-            setNewDosHeights.insert(item);
+            setNewDosHeights.insert(object.first);
         }
 
         if (setNewDosHeights.size())
@@ -417,7 +410,6 @@ void FluxnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
 
             mapStartTxTracker[item] = g_fluxnodeCache.mapStartTxDOSTracker.at(item);
             mapStartTxTracker[item].nStatus = FLUXNODE_TX_STARTED;
-            mapStartTxHeights[removalHeight].insert(item);
 
             mapDOSToUndo[removalHeight].insert(item);
         }
@@ -528,7 +520,7 @@ FluxnodeCacheData FluxnodeCache::GetFluxnodeData(const COutPoint& out, int* nNee
     return data;
 }
 
-bool FluxnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPoint& p_fluxnodeOut)
+bool FluxnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPoint& p_fluxnodeOut, bool fFluxnodeDBRebuild)
 {
     if (nTier == NONE || nTier == LAST) {
         return false;
@@ -557,6 +549,13 @@ bool FluxnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPo
                                 dest = payment_destination;
                                 return true;
                             } else {
+                                // Only in a very specific scenario should this happen. while rebuildfluxnodedb rpc is running
+                                // Because we are only rebuilding the fluxnode db, we are still on the tip of the chian where a utxo could be marked as spent.
+                                // Becase we aren't using the destination address while rebuilding the database this check can be bypassed.
+                                if(fFluxnodeDBRebuild) {
+                                    LogPrintf("%s: Rebuilding Fluxnode Database: P2SH node outpoint %s was spent. So we can't get the address\n", __func__, p_fluxnodeOut.ToString());
+                                    return true;
+                                }
                                 /**
                                  * This shouldn't ever happen. As the only scenario this fails at is if the coin is spent.
                                  * If the coin is spent in the block previous to the block where this fluxnode is next
@@ -750,7 +749,7 @@ void FluxnodeCache::AddBackUndoData(const CFluxnodeTxBlockUndo& p_undoData)
         }
     }
 
-    // Undo the Confirm Update trasnaction back to the old ipAddresses
+    // Undo the Confirm Update transaction back to the old ipAddresses
     for (const auto& item : p_undoData.mapLastIpAddress) {
         LOCK(g_fluxnodeCache.cs);
         // Because we might have already retrieved the fluxnode global data above when adding back the nLastConfirmedBlockHeight
@@ -792,7 +791,6 @@ bool FluxnodeCache::Flush()
      */
     for (const auto& item : mapStartTxTracker) {
         g_fluxnodeCache.mapStartTxTracker[item.first] = item.second;
-        g_fluxnodeCache.mapStartTxHeights[item.second.nAddedBlockHeight].insert(item.first);
         g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
     }
 
@@ -815,10 +813,6 @@ bool FluxnodeCache::Flush()
      */
     for (const auto& item : mapStartTxDOSHeights) {
         g_fluxnodeCache.mapStartTxDOSHeights[item.first] = item.second;
-
-        // TODO - Remove when not needed
-        LogPrintf("%s - %d - Removing mapStartTxHeights from gloabl cache at height %d\n", __func__, __LINE__, item.first);
-        g_fluxnodeCache.mapStartTxHeights.erase(item.first);
     }
 
     /**
@@ -899,20 +893,10 @@ bool FluxnodeCache::Flush()
     }
 
     /**
-     * If we are undoing a block, and this block contained a start node transaction, We need to do the following:
-     * 1. Remove all nodes from the Heights tracker and the height of the block that was undone.
-     */
-    if (setUndoStartTxHeight > 0) {
-        // TODO - Remove when not needed
-        LogPrintf("%s - %d - (Undoing) Removing mapStartTxHeights from global cache at height %d\n", __func__, __LINE__, setUndoStartTxHeight);
-        g_fluxnodeCache.mapStartTxHeights.erase(setUndoStartTxHeight);
-    }
-
-    /**
      * If we are adding a block, and this block contained a START confirmation transaction, We need to do the following:
      * 1. Fetch the nodes data from the start tx tracker
      * 2. Remove the node from the start tx tracker
-     * 3. Remove the node from the strat tx heights tracker
+     * 3. Remove the node from the start tx heights tracker
      * 4. Update the nodes data to status of confirmed
      * 5. Add the node into the confirmed node tracker
      * 6. Mark the collateral as dirty so it can be databased when the daemon shutdowns
@@ -921,98 +905,8 @@ bool FluxnodeCache::Flush()
         // Take the fluxnodedata from the mapStartTxTracker and move it to the mapConfirm
         if (g_fluxnodeCache.mapStartTxTracker.count(item.first)) {
             FluxnodeCacheData data = g_fluxnodeCache.mapStartTxTracker.at(item.first);
-
-            // Check for item in the startTxHeight map
-            if (!g_fluxnodeCache.mapStartTxHeights.count(data.nAddedBlockHeight)) {
-                // TODO - Remove when fixed
-                error("%s - %d , Found map:at error - Daemon will crash ", __func__, __LINE__);
-                error("%s - %d , Debug Data - mapStartTxTracker has item: %s. Moving to confirmed list.", __func__, __LINE__, item.first.ToFullString());
-                error("%s - %d , Debug Data - mapStartTxHeights doesn't have item at %d  added block height", __func__, __LINE__, data.nAddedBlockHeight);
-                error("%s - %d , Debug Data - data info: %s", __func__, __LINE__, data.ToFullString());
-
-                // TODO - Remove when fixed
-                /// This is for debugging a known bug only.
-                // Check if it is already in the confirmed list:
-                if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.first)) {
-                    error("%s - %d , Debug Data - node already in confirmed list:\n %s", __func__, __LINE__, item.first.ToFullString());
-                } else {
-                    error("%s - %d , Debug Data - node wasn't in confirmed list in confirmed list:\n %s", __func__, __LINE__, item.first.ToFullString());
-                }
-
-                // TODO - Remove when fixed
-                /// This is for debugging a known bug only.
-                // Check if it is already in dos tracker:
-                if (g_fluxnodeCache.mapStartTxDOSTracker.count(item.first)) {
-                    error("%s - %d , Debug Data - node already in dos tracker list: %s", __func__, __LINE__, item.first.ToFullString());
-                    error("%s - %d , Debug Data - node data:\n %s", __func__, __LINE__, g_fluxnodeCache.mapStartTxDOSTracker.at(item.first).ToFullString());
-                } else {
-                    error("%s - %d , Debug Data - node wasn't in dos tracker list: %s", __func__, __LINE__, item.first.ToFullString());
-                }
-
-                // TODO - Remove when fixed
-                /// This is for debugging a known bug only.
-                // Check if it is already in dos heights tracker:
-                if (g_fluxnodeCache.mapStartTxDOSHeights.count(data.nAddedBlockHeight)) {
-                    error("%s - %d , Debug Data - node confirmed height in dos height tracker at height: %d", __func__, __LINE__, data.nAddedBlockHeight);
-                    if (g_fluxnodeCache.mapStartTxDOSHeights.at(data.nAddedBlockHeight).count(item.first)) {
-                        error("%s - %d , Debug Data - node collateral: %s found in set of mapStartTxDOSHeights at height: %d", __func__, __LINE__, item.first.ToFullString(), data.nAddedBlockHeight);
-                    } else {
-                        error("%s - %d , Debug Data - node collateral: %s not found in the Dos Heights tracker", __func__, __LINE__, item.first.ToFullString());
-                    }
-                } else {
-                    error("%s - %d , Debug Data - height wasn't in dos tracker heights list at height: %d", __func__, __LINE__, data.nAddedBlockHeight);
-                }
-
-                // TODO - Remove when fixed
-                /// This is for debugging a known bug only.
-                // Check all heights above equal to the expiration height (60) trying to find the item
-                for (int i = 1; i < FLUXNODE_START_TX_EXPIRATION_HEIGHT; i++) {
-                    if (g_fluxnodeCache.mapStartTxHeights.count(data.nAddedBlockHeight + i)) {
-                        error("%s - %d , Debug Data - Found heights at block height : %d", __func__, __LINE__,
-                              data.nAddedBlockHeight + i);
-                        if (g_fluxnodeCache.mapStartTxHeights.at(data.nAddedBlockHeight+i).count(item.first)) {
-                            error("%s - %d , Debug Data - Found item: %s in block heights set at block height : %d", __func__, __LINE__,
-                                  item.first.ToFullString(), data.nAddedBlockHeight + i);
-                        } else {
-                            error("%s - %d , Debug Data - Item not in heights : %d", __func__, __LINE__,
-                                  data.nAddedBlockHeight + i);
-                        }
-                    } else {
-                        error("%s - %d , Debug Data - Found no heights at block height : %d", __func__, __LINE__,
-                              data.nAddedBlockHeight + i);
-                    }
-                }
-
-                // TODO - Remove when fixed
-                /// This is for debugging a known bug only.
-                // Check all heights below equal to the expiration height (60) trying to find the item
-                for (int i = FLUXNODE_START_TX_EXPIRATION_HEIGHT; i > 0; i--) {
-                    if (g_fluxnodeCache.mapStartTxHeights.count(data.nAddedBlockHeight - i)) {
-                        error("%s - %d , Debug Data - Found heights at block height : %d", __func__, __LINE__,
-                              data.nAddedBlockHeight - i);
-                        if (g_fluxnodeCache.mapStartTxHeights.at(data.nAddedBlockHeight - i).count(item.first)) {
-                            error("%s - %d , Debug Data - Found item: %s in block heights set at block height : %d", __func__, __LINE__,
-                                  item.first.ToFullString(), data.nAddedBlockHeight - i);
-                        } else {
-                            error("%s - %d , Debug Data - Item not in heights : %d", __func__, __LINE__,
-                                  data.nAddedBlockHeight - i);
-                        }
-                    } else {
-                        error("%s - %d , Debug Data - Found no heights at block height : %d", __func__, __LINE__,
-                              data.nAddedBlockHeight - i);
-                    }
-                }
-
-
-                // Returning false here should cause the assert to trigger on the Flush command crashing the daemon.
-                return false;
-            }
-
             // Remove from Start Tracking
             g_fluxnodeCache.mapStartTxTracker.erase(item.first);
-
-            /// If the bug happens, this line will cause the daemon to crash. Instead we return false above and cause an asset to trigger.
-            g_fluxnodeCache.mapStartTxHeights.at(data.nAddedBlockHeight).erase(item.first);
 
             // Update the data (STARTED --> CONFIRM)
             data.nStatus = FLUXNODE_TX_CONFIRMED;
@@ -1078,7 +972,6 @@ bool FluxnodeCache::Flush()
 
             // Add the data back into the Start tracker
             g_fluxnodeCache.mapStartTxTracker[item] = data;
-            g_fluxnodeCache.mapStartTxHeights[data.nAddedBlockHeight].insert(item);
 
             g_fluxnodeCache.setDirtyOutPoint.insert(item);
 
@@ -1216,6 +1109,9 @@ bool FluxnodeCache::Flush()
             }
     }
 
+    // Reset the setUndoStartTxHeight variable after each Flush(), which on a disconnectblock should happen after ever block.
+    setUndoStartTxHeight = 0;
+
     //! DO ALL REMOVAL FROM THE ITEMS IN THE LIST HERE (using iterators so we can remove items while going over the list a single time
     // Currently only have to do this when moving from CONFIRM->START (undo blocks only)
     if (setRemoveFromList.size()) {
@@ -1250,7 +1146,6 @@ bool FluxnodeCache::LoadData(FluxnodeCacheData& data)
 {
     if (data.nStatus == FLUXNODE_TX_STARTED) {
         mapStartTxTracker[data.collateralIn] = data;
-        mapStartTxHeights[data.nAddedBlockHeight].insert(data.collateralIn);
     } else if (data.nStatus == FLUXNODE_TX_DOS_PROTECTION) {
         mapStartTxDOSTracker[data.collateralIn] = data;
         mapStartTxDOSHeights[data.nAddedBlockHeight].insert(data.collateralIn);
@@ -1526,14 +1421,6 @@ void FluxnodeCache::LogDebugData(const int& nHeight, const uint256& blockhash, b
     }
     printme = printme + "}";
 
-    std::string printme2 = "{ \n";
-    if (g_fluxnodeCache.mapStartTxHeights.count(nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT)) {
-        for (const auto &printitem: g_fluxnodeCache.mapStartTxHeights.at(nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT)) {
-            printme2 = printme2 + printitem.ToFullString() + ",\n";
-        }
-        printme2 = printme2 + "}";
-    }
-
     std::string printme3 = "{ \n";
     for (const auto &printitem: g_fluxnodeCache.mapStartTxDOSTracker) {
         printme3 = printme3 + printitem.first.ToFullString() + "," + printitem.second.ToFullString() + ",\n";
@@ -1549,11 +1436,11 @@ void FluxnodeCache::LogDebugData(const int& nHeight, const uint256& blockhash, b
     }
 
     if (fFromDisconnect) {
-        LogPrintf("Disconnecting - printing after block=%d, hash=%s\n, mapStart=%s\n\n mapStartTxheights=%s\n\n, mapStartTxDOSTracker=%s\n\n, mapStartTxDOSHeights=%s\n\n",
-                  nHeight, blockhash.GetHex(), printme, printme2, printme3, printme4);
+        LogPrintf("Disconnecting - printing after block=%d, hash=%s\n, mapStart=%s\n\n, mapStartTxDOSTracker=%s\n\n, mapStartTxDOSHeights=%s\n\n",
+                  nHeight, blockhash.GetHex(), printme, printme3, printme4);
     } else {
-        LogPrintf("printing after block=%d, hash=%s\n, mapStart=%s\n\n mapStartTxheights=%s\n\n, mapStartTxDOSTracker=%s\n\n, mapStartTxDOSHeights=%s\n\n",
-                  nHeight, blockhash.GetHex(), printme, printme2, printme3, printme4);
+        LogPrintf("printing after block=%d, hash=%s\n, mapStart=%s\n\n, mapStartTxDOSTracker=%s\n\n, mapStartTxDOSHeights=%s\n\n",
+                  nHeight, blockhash.GetHex(), printme, printme3, printme4);
     }
 
 }

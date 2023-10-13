@@ -125,7 +125,7 @@ UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
                 CTxDestination t_dest;
                 COutPoint t_out;
                 for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-                    if (g_fluxnodeCache.GetNextPayment(t_dest, currentTier, t_out)) {
+                    if (g_fluxnodeCache.GetNextPayment(t_dest, currentTier, t_out, true)) {
                         fluxnodeCache.AddPaidNode(currentTier, t_out, rescanIndex->nHeight);
                     }
                 }
@@ -786,9 +786,9 @@ UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp, strin
                 "\nExamples:\n" +
                 HelpExampleCli(cmdname, ""));
 
-    if (IsInitialBlockDownload(Params())) {
-        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Wait until chain is synced closer to tip");
-    }
+//    if (IsInitialBlockDownload(Params())) {
+//        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Wait until chain is synced closer to tip");
+//    }
 
     // Get filter if any
     std::string strFilter = "";

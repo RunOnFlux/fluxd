@@ -401,7 +401,6 @@ public:
     void SetNull() {
         setDirtyOutPoint.clear();
         mapStartTxTracker.clear();
-        mapStartTxHeights.clear();
         mapStartTxDOSTracker.clear();
         mapStartTxDOSHeights.clear();
         mapDosExpiredToRemove.clear();
@@ -441,7 +440,7 @@ public:
     bool InConfirmTracker(const COutPoint& out);
     bool CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_nHeight);
 
-    bool GetNextPayment(CTxDestination& dest, int nTier, COutPoint& p_fluxnodeOut);
+    bool GetNextPayment(CTxDestination& dest, int nTier, COutPoint& p_fluxnodeOut, bool fFluxnodeDBRebuild = false);
 
     //! Confirmation Tx Methods
     bool CheckNewStartTx(const COutPoint& out);

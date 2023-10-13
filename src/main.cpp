@@ -3059,6 +3059,7 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
     p_fluxnodeCache->CheckForUndoExpiredStartTx(pindex->nHeight);
 
     // undo transactions in reverse order
+    LogPrintf("%s: Undoing transactions for block: %d\n", __func__, pindex->nHeight);
     for (int i = block.vtx.size() - 1; i >= 0; i--) {
         const CTransaction &tx = block.vtx[i];
         uint256 const hash = tx.GetHash();
@@ -3908,6 +3909,7 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
 {
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
+
     // Read block from disk.
     CBlock block;
     if (!ReadBlockFromDisk(block, pindexDelete, chainparams.GetConsensus()))
@@ -3915,6 +3917,9 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
     // Apply the block atomically to the chain state.
     uint256 sproutAnchorBeforeDisconnect = pcoinsTip->GetBestAnchor(SPROUT);
     uint256 saplingAnchorBeforeDisconnect = pcoinsTip->GetBestAnchor(SAPLING);
+
+    LogPrintf("%s: disconnecting=%s height=%d\n", __func__, block.GetHash().GetHex(), pindexDelete->nHeight);
+
     int64_t nStart = GetTimeMicros();
     {
         CCoinsViewCache view(pcoinsTip);
