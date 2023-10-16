@@ -128,7 +128,7 @@ class FluxnodeCacheData {
 
 public:
     // Fluxnode Tx data
-    uint8_t nType;
+    int8_t nType;
     COutPoint collateralIn; // collateral in
     CPubKey collateralPubkey;
     CPubKey pubKey; // Pubkey used for VPS signature verification
@@ -168,7 +168,7 @@ public:
     }
 
     bool IsNull() const{
-        if (nType == FLUXNODE_TX_TYPE_UPGRADED) {
+        if ((nType&FLUXNODE_TX_TYPE_UPGRADED) == FLUXNODE_TX_TYPE_UPGRADED) {
             return nTransactionType == FLUXNODE_NO_TYPE;
         }
         return nType == FLUXNODE_NO_TYPE;
@@ -226,7 +226,7 @@ public:
         READWRITE(nType);
 
         // New nType Version Checker
-        if (nType == FLUXNODE_TX_TYPE_UPGRADED) {
+        if ((nType&FLUXNODE_TX_TYPE_UPGRADED) == FLUXNODE_TX_TYPE_UPGRADED) {
             LogPrintf("FLUXNODE_TX_TYPE_UPGRADED Found %d - %s    - nType = %d - TX-Type (%d), result = %d\n", __LINE__, __func__, nType, FLUXNODE_TX_TYPE_UPGRADED, nType ^ FLUXNODE_TX_TYPE_UPGRADED);
             READWRITE(nFluxTxVersion);
             READWRITE(nTransactionType);
