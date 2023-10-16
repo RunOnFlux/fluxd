@@ -128,7 +128,7 @@ class FluxnodeCacheData {
 
 public:
     // Fluxnode Tx data
-    int8_t nType;
+    uint8_t nType;
     COutPoint collateralIn; // collateral in
     CPubKey collateralPubkey;
     CPubKey pubKey; // Pubkey used for VPS signature verification
