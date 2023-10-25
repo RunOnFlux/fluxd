@@ -46,11 +46,14 @@ public:
 
     std::string notCapableReason;
 
+    int8_t nActiveFluxNodeTxVersion;
 
     ActiveFluxnode()
     {
         notCapableReason = "";
     }
+
+
 
     /** Deterministric Fluxnode functions **/
 
@@ -65,6 +68,8 @@ public:
     bool SignDeterministicConfirmTx(CMutableTransaction& mutableTransaction, std::string& errorMessage);
 
     bool CheckDefaultPort(std::string strService, std::string& strErrorRet, std::string strContext);
+
+    void EnforceActiveFluxNodeTxVersion();
 
     int nLastTriedToConfirm;
 };

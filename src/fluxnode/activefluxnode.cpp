@@ -358,9 +358,8 @@ bool ActiveFluxnode::BuildDeterministicStartTx(std::string strKeyFluxnode, std::
         return false;
     }
 
-    // When we should move to upgraded version for fluxnode transactions
-    bool fP2SHNodesActive = NetworkUpgradeActive(chainActive.Height(), Params().GetConsensus(), Consensus::UPGRADE_P2SHNODES);
-
+    // This function is only used by startfluxnode rpc, and will default to always user version 5
+    mutTransaction.nVersion = FLUXNODE_TX_VERSION;
     mutTransaction.nType = FLUXNODE_START_TX_TYPE;
 
     // Create fluxnode transaction
@@ -369,13 +368,6 @@ bool ActiveFluxnode::BuildDeterministicStartTx(std::string strKeyFluxnode, std::
         mutTransaction.collateralPubkey = pubKeyCollateralAddress;
         mutTransaction.pubKey = pubKeyFluxnode;
 
-        // We can upgrade to v6 transaction which mean the following
-        // nVersion = 6
-        // nFluxTxVersion = Normal Tx Version Value of 1
-        if (fP2SHNodesActive) {
-            mutTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
-            mutTransaction.nFluxTxVersion = FLUXNODE_INTERNAL_NORMAL_TX_VERSION;
-        }
     } else if (mutTransaction.nType == FLUXNODE_CONFIRM_TX_TYPE) {
         mutTransaction.collateralIn = vin.prevout;
         if (mutTransaction.nUpdateType != FluxnodeUpdateType::UPDATE_CONFIRM)
@@ -390,16 +382,46 @@ void ActiveFluxnode::BuildDeterministicConfirmTx(CMutableTransaction& mutTransac
     // When we should move to upgraded version for fluxnode transactions
     bool fP2SHNodesActive = NetworkUpgradeActive(chainActive.Height(), Params().GetConsensus(), Consensus::UPGRADE_P2SHNODES);
 
+    // If this is the first confirmation tx we check for INITIAL_CONFIRM, and we must check the started list
+    if (nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM && g_fluxnodeCache.mapStartTxTracker.count(activeFluxnode.deterministicOutPoint)) {
+        // Set the active Fluxnode to the correct tx version, so it can create the confirmation transaction with the same version (5 or 6)
+        nActiveFluxNodeTxVersion = g_fluxnodeCache.mapStartTxTracker.at(activeFluxnode.deterministicOutPoint).nType;
+    }
+
+    // If this is the second confirmation tx we check for UPDATE_CONFIRM, and we must check the confirmed list
+    if (nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM && g_fluxnodeCache.mapConfirmedFluxnodeData.count(activeFluxnode.deterministicOutPoint)) {
+        // Set the active Fluxnode to the correct tx version, so it can create the confirmation transaction with the same version (5 or 6)
+        nActiveFluxNodeTxVersion = g_fluxnodeCache.mapConfirmedFluxnodeData.at(activeFluxnode.deterministicOutPoint).nType;
+    }
+
+    // Enforce a valid fluxnode tx version
+    EnforceActiveFluxNodeTxVersion();
+
     CKey keyCollateralAddress;
     CKey keyFluxnode;
-    mutTransaction.nVersion = FLUXNODE_TX_VERSION;
-
-    if (fP2SHNodesActive) {
-        // Use upgraded version once active
-        mutTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
-    }
+    mutTransaction.nVersion = nActiveFluxNodeTxVersion;
 
     mutTransaction.nType = FLUXNODE_CONFIRM_TX_TYPE;
     mutTransaction.collateralIn = deterministicOutPoint;
     mutTransaction.nUpdateType = nUpdateType;
+}
+
+void ActiveFluxnode::EnforceActiveFluxNodeTxVersion()
+{
+    // Check for version 5
+    if (nActiveFluxNodeTxVersion == FLUXNODE_TX_VERSION) {
+        return;
+    }
+
+    // Check for version 6
+    if (nActiveFluxNodeTxVersion == FLUXNODE_TX_UPGRADEABLE_VERSION) {
+        return;
+    }
+
+    // Print if it doesn't match
+    LogPrintf("%s: nActiveFluxNodeTxVersion not being set to either valid value: Current set to: %d. Setting to 5 by default.\n",
+              __func__, nActiveFluxNodeTxVersion);
+
+    // Enforce default version 5 as a last resort
+    nActiveFluxNodeTxVersion = FLUXNODE_TX_VERSION;
 }
