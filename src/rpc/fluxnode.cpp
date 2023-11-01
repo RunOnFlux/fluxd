@@ -701,7 +701,7 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
 
 
             CTxDestination payment_destination;
-            if (data.nTransactionType == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+            if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
                 CScriptID inner(data.P2SHRedeemScript);
                 payment_destination = inner;
             } else if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
