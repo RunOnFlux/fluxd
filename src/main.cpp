@@ -999,13 +999,13 @@ bool ContextualCheckTransaction(
 
     if (tx.IsFluxnodeTx()) {
         if (!kamataActive) {
-            return state.DoS(dosLevel, error("ContextualCheckTransaction(): fluxnodes tx seen before active"),
+            return state.DoSTx(dosLevel, error("ContextualCheckTransaction(): fluxnodes tx seen before active"),
                              REJECT_INVALID, "tx-fluxnodes-not-active", false, tx);
         }
 
         if (tx.IsFluxnodeUpgradeTx()) {
             if (!fluxP2SHNodesActive) {
-                return state.DoS(dosLevel, error("ContextualCheckTransaction(): P2SHNodes tx seen before active"),
+                return state.DoSTx(dosLevel, error("ContextualCheckTransaction(): P2SHNodes tx seen before active"),
                                  REJECT_INVALID, "tx-p2shnodes-not-active", false, tx);
             }
         }
@@ -1255,7 +1255,7 @@ bool ContextualCheckTransaction(
             }
 
             if (fFailure && !fFromAccept) {
-                return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
+                return state.DoSTx(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
             }
         } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
             bool fFailure = false;
@@ -1266,7 +1266,7 @@ bool ContextualCheckTransaction(
             }
 
             if (fFailure && !fFromAccept) {
-                return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
+                return state.DoSTx(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
             }
 
             // Check the signatures. This is a contextual check as it requires the fluxnode pubkey
@@ -1301,7 +1301,7 @@ bool ContextualCheckTransaction(
                 }
 
                 if (fFailure && !fFromAccept) {
-                    return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
+                    return state.DoSTx(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
                 }
             } else if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
                 bool fFailure = false;
@@ -1324,13 +1324,13 @@ bool ContextualCheckTransaction(
                 }
 
                 if (fFailure && !fFromAccept) {
-                    return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
+                    return state.DoSTx(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
                 }
             } else {
-                return state.DoS(100, error("fluxnode-tx-malicious-update-type"), REJECT_INVALID, "fluxnode-tx-malicious-update-type", false, tx);
+                return state.DoSTx(100, error("fluxnode-tx-malicious-update-type"), REJECT_INVALID, "fluxnode-tx-malicious-update-type", false, tx);
             }
         } else {
-            return state.DoS(100, error("fluxnode-tx-malicious-type"), REJECT_INVALID, "fluxnode-tx-malicious-type", false, tx);
+            return state.DoSTx(100, error("fluxnode-tx-malicious-type"), REJECT_INVALID, "fluxnode-tx-malicious-type", false, tx);
         }
     }
     return true;
@@ -1352,7 +1352,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state,
         // Ensure that zk-SNARKs verify
         BOOST_FOREACH(const JSDescription &joinsplit, tx.vJoinSplit) {
             if (!joinsplit.Verify(*pfluxParams, verifier, tx.joinSplitPubKey)) {
-                return state.DoS(100, error("CheckTransaction(): joinsplit does not verify"),
+                return state.DoSTx(100, error("CheckTransaction(): joinsplit does not verify"),
                                     REJECT_INVALID, "bad-txns-joinsplit-verification-failed", false, tx);
             }
         }
@@ -3469,13 +3469,13 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 CAmount nCollateralAmount;
                 std::string errorMessage;
                 if (!view.CheckFluxnodeTxInput(tx, pindex->nHeight, nTier, nCollateralAmount, errorMessage))
-                    return state.DoS(100, error("ConnectBlock(): fluxnode tx inputs missing/spent"),
+                    return state.DoSTx(100, error("ConnectBlock(): fluxnode tx inputs missing/spent"),
                                      REJECT_INVALID, strprintf("bad-txns-fluxnode-tx-inputs-missingorspent-%s", errorMessage), false, tx);
 
                 if (tx.nType == FLUXNODE_START_TX_TYPE) {
                     if (p_fluxnodeCache) {
                         if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralIn)) {
-                            return state.DoS(100, error("ConnectBlock(): fluxnode tx, failed CheckNewStartTx call"),
+                            return state.DoSTx(100, error("ConnectBlock(): fluxnode tx, failed CheckNewStartTx call"),
                                              REJECT_INVALID, "bad-txns-fluxnode-tx-check-new-start", false, tx);
                         }
 
@@ -3492,7 +3492,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                             p_fluxnodeCache->AddUpdateConfirm(tx, pindex->nHeight);
                             FluxnodeCacheData global_data = g_fluxnodeCache.GetFluxnodeData(tx.collateralIn);
                             if (global_data.IsNull()) {
-                                return state.DoS(100,
+                                return state.DoSTx(100,
                                                  error("ConnectBlock(): fluxnode tx, failed finding data to creating undo data"),
                                                  REJECT_INVALID, "bad-txns-fluxnode-global-data-not-found", false, tx);
                             }
@@ -4738,7 +4738,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
 
         if (block.vtx[i].IsFluxnodeTx()) {
             if (setFluxnodeTxOuts.count(block.vtx[i].collateralIn))
-                return state.DoS(100, error("CheckBlock(): more than one fluxnodetx with same outpoint"),
+                return state.DoSTx(100, error("CheckBlock(): more than one fluxnodetx with same outpoint"),
                                  REJECT_INVALID, "bad-fluxnode-tx-multiple", false, block.vtx[i]);
             setFluxnodeTxOuts.insert(block.vtx[i].collateralIn);
         }

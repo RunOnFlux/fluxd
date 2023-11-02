@@ -518,20 +518,20 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
         consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight =
-                Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight =
-                Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nProtocolVersion = 170018;
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight =
-                Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight =
-                Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 
         // The best chain should have at least this much work.
