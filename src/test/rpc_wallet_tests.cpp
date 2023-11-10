@@ -951,7 +951,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_parameters)
     BOOST_CHECK_THROW(CallRPC("z_sendmany "
             "tmRr6yJonqGK23UVhrKuyvTpF8qxQQjKigJ "
             "[{\"address\":\"tmQP9L3s31cLsghVYf2Jb5MhKj1jRBPoeQn\", \"amount\":50.0}] "
-            "1 21000001"
+            "1 44000001"
             ), runtime_error);
 
     // fee amount is bigger than sum of outputs
@@ -1545,7 +1545,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_shieldcoinbase_parameters)
     BOOST_CHECK_THROW(CallRPC("z_shieldcoinbase "
             "tmRr6yJonqGK23UVhrKuyvTpF8qxQQjKigJ "
             "tnpoQJVnYBZZqkFadj2bJJLThNCxbADGB5gSGeYTAGGrT5tejsxY9Zc1BtY8nnHmZkB "
-            "21000001"
+            "44000001"
             ), runtime_error);
 
     // invalid limit, must be at least 0
@@ -1718,7 +1718,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_parameters)
         "Amount out of range");
 
     // invalid fee amount, bigger than MAX_MONEY
-    CheckRPCThrows("z_mergetoaddress [\"" + taddr1 + "\"] "  + taddr2 + " 21000001",
+    CheckRPCThrows("z_mergetoaddress [\"" + taddr1 + "\"] "  + taddr2 + " 44000001",
         "Amount out of range");
 
     // invalid transparent limit, must be at least 0

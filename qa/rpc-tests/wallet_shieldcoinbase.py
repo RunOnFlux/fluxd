@@ -84,7 +84,7 @@ class WalletShieldCoinbaseTest (BitcoinTestFramework):
 
         # Shielding will fail because fee is larger than MAX_MONEY
         try:
-            self.nodes[0].z_shieldcoinbase("*", myzaddr, Decimal('21000000.00000001'))
+            self.nodes[0].z_shieldcoinbase("*", myzaddr, Decimal('44000000.00000001'))
         except JSONRPCException,e:
             errorString = e.error['message']
         assert_equal("Amount out of range" in errorString, True)

@@ -323,11 +323,11 @@ TEST(joinsplit, full_api_test)
         increment_note_witnesses(note1.cm(), witnesses, tree);
         SproutNote note2(addr.a_pk, 100, random_uint256(), random_uint256());
         increment_note_witnesses(note2.cm(), witnesses, tree);
-        SproutNote note3(addr.a_pk, 21000000000000001, random_uint256(), random_uint256());
+        SproutNote note3(addr.a_pk, 44000000000000001, random_uint256(), random_uint256());
         increment_note_witnesses(note3.cm(), witnesses, tree);
-        SproutNote note4(addr.a_pk, 19000000000000000, random_uint256(), random_uint256());
+        SproutNote note4(addr.a_pk, 29000000000000000, random_uint256(), random_uint256());
         increment_note_witnesses(note4.cm(), witnesses, tree);
-        SproutNote note5(addr.a_pk, 19000000000000000, random_uint256(), random_uint256());
+        SproutNote note5(addr.a_pk, 29000000000000000, random_uint256(), random_uint256());
         increment_note_witnesses(note5.cm(), witnesses, tree);
 
         // Should work
@@ -354,7 +354,7 @@ TEST(joinsplit, full_api_test)
             JSOutput(),
             JSOutput()
         },
-        21000000000000001,
+        44000000000000001,
         0,
         tree.root(),
         "nonsensical vpub_old value");
@@ -370,7 +370,7 @@ TEST(joinsplit, full_api_test)
             JSOutput()
         },
         0,
-        21000000000000001,
+        44000000000000001,
         tree.root(),
         "nonsensical vpub_new value");
 
@@ -471,7 +471,7 @@ TEST(joinsplit, full_api_test)
             JSInput()
         },
         {
-            JSOutput(addr, 21000000000000001),
+            JSOutput(addr, 44000000000000001),
             JSOutput()
         },
         0,
@@ -486,8 +486,8 @@ TEST(joinsplit, full_api_test)
             JSInput()
         },
         {
-            JSOutput(addr, 19000000000000000),
-            JSOutput(addr, 19000000000000000)
+            JSOutput(addr, 24000000000000000),
+            JSOutput(addr, 24000000000000000)
         },
         0,
         0,
