@@ -347,31 +347,45 @@ UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
     if (fHelp || (params.size() != 0))
         throw runtime_error(
                 "createconfirmationtransaction\n"
-                "\nCreate a new confirmation transaction and return the raw hex\n"
+                "\nCreate a new confirmation transaction, tries to get fluxbench to sign it. Broadcasts it.\n"
 
                 "\nResult:\n"
-                "    \"hex\": \"xxxx\",    (string) output transaction hex\n"
+                "    \"status\": \"xxxx\",    (string) \"Successfully Sent\" or \"Fail to send\"\n"
+                "    \"txid\": \"xxxx\",    (string) \"Transaction hash\"\n"
+                "    \"raw\": \"xxxx\",    (string) \"Raw transaction hex\"\n"
 
                 "\nExamples:\n" +
                 HelpExampleCli("createconfirmationtransaction", "") + HelpExampleRpc("createconfirmationtransaction", ""));
 
-    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
+    if (!fFluxnode) throw JSONRPCError(RPC_INVALID_REQUEST, "This is not a Flux Node");
 
     std::string errorMessage;
     CMutableTransaction mutTx;
 
-
     activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::UPDATE_CONFIRM);
 
     if (!activeFluxnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
-        throw runtime_error(strprintf("Failed to sign new confirmation transaction: %s\n", errorMessage));
+        throw JSONRPCError(RPC_VERIFY_ERROR, strprintf("Failed to sign new confirmation transaction: %s\n", errorMessage));
     }
 
+    CReserveKey reservekey(pwalletMain);
     CTransaction tx(mutTx);
+    CTransaction signedTx;
+    bool fSent = false;
+    if (GetBenchmarkSignedTransaction(tx, signedTx, errorMessage)) {
+        CWalletTx walletTx(pwalletMain, signedTx);
+        fSent = pwalletMain->CommitTransaction(walletTx, reservekey);
+    } else {
+        throw JSONRPCError(RPC_VERIFY_ERROR, strprintf("Benchmark failed to sign new confirmation transaction: %s\n", errorMessage));
+    }
 
-    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-    ss << tx;
-    return HexStr(ss.begin(), ss.end());
+    CDataStream ss(SER_NETWORK, CLIENT_VERSION);
+    ss << signedTx;
+    UniValue ret(UniValue::VOBJ);
+    ret.pushKV("status", fSent ? "Successfully Sent" : "Fail to send");
+    ret.pushKV("txid", signedTx.GetHash().GetHex());
+    ret.pushKV("raw", HexStr(ss.begin(), ss.end()));
+    return ret;
 }
 
 UniValue startfluxnode(const UniValue& params, bool fHelp, string cmdname)
