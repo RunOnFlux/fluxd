@@ -17,7 +17,7 @@
 
 #include <array>
 
-namespace libzelcash {
+namespace libflux {
 
 static constexpr size_t GROTH_PROOF_SIZE = (
     48 + // π_A
@@ -95,7 +95,7 @@ protected:
 
 }
 
-typedef libzelcash::JoinSplit<ZC_NUM_JS_INPUTS,
+typedef libflux::JoinSplit<ZC_NUM_JS_INPUTS,
                             ZC_NUM_JS_OUTPUTS> ZCJoinSplit;
 
 #endif // ZC_JOINSPLIT_H_

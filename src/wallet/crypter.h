@@ -10,8 +10,8 @@
 #include "serialize.h"
 #include "streams.h"
 #include "support/allocators/secure.h"
-#include "zelcash/Address.hpp"
-#include "zelcash/zip32.h"
+#include "flux/Address.hpp"
+#include "flux/zip32.h"
 
 class uint256;
 
@@ -211,11 +211,11 @@ public:
     }
 
     virtual bool AddCryptedSproutSpendingKey(
-        const libzelcash::SproutPaymentAddress &address,
-        const libzelcash::ReceivingKey &rk,
+        const libflux::SproutPaymentAddress &address,
+        const libflux::ReceivingKey &rk,
         const std::vector<unsigned char> &vchCryptedSecret);
-    bool AddSproutSpendingKey(const libzelcash::SproutSpendingKey &sk);
-    bool HaveSproutSpendingKey(const libzelcash::SproutPaymentAddress &address) const
+    bool AddSproutSpendingKey(const libflux::SproutSpendingKey &sk);
+    bool HaveSproutSpendingKey(const libflux::SproutPaymentAddress &address) const
     {
         {
             LOCK(cs_SpendingKeyStore);
@@ -226,8 +226,8 @@ public:
         return false;
     }
 
-    bool GetSproutSpendingKey(const libzelcash::SproutPaymentAddress &address, libzelcash::SproutSpendingKey &skOut) const;
-    void GetSproutPaymentAddresses(std::set<libzelcash::SproutPaymentAddress> &setAddress) const
+    bool GetSproutSpendingKey(const libflux::SproutPaymentAddress &address, libflux::SproutSpendingKey &skOut) const;
+    void GetSproutPaymentAddresses(std::set<libflux::SproutPaymentAddress> &setAddress) const
     {
         if (!IsCrypted())
         {
@@ -244,13 +244,13 @@ public:
     }
     //! Sapling 
     virtual bool AddCryptedSaplingSpendingKey(
-        const libzelcash::SaplingExtendedFullViewingKey &extfvk,
+        const libflux::SaplingExtendedFullViewingKey &extfvk,
         const std::vector<unsigned char> &vchCryptedSecret,
-        const libzelcash::SaplingPaymentAddress &defaultAddr);
+        const libflux::SaplingPaymentAddress &defaultAddr);
     bool AddSaplingSpendingKey(
-        const libzelcash::SaplingExtendedSpendingKey &sk,
-        const libzelcash::SaplingPaymentAddress &defaultAddr);
-    bool HaveSaplingSpendingKey(const libzelcash::SaplingFullViewingKey &fvk) const
+        const libflux::SaplingExtendedSpendingKey &sk,
+        const libflux::SaplingPaymentAddress &defaultAddr);
+    bool HaveSaplingSpendingKey(const libflux::SaplingFullViewingKey &fvk) const
     {
         {
             LOCK(cs_SpendingKeyStore);
@@ -264,7 +264,7 @@ public:
         }
         return false;
     }
-    bool GetSaplingSpendingKey(const libzelcash::SaplingFullViewingKey &fvk, libzelcash::SaplingExtendedSpendingKey &skOut) const;
+    bool GetSaplingSpendingKey(const libflux::SaplingFullViewingKey &fvk, libflux::SaplingExtendedSpendingKey &skOut) const;
 
 
     /**

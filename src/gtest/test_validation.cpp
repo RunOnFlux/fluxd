@@ -101,7 +101,7 @@ TEST(Validation, ContextualCheckInputsPassesWithCoinbase) {
 
 TEST(Validation, ReceivedBlockTransactions) {
     auto chainParams = Params();
-    auto sk = libzelcash::SproutSpendingKey::random();
+    auto sk = libflux::SproutSpendingKey::random();
 
     // Create a fake genesis block
     CBlock block1;

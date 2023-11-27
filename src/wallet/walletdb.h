@@ -11,8 +11,8 @@
 #include "wallet/db.h"
 #include "key.h"
 #include "keystore.h"
-#include "zelcash/Address.hpp"
-#include "zelcash/zip32.h"
+#include "flux/Address.hpp"
+#include "flux/zip32.h"
 
 #include <list>
 #include <stdint.h>
@@ -184,22 +184,22 @@ public:
     bool WriteHDChain(const CHDChain& chain);
 
     /// Write spending key to wallet database, where key is payment address and value is spending key.
-    bool WriteZKey(const libzelcash::SproutPaymentAddress& addr, const libzelcash::SproutSpendingKey& key, const CKeyMetadata &keyMeta);
-    bool WriteSaplingZKey(const libzelcash::SaplingIncomingViewingKey &ivk,
-                          const libzelcash::SaplingExtendedSpendingKey &key,
+    bool WriteZKey(const libflux::SproutPaymentAddress& addr, const libflux::SproutSpendingKey& key, const CKeyMetadata &keyMeta);
+    bool WriteSaplingZKey(const libflux::SaplingIncomingViewingKey &ivk,
+                          const libflux::SaplingExtendedSpendingKey &key,
                           const CKeyMetadata  &keyMeta);
-    bool WriteSaplingPaymentAddress(const libzelcash::SaplingPaymentAddress &addr,
-                                    const libzelcash::SaplingIncomingViewingKey &ivk);
-    bool WriteCryptedZKey(const libzelcash::SproutPaymentAddress & addr,
-                          const libzelcash::ReceivingKey & rk,
+    bool WriteSaplingPaymentAddress(const libflux::SaplingPaymentAddress &addr,
+                                    const libflux::SaplingIncomingViewingKey &ivk);
+    bool WriteCryptedZKey(const libflux::SproutPaymentAddress & addr,
+                          const libflux::ReceivingKey & rk,
                           const std::vector<unsigned char>& vchCryptedSecret,
                           const CKeyMetadata &keyMeta);
-    bool WriteCryptedSaplingZKey(const libzelcash::SaplingExtendedFullViewingKey &extfvk,
+    bool WriteCryptedSaplingZKey(const libflux::SaplingExtendedFullViewingKey &extfvk,
                           const std::vector<unsigned char>& vchCryptedSecret,
                           const CKeyMetadata &keyMeta);
 
-    bool WriteSproutViewingKey(const libzelcash::SproutViewingKey &vk);
-    bool EraseSproutViewingKey(const libzelcash::SproutViewingKey &vk);
+    bool WriteSproutViewingKey(const libflux::SproutViewingKey &vk);
+    bool EraseSproutViewingKey(const libflux::SproutViewingKey &vk);
 
 private:
     CWalletDB(const CWalletDB&);

@@ -5,14 +5,14 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
-#include "activezelnode.h"
+#include "activefluxnode.h"
 #include "addrman.h"
-#include "zelnode/zelnode.h"
-#include "zelnode/zelnodeconfig.h"
+#include "fluxnode/fluxnode.h"
+#include "fluxnode/fluxnodeconfig.h"
 #include "protocol.h"
 
 #include "key_io.h"
-#include "zelnode/benchmarks.h"
+#include "fluxnode/benchmarks.h"
 
 
 void ActiveFluxnode::ManageDeterministricFluxnode()
@@ -25,7 +25,6 @@ void ActiveFluxnode::ManageDeterministricFluxnode()
 
     // Start confirm transaction
     CMutableTransaction mutTx;
-    mutTx.nVersion = FLUXNODE_TX_VERSION;
 
     // Get the current height
     int nHeight = chainActive.Height();
@@ -359,6 +358,8 @@ bool ActiveFluxnode::BuildDeterministicStartTx(std::string strKeyFluxnode, std::
         return false;
     }
 
+    // This function is only used by startfluxnode rpc, and will default to always user version 5
+    mutTransaction.nVersion = FLUXNODE_TX_VERSION;
     mutTransaction.nType = FLUXNODE_START_TX_TYPE;
 
     // Create fluxnode transaction
@@ -366,6 +367,7 @@ bool ActiveFluxnode::BuildDeterministicStartTx(std::string strKeyFluxnode, std::
         mutTransaction.collateralIn = vin.prevout;
         mutTransaction.collateralPubkey = pubKeyCollateralAddress;
         mutTransaction.pubKey = pubKeyFluxnode;
+
     } else if (mutTransaction.nType == FLUXNODE_CONFIRM_TX_TYPE) {
         mutTransaction.collateralIn = vin.prevout;
         if (mutTransaction.nUpdateType != FluxnodeUpdateType::UPDATE_CONFIRM)
@@ -377,10 +379,49 @@ bool ActiveFluxnode::BuildDeterministicStartTx(std::string strKeyFluxnode, std::
 
 void ActiveFluxnode::BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType)
 {
+    // When we should move to upgraded version for fluxnode transactions
+    bool fP2SHNodesActive = NetworkUpgradeActive(chainActive.Height(), Params().GetConsensus(), Consensus::UPGRADE_P2SHNODES);
+
+    // If this is the first confirmation tx we check for INITIAL_CONFIRM, and we must check the started list
+    if (nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM && g_fluxnodeCache.mapStartTxTracker.count(activeFluxnode.deterministicOutPoint)) {
+        // Set the active Fluxnode to the correct tx version, so it can create the confirmation transaction with the same version (5 or 6)
+        nActiveFluxNodeTxVersion = g_fluxnodeCache.mapStartTxTracker.at(activeFluxnode.deterministicOutPoint).nType;
+    }
+
+    // If this is the second confirmation tx we check for UPDATE_CONFIRM, and we must check the confirmed list
+    if (nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM && g_fluxnodeCache.mapConfirmedFluxnodeData.count(activeFluxnode.deterministicOutPoint)) {
+        // Set the active Fluxnode to the correct tx version, so it can create the confirmation transaction with the same version (5 or 6)
+        nActiveFluxNodeTxVersion = g_fluxnodeCache.mapConfirmedFluxnodeData.at(activeFluxnode.deterministicOutPoint).nType;
+    }
+
+    // Enforce a valid fluxnode tx version
+    EnforceActiveFluxNodeTxVersion();
+
     CKey keyCollateralAddress;
     CKey keyFluxnode;
+    mutTransaction.nVersion = nActiveFluxNodeTxVersion;
 
     mutTransaction.nType = FLUXNODE_CONFIRM_TX_TYPE;
     mutTransaction.collateralIn = deterministicOutPoint;
     mutTransaction.nUpdateType = nUpdateType;
+}
+
+void ActiveFluxnode::EnforceActiveFluxNodeTxVersion()
+{
+    // Check for version 5
+    if (nActiveFluxNodeTxVersion == FLUXNODE_TX_VERSION) {
+        return;
+    }
+
+    // Check for version 6
+    if (nActiveFluxNodeTxVersion == FLUXNODE_TX_UPGRADEABLE_VERSION) {
+        return;
+    }
+
+    // Print if it doesn't match
+    LogPrintf("%s: nActiveFluxNodeTxVersion not being set to either valid value: Current set to: %d. Setting to 5 by default.\n",
+              __func__, nActiveFluxNodeTxVersion);
+
+    // Enforce default version 5 as a last resort
+    nActiveFluxNodeTxVersion = FLUXNODE_TX_VERSION;
 }

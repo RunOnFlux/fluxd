@@ -8,7 +8,7 @@
 #include "utilmoneystr.h"
 #include "chainparams.h"
 #include "utilstrencodings.h"
-#include "zelcash/Address.hpp"
+#include "flux/Address.hpp"
 #include "wallet/wallet.h"
 #include "amount.h"
 #include <memory>

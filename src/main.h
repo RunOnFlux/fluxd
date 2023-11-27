@@ -43,7 +43,7 @@
 
 #include <boost/unordered_map.hpp>
 
-#include "zelnode/zelnodecachedb.h"
+#include "fluxnode/fluxnodecachedb.h"
 #include "snapshot/snapshotdb.h"
 
 class CBlockIndex;
@@ -382,7 +382,7 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, int nHeight);
 /** Transaction validation functions */
 
 /** Context-independent validity checks */
-bool CheckTransaction(const CTransaction& tx, CValidationState& state, libzelcash::ProofVerifier& verifier);
+bool CheckTransaction(const CTransaction& tx, CValidationState& state, libflux::ProofVerifier& verifier);
 bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidationState &state);
 
 /** Check for standard transaction types
@@ -490,7 +490,7 @@ bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state,
     bool fCheckPOW = true);
 bool CheckBlock(const CBlock& block, CValidationState& state,
                 const CChainParams& chainparams,
-                libzelcash::ProofVerifier& verifier,
+                libflux::ProofVerifier& verifier,
                 bool fCheckPOW = true, bool fCheckMerkleRoot = true);
 
 /** Context-dependent validity checks.

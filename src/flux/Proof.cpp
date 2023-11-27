@@ -9,7 +9,7 @@
 #include <boost/static_assert.hpp>
 #include <mutex>
 
-namespace libzelcash {
+namespace libflux {
 
 ProofVerifier ProofVerifier::Strict() {
     return ProofVerifier(true);

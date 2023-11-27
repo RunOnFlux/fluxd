@@ -5,7 +5,7 @@
 
 #include <utilstrencodings.h>
 #include <test/test_bitcoin.h>
-#include <zelcash/NoteEncryption.hpp>
+#include <flux/NoteEncryption.hpp>
 
 #include <boost/test/unit_test.hpp>
 
@@ -39,7 +39,7 @@ BOOST_AUTO_TEST_CASE(convertbits_deterministic)
 BOOST_AUTO_TEST_CASE(convertbits_random)
 {
     for (size_t i = 0; i < 1000; i++) {
-        auto input = libzelcash::random_uint256();
+        auto input = libflux::random_uint256();
         std::vector<unsigned char> data;
         std::vector<unsigned char> output;
         ConvertBits<8, 5, true>([&](unsigned char c) { data.push_back(c); }, input.begin(), input.end());

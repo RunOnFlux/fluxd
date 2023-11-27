@@ -146,7 +146,7 @@ EOF
     if [ $ARCHIVE_RESULT -ne 0 ]; then
         zelcashd_stop
         echo
-        echo "Please generate it using qa/zelcash/create_benchmark_archive.py"
+        echo "Please generate it using qa/flux/create_benchmark_archive.py"
         echo "and place it in the base directory of the repository."
         echo "Usage details are inside the Python script."
         exit 1

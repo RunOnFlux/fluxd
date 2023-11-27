@@ -24,7 +24,7 @@
 #include "walletdb.h"
 #include "script/interpreter.h"
 #include "utiltime.h"
-#include "zelcash/IncrementalMerkleTree.hpp"
+#include "flux/IncrementalMerkleTree.hpp"
 #include "sodium.h"
 #include "miner.h"
 #include "wallet/paymentdisclosuredb.h"
@@ -35,7 +35,7 @@
 #include <thread>
 #include <string>
 
-using namespace libzelcash;
+using namespace libflux;
 
 static int find_output(UniValue obj, int n) {
     UniValue outputMapValue = find_value(obj, "outputmap");
@@ -210,7 +210,7 @@ bool AsyncRPCOperation_shieldcoinbase::main_impl() {
     return boost::apply_visitor(ShieldToAddress(this, sendAmount), tozaddr_);
 }
 
-bool ShieldToAddress::operator()(const libzelcash::SproutPaymentAddress &zaddr) const {
+bool ShieldToAddress::operator()(const libflux::SproutPaymentAddress &zaddr) const {
     // update the transaction with these inputs
     CMutableTransaction rawTx(m_op->tx_);
     for (ShieldCoinbaseUTXO & t : m_op->inputs_) {
@@ -240,7 +240,7 @@ bool ShieldToAddress::operator()(const libzelcash::SproutPaymentAddress &zaddr) 
 }
 
 
-bool ShieldToAddress::operator()(const libzelcash::SaplingPaymentAddress &zaddr) const {
+bool ShieldToAddress::operator()(const libflux::SaplingPaymentAddress &zaddr) const {
     m_op->builder_.SetFee(m_op->fee_);
 
     // Sending from a t-address, which we don't have an ovk for. Instead,
@@ -267,7 +267,7 @@ bool ShieldToAddress::operator()(const libzelcash::SaplingPaymentAddress &zaddr)
     return true;
 }
 
-bool ShieldToAddress::operator()(const libzelcash::InvalidEncoding& no) const {
+bool ShieldToAddress::operator()(const libflux::InvalidEncoding& no) const {
     return false;
 }
 
@@ -310,9 +310,9 @@ UniValue AsyncRPCOperation_shieldcoinbase::perform_joinsplit(ShieldCoinbaseJSInf
             );
 
     // Generate the proof, this can take over a minute.
-    std::array<libzelcash::JSInput, ZC_NUM_JS_INPUTS> inputs
+    std::array<libflux::JSInput, ZC_NUM_JS_INPUTS> inputs
             {info.vjsin[0], info.vjsin[1]};
-    std::array<libzelcash::JSOutput, ZC_NUM_JS_OUTPUTS> outputs
+    std::array<libflux::JSOutput, ZC_NUM_JS_OUTPUTS> outputs
             {info.vjsout[0], info.vjsout[1]};
     std::array<size_t, ZC_NUM_JS_INPUTS> inputMap;
     std::array<size_t, ZC_NUM_JS_OUTPUTS> outputMap;
@@ -333,7 +333,7 @@ UniValue AsyncRPCOperation_shieldcoinbase::perform_joinsplit(ShieldCoinbaseJSInf
             !this->testmode,
             &esk); // parameter expects pointer to esk, so pass in address
     {
-        auto verifier = libzelcash::ProofVerifier::Strict();
+        auto verifier = libflux::ProofVerifier::Strict();
         if (!(jsdesc.Verify(*pfluxParams, verifier, joinSplitPubKey_))) {
             throw std::runtime_error("error verifying joinsplit");
         }
@@ -412,7 +412,7 @@ UniValue AsyncRPCOperation_shieldcoinbase::perform_joinsplit(ShieldCoinbaseJSInf
         // placeholder for txid will be filled in later when tx has been finalized and signed.
         PaymentDisclosureKey pdKey = {placeholder, js_index, mapped_index};
         JSOutput output = outputs[mapped_index];
-        libzelcash::SproutPaymentAddress zaddr = output.addr;  // randomized output
+        libflux::SproutPaymentAddress zaddr = output.addr;  // randomized output
         PaymentDisclosureInfo pdInfo = {PAYMENT_DISCLOSURE_VERSION_EXPERIMENTAL, esk, joinSplitPrivKey, zaddr};
         paymentDisclosureData_.push_back(PaymentDisclosureKeyInfo(pdKey, pdInfo));
 

@@ -6,8 +6,8 @@
 // Created by ja on 11/14/19.
 //
 
-#include "zelnode/zelnodecachedb.h"
-#include "zelnode.h"
+#include "fluxnode/fluxnodecachedb.h"
+#include "fluxnode.h"
 #include "undo.h"
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>

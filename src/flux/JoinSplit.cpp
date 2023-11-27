@@ -6,7 +6,7 @@
 #include "prf.h"
 #include "sodium.h"
 
-#include "zelcash/util.h"
+#include "flux/util.h"
 
 #include <memory>
 
@@ -22,7 +22,7 @@
 #include "streams.h"
 #include "version.h"
 
-namespace libzelcash {
+namespace libflux {
 
 static CCriticalSection cs_ParamsIO;
 

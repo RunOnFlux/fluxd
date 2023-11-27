@@ -5,8 +5,8 @@
 #include "amount.h"
 #include "asyncrpcoperation.h"
 #include "univalue.h"
-#include "zelcash/Address.hpp"
-#include "zelcash/zip32.h"
+#include "flux/Address.hpp"
+#include "flux/zip32.h"
 
 class AsyncRPCOperation_saplingmigration : public AsyncRPCOperation
 {
@@ -20,7 +20,7 @@ public:
     AsyncRPCOperation_saplingmigration& operator=(AsyncRPCOperation_saplingmigration const&) = delete; // Copy assign
     AsyncRPCOperation_saplingmigration& operator=(AsyncRPCOperation_saplingmigration&&) = delete;      // Move assign
 
-    static libzelcash::SaplingPaymentAddress getMigrationDestAddress(const HDSeed& seed, bool& fFailed);
+    static libflux::SaplingPaymentAddress getMigrationDestAddress(const HDSeed& seed, bool& fFailed);
 
     virtual void main();
 

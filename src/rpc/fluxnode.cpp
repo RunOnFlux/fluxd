@@ -5,15 +5,15 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
-#include "zelnode/activezelnode.h"
+#include "fluxnode/activefluxnode.h"
 #include "db.h"
 #include "init.h"
 #include "main.h"
-#include "zelnode/zelnodeconfig.h"
+#include "fluxnode/fluxnodeconfig.h"
 #include "rpc/server.h"
 #include "utilmoneystr.h"
 #include "key_io.h"
-#include "zelnode/benchmarks.h"
+#include "fluxnode/benchmarks.h"
 #include "util.h"
 
 #include <univalue.h>
@@ -23,6 +23,8 @@
 #include <fstream>
 #include <consensus/validation.h>
 #include <undo.h>
+#include "core_io.h"
+#include "boost/assign/list_of.hpp"
 
 #define MICRO 0.000001
 #define MILLI 0.001
@@ -123,7 +125,7 @@ UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
                 CTxDestination t_dest;
                 COutPoint t_out;
                 for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
-                    if (g_fluxnodeCache.GetNextPayment(t_dest, currentTier, t_out)) {
+                    if (g_fluxnodeCache.GetNextPayment(t_dest, currentTier, t_out, true)) {
                         fluxnodeCache.AddPaidNode(currentTier, t_out, rescanIndex->nHeight);
                     }
                 }
@@ -147,15 +149,15 @@ UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
                     int nTier = 0;
                     CTransaction get_tx;
                     uint256 block_hash;
-                    if (GetTransaction(tx.collateralOut.hash, get_tx, Params().GetConsensus(), block_hash,
+                    if (GetTransaction(tx.collateralIn.hash, get_tx, Params().GetConsensus(), block_hash,
                                        true)) {
 
-                        if (!GetCoinTierFromAmount(rescanIndex->nHeight, get_tx.vout[tx.collateralOut.n].nValue, nTier)) {
-                            return error("Failed to get tier from amount. This shouldn't happen tx = %s", tx.collateralOut.ToFullString());
+                        if (!GetCoinTierFromAmount(rescanIndex->nHeight, get_tx.vout[tx.collateralIn.n].nValue, nTier)) {
+                            return error("Failed to get tier from amount. This shouldn't happen tx = %s", tx.collateralIn.ToFullString());
                         }
 
                     } else {
-                        return error("Failed to find tx: %s", tx.collateralOut.ToFullString());
+                        return error("Failed to find tx: %s", tx.collateralIn.ToFullString());
                     }
 
                     int64_t nLoop2 = GetTimeMicros(); nLoopFetchTx += nLoop2 - nLoop1;
@@ -163,7 +165,7 @@ UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
                     if (tx.nType == FLUXNODE_START_TX_TYPE) {
 
                         // Add new Fluxnode Start Tx into local cache
-                        fluxnodeCache.AddNewStart(tx, rescanIndex->nHeight, nTier, get_tx.vout[tx.collateralOut.n].nValue);
+                        fluxnodeCache.AddNewStart(tx, rescanIndex->nHeight, nTier, get_tx.vout[tx.collateralIn.n].nValue);
                         int64_t nLoop3 = GetTimeMicros(); nAddStart += nLoop3 - nLoop2;
 
                     } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
@@ -173,15 +175,15 @@ UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
                             int64_t nLoop4 = GetTimeMicros(); nAddNewConfirm += nLoop4 - nLoop2;
                         } else if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
                             fluxnodeCache.AddUpdateConfirm(tx, rescanIndex->nHeight);
-                            FluxnodeCacheData global_data = g_fluxnodeCache.GetFluxnodeData(tx.collateralOut);
+                            FluxnodeCacheData global_data = g_fluxnodeCache.GetFluxnodeData(tx.collateralIn);
                             if (global_data.IsNull()) {
                                 return error("Failed to find global data on update confirm tx, %s",
                                              tx.GetHash().GetHex());
                             }
                             fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight.insert(
-                                    std::make_pair(tx.collateralOut,
+                                    std::make_pair(tx.collateralIn,
                                                    global_data.nLastConfirmedBlockHeight));
-                            fluxnodeTxBlockUndo.mapLastIpAddress.insert(std::make_pair(tx.collateralOut, global_data.ip));
+                            fluxnodeTxBlockUndo.mapLastIpAddress.insert(std::make_pair(tx.collateralIn, global_data.ip));
                             int64_t nLoop5 = GetTimeMicros(); nAddUpdateConfirm += nLoop5 - nLoop2;
                         }
                     }
@@ -345,31 +347,45 @@ UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
     if (fHelp || (params.size() != 0))
         throw runtime_error(
                 "createconfirmationtransaction\n"
-                "\nCreate a new confirmation transaction and return the raw hex\n"
+                "\nCreate a new confirmation transaction, tries to get fluxbench to sign it. Broadcasts it.\n"
 
                 "\nResult:\n"
-                "    \"hex\": \"xxxx\",    (string) output transaction hex\n"
+                "    \"status\": \"xxxx\",    (string) \"Successfully Sent\" or \"Fail to send\"\n"
+                "    \"txid\": \"xxxx\",    (string) \"Transaction hash\"\n"
+                "    \"raw\": \"xxxx\",    (string) \"Raw transaction hex\"\n"
 
                 "\nExamples:\n" +
                 HelpExampleCli("createconfirmationtransaction", "") + HelpExampleRpc("createconfirmationtransaction", ""));
 
-    if (!fFluxnode) throw runtime_error("This is not a Flux Node");
+    if (!fFluxnode) throw JSONRPCError(RPC_INVALID_REQUEST, "This is not a Flux Node");
 
     std::string errorMessage;
     CMutableTransaction mutTx;
-    mutTx.nVersion = FLUXNODE_TX_VERSION;
 
     activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::UPDATE_CONFIRM);
 
     if (!activeFluxnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
-        throw runtime_error(strprintf("Failed to sign new confirmation transaction: %s\n", errorMessage));
+        throw JSONRPCError(RPC_VERIFY_ERROR, strprintf("Failed to sign new confirmation transaction: %s\n", errorMessage));
     }
 
+    CReserveKey reservekey(pwalletMain);
     CTransaction tx(mutTx);
+    CTransaction signedTx;
+    bool fSent = false;
+    if (GetBenchmarkSignedTransaction(tx, signedTx, errorMessage)) {
+        CWalletTx walletTx(pwalletMain, signedTx);
+        fSent = pwalletMain->CommitTransaction(walletTx, reservekey);
+    } else {
+        throw JSONRPCError(RPC_VERIFY_ERROR, strprintf("Benchmark failed to sign new confirmation transaction: %s\n", errorMessage));
+    }
 
-    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-    ss << tx;
-    return HexStr(ss.begin(), ss.end());
+    CDataStream ss(SER_NETWORK, CLIENT_VERSION);
+    ss << signedTx;
+    UniValue ret(UniValue::VOBJ);
+    ret.pushKV("status", fSent ? "Successfully Sent" : "Fail to send");
+    ret.pushKV("txid", signedTx.GetHash().GetHex());
+    ret.pushKV("raw", HexStr(ss.begin(), ss.end()));
+    return ret;
 }
 
 UniValue startfluxnode(const UniValue& params, bool fHelp, string cmdname)
@@ -699,7 +715,10 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
 
 
             CTxDestination payment_destination;
-            if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+            if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+                CScriptID inner(data.P2SHRedeemScript);
+                payment_destination = inner;
+            } else if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
                 GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
             } else {
                 payment_destination = data.collateralPubkey.GetID();
@@ -781,9 +800,9 @@ UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp, strin
                 "\nExamples:\n" +
                 HelpExampleCli(cmdname, ""));
 
-    if (IsInitialBlockDownload(Params())) {
-        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Wait until chain is synced closer to tip");
-    }
+//    if (IsInitialBlockDownload(Params())) {
+//        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Wait until chain is synced closer to tip");
+//    }
 
     // Get filter if any
     std::string strFilter = "";
@@ -861,7 +880,13 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
         const FluxnodeCacheData data = item.second;
 
         CTxDestination payment_destination;
-        if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+
+        // If this is P2SH node, we need to generate the payment destination from the redeemscript
+        if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+            CScriptID innerID(data.P2SHRedeemScript);
+            payment_destination = innerID;
+        } else if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+            // This is needed for backwards compatibility but will no longer be used once P2SH nodes go live.
             GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
         } else {
             payment_destination = data.collateralPubkey.GetID();
@@ -928,7 +953,10 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
         const FluxnodeCacheData data = item.second;
 
         CTxDestination payment_destination;
-        if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
+        if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+            CScriptID inner(data.P2SHRedeemScript);
+            payment_destination = inner;
+        } else if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
             GetFluxNodeP2SHDestination(pcoinsTip, data.collateralIn, payment_destination);
         } else {
             payment_destination = data.collateralPubkey.GetID();
@@ -1161,6 +1189,265 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
     obj.pushKV("onion", onion);
 
     return obj;
+}
+
+UniValue createp2shstarttx(const UniValue& params, bool fHelp)
+{
+    if (fHelp || (params.size() != 4))
+        throw runtime_error(
+                "createp2shstarttx \"redeemscript\" \"vpspubkey\" \"txid\" index\n"
+                "\nCreate a transaction spending the given inputs and sending to the given addresses.\n"
+                "Returns hex-encoded raw transaction.\n"
+                "Note that the transaction's inputs are not signed, and\n"
+                "it is not stored in the wallet or transmitted to the network.\n"
+
+                "\nArguments:\n"
+                "1. \"redeemscript\"        (string, required) The redeemscript of the multisig address that hold the collateral for the fluxnode\n"
+                "3. \"vpspubkey\"           (string, required) The pubkey the the fluxnode server will use to confirm fluxnode transactions\n"
+                "4. \"txid\"                (string, required) the transaction hash of the collateral input\n"
+                "5. \"index\"               (number, required) the index of the transaction collateral input\n"
+
+                "\nResult:\n"
+                "\"transaction\"            (string) hex string of the transaction\n"
+
+                "\nExamples\n"
+                + HelpExampleCli("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
+                                                      " \"02d8ada61e8847722e91cc652082174e8b6b2844661d518e0eb78e65790f3b451c\""
+                                                      " \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\" 0")
+                + HelpExampleRpc("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
+                                                      " \"02d8ada61e8847722e91cc652082174e8b6b2844661d518e0eb78e65790f3b451c\""
+                                                      " \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\" 0"));
+
+
+    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR)(UniValue::VSTR)(UniValue::VNUM), false);
+
+
+    // Get data from the parameters
+    std::string strRedeemScript = params[0].get_str();
+    std::string strVpsPubKey = params[1].get_str();
+    std::string strCollateralTransactionHash = params[2].get_str();
+    int nCollateralIndex = params[3].get_int();
+
+
+    // Process data into useable objects
+    std::vector<unsigned char> redeemScriptData = ParseHex( strRedeemScript);
+    CScript redeemScript(redeemScriptData.begin(), redeemScriptData.end());
+
+
+    // Collateral PubKey Creation
+    std::vector<unsigned char> vpsPubKeyData = ParseHex( strVpsPubKey);
+    CPubKey vpsPubKey(vpsPubKeyData);
+
+    COutPoint collateralIn(uint256S(strCollateralTransactionHash), nCollateralIndex);
+
+    // Create the transaction
+    CMutableTransaction mutableTransaction;
+
+    // Set the data for the P2SH Node Transaction
+    mutableTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
+    mutableTransaction.nFluxTxVersion = FLUXNODE_INTERNAL_P2SH_TX_VERSION;
+    mutableTransaction.nType = FLUXNODE_START_TX_TYPE;
+    mutableTransaction.collateralIn = collateralIn;
+    mutableTransaction.P2SHRedeemScript = redeemScript;
+    mutableTransaction.pubKey = vpsPubKey;
+
+    // Variables needed for List PubKeys Call
+    txnouttype type;
+    std::vector<CTxDestination> addresses;
+    std::vector<CPubKey> pubkeys;
+    int nRequired;
+
+    std::string strMessage;
+    bool fFoundKey = false;
+
+    // Variables needed for scripthash check
+    CScriptID inner;
+    CTxDestination destination;
+
+    // Core Check 2 (The redeem script hash is the same as the address)
+    {
+        inner = CScriptID(mutableTransaction.P2SHRedeemScript);
+
+        CCoinsViewCache &view = *pcoinsTip;
+        const CCoins* existingCoins = view.AccessCoins(collateralIn.hash);
+        if (!existingCoins) {
+            throw JSONRPCError(RPC_VERIFY_ERROR, "Coins not found in chain");
+        }
+
+        if (!ExtractDestination(existingCoins->vout[collateralIn.n].scriptPubKey, destination)) {
+            throw JSONRPCError(RPC_VERIFY_ERROR, "Couldn't extract destination from coins");
+        }
+
+        if (EncodeDestination(destination) != EncodeDestination(inner)) {
+            throw JSONRPCError(RPC_VERIFY_ERROR, "Address not matching Redeemscript hash");
+        }
+    }
+
+    return EncodeHexTx(mutableTransaction);
+}
+
+UniValue signp2shstarttx(const UniValue& params, bool fHelp)
+{
+    if (fHelp || (params.size() < 1 || params.size() > 2))
+        throw runtime_error(
+                "signp2shstarttx \n"
+                "\nSign a Multisig Fluxnode Start Transaction\n"
+                "\nArguments:\n"
+                "1. rawtxhex         (string, required) The raw hex for the multisig Fluxnode start transaction\n"
+                "2. privatekey  (string, optional) The privatekey that will sign the transaction if not owned by the local wallet\n"
+
+                "\nResult:\n"
+                "\"SignedTx\"     (string) The raw hex of the signed transaction\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("signp2shstarttx", "\"rawtransactionhex\" \"privatekey\"") + HelpExampleRpc("signp2shstarttx", ""));
+
+#ifdef ENABLE_WALLET
+    LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
+#else
+    LOCK(cs_main);
+#endif
+    if (params.size() == 1) {
+        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR), false);
+    } else {
+        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR), false);
+    }
+
+    std::string strRawTx = params[0].get_str();
+
+    CTransaction tx;
+    bool fTx = DecodeHexTx(tx, strRawTx);
+
+    if (!fTx) {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+    }
+
+    bool fGivenKeys = false;
+    CKey key;
+
+    // If key is provided
+    if (params.size() > 1) {
+        fGivenKeys = true;
+        key = DecodeSecret(params[1].get_str());
+        if (!key.IsValid())
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
+    } else {
+
+#ifdef ENABLE_WALLET
+        if (pwalletMain)
+            EnsureWalletIsUnlocked();
+#endif
+
+        // Get the public keys from the redeemscript
+        std::vector<CPubKey> pubkeys;
+        if(!ListPubKeysFromMultiSigScript(tx.P2SHRedeemScript, pubkeys)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Failed to get pubkeys from redeemscript");
+        }
+
+        bool fKeyInWallet = false;
+
+        // Loop through pubkeys and see if wallets owns any of the keys. Return on the first key found by the wallet
+        for (const auto& pubkey: pubkeys) {
+            const CKeyID keyID = pubkey.GetID();
+            if (pwalletMain->GetKey(keyID, key)) {
+                fKeyInWallet = true;
+                break;
+            }
+        }
+
+        // If key isn't provided, see if our wallet owns it
+        if (!fKeyInWallet) {
+            throw JSONRPCError(RPC_WALLET_ERROR, "Private key not available");
+        }
+    }
+
+    CMutableTransaction mutableTransaction(tx);
+
+    // Core Check 3 (Signature Sign and Verify)
+    {
+        std::string strMessage;
+        std::string errorMessage;
+        CObfuScationSigner Signer;
+
+        // Sign & Verify the transaction
+        mutableTransaction.sigTime = GetTime();
+
+        strMessage = mutableTransaction.GetHash().GetHex();
+
+        if (!Signer.SignMessage(strMessage, errorMessage, mutableTransaction.sig, key)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Failed to sign transaction");
+        }
+
+        std::vector<CPubKey> pubkeys;
+        if(!ListPubKeysFromMultiSigScript(tx.P2SHRedeemScript, pubkeys)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Failed to get pubkeys from redeemscript");
+        }
+
+        bool fValidatedSignature = false;
+        for (const auto& pubkey: pubkeys) {
+            // Loop through Redeemscript keys and make sure the signature is valid with atleast one of them
+            if (Signer.VerifyMessage(pubkey, mutableTransaction.sig, strMessage, errorMessage)) {
+                fValidatedSignature = true;
+                break;
+            }
+        }
+
+        if (!fValidatedSignature) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Signature Verify Failed");
+        }
+    }
+
+    return EncodeHexTx(mutableTransaction);
+}
+
+UniValue sendp2shstarttx(const UniValue& params, bool fHelp)
+{
+    if (fHelp || (params.size() != 1))
+        throw runtime_error(
+                "sendp2shstarttx \n"
+                "\nBroadcast a Multisig Fluxnode Start Transaction\n"
+                "\nArguments:\n"
+                "1. rawtx         (string, required) The raw hex for the multisig Fluxnode start transaction\n"
+
+                "\nResult:\n"
+                "\"txhash\"     (string) The hash of the transaction that is broadcast to the network\n"
+
+                "\nExamples:\n" +
+                HelpExampleCli("sendp2shstarttx", "\"rawtransactionhex\"") + HelpExampleRpc("sendp2shstarttx", "\"rawtransactionhex\""));
+
+    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR), false);
+
+    std::string strRawTx = params[0].get_str();
+
+    CTransaction tx;
+    DecodeHexTx(tx, strRawTx);
+
+    txnouttype type;
+    std::vector<CTxDestination> addresses;
+    std::vector<CPubKey> pubkeys;
+    int nRequired;
+
+    std::string strMessage;
+    bool fFoundKey = false;
+
+    CValidationState state;
+    bool fMissingInputs;
+    bool fOverrideFees;
+
+    if (!AcceptToMemoryPool(mempool, state, tx, false, &fMissingInputs, !fOverrideFees)) {
+        if (state.IsInvalid()) {
+            throw JSONRPCError(RPC_TRANSACTION_REJECTED, strprintf("%i: %s", state.GetRejectCode(), state.GetRejectReason()));
+        } else {
+            if (fMissingInputs) {
+                throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
+            }
+            throw JSONRPCError(RPC_TRANSACTION_ERROR, state.GetRejectReason());
+        }
+    }
+
+    RelayTransaction(tx);
+
+    return tx.GetHash().GetHex();
 }
 
 UniValue getfluxnodecount (const UniValue& params, bool fHelp)
@@ -1464,6 +1751,9 @@ static const CRPCCommand commands[] =
                 { "fluxnode",   "getfluxnodestatus",      &getfluxnodestatus,      false  },
                 { "fluxnode",   "listfluxnodeconf",       &listfluxnodeconf,       false  },
                 { "hidden",     "rebuildfluxnodedb",      &rebuildfluxnodedb,      false  },
+                { "fluxnode",   "createp2shstarttx",      &createp2shstarttx,      false  },
+                { "fluxnode",   "signp2shstarttx",      &signp2shstarttx,      false  },
+                { "fluxnode",   "sendp2shstarttx",      &sendp2shstarttx,      false  },
 
                 { "fluxnode",   "startdeterministicfluxnode", &startdeterministicfluxnode, false },
                 { "fluxnode",   "viewdeterministicfluxnodelist", &viewdeterministicfluxnodelist, false },

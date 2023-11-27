@@ -19,7 +19,7 @@
 
 #include <boost/foreach.hpp>
 #include <boost/unordered_map.hpp>
-#include "zelcash/IncrementalMerkleTree.hpp"
+#include "flux/IncrementalMerkleTree.hpp"
 
 /** 
  * Pruned version of CTransaction: only retains metadata and unspent transaction outputs
@@ -545,7 +545,7 @@ public:
     bool HaveInputs(const CTransaction& tx) const;
 
     //! Check whether the prevout is present in the UTXO set represented by this view
-    bool CheckFluxnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier, CAmount& nCollateralAmount) const;
+    bool CheckFluxnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier, CAmount& nCollateralAmount, std::string& errorMessage) const;
 
     //! Check whether all joinsplit and sapling spend requirements (anchors/nullifiers) are satisfied
     bool HaveShieldedRequirements(const CTransaction& tx) const;
@@ -594,7 +594,7 @@ private:
 
 
 /** Coins Tier code
- * Any changes to this code needs to be also made to the code in zelnode.h and zelnode.cpp
+ * Any changes to this code needs to be also made to the code in fluxnode.h and fluxnode.cpp
  * We are unable to use the same code because of build/linking restrictions
  */
 extern std::map<int, double> mapCoinTierPercentages;

@@ -36,17 +36,17 @@ typedef JSOutPoint PaymentDisclosureKey;
 
 struct PaymentDisclosureInfo {
     uint8_t version;          // 0 = experimental, 1 = first production version, etc.
-    uint256 esk;              // zelcash/NoteEncryption.cpp
+    uint256 esk;              // flux/NoteEncryption.cpp
     uint256 joinSplitPrivKey; // primitives/transaction.h
     // ed25519 - not tied to implementation e.g. libsodium, see ed25519 rfc
 
-    libzelcash::SproutPaymentAddress zaddr;
+    libflux::SproutPaymentAddress zaddr;
 
     PaymentDisclosureInfo() : version(PAYMENT_DISCLOSURE_VERSION_EXPERIMENTAL) {
     }
 
 
-    PaymentDisclosureInfo(uint8_t v, uint256 esk, uint256 key, libzelcash::SproutPaymentAddress zaddr) : version(v), esk(esk), joinSplitPrivKey(key), zaddr(zaddr) { }
+    PaymentDisclosureInfo(uint8_t v, uint256 esk, uint256 key, libflux::SproutPaymentAddress zaddr) : version(v), esk(esk), joinSplitPrivKey(key), zaddr(zaddr) { }
 
     ADD_SERIALIZE_METHODS;
 
@@ -74,12 +74,12 @@ struct PaymentDisclosureInfo {
 struct PaymentDisclosurePayload {
     int32_t marker = PAYMENT_DISCLOSURE_PAYLOAD_MAGIC_BYTES;  // to be disjoint from transaction encoding
     uint8_t version;        // 0 = experimental, 1 = first production version, etc.
-    uint256 esk;            // zelcash/NoteEncryption.cpp
+    uint256 esk;            // flux/NoteEncryption.cpp
     uint256 txid;           // primitives/transaction.h
     uint64_t js;            // Index into CTransaction.vJoinSplit
     uint8_t n;              // Index into JSDescription fields of length ZC_NUM_JS_OUTPUTS
 
-    libzelcash::SproutPaymentAddress zaddr; // zelcash/Address.hpp
+    libflux::SproutPaymentAddress zaddr; // flux/Address.hpp
     std::string message;     // parameter to RPC call
 
     ADD_SERIALIZE_METHODS;

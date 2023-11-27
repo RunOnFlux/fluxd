@@ -7,7 +7,7 @@
 
 
 #include "netbase.h"
-#include "zelnodeconfig.h"
+#include "fluxnodeconfig.h"
 #include "util.h"
 #include "ui_interface.h"
 #include "chainparams.h"

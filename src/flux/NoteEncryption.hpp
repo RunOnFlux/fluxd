@@ -12,12 +12,12 @@ https://fluxwhitepaper.app.runonflux.io/?_gl=1*egc2l8*_ga*NTM5NTY4MDM1LjE2Mjg5ND
 
 #include "uint256.h"
 #include "uint252.h"
-#include "zelcash/Zelcash.h"
-#include "zelcash/Address.hpp"
+#include "flux/Zelcash.h"
+#include "flux/Address.hpp"
 
 #include <array>
 
-namespace libzelcash {
+namespace libflux {
 
 // Ciphertext for the recipient to decrypt
 typedef std::array<unsigned char, ZC_SAPLING_ENCCIPHERTEXT_SIZE> SaplingEncCiphertext;
@@ -196,9 +196,9 @@ public:
 
 }
 
-typedef libzelcash::NoteEncryption<ZC_NOTEPLAINTEXT_SIZE> ZCNoteEncryption;
-typedef libzelcash::NoteDecryption<ZC_NOTEPLAINTEXT_SIZE> ZCNoteDecryption;
+typedef libflux::NoteEncryption<ZC_NOTEPLAINTEXT_SIZE> ZCNoteEncryption;
+typedef libflux::NoteDecryption<ZC_NOTEPLAINTEXT_SIZE> ZCNoteDecryption;
 
-typedef libzelcash::PaymentDisclosureNoteDecryption<ZC_NOTEPLAINTEXT_SIZE> ZCPaymentDisclosureNoteDecryption;
+typedef libflux::PaymentDisclosureNoteDecryption<ZC_NOTEPLAINTEXT_SIZE> ZCPaymentDisclosureNoteDecryption;
 
 #endif /* ZC_NOTE_ENCRYPTION_H_ */

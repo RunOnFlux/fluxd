@@ -33,6 +33,7 @@ enum UpgradeIndex {
     UPGRADE_KAMATA,
     UPGRADE_FLUX,
     UPGRADE_HALVING,
+    UPGRADE_P2SHNODES,
     // NOTE: Also add new upgrades to NetworkUpgradeInfo in upgrades.cpp
     MAX_NETWORK_UPGRADES
 };

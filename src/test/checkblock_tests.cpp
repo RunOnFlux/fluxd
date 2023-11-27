@@ -8,7 +8,7 @@
 #include "main.h"
 #include "test/test_bitcoin.h"
 #include "utiltime.h"
-#include "zelcash/Proof.hpp"
+#include "flux/Proof.hpp"
 
 #include <cstdio>
 
@@ -58,7 +58,7 @@ BOOST_AUTO_TEST_CASE(May15)
 
         // After May 15'th, big blocks are OK:
         forkingBlock.nTime = tMay15; // Invalidates PoW
-        auto verifier = libzelcash::ProofVerifier::Strict();
+        auto verifier = libflux::ProofVerifier::Strict();
         BOOST_CHECK(CheckBlock(forkingBlock, state, Params(), verifier, false, false));
     }
 

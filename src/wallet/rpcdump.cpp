@@ -569,25 +569,25 @@ UniValue dumpwallet_impl(const UniValue& params, bool fHelp, bool fDumpZKeys)
     file << "\n";
 
     if (fDumpZKeys) {
-        std::set<libzelcash::SproutPaymentAddress> sproutAddresses;
+        std::set<libflux::SproutPaymentAddress> sproutAddresses;
         pwalletMain->GetSproutPaymentAddresses(sproutAddresses);
         file << "\n";
         file << "# Zkeys\n";
         file << "\n";
         for (auto addr : sproutAddresses) {
-            libzelcash::SproutSpendingKey key;
+            libflux::SproutSpendingKey key;
             if (pwalletMain->GetSproutSpendingKey(addr, key)) {
                 std::string strTime = EncodeDumpTime(pwalletMain->mapSproutZKeyMetadata[addr].nCreateTime);
                 file << strprintf("%s %s # zaddr=%s\n", EncodeSpendingKey(key), strTime, EncodePaymentAddress(addr));
             }
         }
-        std::set<libzelcash::SaplingPaymentAddress> saplingAddresses;
+        std::set<libflux::SaplingPaymentAddress> saplingAddresses;
         pwalletMain->GetSaplingPaymentAddresses(saplingAddresses);
         file << "\n";
         file << "# Sapling keys\n";
         file << "\n";
         for (auto addr : saplingAddresses) {
-            libzelcash::SaplingExtendedSpendingKey extsk;
+            libflux::SaplingExtendedSpendingKey extsk;
             if (pwalletMain->GetSaplingExtendedSpendingKey(addr, extsk)) {
                 auto ivk = extsk.expsk.full_viewing_key().in_viewing_key();
                 CKeyMetadata keyMeta = pwalletMain->mapSaplingZKeyMetadata[ivk];
@@ -764,10 +764,10 @@ UniValue z_importviewingkey(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid viewing key");
     }
     // TODO: Add Sapling support. For now, return an error to the user.
-    if (boost::get<libzelcash::SproutViewingKey>(&viewingkey) == nullptr) {
+    if (boost::get<libflux::SproutViewingKey>(&viewingkey) == nullptr) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Currently, only Sprout viewing keys are supported");
     }
-    auto vkey = boost::get<libzelcash::SproutViewingKey>(viewingkey);
+    auto vkey = boost::get<libflux::SproutViewingKey>(viewingkey);
     auto addr = vkey.address();
 
     {
@@ -866,14 +866,14 @@ UniValue z_exportviewingkey(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid zaddr");
     }
     // TODO: Add Sapling support. For now, return an error to the user.
-    if (boost::get<libzelcash::SproutPaymentAddress>(&address) == nullptr) {
+    if (boost::get<libflux::SproutPaymentAddress>(&address) == nullptr) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Currently, only Sprout zaddrs are supported");
     }
-    auto addr = boost::get<libzelcash::SproutPaymentAddress>(address);
+    auto addr = boost::get<libflux::SproutPaymentAddress>(address);
 
-    libzelcash::SproutViewingKey vk;
+    libflux::SproutViewingKey vk;
     if (!pwalletMain->GetSproutViewingKey(addr, vk)) {
-        libzelcash::SproutSpendingKey k;
+        libflux::SproutSpendingKey k;
         if (!pwalletMain->GetSproutSpendingKey(addr, k)) {
             throw JSONRPCError(RPC_WALLET_ERROR, "Wallet does not hold private key or viewing key for this zaddr");
         }

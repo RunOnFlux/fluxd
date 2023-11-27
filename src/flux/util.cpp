@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
-#include "zelcash/util.h"
+#include "flux/util.h"
 #include <algorithm>
 #include <stdexcept>
 

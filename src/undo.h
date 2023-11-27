@@ -10,7 +10,7 @@
 #include "compressor.h" 
 #include "primitives/transaction.h"
 #include "serialize.h"
-#include "zelnode/zelnode.h"
+#include "fluxnode/fluxnode.h"
 
 /** Undo information for a CTxIn
  *

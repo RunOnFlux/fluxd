@@ -39,7 +39,7 @@ LIBBITCOIN_UTIL=libbitcoin_util.a
 LIBBITCOIN_CRYPTO=crypto/libbitcoin_crypto.a
 LIBSECP256K1=secp256k1/libsecp256k1.la
 LIBUNIVALUE=univalue/libunivalue.la
-LIBZELCASH=libzelcash.a
+LIBFLUX=libflux.a
 
 if ENABLE_ZMQ
 LIBBITCOIN_ZMQ=libbitcoin_zmq.a
@@ -48,7 +48,7 @@ if ENABLE_PROTON
 LIBBITCOIN_PROTON=libbitcoin_proton.a
 endif
 if BUILD_BITCOIN_LIBS
-LIBZELCASH_CONSENSUS=libzelcashconsensus.la
+LIBFLUX_CONSENSUS=libfluxconsensus.la
 endif
 if ENABLE_WALLET
 LIBBITCOIN_WALLET=libbitcoin_wallet.a
@@ -72,9 +72,9 @@ EXTRA_LIBRARIES += \
   $(LIBBITCOIN_WALLET) \
   $(LIBBITCOIN_ZMQ) \
   $(LIBBITCOIN_PROTON) \
-  $(LIBZELCASH)
+  $(LIBFLUX)
 
-lib_LTLIBRARIES = $(LIBZELCASH_CONSENSUS)
+lib_LTLIBRARIES = $(LIBFLUX_CONSENSUS)
 bin_PROGRAMS =
 noinst_PROGRAMS =
 TESTS =
@@ -87,17 +87,17 @@ if BUILD_BITCOIN_UTILS
   bin_PROGRAMS += flux-cli flux-tx
 endif
 
-LIBZCELASH_H = \
-  zelcash/IncrementalMerkleTree.hpp \
-  zelcash/NoteEncryption.hpp \
-  zelcash/Address.hpp \
-  zelcash/JoinSplit.hpp \
-  zelcash/Note.hpp \
-  zelcash/prf.h \
-  zelcash/Proof.hpp \
-  zelcash/util.h \
-  zelcash/Zelcash.h \
-  zelcash/zip32.h
+LIBFLUX_H = \
+  flux/IncrementalMerkleTree.hpp \
+  flux/NoteEncryption.hpp \
+  flux/Address.hpp \
+  flux/JoinSplit.hpp \
+  flux/Note.hpp \
+  flux/prf.h \
+  flux/Proof.hpp \
+  flux/util.h \
+  flux/Zelcash.h \
+  flux/zip32.h
 
 .PHONY: FORCE check-symbols check-security
 # bitcoin core #
@@ -220,12 +220,12 @@ BITCOIN_CORE_H = \
   wallet/wallet.h \
   wallet/wallet_ismine.h \
   wallet/walletdb.h \
-  zelnode/activezelnode.h \
-  zelnode/benchmarks.h \
-  zelnode/obfuscation.h \
-  zelnode/zelnode.h \
-  zelnode/zelnodeconfig.h \
-  zelnode/zelnodecachedb.h \
+  fluxnode/activefluxnode.h \
+  fluxnode/benchmarks.h \
+  fluxnode/obfuscation.h \
+  fluxnode/fluxnode.h \
+  fluxnode/fluxnodeconfig.h \
+  fluxnode/fluxnodecachedb.h \
   zmq/zmqabstractnotifier.h \
   zmq/zmqconfig.h\
   zmq/zmqnotificationinterface.h \
@@ -281,14 +281,14 @@ libbitcoin_server_a_SOURCES = \
   mempool_limit.cpp \
   txmempool.cpp \
   validationinterface.cpp \
-  zelnode/activezelnode.cpp \
-  zelnode/benchmarks.cpp \
-  zelnode/obfuscation.cpp \
-  zelnode/zelnode.cpp \
-  zelnode/zelnodeconfig.cpp \
-  zelnode/zelnodecachedb.cpp \
+  fluxnode/activefluxnode.cpp \
+  fluxnode/benchmarks.cpp \
+  fluxnode/obfuscation.cpp \
+  fluxnode/fluxnode.cpp \
+  fluxnode/fluxnodeconfig.cpp \
+  fluxnode/fluxnodecachedb.cpp \
   $(BITCOIN_CORE_H) \
-  $(LIBZELCASH_H)
+  $(LIBFLUX_H)
 
 if ENABLE_ZMQ
 libbitcoin_zmq_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(ZMQ_CFLAGS)
@@ -330,7 +330,7 @@ libbitcoin_wallet_a_SOURCES = \
   wallet/wallet_ismine.cpp \
   wallet/walletdb.cpp \
   $(BITCOIN_CORE_H) \
-  $(LIBZELCASH_H)
+  $(LIBFLUX_H)
 
 # crypto primitives library
 crypto_libbitcoin_crypto_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_CONFIG_INCLUDES)
@@ -397,7 +397,7 @@ libbitcoin_common_a_SOURCES = \
   transaction_builder.cpp \
   utiltest.cpp \
   $(BITCOIN_CORE_H) \
-  $(LIBZELCASH_H)
+  $(LIBFLUX_H)
 
 # util: shared between all executables.
 # This library *must* be included to make sure that the glibc
@@ -421,7 +421,7 @@ libbitcoin_util_a_SOURCES = \
   utilstrencodings.cpp \
   utiltime.cpp \
   $(BITCOIN_CORE_H) \
-  $(LIBZELCASH_H)
+  $(LIBFLUX_H)
 
 if GLIBC_BACK_COMPAT
 libbitcoin_util_a_SOURCES += compat/glibc_compat.cpp
@@ -433,7 +433,7 @@ libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
   rpc/client.cpp \
   $(BITCOIN_CORE_H) \
-  $(LIBZELCASH_H)
+  $(LIBFLUX_H)
 
 nodist_libbitcoin_util_a_SOURCES = $(srcdir)/obj/build.h
 #
@@ -457,7 +457,7 @@ fluxd_LDADD = \
   $(LIBBITCOIN_ZMQ) \
   $(LIBBITCOIN_PROTON) \
   $(LIBBITCOIN_CRYPTO) \
-  $(LIBZELCASH) \
+  $(LIBFLUX) \
   $(LIBLEVELDB) \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
@@ -472,7 +472,7 @@ fluxd_LDADD += \
   $(ZMQ_LIBS) \
   $(PROTON_LIBS) \
   $(LIBBITCOIN_CRYPTO) \
-  $(LIBZELCASH_LIBS)
+  $(LIBFLUX_LIBS)
 
 # flux-cli binary #
 flux_cli_SOURCES = flux-cli.cpp
@@ -492,9 +492,9 @@ flux_cli_LDADD = \
   $(SSL_LIBS) \
   $(CRYPTO_LIBS) \
   $(EVENT_LIBS) \
-  $(LIBZELCASH) \
+  $(LIBFLUX) \
   $(LIBBITCOIN_CRYPTO) \
-  $(LIBZELCASH_LIBS)
+  $(LIBFLUX_LIBS)
 #
 
 # flux-tx binary #
@@ -507,41 +507,41 @@ if TARGET_WINDOWS
 flux_tx_SOURCES += flux-tx-res.rc
 endif
 
-# FIXME: Is libzelcash needed for zelcash_tx?
+# FIXME: Is libflux needed for zelcash_tx?
 flux_tx_LDADD = \
   $(LIBUNIVALUE) \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UTIL) \
   $(LIBSECP256K1) \
-  $(LIBZELCASH) \
+  $(LIBFLUX) \
   $(LIBBITCOIN_CRYPTO) \
-  $(LIBZELCASH_LIBS)
+  $(LIBFLUX_LIBS)
 
 flux_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
 #
 
 # zelcash protocol primitives #
-libzelcash_a_SOURCES = \
-  zelcash/IncrementalMerkleTree.cpp \
-  zelcash/NoteEncryption.cpp \
-  zelcash/Address.cpp \
-  zelcash/JoinSplit.cpp \
-  zelcash/Proof.cpp \
-  zelcash/Note.cpp \
-  zelcash/prf.cpp \
-  zelcash/util.cpp \
-  zelcash/zip32.cpp
+libflux_a_SOURCES = \
+  flux/IncrementalMerkleTree.cpp \
+  flux/NoteEncryption.cpp \
+  flux/Address.cpp \
+  flux/JoinSplit.cpp \
+  flux/Proof.cpp \
+  flux/Note.cpp \
+  flux/prf.cpp \
+  flux/util.cpp \
+  flux/zip32.cpp
 
-libzelcash_a_CPPFLAGS = $(AM_CPPFLAGS) $(PIC_FLAGS) -DBINARY_OUTPUT -DCURVE_ALT_BN128 -DBOOST_SPIRIT_THREADSAFE -fvisibility=hidden -DSTATIC $(BITCOIN_INCLUDES)
-libzelcash_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-libzelcash_a_LDFLAGS = $(AM_LDFLAGS)
+libflux_a_CPPFLAGS = $(AM_CPPFLAGS) $(PIC_FLAGS) -DBINARY_OUTPUT -DCURVE_ALT_BN128 -DBOOST_SPIRIT_THREADSAFE -fvisibility=hidden -DSTATIC $(BITCOIN_INCLUDES)
+libflux_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+libflux_a_LDFLAGS = $(AM_LDFLAGS)
 
-libzelcash_a_CPPFLAGS += -DMONTGOMERY_OUTPUT
+libflux_a_CPPFLAGS += -DMONTGOMERY_OUTPUT
 
 # zelcashconsensus library #
 if BUILD_BITCOIN_LIBS
 include_HEADERS = script/zelcashconsensus.h
-libzelcashconsensus_la_SOURCES = \
+libfluxconsensus_la_SOURCES = \
   crypto/equihash.cpp \
   crypto/hmac_sha512.cpp \
   crypto/ripemd160.cpp \
@@ -558,13 +558,13 @@ libzelcashconsensus_la_SOURCES = \
   utilstrencodings.cpp
 
 if GLIBC_BACK_COMPAT
-  libzelcashconsensus_la_SOURCES += compat/glibc_compat.cpp
+  libfluxconsensus_la_SOURCES += compat/glibc_compat.cpp
 endif
 
-libzelcashconsensus_la_LDFLAGS = $(AM_LDFLAGS) -no-undefined $(RELDFLAGS)
-libzelcashconsensus_la_LIBADD = $(LIBSECP256K1)
-libzelcashconsensus_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(builddir)/obj -I$(srcdir)/secp256k1/include -DBUILD_BITCOIN_INTERNAL
-libzelcashconsensus_la_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+libfluxconsensus_la_LDFLAGS = $(AM_LDFLAGS) -no-undefined $(RELDFLAGS)
+libfluxconsensus_la_LIBADD = $(LIBSECP256K1)
+libfluxconsensus_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(builddir)/obj -I$(srcdir)/secp256k1/include -DBUILD_BITCOIN_INTERNAL
+libfluxconsensus_la_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
 endif
 #

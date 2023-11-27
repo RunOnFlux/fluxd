@@ -25,8 +25,8 @@
 #include "serialize.h"
 #include "streams.h"
 
-#include "zelcash/IncrementalMerkleTree.hpp"
-#include "zelcash/util.h"
+#include "flux/IncrementalMerkleTree.hpp"
+#include "flux/util.h"
 
 #include <boost/foreach.hpp>
 
@@ -167,13 +167,13 @@ TEST(merkletree, SaplingVectors) {
 }
 
 TEST(merkletree, emptyroots) {
-    libzelcash::EmptyMerkleRoots<64, libzelcash::SHA256Compress> emptyroots;
-    std::array<libzelcash::SHA256Compress, 65> computed;
+    libflux::EmptyMerkleRoots<64, libflux::SHA256Compress> emptyroots;
+    std::array<libflux::SHA256Compress, 65> computed;
 
-    computed.at(0) = libzelcash::SHA256Compress::uncommitted();
+    computed.at(0) = libflux::SHA256Compress::uncommitted();
     ASSERT_TRUE(emptyroots.empty_root(0) == computed.at(0));
     for (size_t d = 1; d <= 64; d++) {
-        computed.at(d) = libzelcash::SHA256Compress::combine(computed.at(d-1), computed.at(d-1), d-1);
+        computed.at(d) = libflux::SHA256Compress::combine(computed.at(d-1), computed.at(d-1), d-1);
         ASSERT_TRUE(emptyroots.empty_root(d) == computed.at(d));
     }
 
@@ -182,13 +182,13 @@ TEST(merkletree, emptyroots) {
 }
 
 TEST(merkletree, EmptyrootsSapling) {
-    libzelcash::EmptyMerkleRoots<62, libzelcash::PedersenHash> emptyroots;
-    std::array<libzelcash::PedersenHash, 63> computed;
+    libflux::EmptyMerkleRoots<62, libflux::PedersenHash> emptyroots;
+    std::array<libflux::PedersenHash, 63> computed;
 
-    computed.at(0) = libzelcash::PedersenHash::uncommitted();
+    computed.at(0) = libflux::PedersenHash::uncommitted();
     ASSERT_TRUE(emptyroots.empty_root(0) == computed.at(0));
     for (size_t d = 1; d <= 62; d++) {
-        computed.at(d) = libzelcash::PedersenHash::combine(computed.at(d-1), computed.at(d-1), d-1);
+        computed.at(d) = libflux::PedersenHash::combine(computed.at(d-1), computed.at(d-1), d-1);
         ASSERT_TRUE(emptyroots.empty_root(d) == computed.at(d));
     }
 

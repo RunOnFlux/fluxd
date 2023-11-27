@@ -6,7 +6,7 @@
 #include "crypto/common.h"
 #include "key.h"
 #include "pubkey.h"
-#include "zelcash/JoinSplit.hpp"
+#include "flux/JoinSplit.hpp"
 #include "util.h"
 
 #include "librustzcash.h"

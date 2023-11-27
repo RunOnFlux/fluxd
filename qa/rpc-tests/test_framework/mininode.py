@@ -746,7 +746,7 @@ class CTransaction(object):
     def is_valid(self):
         self.calc_sha256()
         for tout in self.vout:
-            if tout.nValue < 0 or tout.nValue > 21000000L * 100000000L:
+            if tout.nValue < 0 or tout.nValue > 44000000L * 100000000L:
                 return False
         return True
 

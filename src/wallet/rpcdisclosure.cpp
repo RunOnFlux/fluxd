@@ -24,11 +24,11 @@
 
 #include <univalue.h>
 
-#include "zelcash/Note.hpp"
-#include "zelcash/NoteEncryption.hpp"
+#include "flux/Note.hpp"
+#include "flux/NoteEncryption.hpp"
 
 using namespace std;
-using namespace libzelcash;
+using namespace libflux;
 
 // Function declaration for function implemented in wallet/rpcwallet.cpp
 bool EnsureWalletIsAvailable(bool avoidException);

@@ -11,9 +11,9 @@
 
 #include "init.h"
 #include "key.h"
-#include "zelnode/zelnode.h"
+#include "fluxnode/fluxnode.h"
 #include "net.h"
-#include "zelnode/obfuscation.h"
+#include "fluxnode/obfuscation.h"
 #include "sync.h"
 #include "wallet/wallet.h"
 
@@ -46,11 +46,14 @@ public:
 
     std::string notCapableReason;
 
+    int8_t nActiveFluxNodeTxVersion;
 
     ActiveFluxnode()
     {
         notCapableReason = "";
     }
+
+
 
     /** Deterministric Fluxnode functions **/
 
@@ -65,6 +68,8 @@ public:
     bool SignDeterministicConfirmTx(CMutableTransaction& mutableTransaction, std::string& errorMessage);
 
     bool CheckDefaultPort(std::string strService, std::string& strErrorRet, std::string strContext);
+
+    void EnforceActiveFluxNodeTxVersion();
 
     int nLastTriedToConfirm;
 };

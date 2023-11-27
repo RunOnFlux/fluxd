@@ -37,9 +37,9 @@
 #include <atomic>
 
 #include "snapshot/snapshotdb.h"
-#include "zelnode/zelnodecachedb.h"
-#include "zelnode/obfuscation.h"
-#include "zelnode/activezelnode.h"
+#include "fluxnode/fluxnodecachedb.h"
+#include "fluxnode/obfuscation.h"
+#include "fluxnode/activefluxnode.h"
 
 #include <sstream>
 
@@ -932,6 +932,7 @@ bool ContextualCheckTransaction(
 
     bool kamataActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_KAMATA);
     bool fluxRebrandActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_FLUX);
+    bool fluxP2SHNodesActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_P2SHNODES);
 
     if (tx.IsCoinBase()) {
         // Check for exchange address funding
@@ -998,8 +999,15 @@ bool ContextualCheckTransaction(
 
     if (tx.IsFluxnodeTx()) {
         if (!kamataActive) {
-            return state.DoS(dosLevel, error("ContextualCheckTransaction(): fluxnodes tx seen before active"),
+            return state.DoSTx(dosLevel, error("ContextualCheckTransaction(): fluxnodes tx seen before active"),
                              REJECT_INVALID, "tx-fluxnodes-not-active", false, tx);
+        }
+
+        if (tx.IsFluxnodeUpgradeTx()) {
+            if (!fluxP2SHNodesActive) {
+                return state.DoSTx(dosLevel, error("ContextualCheckTransaction(): P2SHNodes tx seen before active"),
+                                 REJECT_INVALID, "tx-p2shnodes-not-active", false, tx);
+            }
         }
     }
 
@@ -1161,18 +1169,18 @@ bool ContextualCheckTransaction(
 
             bool fFailure = false;
             std::string strFailMessage;
-            if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralOut)) {
+            if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralIn)) {
                 fFailure = true;
                 strFailMessage = "fluxnode-tx-already-in-chain-or-waiting-for-dos-unban";
             }
 
-            if (!fFailure && g_fluxnodeCache.CheckIfConfirmed(tx.collateralOut)) {
+            if (!fFailure && g_fluxnodeCache.CheckIfConfirmed(tx.collateralIn)) {
                 fFailure = true;
                 strFailMessage = "fluxnode-tx-already-in-confirm-chain";
             }
 
             if (!fFailure) {
-                COutPoint outPoint = tx.collateralOut;
+                COutPoint outPoint = tx.collateralIn;
                 CPubKey userpubkey = tx.collateralPubkey;
 
                 CCoins coins;
@@ -1192,16 +1200,51 @@ bool ContextualCheckTransaction(
                     strFailMessage = "fluxnode-tx-failed-to-extract-destination";
                 }
 
-                if (!fFailure && coins.vout[outPoint.n].scriptPubKey.IsPayToScriptHash()) {
-                    // Here we have a node of which the collatoral is stored in a multisig address.
-                    // Only the flux foundation can do this. So lets use the chainparams public key to verify the signature
-                    // This means that the userpubkey is unable to be the same as the destination
-                    std::string public_key = GetP2SHFluxNodePublicKey(tx);
-                    CPubKey pubkey(ParseHex(public_key));
-
-                    if (tx.collateralPubkey != pubkey) {
+                // enforce New V6 Tx Versions to only allow certain scripts per
+                if (!fFailure && tx.IsFluxnodeUpgradedNormalTx()) {
+                    if (!coins.vout[outPoint.n].scriptPubKey.IsPayToPublicKeyHash()) {
                         fFailure = true;
-                        strFailMessage = "fluxnode-tx-p2sh-publickeys-didn't-match";
+                        strFailMessage = "fluxnode-tx-normal-version-not-p2pkh-script";
+                    }
+                }
+
+                // enforce New V6 Tx Versions to only allow certain scripts per
+                if (!fFailure && tx.IsFluxnodeUpgradedP2SHTx()) {
+                    if (!coins.vout[outPoint.n].scriptPubKey.IsPayToScriptHash()) {
+                        fFailure = true;
+                        strFailMessage = "fluxnode-tx-p2sh-version-not-p2sh-script";
+                    }
+                }
+
+                if (!fFailure && coins.vout[outPoint.n].scriptPubKey.IsPayToScriptHash()) {
+                    // This could mean that it is either a flux foundation key or P2SH Nodes is active and this is one of those transactions
+                    if (tx.IsFluxnodeUpgradedP2SHTx()) {
+                        txnouttype type;
+                        vector<CTxDestination> addresses;
+                        vector<CPubKey> pubkeys;
+                        int nRequired;
+
+                        /**
+                         * P2SH NODES CORE CHECK 2
+                         * We must check to make sure the hash of the redeem script matches the scriptpubkey of the coin
+                         * This check is very important so only owners of the P2SH address can sign the start transaction
+                         */
+                        CScriptID inner(tx.P2SHRedeemScript);
+                        if (EncodeDestination(destination) != EncodeDestination(inner)) {
+                            fFailure = true;
+                            strFailMessage = "fluxnode-tx-p2shnodes-destinations-didn't-match";
+                        }
+                    } else {
+                        // Here we have a node of which the collatoral is stored in a multisig address.
+                        // Only the flux foundation can do this. So lets use the chainparams public key to verify the signature
+                        // This means that the userpubkey is unable to be the same as the destination
+                        std::string public_key = GetP2SHFluxNodePublicKey(tx);
+                        CPubKey pubkey(ParseHex(public_key));
+
+                        if (tx.collateralPubkey != pubkey) {
+                            fFailure = true;
+                            strFailMessage = "fluxnode-tx-p2sh-publickeys-didn't-match";
+                        }
                     }
                 } else {
                     if (!fFailure && EncodeDestination(destination) != EncodeDestination(userpubkey.GetID())) {
@@ -1212,26 +1255,26 @@ bool ContextualCheckTransaction(
             }
 
             if (fFailure && !fFromAccept) {
-                return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
+                return state.DoSTx(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
             }
         } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
             bool fFailure = false;
             std::string strFailMessage;
-            if (g_fluxnodeCache.GetFluxnodeData(tx.collateralOut).nTier > tx.benchmarkTier) {
+            if (g_fluxnodeCache.GetFluxnodeData(tx.collateralIn).nTier > tx.benchmarkTier) {
                 fFailure = true;
                 strFailMessage = "fluxnode-tx-benchmark-tier-to-low-for-collateral";
             }
 
             if (fFailure && !fFromAccept) {
-                return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
+                return state.DoSTx(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
             }
 
             // Check the signatures. This is a contextual check as it requires the fluxnode pubkey
-            auto data = g_fluxnodeCache.GetFluxnodeData(tx.collateralOut);
+            auto data = g_fluxnodeCache.GetFluxnodeData(tx.collateralIn);
             std::string errorMessage;
 
             if (!data.IsNull()) {
-                std::string strMessage = tx.collateralOut.ToString() + std::to_string(tx.collateralOut.n) +
+                std::string strMessage = tx.collateralIn.ToString() + std::to_string(tx.collateralIn.n) +
                                          std::to_string(tx.nUpdateType) + std::to_string(tx.sigTime);
 
                 if (!obfuScationSigner.VerifyMessage(data.pubKey, tx.sig, strMessage, errorMessage)) {
@@ -1252,18 +1295,18 @@ bool ContextualCheckTransaction(
             if (tx.nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM) {
                 bool fFailure = false;
                 std::string strFailMessage;
-                if (!g_fluxnodeCache.CheckIfStarted(tx.collateralOut)) {
+                if (!g_fluxnodeCache.CheckIfStarted(tx.collateralIn)) {
                     fFailure = true;
                     strFailMessage = "fluxnode-tx-invalid-confirm-outpoint-not-started";
                 }
 
                 if (fFailure && !fFromAccept) {
-                    return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
+                    return state.DoSTx(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
                 }
             } else if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
                 bool fFailure = false;
                 std::string strFailMessage;
-                if (!g_fluxnodeCache.CheckIfConfirmed(tx.collateralOut)) {
+                if (!g_fluxnodeCache.CheckIfConfirmed(tx.collateralIn)) {
                     fFailure = true;
                     strFailMessage = "fluxnode-tx-invalid-update-confirm-outpoint-not-confirmed";
                 }
@@ -1275,19 +1318,19 @@ bool ContextualCheckTransaction(
                     strFailMessage = "fluxnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon";
                 }
 
-                if (!fFailure && g_fluxnodeCache.GetFluxnodeData(tx.collateralOut).nTier > tx.benchmarkTier) {
+                if (!fFailure && g_fluxnodeCache.GetFluxnodeData(tx.collateralIn).nTier > tx.benchmarkTier) {
                     fFailure = true;
                     strFailMessage = "fluxnode-tx-benchmark-tier-to-low-for-collateral";
                 }
 
                 if (fFailure && !fFromAccept) {
-                    return state.DoS(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
+                    return state.DoSTx(dosLevel, error(strFailMessage.c_str()), REJECT_INVALID, strFailMessage, false, tx);
                 }
             } else {
-                return state.DoS(100, error("fluxnode-tx-malicious-update-type"), REJECT_INVALID, "fluxnode-tx-malicious-update-type", false, tx);
+                return state.DoSTx(100, error("fluxnode-tx-malicious-update-type"), REJECT_INVALID, "fluxnode-tx-malicious-update-type", false, tx);
             }
         } else {
-            return state.DoS(100, error("fluxnode-tx-malicious-type"), REJECT_INVALID, "fluxnode-tx-malicious-type", false, tx);
+            return state.DoSTx(100, error("fluxnode-tx-malicious-type"), REJECT_INVALID, "fluxnode-tx-malicious-type", false, tx);
         }
     }
     return true;
@@ -1295,7 +1338,7 @@ bool ContextualCheckTransaction(
 
 
 bool CheckTransaction(const CTransaction& tx, CValidationState &state,
-                      libzelcash::ProofVerifier& verifier)
+                      libflux::ProofVerifier& verifier)
 {
     // Don't count coinbase transactions because mining skews the count
     if (!tx.IsCoinBase()) {
@@ -1309,7 +1352,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state,
         // Ensure that zk-SNARKs verify
         BOOST_FOREACH(const JSDescription &joinsplit, tx.vJoinSplit) {
             if (!joinsplit.Verify(*pfluxParams, verifier, tx.joinSplitPubKey)) {
-                return state.DoS(100, error("CheckTransaction(): joinsplit does not verify"),
+                return state.DoSTx(100, error("CheckTransaction(): joinsplit does not verify"),
                                     REJECT_INVALID, "bad-txns-joinsplit-verification-failed", false, tx);
             }
         }
@@ -1382,15 +1425,33 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
     }
 
     if (tx.IsFluxnodeTx()) {
+        if (tx.nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION) {
+            LogPrintf("Found a upgraded TX --------------------------------\n");
+        }
         // Check type of fluxnode tx
         if (tx.nType != FLUXNODE_START_TX_TYPE && tx.nType != FLUXNODE_CONFIRM_TX_TYPE)
             return state.DoS(10, error("CheckTransaction(): Is Fluxnode Tx, bad type"),
                              REJECT_INVALID, "bad-txns-fluxnode-tx-invalid-type");
 
         // Check Input is not null
-        if (tx.collateralOut.IsNull()) {
-            return state.DoS(10, error("CheckTransaction(): Is Fluxnode Tx, with null collateralOut prevout"),
+        if (tx.collateralIn.IsNull()) {
+            return state.DoS(10, error("CheckTransaction(): Is Fluxnode Tx, with null collateralIn prevout"),
                              REJECT_INVALID, "bad-txns-fluxnode-tx-null-prevout");
+        }
+
+        // We do this before checking the signatures as they would use the Redeemscript.
+        if (tx.IsFluxnodeUpgradedP2SHTx()) {
+            if (tx.P2SHRedeemScript.size() > MAX_SCRIPT_SIZE) {
+                return state.DoS(10, error("CheckTransaction(): P2SH RedeemScript to large. Maximum %d Bytes", MAX_SCRIPT_SIZE),
+                                 REJECT_INVALID, "bad-txns-fluxnode-tx-redeemscript-to-large");
+            }
+        }
+
+        if (tx.IsFluxnodeUpgradedP2SHTx()) {
+            if (!IsMultiSigRedeemScript(tx.P2SHRedeemScript)) {
+                return state.DoS(10, error("CheckTransaction(): P2SH RedeemScript is not multisig"),
+                                 REJECT_INVALID, "bad-txns-fluxnode-tx-redeemscript-not-multisig");
+            }
         }
 
         if (!CheckFluxnodeTxSignatures(tx)) {
@@ -1677,7 +1738,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE && tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
             {
                 LOCK(g_fluxnodeCache.cs);
-                if (!g_fluxnodeCache.CheckConfirmationHeights(nextBlockHeight, tx.collateralOut, tx.ip)) {
+                if (!g_fluxnodeCache.CheckConfirmationHeights(nextBlockHeight, tx.collateralIn, tx.ip)) {
                     LogPrint("mempool", "Dropping confirmation fluxnode txid %s : failed CheckConfirmationHeights check\n", tx.GetHash().ToString());
                     return false;
                 }
@@ -1685,7 +1746,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
     }
 
-    auto verifier = libzelcash::ProofVerifier::Strict();
+    auto verifier = libflux::ProofVerifier::Strict();
     if (!CheckTransaction(tx, state, verifier))
         return error("AcceptToMemoryPool: CheckTransaction failed");
 
@@ -1726,25 +1787,25 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         return false;
 
     if (tx.IsFluxnodeTx()) {
-        // If we already have a tx for this collateralOut
+        // If we already have a tx for this collateralIn
         // Get the transaction in the mempool, and replace it with the new one if the sigTime is greater
         // then the current sigTime
-        if (pool.mapFluxnodeTxMempool.count(tx.collateralOut)) {
-            uint256 poolTxHash = pool.mapFluxnodeTxMempool.at(tx.collateralOut);
+        if (pool.mapFluxnodeTxMempool.count(tx.collateralIn)) {
+            uint256 poolTxHash = pool.mapFluxnodeTxMempool.at(tx.collateralIn);
             CTransaction poolTx;
 
             if (pool.lookup(poolTxHash, poolTx)) {
                 if (tx.sigTime > poolTx.sigTime) {
-                    LogPrint("fluxnode", "Removing fluxnode transaction, because it is getting replaced by newer transaction. old: %s, new: %s, collateral: %s\n", poolTx.GetHash().GetHex(), tx.GetHash().GetHex(), tx.collateralOut.ToFullString());
+                    LogPrint("fluxnode", "Removing fluxnode transaction, because it is getting replaced by newer transaction. old: %s, new: %s, collateral: %s\n", poolTx.GetHash().GetHex(), tx.GetHash().GetHex(), tx.collateralIn.ToFullString());
                     std::list<CTransaction> removed;
                     mempool.remove(poolTx, removed, false);
                 } else {
                     return state.DoS(0, false, REJECT_DUPLICATE, "fluxnode-tx-outpoint-sigTime-older-cant-replace");
                 }
             } else {
-                pool.mapFluxnodeTxMempool.erase(tx.collateralOut);
+                pool.mapFluxnodeTxMempool.erase(tx.collateralIn);
                 pool.mapSeenFluxnodeTx.erase(poolTxHash);
-                error("AcceptToMemoryPool: Fluxnodetx in mapFluxnodeTxMempool, but not in the mempool. txhash: %s, collateral: %s", poolTxHash.GetHex(), tx.collateralOut.ToFullString());
+                error("AcceptToMemoryPool: Fluxnodetx in mapFluxnodeTxMempool, but not in the mempool. txhash: %s, collateral: %s", poolTxHash.GetHex(), tx.collateralIn.ToFullString());
             }
         }
 
@@ -1804,14 +1865,16 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                 // Check to make sure the input is not spent and meets the criteria of a fluxnode input
                 int nTier;
                 CAmount nCollateralAmount;
-                if (!view.CheckFluxnodeTxInput(tx, nextBlockHeight, nTier, nCollateralAmount)) {
-                    return state.DoS(10, error("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-fluxnode-inputs-invalid-spent-or-bad-value");
+                std::string errorMessage;
+                if (!view.CheckFluxnodeTxInput(tx, nextBlockHeight, nTier, nCollateralAmount, errorMessage)) {
+                    return state.DoS(10, error("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, strprintf("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value-%s", errorMessage));
                 }
             } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
                 int nTier;
                 CAmount nCollateralAmount;
-                if (!view.CheckFluxnodeTxInput(tx, nextBlockHeight, nTier, nCollateralAmount)) {
-                    return state.DoS(10, error("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, "bad-txns-fluxnode-inputs-invalid-spent-or-bad-value");
+                std::string errorMessage;
+                if (!view.CheckFluxnodeTxInput(tx, nextBlockHeight, nTier, nCollateralAmount, errorMessage)) {
+                    return state.DoS(10, error("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value"), REJECT_INVALID, strprintf("bad-txns-fluxnode-inputs-invalid-spent-or-bad-value-%s", errorMessage));
                 }
             }
         }
@@ -1970,8 +2033,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             }
 
             if (tx.IsFluxnodeTx()) {
-                LogPrint("fluxnode", "%s: Adding fluxnode transaction to mempool: %s hash: %s\n", __func__, tx.collateralOut.ToString(), tx.GetHash().GetHex());
-                pool.mapFluxnodeTxMempool[tx.collateralOut] = tx.GetHash();
+                LogPrint("fluxnode", "%s: Adding fluxnode transaction to mempool: %s hash: %s\n", __func__, tx.collateralIn.ToString(), tx.GetHash().GetHex());
+                pool.mapFluxnodeTxMempool[tx.collateralIn] = tx.GetHash();
                 pool.mapSeenFluxnodeTx[tx.GetHash()] = GetTime();
 
                 // Go through all the current seen fluxnode tx, and expire them after 1800 seconds if they are still in the mempool
@@ -2016,7 +2079,7 @@ bool AcceptableInputs(CTxMemPool& pool, CValidationState& state, const CTransact
     if (pfMissingInputs)
         *pfMissingInputs = false;
 
-    auto verifier = libzelcash::ProofVerifier::Strict();
+    auto verifier = libflux::ProofVerifier::Strict();
     if (!CheckTransaction(tx, state, verifier))
         return error("AcceptableInputs: : CheckTransaction failed");
 
@@ -2996,6 +3059,7 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
     p_fluxnodeCache->CheckForUndoExpiredStartTx(pindex->nHeight);
 
     // undo transactions in reverse order
+    LogPrintf("%s: Undoing transactions for block: %d\n", __func__, pindex->nHeight);
     for (int i = block.vtx.size() - 1; i >= 0; i--) {
         const CTransaction &tx = block.vtx[i];
         uint256 const hash = tx.GetHash();
@@ -3257,8 +3321,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     }
 
 
-    auto verifier = libzelcash::ProofVerifier::Strict();
-    auto disabledVerifier = libzelcash::ProofVerifier::Disabled();
+    auto verifier = libflux::ProofVerifier::Strict();
+    auto disabledVerifier = libflux::ProofVerifier::Disabled();
 
     // Check it again to verify JoinSplit proofs, and in case a previous version let a bad block in
     if (!CheckBlock(block, state, chainparams, fExpensiveChecks ? verifier : disabledVerifier, !fJustCheck, !fJustCheck))
@@ -3403,14 +3467,15 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             if (tx.IsFluxnodeTx()) {
                 int nTier = 0;
                 CAmount nCollateralAmount;
-                if (!view.CheckFluxnodeTxInput(tx, pindex->nHeight, nTier, nCollateralAmount))
-                    return state.DoS(100, error("ConnectBlock(): fluxnode tx inputs missing/spent"),
-                                     REJECT_INVALID, "bad-txns-fluxnode-tx-inputs-missingorspent", false, tx);
+                std::string errorMessage;
+                if (!view.CheckFluxnodeTxInput(tx, pindex->nHeight, nTier, nCollateralAmount, errorMessage))
+                    return state.DoSTx(100, error("ConnectBlock(): fluxnode tx inputs missing/spent"),
+                                     REJECT_INVALID, strprintf("bad-txns-fluxnode-tx-inputs-missingorspent-%s", errorMessage), false, tx);
 
                 if (tx.nType == FLUXNODE_START_TX_TYPE) {
                     if (p_fluxnodeCache) {
-                        if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralOut)) {
-                            return state.DoS(100, error("ConnectBlock(): fluxnode tx, failed CheckNewStartTx call"),
+                        if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralIn)) {
+                            return state.DoSTx(100, error("ConnectBlock(): fluxnode tx, failed CheckNewStartTx call"),
                                              REJECT_INVALID, "bad-txns-fluxnode-tx-check-new-start", false, tx);
                         }
 
@@ -3425,16 +3490,16 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                     } else if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
                         if (p_fluxnodeCache) {
                             p_fluxnodeCache->AddUpdateConfirm(tx, pindex->nHeight);
-                            FluxnodeCacheData global_data = g_fluxnodeCache.GetFluxnodeData(tx.collateralOut);
+                            FluxnodeCacheData global_data = g_fluxnodeCache.GetFluxnodeData(tx.collateralIn);
                             if (global_data.IsNull()) {
-                                return state.DoS(100,
+                                return state.DoSTx(100,
                                                  error("ConnectBlock(): fluxnode tx, failed finding data to creating undo data"),
                                                  REJECT_INVALID, "bad-txns-fluxnode-global-data-not-found", false, tx);
                             }
 
                             // Add the lastConfirmed and lastIpAddress into the undoblock data
-                            fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight[tx.collateralOut] =  global_data.nLastConfirmedBlockHeight;
-                            fluxnodeTxBlockUndo.mapLastIpAddress[tx.collateralOut] = global_data.ip;
+                            fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight[tx.collateralIn] =  global_data.nLastConfirmedBlockHeight;
+                            fluxnodeTxBlockUndo.mapLastIpAddress[tx.collateralIn] = global_data.ip;
                         }
                     }
                 }
@@ -3844,6 +3909,7 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
 {
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
+
     // Read block from disk.
     CBlock block;
     if (!ReadBlockFromDisk(block, pindexDelete, chainparams.GetConsensus()))
@@ -3851,6 +3917,9 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
     // Apply the block atomically to the chain state.
     uint256 sproutAnchorBeforeDisconnect = pcoinsTip->GetBestAnchor(SPROUT);
     uint256 saplingAnchorBeforeDisconnect = pcoinsTip->GetBestAnchor(SAPLING);
+
+    LogPrintf("%s: disconnecting=%s height=%d\n", __func__, block.GetHash().GetHex(), pindexDelete->nHeight);
+
     int64_t nStart = GetTimeMicros();
     {
         CCoinsViewCache view(pcoinsTip);
@@ -4621,7 +4690,7 @@ bool CheckBlockHeader(
 
 bool CheckBlock(const CBlock& block, CValidationState& state,
                 const CChainParams& chainparams,
-                libzelcash::ProofVerifier& verifier,
+                libflux::ProofVerifier& verifier,
                 bool fCheckPOW, bool fCheckMerkleRoot)
 {
     // These are checks that are independent of context.
@@ -4668,10 +4737,10 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
                              REJECT_INVALID, "bad-cb-multiple");
 
         if (block.vtx[i].IsFluxnodeTx()) {
-            if (setFluxnodeTxOuts.count(block.vtx[i].collateralOut))
-                return state.DoS(100, error("CheckBlock(): more than one fluxnodetx with same outpoint"),
+            if (setFluxnodeTxOuts.count(block.vtx[i].collateralIn))
+                return state.DoSTx(100, error("CheckBlock(): more than one fluxnodetx with same outpoint"),
                                  REJECT_INVALID, "bad-fluxnode-tx-multiple", false, block.vtx[i]);
-            setFluxnodeTxOuts.insert(block.vtx[i].collateralOut);
+            setFluxnodeTxOuts.insert(block.vtx[i].collateralIn);
         }
     }
 
@@ -4902,7 +4971,7 @@ static bool AcceptBlock(const CBlock& block, CValidationState& state, const CCha
     }
 
     // See method docstring for why this is always disabled
-    auto verifier = libzelcash::ProofVerifier::Disabled();
+    auto verifier = libflux::ProofVerifier::Disabled();
     if ((!CheckBlock(block, state, chainparams, verifier)) || !ContextualCheckBlock(block, state, chainparams, pindex->pprev, true)) {
         if (state.IsInvalid() && !state.CorruptionPossible()) {
             pindex->nStatus |= BLOCK_FAILED_VALID;
@@ -4952,7 +5021,7 @@ static bool IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned 
 bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, const CNode* pfrom, const CBlock* pblock, bool fForceProcessing, CDiskBlockPos* dbp)
 {
     // Preliminary checks
-    auto verifier = libzelcash::ProofVerifier::Disabled();
+    auto verifier = libflux::ProofVerifier::Disabled();
     bool checked = CheckBlock(*pblock, state, chainparams, verifier);
 
     {
@@ -4995,7 +5064,7 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev->nHeight + 1;
     // JoinSplit proofs are verified in ConnectBlock
-    auto verifier = libzelcash::ProofVerifier::Disabled();
+    auto verifier = libflux::ProofVerifier::Disabled();
 
     // NOTE: CheckBlockHeader is called by CheckBlock
     if (!ContextualCheckBlockHeader(block, state, chainparams, pindexPrev))
@@ -5387,7 +5456,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
     int nGoodTransactions = 0;
     CValidationState state;
     // No need to verify JoinSplits twice
-    auto verifier = libzelcash::ProofVerifier::Disabled();
+    auto verifier = libflux::ProofVerifier::Disabled();
     for (CBlockIndex* pindex = chainActive.Tip(); pindex && pindex->pprev; pindex = pindex->pprev)
     {
         boost::this_thread::interruption_point();

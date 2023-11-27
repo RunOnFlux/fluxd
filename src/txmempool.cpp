@@ -4,7 +4,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
-#include <zelnode/zelnode.h>
+#include <fluxnode/fluxnode.h>
 #include "txmempool.h"
 
 #include "clientversion.h"
@@ -301,7 +301,7 @@ void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction>& rem
 
         if (origTx.IsFluxnodeTx()) {
             LogPrint("fluxnode", "%s: Remove fluxnode tx from mempool %s\n", __func__, origTx.GetHash().GetHex());
-            mapFluxnodeTxMempool.erase(origTx.collateralOut);
+            mapFluxnodeTxMempool.erase(origTx.collateralIn);
         }
     }
 }
@@ -449,8 +449,8 @@ void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx, unsigned i
         indexed_transaction_set::iterator i = mapTx.find(hash);
 
         if (tx.IsFluxnodeTx()) {
-            if (mapFluxnodeTxMempool.count(tx.collateralOut)) {
-                i = mapTx.find(mapFluxnodeTxMempool.at(tx.collateralOut));
+            if (mapFluxnodeTxMempool.count(tx.collateralIn)) {
+                i = mapTx.find(mapFluxnodeTxMempool.at(tx.collateralIn));
 
                 if (i != mapTx.end()) {
                     entries.push_back(*i);

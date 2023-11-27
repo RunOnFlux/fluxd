@@ -139,6 +139,11 @@ public:
     std::string ip;
     int8_t nTier;
 
+    // New Version Tracking (adding in P2SH node upgrade)
+    int32_t nFluxTxVersion;
+    CScript P2SHRedeemScript;
+    int8_t nTransactionType;
+
     int8_t nStatus;
 
     CAmount nCollateral;
@@ -153,6 +158,9 @@ public:
         nTier = 0;
         nStatus =  FLUXNODE_TX_ERROR;
         nCollateral = 0;
+        nFluxTxVersion = 0;
+        P2SHRedeemScript.clear();
+        nTransactionType = FLUXNODE_NO_TYPE;
     }
 
     FluxnodeCacheData() {
@@ -160,6 +168,9 @@ public:
     }
 
     bool IsNull() const{
+        if ((nType&FLUXNODE_TX_TYPE_UPGRADED) == FLUXNODE_TX_TYPE_UPGRADED) {
+            return nTransactionType == FLUXNODE_NO_TYPE;
+        }
         return nType == FLUXNODE_NO_TYPE;
     }
 
@@ -196,7 +207,7 @@ public:
 
     std::string ToFullString() const
     {
-        return strprintf("FluxnodeCacheData Type(%d), %s, nAddedBlockHeight(%d), nConfirmedBlockHeight(%d), nLastConfirmedBlockHeight(%d), nLastPaidHeight(%d), %s", nType,  collateralIn.ToFullString(), nAddedBlockHeight, nConfirmedBlockHeight, nLastConfirmedBlockHeight, nLastPaidHeight, this->TierToString());
+        return strprintf("FluxnodeCacheData Type(%d), FluxnodeCacheData nTransactionType (%d), %s, nAddedBlockHeight(%d), nConfirmedBlockHeight(%d), nLastConfirmedBlockHeight(%d), nLastPaidHeight(%d), %s, RedeemScript(%s)", nType, nTransactionType,  collateralIn.ToFullString(), nAddedBlockHeight, nConfirmedBlockHeight, nLastConfirmedBlockHeight, nLastPaidHeight, this->TierToString(), P2SHRedeemScript.ToString());
     }
 
     friend bool operator<(const FluxnodeCacheData& a, const FluxnodeCacheData& b)
@@ -213,18 +224,42 @@ public:
     inline void SerializationOp(Stream& s, Operation ser_action)
     {
         READWRITE(nType);
-        READWRITE(collateralIn);
-        READWRITE(collateralPubkey);
-        READWRITE(pubKey);
-        READWRITE(nAddedBlockHeight);
-        READWRITE(nConfirmedBlockHeight);
-        READWRITE(nLastConfirmedBlockHeight);
-        READWRITE(nLastPaidHeight);
-        READWRITE(ip);
-        READWRITE(nTier);
-        READWRITE(nStatus);
-        if (nType & FLUXNODE_HAS_COLLATERAL) {
+
+        // New nType Version Checker
+        if ((nType&FLUXNODE_TX_TYPE_UPGRADED) == FLUXNODE_TX_TYPE_UPGRADED) {
+            LogPrintf("FLUXNODE_TX_TYPE_UPGRADED Found %d - %s    - nType = %d - TX-Type (%d), result = %d\n", __LINE__, __func__, nType, FLUXNODE_TX_TYPE_UPGRADED, nType ^ FLUXNODE_TX_TYPE_UPGRADED);
+            READWRITE(nFluxTxVersion);
+            READWRITE(nTransactionType);
+            // Normal and P2SH data share most fields so for now we can just check at the end for P2SH
+            READWRITE(collateralIn);
+            READWRITE(collateralPubkey);
+            READWRITE(pubKey);
+            READWRITE(nAddedBlockHeight);
+            READWRITE(nConfirmedBlockHeight);
+            READWRITE(nLastConfirmedBlockHeight);
+            READWRITE(nLastPaidHeight);
+            READWRITE(ip);
+            READWRITE(nTier);
+            READWRITE(nStatus);
             READWRITE(nCollateral);
+            if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+                READWRITE(*(CScriptBase*)(&P2SHRedeemScript));
+            }
+        } else {
+            // We must retain backwards compatibility with older transactions
+            READWRITE(collateralIn);
+            READWRITE(collateralPubkey);
+            READWRITE(pubKey);
+            READWRITE(nAddedBlockHeight);
+            READWRITE(nConfirmedBlockHeight);
+            READWRITE(nLastConfirmedBlockHeight);
+            READWRITE(nLastPaidHeight);
+            READWRITE(ip);
+            READWRITE(nTier);
+            READWRITE(nStatus);
+            if ((nType ^ FLUXNODE_HAS_COLLATERAL) == 0) {
+                READWRITE(nCollateral);
+            }
         }
     }
 };
@@ -305,9 +340,6 @@ public:
     // Set only used by local cache to inform the global cache when Flushing to remove Started Fluxnode from being tracked
     std::set<COutPoint> setUndoStartTx;
 
-    // Int only used by local cache to inform the global cache when Flushing to remove all Started Outpoint at this height from being tracked
-    int setUndoStartTxHeight;
-
     // Map only used by local cache to inform the global cache when Flushing to expire DoS Fluxnode from being tracked
     std::map<int, std::set<COutPoint>> mapDosExpiredToRemove;
 
@@ -339,13 +371,11 @@ public:
     std::map<COutPoint, int> mapUndoPaidNodes;
 
     //! GLOBAL CACHE ITEMS ONLY
-    // Global tracking of Started Fluxnode
+    // Global tracking of Started Fluxnodes
     std::map<COutPoint, FluxnodeCacheData> mapStartTxTracker;
-    std::map<int, std::set<COutPoint> > mapStartTxHeights;
 
-    // Global tracking of DoS Prevention Fluxnode
+    // Global tracking of DoS Prevention Fluxnodes
     std::map<COutPoint, FluxnodeCacheData> mapStartTxDOSTracker;
-    std::map<int, std::set<COutPoint> > mapStartTxDOSHeights;
 
     // Global tracking of Confirmed Fluxnodes
     std::map<COutPoint, FluxnodeCacheData> mapConfirmedFluxnodeData;
@@ -366,13 +396,10 @@ public:
     void SetNull() {
         setDirtyOutPoint.clear();
         mapStartTxTracker.clear();
-        mapStartTxHeights.clear();
         mapStartTxDOSTracker.clear();
-        mapStartTxDOSHeights.clear();
         mapDosExpiredToRemove.clear();
         mapDOSToUndo.clear();
         setUndoStartTx.clear();
-        setUndoStartTxHeight = 0;
         mapAddToConfirm.clear();
         setAddToConfirmHeight = 0;
         mapConfirmedFluxnodeData.clear();
@@ -406,7 +433,7 @@ public:
     bool InConfirmTracker(const COutPoint& out);
     bool CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_nHeight);
 
-    bool GetNextPayment(CTxDestination& dest, int nTier, COutPoint& p_fluxnodeOut);
+    bool GetNextPayment(CTxDestination& dest, int nTier, COutPoint& p_fluxnodeOut, bool fFluxnodeDBRebuild = false);
 
     //! Confirmation Tx Methods
     bool CheckNewStartTx(const COutPoint& out);
@@ -449,10 +476,5 @@ std::string GetP2SHFluxNodePublicKey(const CTransaction& tx);
 bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet);
 
 bool IsFluxnodeTransactionsActive();
-
-
-
-
-
 
 #endif //ZELCASHNODES_FLUXNODE_H

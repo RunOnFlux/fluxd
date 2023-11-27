@@ -117,7 +117,7 @@ TEST(MempoolLimitTests, WeightedTxInfoFromTx)
     // test_transaction_builder.cpp/TEST(TransactionBuilder, SetFee)
     auto consensusParams = RegtestActivateAcadia();
 
-    auto sk = libzelcash::SaplingSpendingKey::random();
+    auto sk = libflux::SaplingSpendingKey::random();
     auto testNote = GetTestSaplingNote(sk.default_address(), 50000);
 
     // Default fee

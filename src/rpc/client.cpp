@@ -146,7 +146,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "z_getpaymentdisclosure", 2},
     { "z_setmigration", 0},
     { "spork", 1},
-    { "printsnapshot", 0}
+    { "printsnapshot", 0},
+    { "createp2shstarttx", 3}
 };
 
 class CRPCConvertTable

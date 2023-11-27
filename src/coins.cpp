@@ -11,7 +11,7 @@
 #include "policy/fees.h"
 
 #include <assert.h>
-#include <zelnode/zelnode.h>
+#include <fluxnode/fluxnode.h>
 
 /**
  * calculate number of bytes for the bitmask, and its number of non-zero bytes
@@ -627,39 +627,62 @@ bool CCoinsViewCache::HaveInputs(const CTransaction& tx) const
     return true;
 }
 
-bool CCoinsViewCache::CheckFluxnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier, CAmount& nCollateralAmount) const
+bool CCoinsViewCache::CheckFluxnodeTxInput(const CTransaction& tx, const int& p_Height, int& nTier, CAmount& nCollateralAmount, std::string& errorMessage) const
 {
     if (!tx.IsFluxnodeTx()) {
-        return false;
+        errorMessage = "Not a Fluxnode Tx";
+        return error("%s", errorMessage);
     }
 
-    const COutPoint &prevout = tx.collateralOut;
+    const COutPoint &prevout = tx.collateralIn;
     const CCoins* coins = AccessCoins(prevout.hash);
     if (!coins || !coins->IsAvailable(prevout.n)) {
-        return false;
+        errorMessage = "Coins not available";
+        return error("%s", errorMessage);
     }
 
     // Check for minimum height requirement
     if (p_Height - coins->nHeight < FLUXNODE_MIN_CONFIRMATION_DETERMINISTIC) {
-        return false;
+        errorMessage = "Minimum height requirement not met";
+        return error("%s", errorMessage);
     }
 
     // Get the tier from the amount if possible
     if (!GetCoinTierFromAmount(p_Height, coins->vout[prevout.n].nValue, nTier)) {
-        return false;
+        errorMessage = "Couldn't get coin tier from amount";
+        return error("%s", errorMessage);
     }
 
     if (IsAP2SHFluxNodePublicKey(tx.collateralPubkey)) {
         bool fHalvingActive = NetworkUpgradeActive(p_Height, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
         if (!fHalvingActive) {
-            error("Using P2SH collateral key before it is actives");
-            return false;
+            errorMessage = "Using P2SH collateral key before it is active";
+            return error("%s", errorMessage);
         }
+    }
+
+    bool fP2SHNodesActive = NetworkUpgradeActive(p_Height, Params().GetConsensus(), Consensus::UPGRADE_P2SHNODES);
+    if (tx.IsFluxnodeUpgradeTx()) {
+        if (!fP2SHNodesActive) {
+            errorMessage = "Using P2SH nodes before it is active";
+            return error("%s", errorMessage);
+        }
+    }
+
+    if (fP2SHNodesActive && IsAP2SHFluxNodePublicKey(tx.collateralPubkey)) {
+        errorMessage = "Old Style P2SH Nodes is no longer available. Please use new transaction version 6 style.";
+        return error("%s", errorMessage);
     }
 
     nCollateralAmount = coins->vout[prevout.n].nValue;
 
-    return IsCoinTierValid(nTier);
+    bool ret = IsCoinTierValid(nTier);
+
+    if (!ret) {
+        errorMessage = "Coin Tier Not Valid";
+        error("%s", errorMessage);
+    }
+    return ret;
 }
 
 double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight) const
@@ -711,7 +734,7 @@ CCoinsModifier::~CCoinsModifier()
 }
 
 /** Coins Tier code
- * Any changes to this code needs to be also made to the code in zelnode.h and zelnode.cpp
+ * Any changes to this code needs to be also made to the code in fluxnode.h and zelnode.cpp
  * We are unable to use the same code because of build/linking restrictions
  */
 std::map<int, double> mapCoinTierPercentages;
@@ -801,7 +824,7 @@ bool IsCoinTierValid(const int& nTier)
 }
 
 bool IsAP2SHFluxNodePublicKey(const CPubKey& pubkey) {
-    // Get the public keys and timestamps from the chainparams
+        // Get the public keys and timestamps from the chainparams
     std::vector<std::pair<std::string, uint32_t> > vectorPublicKeys = Params().GetP2SHFluxnodePublicKeys();
 
     for (int i = 0; i < vectorPublicKeys.size(); i++) {

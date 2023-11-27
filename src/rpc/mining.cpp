@@ -23,7 +23,7 @@
 #include "txmempool.h"
 #include "util.h"
 #include "validationinterface.h"
-#include "zelnode/zelnode.h"
+#include "fluxnode/fluxnode.h"
 
 #include <stdint.h>
 
@@ -542,8 +542,8 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     if (vNodes.empty())
         throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Flux is not connected!");
 
-    if (IsInitialBlockDownload(Params()))
-        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Flux is downloading blocks...");
+//    if (IsInitialBlockDownload(Params()))
+//        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Flux is downloading blocks...");
 
     static unsigned int nTransactionsUpdatedLast;
 
@@ -750,7 +750,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         result.pushKV(std::string(start_rename + "_fluxnode_address"), EncodeDestination(dest));
         result.pushKV(std::string(start_rename + "_fluxnode_payout"), payout.second.second);
 
-        /** We must keep zelnode here for backwards capabilities so pools don't break when they upgrade to latest releases */
+        /** We must keep fluxnode here for backwards capabilities so pools don't break when they upgrade to latest releases */
         result.pushKV(std::string(start + "_zelnode_address"), EncodeDestination(dest));
         result.pushKV(std::string(start + "_zelnode_payout"), payout.second.second);
         result.pushKV(std::string(start_rename + "_zelnode_address"), EncodeDestination(dest));

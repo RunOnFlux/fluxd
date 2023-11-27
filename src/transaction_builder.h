@@ -13,36 +13,36 @@
 #include "script/script.h"
 #include "script/standard.h"
 #include "uint256.h"
-#include "zelcash/Address.hpp"
-#include "zelcash/IncrementalMerkleTree.hpp"
-#include "zelcash/JoinSplit.hpp"
-#include "zelcash/Note.hpp"
-#include "zelcash/NoteEncryption.hpp"
+#include "flux/Address.hpp"
+#include "flux/IncrementalMerkleTree.hpp"
+#include "flux/JoinSplit.hpp"
+#include "flux/Note.hpp"
+#include "flux/NoteEncryption.hpp"
 
 #include <boost/optional.hpp>
 
 struct SpendDescriptionInfo {
-    libzelcash::SaplingExpandedSpendingKey expsk;
-    libzelcash::SaplingNote note;
+    libflux::SaplingExpandedSpendingKey expsk;
+    libflux::SaplingNote note;
     uint256 alpha;
     uint256 anchor;
     SaplingWitness witness;
 
     SpendDescriptionInfo(
-        libzelcash::SaplingExpandedSpendingKey expsk,
-        libzelcash::SaplingNote note,
+        libflux::SaplingExpandedSpendingKey expsk,
+        libflux::SaplingNote note,
         uint256 anchor,
         SaplingWitness witness);
 };
 
 struct OutputDescriptionInfo {
     uint256 ovk;
-    libzelcash::SaplingNote note;
+    libflux::SaplingNote note;
     std::array<unsigned char, ZC_MEMO_SIZE> memo;
 
     OutputDescriptionInfo(
         uint256 ovk,
-        libzelcash::SaplingNote note,
+        libflux::SaplingNote note,
         std::array<unsigned char, ZC_MEMO_SIZE> memo) : ovk(ovk), note(note), memo(memo) {}
 };
 
@@ -83,12 +83,12 @@ private:
 
     std::vector<SpendDescriptionInfo> spends;
     std::vector<OutputDescriptionInfo> outputs;
-    std::vector<libzelcash::JSInput> jsInputs;
-    std::vector<libzelcash::JSOutput> jsOutputs;
+    std::vector<libflux::JSInput> jsInputs;
+    std::vector<libflux::JSOutput> jsOutputs;
     std::vector<TransparentInputInfo> tIns;
 
-    boost::optional<std::pair<uint256, libzelcash::SaplingPaymentAddress>> saplingChangeAddr;
-    boost::optional<libzelcash::SproutPaymentAddress> sproutChangeAddr;
+    boost::optional<std::pair<uint256, libflux::SaplingPaymentAddress>> saplingChangeAddr;
+    boost::optional<libflux::SproutPaymentAddress> sproutChangeAddr;
     boost::optional<CTxDestination> tChangeAddr;
 
 public:
@@ -107,26 +107,26 @@ public:
     // Throws if the anchor does not match the anchor used by
     // previously-added Sapling spends.
     void AddSaplingSpend(
-        libzelcash::SaplingExpandedSpendingKey expsk,
-        libzelcash::SaplingNote note,
+        libflux::SaplingExpandedSpendingKey expsk,
+        libflux::SaplingNote note,
         uint256 anchor,
         SaplingWitness witness);
 
     void AddSaplingOutput(
         uint256 ovk,
-        libzelcash::SaplingPaymentAddress to,
+        libflux::SaplingPaymentAddress to,
         CAmount value,
         std::array<unsigned char, ZC_MEMO_SIZE> memo = {{0xF6}});
 
     // Throws if the anchor does not match the anchor used by
     // previously-added Sprout inputs.
     void AddSproutInput(
-        libzelcash::SproutSpendingKey sk,
-        libzelcash::SproutNote note,
+        libflux::SproutSpendingKey sk,
+        libflux::SproutNote note,
         SproutWitness witness);
 
     void AddSproutOutput(
-        libzelcash::SproutPaymentAddress to,
+        libflux::SproutPaymentAddress to,
         CAmount value,
         std::array<unsigned char, ZC_MEMO_SIZE> memo = {{0xF6}});
 
@@ -135,9 +135,9 @@ public:
 
     void AddTransparentOutput(CTxDestination& to, CAmount value);
 
-    void SendChangeTo(libzelcash::SaplingPaymentAddress changeAddr, uint256 ovk);
+    void SendChangeTo(libflux::SaplingPaymentAddress changeAddr, uint256 ovk);
 
-    void SendChangeTo(libzelcash::SproutPaymentAddress);
+    void SendChangeTo(libflux::SproutPaymentAddress);
 
     void SendChangeTo(CTxDestination& changeAddr);
 
@@ -149,8 +149,8 @@ private:
     void CreateJSDescription(
         uint64_t vpub_old,
         uint64_t vpub_new,
-        std::array<libzelcash::JSInput, ZC_NUM_JS_INPUTS> vjsin,
-        std::array<libzelcash::JSOutput, ZC_NUM_JS_OUTPUTS> vjsout,
+        std::array<libflux::JSInput, ZC_NUM_JS_INPUTS> vjsin,
+        std::array<libflux::JSOutput, ZC_NUM_JS_OUTPUTS> vjsout,
         std::array<size_t, ZC_NUM_JS_INPUTS>& inputMap,
         std::array<size_t, ZC_NUM_JS_OUTPUTS>& outputMap);
 };

@@ -77,7 +77,7 @@ private:
 public:
     PaymentAddressEncoder(const CChainParams& params) : m_params(params) {}
 
-    std::string operator()(const libzelcash::SproutPaymentAddress& zaddr) const
+    std::string operator()(const libflux::SproutPaymentAddress& zaddr) const
     {
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         ss << zaddr;
@@ -86,7 +86,7 @@ public:
         return EncodeBase58Check(data);
     }
 
-    std::string operator()(const libzelcash::SaplingPaymentAddress& zaddr) const
+    std::string operator()(const libflux::SaplingPaymentAddress& zaddr) const
     {
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         ss << zaddr;
@@ -99,7 +99,7 @@ public:
         return bech32::Encode(m_params.Bech32HRP(CChainParams::SAPLING_PAYMENT_ADDRESS), data);
     }
 
-    std::string operator()(const libzelcash::InvalidEncoding& no) const { return {}; }
+    std::string operator()(const libflux::InvalidEncoding& no) const { return {}; }
 };
 
 class ViewingKeyEncoder : public boost::static_visitor<std::string>
@@ -110,7 +110,7 @@ private:
 public:
     ViewingKeyEncoder(const CChainParams& params) : m_params(params) {}
 
-    std::string operator()(const libzelcash::SproutViewingKey& vk) const
+    std::string operator()(const libflux::SproutViewingKey& vk) const
     {
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         ss << vk;
@@ -121,7 +121,7 @@ public:
         return ret;
     }
 
-    std::string operator()(const libzelcash::InvalidEncoding& no) const { return {}; }
+    std::string operator()(const libflux::InvalidEncoding& no) const { return {}; }
 };
 
 class SpendingKeyEncoder : public boost::static_visitor<std::string>
@@ -132,7 +132,7 @@ private:
 public:
     SpendingKeyEncoder(const CChainParams& params) : m_params(params) {}
 
-    std::string operator()(const libzelcash::SproutSpendingKey& zkey) const
+    std::string operator()(const libflux::SproutSpendingKey& zkey) const
     {
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         ss << zkey;
@@ -143,7 +143,7 @@ public:
         return ret;
     }
 
-    std::string operator()(const libzelcash::SaplingExtendedSpendingKey& zkey) const
+    std::string operator()(const libflux::SaplingExtendedSpendingKey& zkey) const
     {
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         ss << zkey;
@@ -159,7 +159,7 @@ public:
         return ret;
     }
 
-    std::string operator()(const libzelcash::InvalidEncoding& no) const { return {}; }
+    std::string operator()(const libflux::InvalidEncoding& no) const { return {}; }
 };
 
 // Sizes of SaplingPaymentAddress and SaplingSpendingKey after
@@ -266,21 +266,21 @@ bool IsValidDestinationString(const std::string& str)
     return IsValidDestinationString(str, Params());
 }
 
-std::string EncodePaymentAddress(const libzelcash::PaymentAddress& zaddr)
+std::string EncodePaymentAddress(const libflux::PaymentAddress& zaddr)
 {
     return boost::apply_visitor(PaymentAddressEncoder(Params()), zaddr);
 }
 
-libzelcash::PaymentAddress DecodePaymentAddress(const std::string& str)
+libflux::PaymentAddress DecodePaymentAddress(const std::string& str)
 {
     std::vector<unsigned char> data;
     if (DecodeBase58Check(str, data)) {
         const std::vector<unsigned char>& zaddr_prefix = Params().Base58Prefix(CChainParams::ZCPAYMENT_ADDRRESS);
-        if ((data.size() == libzelcash::SerializedSproutPaymentAddressSize + zaddr_prefix.size()) &&
+        if ((data.size() == libflux::SerializedSproutPaymentAddressSize + zaddr_prefix.size()) &&
             std::equal(zaddr_prefix.begin(), zaddr_prefix.end(), data.begin())) {
             CSerializeData serialized(data.begin() + zaddr_prefix.size(), data.end());
             CDataStream ss(serialized, SER_NETWORK, PROTOCOL_VERSION);
-            libzelcash::SproutPaymentAddress ret;
+            libflux::SproutPaymentAddress ret;
             ss >> ret;
             return ret;
         }
@@ -293,33 +293,33 @@ libzelcash::PaymentAddress DecodePaymentAddress(const std::string& str)
         data.reserve((bech.second.size() * 5) / 8);
         if (ConvertBits<5, 8, false>([&](unsigned char c) { data.push_back(c); }, bech.second.begin(), bech.second.end())) {
             CDataStream ss(data, SER_NETWORK, PROTOCOL_VERSION);
-            libzelcash::SaplingPaymentAddress ret;
+            libflux::SaplingPaymentAddress ret;
             ss >> ret;
             return ret;
         }
     }
-    return libzelcash::InvalidEncoding();
+    return libflux::InvalidEncoding();
 }
 
 bool IsValidPaymentAddressString(const std::string& str) {
     return IsValidPaymentAddress(DecodePaymentAddress(str));
 }
 
-std::string EncodeViewingKey(const libzelcash::ViewingKey& vk)
+std::string EncodeViewingKey(const libflux::ViewingKey& vk)
 {
     return boost::apply_visitor(ViewingKeyEncoder(Params()), vk);
 }
 
-libzelcash::ViewingKey DecodeViewingKey(const std::string& str)
+libflux::ViewingKey DecodeViewingKey(const std::string& str)
 {
     std::vector<unsigned char> data;
     if (DecodeBase58Check(str, data)) {
         const std::vector<unsigned char>& vk_prefix = Params().Base58Prefix(CChainParams::ZCVIEWING_KEY);
-        if ((data.size() == libzelcash::SerializedSproutViewingKeySize + vk_prefix.size()) &&
+        if ((data.size() == libflux::SerializedSproutViewingKeySize + vk_prefix.size()) &&
             std::equal(vk_prefix.begin(), vk_prefix.end(), data.begin())) {
             CSerializeData serialized(data.begin() + vk_prefix.size(), data.end());
             CDataStream ss(serialized, SER_NETWORK, PROTOCOL_VERSION);
-            libzelcash::SproutViewingKey ret;
+            libflux::SproutViewingKey ret;
             ss >> ret;
             memory_cleanse(serialized.data(), serialized.size());
             memory_cleanse(data.data(), data.size());
@@ -327,24 +327,24 @@ libzelcash::ViewingKey DecodeViewingKey(const std::string& str)
         }
     }
     memory_cleanse(data.data(), data.size());
-    return libzelcash::InvalidEncoding();
+    return libflux::InvalidEncoding();
 }
 
-std::string EncodeSpendingKey(const libzelcash::SpendingKey& zkey)
+std::string EncodeSpendingKey(const libflux::SpendingKey& zkey)
 {
     return boost::apply_visitor(SpendingKeyEncoder(Params()), zkey);
 }
 
-libzelcash::SpendingKey DecodeSpendingKey(const std::string& str)
+libflux::SpendingKey DecodeSpendingKey(const std::string& str)
 {
     std::vector<unsigned char> data;
     if (DecodeBase58Check(str, data)) {
         const std::vector<unsigned char>& zkey_prefix = Params().Base58Prefix(CChainParams::ZCSPENDING_KEY);
-        if ((data.size() == libzelcash::SerializedSproutSpendingKeySize + zkey_prefix.size()) &&
+        if ((data.size() == libflux::SerializedSproutSpendingKeySize + zkey_prefix.size()) &&
             std::equal(zkey_prefix.begin(), zkey_prefix.end(), data.begin())) {
             CSerializeData serialized(data.begin() + zkey_prefix.size(), data.end());
             CDataStream ss(serialized, SER_NETWORK, PROTOCOL_VERSION);
-            libzelcash::SproutSpendingKey ret;
+            libflux::SproutSpendingKey ret;
             ss >> ret;
             memory_cleanse(serialized.data(), serialized.size());
             memory_cleanse(data.data(), data.size());
@@ -359,12 +359,12 @@ libzelcash::SpendingKey DecodeSpendingKey(const std::string& str)
         data.reserve((bech.second.size() * 5) / 8);
         if (ConvertBits<5, 8, false>([&](unsigned char c) { data.push_back(c); }, bech.second.begin(), bech.second.end())) {
             CDataStream ss(data, SER_NETWORK, PROTOCOL_VERSION);
-            libzelcash::SaplingExtendedSpendingKey ret;
+            libflux::SaplingExtendedSpendingKey ret;
             ss >> ret;
             memory_cleanse(data.data(), data.size());
             return ret;
         }
     }
     memory_cleanse(data.data(), data.size());
-    return libzelcash::InvalidEncoding();
+    return libflux::InvalidEncoding();
 }

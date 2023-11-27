@@ -21,10 +21,10 @@
 #include <netbase.h>
 #include <pubkey.h>
 
-#include "zelcash/NoteEncryption.hpp"
-#include "zelcash/Zelcash.h"
-#include "zelcash/JoinSplit.hpp"
-#include "zelcash/Proof.hpp"
+#include "flux/NoteEncryption.hpp"
+#include "flux/Zelcash.h"
+#include "flux/JoinSplit.hpp"
+#include "flux/Proof.hpp"
 
 #define JOINSPLIT_SIZE GetSerializeSize(JSDescription(), SER_NETWORK, PROTOCOL_VERSION)
 #define OUTPUTDESCRIPTION_SIZE GetSerializeSize(OutputDescription(), SER_NETWORK, PROTOCOL_VERSION)
@@ -45,6 +45,10 @@ static_assert(SAPLING_TX_VERSION <= SAPLING_MAX_TX_VERSION,
     "Sapling tx version must not be higher than maximum");
 
 static const int32_t FLUXNODE_TX_VERSION = 5;
+static const int32_t FLUXNODE_TX_UPGRADEABLE_VERSION = 6;
+
+static const int32_t FLUXNODE_INTERNAL_NORMAL_TX_VERSION = 1;
+static const int32_t FLUXNODE_INTERNAL_P2SH_TX_VERSION = 2;
 
 /**
  * A shielded input to a transaction. It contains data that describes a Spend transfer.
@@ -58,7 +62,7 @@ public:
     uint256 anchor;                //!< A Merkle root of the Sapling note commitment tree at some block height in the past.
     uint256 nullifier;             //!< The nullifier of the input note.
     uint256 rk;                    //!< The randomized public key for spendAuthSig.
-    libzelcash::GrothProof zkproof;  //!< A zero-knowledge proof using the spend circuit.
+    libflux::GrothProof zkproof;  //!< A zero-knowledge proof using the spend circuit.
     spend_auth_sig_t spendAuthSig; //!< A signature authorizing this spend.
 
     SpendDescription() { }
@@ -102,9 +106,9 @@ public:
     uint256 cv;                     //!< A value commitment to the value of the output note.
     uint256 cm;                     //!< The note commitment for the output note.
     uint256 ephemeralKey;           //!< A Jubjub public key.
-    libzelcash::SaplingEncCiphertext encCiphertext; //!< A ciphertext component for the encrypted output note.
-    libzelcash::SaplingOutCiphertext outCiphertext; //!< A ciphertext component for the encrypted output note.
-    libzelcash::GrothProof zkproof;   //!< A zero-knowledge proof using the output circuit.
+    libflux::SaplingEncCiphertext encCiphertext; //!< A ciphertext component for the encrypted output note.
+    libflux::SaplingOutCiphertext outCiphertext; //!< A ciphertext component for the encrypted output note.
+    libflux::GrothProof zkproof;   //!< A zero-knowledge proof using the output circuit.
 
     OutputDescription() { }
 
@@ -147,7 +151,7 @@ class SproutProofSerializer : public boost::static_visitor<>
 public:
     SproutProofSerializer(Stream& s, bool useGroth) : s(s), useGroth(useGroth) {}
 
-    void operator()(const libzelcash::PHGRProof& proof) const
+    void operator()(const libflux::PHGRProof& proof) const
     {
         if (useGroth) {
             throw std::ios_base::failure("Invalid Sprout proof for transaction format (expected GrothProof, found PHGRProof)");
@@ -155,7 +159,7 @@ public:
         ::Serialize(s, proof);
     }
 
-    void operator()(const libzelcash::GrothProof& proof) const
+    void operator()(const libflux::GrothProof& proof) const
     {
         if (!useGroth) {
             throw std::ios_base::failure("Invalid Sprout proof for transaction format (expected PHGRProof, found GrothProof)");
@@ -175,11 +179,11 @@ template<typename Stream, typename T>
 inline void SerReadWriteSproutProof(Stream& s, T& proof, bool useGroth, CSerActionUnserialize ser_action)
 {
     if (useGroth) {
-        libzelcash::GrothProof grothProof;
+        libflux::GrothProof grothProof;
         ::Unserialize(s, grothProof);
         proof = grothProof;
     } else {
-        libzelcash::PHGRProof pghrProof;
+        libflux::PHGRProof pghrProof;
         ::Unserialize(s, pghrProof);
         proof = pghrProof;
     }
@@ -231,7 +235,7 @@ public:
 
     // JoinSplit proof
     // This is a zk-SNARK which ensures that this JoinSplit is valid.
-    libzelcash::SproutProof proof;
+    libflux::SproutProof proof;
 
     JSDescription(): vpub_old(0), vpub_new(0) { }
 
@@ -239,8 +243,8 @@ public:
             ZCJoinSplit& params,
             const uint256& joinSplitPubKey,
             const uint256& rt,
-            const std::array<libzelcash::JSInput, ZC_NUM_JS_INPUTS>& inputs,
-            const std::array<libzelcash::JSOutput, ZC_NUM_JS_OUTPUTS>& outputs,
+            const std::array<libflux::JSInput, ZC_NUM_JS_INPUTS>& inputs,
+            const std::array<libflux::JSOutput, ZC_NUM_JS_OUTPUTS>& outputs,
             CAmount vpub_old,
             CAmount vpub_new,
             bool computeProof = true, // Set to false in some tests
@@ -252,8 +256,8 @@ public:
             const uint256& joinSplitPubKey,
             const uint256& rt,
 
-            std::array<libzelcash::JSInput, ZC_NUM_JS_INPUTS>& inputs,
-            std::array<libzelcash::JSOutput, ZC_NUM_JS_OUTPUTS>& outputs,
+            std::array<libflux::JSInput, ZC_NUM_JS_INPUTS>& inputs,
+            std::array<libflux::JSOutput, ZC_NUM_JS_OUTPUTS>& outputs,
             std::array<size_t, ZC_NUM_JS_INPUTS>& inputMap,
             std::array<size_t, ZC_NUM_JS_OUTPUTS>& outputMap,
 
@@ -267,7 +271,7 @@ public:
     // Verifies that the JoinSplit proof is correct.
     bool Verify(
         ZCJoinSplit& params,
-        libzelcash::ProofVerifier& verifier,
+        libflux::ProofVerifier& verifier,
         const uint256& joinSplitPubKey
     ) const;
 
@@ -511,11 +515,11 @@ static constexpr uint32_t SAPLING_VERSION_GROUP_ID = 0x892F2085;
 static_assert(SAPLING_VERSION_GROUP_ID != 0, "version group id must be non-zero as specified in ZIP 202");
 
 enum {
-    FLUXNODE_NO_TYPE = 1 << 0, // 0001
-    FLUXNODE_START_TX_TYPE = 1 << 1, // 0010
-    FLUXNODE_CONFIRM_TX_TYPE = 1 << 2, // 0100
-    FLUXNODE_HAS_COLLATERAL= 1 << 3, // 1000
-
+    FLUXNODE_NO_TYPE = 1 << 0, // 00000001
+    FLUXNODE_START_TX_TYPE = 1 << 1, // 00000010
+    FLUXNODE_CONFIRM_TX_TYPE = 1 << 2, // 00000100
+    FLUXNODE_HAS_COLLATERAL= 1 << 3, // 00001000
+    FLUXNODE_TX_TYPE_UPGRADED = 1 << 7, // 10000000
 };
 
 struct CMutableTransaction;
@@ -585,9 +589,9 @@ public:
     const joinsplit_sig_t joinSplitSig = {{0}};
     const binding_sig_t bindingSig = {{0}};
 
-    // Fluxnode Tx data
+    // Fluxnode Tx version 5 (Normal p2pkh nodes only)
     const int8_t nType;
-    const COutPoint collateralOut; // collateral out
+    const COutPoint collateralIn; // collateral in
     const CPubKey collateralPubkey;
     const CPubKey pubKey; // Pubkey used for VPS signature verification
     const uint32_t sigTime; // Timestamp to be used for hash verification
@@ -597,6 +601,11 @@ public:
     const std::vector<unsigned char> benchmarkSig;
     const uint32_t benchmarkSigTime;
     const int8_t nUpdateType;
+
+    // Fluxnode Tx Version 6 (Includes P2SH nodes ability)
+    const int32_t nFluxTxVersion; // Adding this field for further upgradability to fluxnode txes in the future
+    const CScript P2SHRedeemScript;
+
 
     /** Construct a CTransaction that qualifies as IsNull() */
     CTransaction();
@@ -636,31 +645,67 @@ public:
         if (fOverwintered && !(isOverwinterV3 || isSaplingV4)) {
             throw std::ios_base::failure("Unknown transaction format");
         }
-
         if (nVersion == FLUXNODE_TX_VERSION) {
-            READWRITE(*const_cast<int8_t*>(&nType));
-            if (nType & FLUXNODE_START_TX_TYPE) {
-                READWRITE(*const_cast<COutPoint*>(&collateralOut));
-                READWRITE(*const_cast<CPubKey*>(&collateralPubkey));
-                READWRITE(*const_cast<CPubKey*>(&pubKey));
-                READWRITE(*const_cast<uint32_t*>(&sigTime));
+            READWRITE(*const_cast<int8_t *>(&nType));
+            if (nType == FLUXNODE_START_TX_TYPE) {
+                READWRITE(*const_cast<COutPoint *>(&collateralIn));
+                READWRITE(*const_cast<CPubKey *>(&collateralPubkey));
+                READWRITE(*const_cast<CPubKey *>(&pubKey));
+                READWRITE(*const_cast<uint32_t *>(&sigTime));
                 if (!(s.GetType() & SER_GETHASH))
-                    READWRITE(*const_cast<std::vector<unsigned char>*>(&sig));
+                    READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
 
-            } else if (nType & FLUXNODE_CONFIRM_TX_TYPE) {
-                READWRITE(*const_cast<COutPoint*>(&collateralOut));
-                READWRITE(*const_cast<uint32_t*>(&sigTime));
-                READWRITE(*const_cast<int8_t*>(&benchmarkTier));
-                READWRITE(*const_cast<uint32_t*>(&benchmarkSigTime));
-                READWRITE(*const_cast<int8_t*>(&nUpdateType));
-                READWRITE(*const_cast<std::string*>(&ip));
+            } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
+                READWRITE(*const_cast<COutPoint *>(&collateralIn));
+                READWRITE(*const_cast<uint32_t *>(&sigTime));
+                READWRITE(*const_cast<int8_t *>(&benchmarkTier));
+                READWRITE(*const_cast<uint32_t *>(&benchmarkSigTime));
+                READWRITE(*const_cast<int8_t *>(&nUpdateType));
+                READWRITE(*const_cast<std::string *>(&ip));
                 if (!(s.GetType() & SER_GETHASH)) {
-                    READWRITE(*const_cast<std::vector<unsigned char>*>(&sig));
-                    READWRITE(*const_cast<std::vector<unsigned char>*>(&benchmarkSig));
+                    READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
+                    READWRITE(*const_cast<std::vector<unsigned char> *>(&benchmarkSig));
                 }
             }
             if (ser_action.ForRead())
                 UpdateHash();
+            return;
+        } else if (nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION) { // Support P2SH and Normal Fluxnode Tx
+            LogPrintf("FLUXNODE_TX_UPGRADEABLE_VERSION Found------------------------- %d\n", nVersion);
+            READWRITE(*const_cast<int8_t*>(&nType)); // Start, Confirm
+
+            if (nType == FLUXNODE_START_TX_TYPE) {
+                READWRITE(*const_cast<int32_t *>(&nFluxTxVersion)); // Normal or P2SH
+                if (nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION) {
+                    READWRITE(*const_cast<COutPoint *>(&collateralIn));
+                    READWRITE(*const_cast<CPubKey *>(&collateralPubkey));
+                    READWRITE(*const_cast<CPubKey *>(&pubKey));
+                    READWRITE(*const_cast<uint32_t *>(&sigTime));
+                    if (!(s.GetType() & SER_GETHASH))
+                        READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
+                } else if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+                    READWRITE(*const_cast<COutPoint *>(&collateralIn));
+                    READWRITE(*const_cast<CPubKey *>(&pubKey));
+                    READWRITE(*const_cast<CScriptBase *>((CScriptBase *) (&P2SHRedeemScript))); // New Addition to Tx
+                    READWRITE(*const_cast<uint32_t *>(&sigTime));
+                    if (!(s.GetType() & SER_GETHASH))
+                        READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
+                }
+            } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
+                READWRITE(*const_cast<COutPoint *>(&collateralIn));
+                READWRITE(*const_cast<uint32_t *>(&sigTime));
+                READWRITE(*const_cast<int8_t *>(&benchmarkTier));
+                READWRITE(*const_cast<uint32_t *>(&benchmarkSigTime));
+                READWRITE(*const_cast<int8_t *>(&nUpdateType));
+                READWRITE(*const_cast<std::string *>(&ip));
+                if (!(s.GetType() & SER_GETHASH)) {
+                    READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
+                    READWRITE(*const_cast<std::vector<unsigned char> *>(&benchmarkSig));
+                }
+            }
+            if (ser_action.ForRead())
+                UpdateHash();
+
             return;
         }
 
@@ -694,17 +739,29 @@ public:
     CTransaction(deserialize_type, Stream& s) : CTransaction(CMutableTransaction(deserialize, s)) {}
 
     bool IsFluxnodeTx() const {
-        return nVersion == FLUXNODE_TX_VERSION;
+        return nVersion == FLUXNODE_TX_VERSION || nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION;
+    }
+
+    bool IsFluxnodeUpgradeTx() const {
+        return nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION;
+    }
+
+    bool IsFluxnodeUpgradedNormalTx() const {
+        return IsFluxnodeUpgradeTx() && nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION;
+    }
+
+    bool IsFluxnodeUpgradedP2SHTx() const {
+        return IsFluxnodeUpgradeTx() && nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION;
     }
 
     bool IsNull() const {
-        return (vin.empty() && vout.empty() && !IsFluxnodeTx()) || (IsFluxnodeTx() && collateralOut.IsNull());
+        return (vin.empty() && vout.empty() && !IsFluxnodeTx()) || (IsFluxnodeTx() && collateralIn.IsNull());
     }
 
     std::string TypeToString() const {
-        if (nType & FLUXNODE_START_TX_TYPE) {
+        if (nType == FLUXNODE_START_TX_TYPE) {
             return "Starting a fluxnode";
-        } else if (nType & FLUXNODE_CONFIRM_TX_TYPE) {
+        } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
             return "Confirming a fluxnode";
         } else {
             return "No type (Error)";
@@ -798,6 +855,13 @@ struct CMutableTransaction
     uint32_t benchmarkSigTime;
     int8_t nUpdateType;
 
+    // P2SH Nodes -> If nType is certain number we introduce a new version that will allow to
+    // customize the code even further.
+    // Fluxnode Tx Version 6 (Includes P2SH nodes ability)
+    int32_t nFluxTxVersion; // Adding this field for further upgradability to fluxnode txes in the future
+    CScript P2SHRedeemScript;
+
+
     CMutableTransaction();
     CMutableTransaction(const CTransaction& tx);
 
@@ -836,9 +900,10 @@ struct CMutableTransaction
             throw std::ios_base::failure("Unknown transaction format");
         }
 
+        // We use the operator ^ which is xor. XOR will return 0/false if the numbers match, and true/1 if they don't
         if (nVersion == FLUXNODE_TX_VERSION) {
             READWRITE(nType);
-            if (nType & FLUXNODE_START_TX_TYPE) {
+            if (nType == FLUXNODE_START_TX_TYPE) {
                 READWRITE(collateralIn);
                 READWRITE(collateralPubkey);
                 READWRITE(pubKey);
@@ -846,7 +911,39 @@ struct CMutableTransaction
                 if (!(s.GetType() & SER_GETHASH))
                     READWRITE(sig);
 
-            } else if (nType & FLUXNODE_CONFIRM_TX_TYPE) {
+            } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
+                READWRITE(collateralIn);
+                READWRITE(sigTime);
+                READWRITE(benchmarkTier);
+                READWRITE(benchmarkSigTime);
+                READWRITE(nUpdateType);
+                READWRITE(ip);
+                if (!(s.GetType() & SER_GETHASH)) {
+                    READWRITE(sig);
+                    READWRITE(benchmarkSig);
+                }
+            }
+            return;
+        } else if (nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION) {
+            READWRITE(nType);
+            if (nType == FLUXNODE_START_TX_TYPE) {
+                READWRITE(nFluxTxVersion);
+                if (nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION) {
+                    READWRITE(collateralIn);
+                    READWRITE(collateralPubkey);
+                    READWRITE(pubKey);
+                    READWRITE(sigTime);
+                    if (!(s.GetType() & SER_GETHASH))
+                        READWRITE(sig);
+                } else if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+                    READWRITE(collateralIn);
+                    READWRITE(pubKey);
+                    READWRITE(*(CScriptBase*)(&P2SHRedeemScript));
+                    READWRITE(sigTime);
+                    if (!(s.GetType() & SER_GETHASH))
+                        READWRITE(sig);
+                }
+            } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
                 READWRITE(collateralIn);
                 READWRITE(sigTime);
                 READWRITE(benchmarkTier);

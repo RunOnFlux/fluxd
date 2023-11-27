@@ -4,8 +4,8 @@
 
 #include <gtest/gtest.h>
 
-#include "zelcash/Address.hpp"
-#include "zelcash/Note.hpp"
+#include "flux/Address.hpp"
+#include "flux/Note.hpp"
 
 #include "amount.h"
 #include "random.h"
@@ -13,7 +13,7 @@
 
 #include <array>
 
-using namespace libzelcash;
+using namespace libflux;
 
 // Test data from https://github.com/zcash-hackworks/zcash-test-vectors/blob/master/sapling_key_components.py
 TEST(SaplingNote, TestVectors)

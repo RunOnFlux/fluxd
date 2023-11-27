@@ -36,9 +36,9 @@
 
 #include <univalue.h>
 
-#include "zelcash/Note.hpp"
-#include "zelcash/Address.hpp"
-#include "zelcash/Proof.hpp"
+#include "flux/Note.hpp"
+#include "flux/Address.hpp"
+#include "flux/Proof.hpp"
 
 using namespace std;
 
@@ -108,7 +108,7 @@ BOOST_AUTO_TEST_CASE(tx_valid)
     UniValue tests = read_json(std::string(json_tests::tx_valid, json_tests::tx_valid + sizeof(json_tests::tx_valid)));
     std::string comment("");
 
-    auto verifier = libzelcash::ProofVerifier::Strict();
+    auto verifier = libflux::ProofVerifier::Strict();
     ScriptError err;
     for (size_t idx = 0; idx < tests.size(); idx++) {
         UniValue test = tests[idx];
@@ -196,7 +196,7 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
     UniValue tests = read_json(std::string(json_tests::tx_invalid, json_tests::tx_invalid + sizeof(json_tests::tx_invalid)));
     std::string comment("");
 
-    auto verifier = libzelcash::ProofVerifier::Strict();
+    auto verifier = libflux::ProofVerifier::Strict();
     ScriptError err;
     for (size_t idx = 0; idx < tests.size(); idx++) {
         UniValue test = tests[idx];
@@ -278,7 +278,7 @@ BOOST_AUTO_TEST_CASE(basic_transaction_tests)
     CMutableTransaction tx;
     stream >> tx;
     CValidationState state;
-    auto verifier = libzelcash::ProofVerifier::Strict();
+    auto verifier = libflux::ProofVerifier::Strict();
     BOOST_CHECK_MESSAGE(CheckTransaction(tx, state, verifier) && state.IsValid(), "Simple deserialized transaction should be valid.");
 
     // Check that duplicate txins fail
@@ -338,17 +338,17 @@ BOOST_AUTO_TEST_CASE(test_basic_joinsplit_verification)
     // on all platforms and would gently push us down an ugly
     // path. We should just fix the assertions.
     //
-    // Also, it's generally libzelcash's job to ensure the
+    // Also, it's generally libflux's job to ensure the
     // integrity of the scheme through its own tests.
 
     // construct a merkle tree
     SproutMerkleTree merkleTree;
 
 
-    auto k = libzelcash::SproutSpendingKey::random();
+    auto k = libflux::SproutSpendingKey::random();
     auto addr = k.address();
 
-    libzelcash::SproutNote note(addr.a_pk, 100, uint256(), uint256());
+    libflux::SproutNote note(addr.a_pk, 100, uint256(), uint256());
 
     // commitment from coin
     uint256 commitment = note.cm();
@@ -363,16 +363,16 @@ BOOST_AUTO_TEST_CASE(test_basic_joinsplit_verification)
 
     // create JSDescription
     uint256 joinSplitPubKey;
-    std::array<libzelcash::JSInput, ZC_NUM_JS_INPUTS> inputs = {
-        libzelcash::JSInput(witness, note, k),
-        libzelcash::JSInput() // dummy input of zero value
+    std::array<libflux::JSInput, ZC_NUM_JS_INPUTS> inputs = {
+        libflux::JSInput(witness, note, k),
+        libflux::JSInput() // dummy input of zero value
     };
-    std::array<libzelcash::JSOutput, ZC_NUM_JS_OUTPUTS> outputs = {
-        libzelcash::JSOutput(addr, 50),
-        libzelcash::JSOutput(addr, 50)
+    std::array<libflux::JSOutput, ZC_NUM_JS_OUTPUTS> outputs = {
+        libflux::JSOutput(addr, 50),
+        libflux::JSOutput(addr, 50)
     };
 
-    auto verifier = libzelcash::ProofVerifier::Strict();
+    auto verifier = libflux::ProofVerifier::Strict();
 
     {
         JSDescription jsdesc(*pfluxParams, joinSplitPubKey, rt, inputs, outputs, 0, 0);
@@ -468,7 +468,7 @@ void test_simple_sapling_invalidity(uint32_t consensusBranchId, CMutableTransact
 
 void test_simple_joinsplit_invalidity(uint32_t consensusBranchId, CMutableTransaction tx)
 {
-    auto verifier = libzelcash::ProofVerifier::Strict();
+    auto verifier = libflux::ProofVerifier::Strict();
     {
         // Ensure that empty vin/vout remain invalid without
         // joinsplits.

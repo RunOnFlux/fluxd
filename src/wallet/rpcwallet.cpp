@@ -22,7 +22,7 @@
 #include "primitives/transaction.h"
 #include "zcbenchmarks.h"
 #include "script/interpreter.h"
-#include "zelcash/zip32.h"
+#include "flux/zip32.h"
 
 #include "utiltime.h"
 #include "asyncrpcoperation.h"
@@ -45,7 +45,7 @@
 
 using namespace std;
 
-using namespace libzelcash;
+using namespace libflux;
 
 const std::string ADDR_TYPE_SPROUT = "sprout";
 const std::string ADDR_TYPE_SAPLING = "sapling";
@@ -2640,7 +2640,7 @@ UniValue z_listunspent(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Maximum number of confirmations must be greater or equal to the minimum number of confirmations");
     }
 
-    std::set<libzelcash::PaymentAddress> zaddrs = {};
+    std::set<libflux::PaymentAddress> zaddrs = {};
 
     bool fIncludeWatchonly = false;
     if (params.size() > 2) {
@@ -2682,11 +2682,11 @@ UniValue z_listunspent(const UniValue& params, bool fHelp)
     }
     else {
         // User did not provide zaddrs, so use default i.e. all addresses
-        std::set<libzelcash::SproutPaymentAddress> sproutzaddrs = {};
+        std::set<libflux::SproutPaymentAddress> sproutzaddrs = {};
         pwalletMain->GetSproutPaymentAddresses(sproutzaddrs);
         
         // Sapling support
-        std::set<libzelcash::SaplingPaymentAddress> saplingzaddrs = {};
+        std::set<libflux::SaplingPaymentAddress> saplingzaddrs = {};
         pwalletMain->GetSaplingPaymentAddresses(saplingzaddrs);
         
         zaddrs.insert(sproutzaddrs.begin(), sproutzaddrs.end());
@@ -2707,7 +2707,7 @@ UniValue z_listunspent(const UniValue& params, bool fHelp)
             obj.pushKV("jsindex", (int)entry.jsop.js );
             obj.pushKV("jsoutindex", (int)entry.jsop.n);
             obj.pushKV("confirmations", entry.confirmations);
-            bool hasSproutSpendingKey = pwalletMain->HaveSproutSpendingKey(boost::get<libzelcash::SproutPaymentAddress>(entry.address));
+            bool hasSproutSpendingKey = pwalletMain->HaveSproutSpendingKey(boost::get<libflux::SproutPaymentAddress>(entry.address));
             obj.pushKV("spendable", hasSproutSpendingKey);
             obj.pushKV("address", EncodePaymentAddress(entry.address));
             obj.pushKV("amount", ValueFromAmount(CAmount(entry.note.value())));
@@ -2724,9 +2724,9 @@ UniValue z_listunspent(const UniValue& params, bool fHelp)
             obj.pushKV("txid", entry.op.hash.ToString());
             obj.pushKV("outindex", (int)entry.op.n);
             obj.pushKV("confirmations", entry.confirmations);
-            libzelcash::SaplingIncomingViewingKey ivk;
-            libzelcash::SaplingFullViewingKey fvk;
-            pwalletMain->GetSaplingIncomingViewingKey(boost::get<libzelcash::SaplingPaymentAddress>(entry.address), ivk);
+            libflux::SaplingIncomingViewingKey ivk;
+            libflux::SaplingFullViewingKey fvk;
+            pwalletMain->GetSaplingIncomingViewingKey(boost::get<libflux::SaplingPaymentAddress>(entry.address), ivk);
             pwalletMain->GetSaplingFullViewingKey(ivk, fvk);
             bool hasSaplingSpendingKey = pwalletMain->HaveSaplingSpendingKey(fvk);
             obj.pushKV("spendable", hasSaplingSpendingKey);
@@ -2987,10 +2987,10 @@ UniValue zc_raw_receive(const UniValue& params, bool fHelp)
     if (!IsValidSpendingKey(spendingkey)) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid spending key");
     }
-    if (boost::get<libzelcash::SproutSpendingKey>(&spendingkey) == nullptr) {
+    if (boost::get<libflux::SproutSpendingKey>(&spendingkey) == nullptr) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Only works with Sprout spending keys");
     }
-    SproutSpendingKey k = boost::get<libzelcash::SproutSpendingKey>(spendingkey);
+    SproutSpendingKey k = boost::get<libflux::SproutSpendingKey>(spendingkey);
 
     uint256 epk;
     unsigned char nonce;
@@ -3104,10 +3104,10 @@ UniValue zc_raw_joinsplit(const UniValue& params, bool fHelp)
         if (!IsValidSpendingKey(spendingkey)) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid spending key");
         }
-        if (boost::get<libzelcash::SproutSpendingKey>(&spendingkey) == nullptr) {
+        if (boost::get<libflux::SproutSpendingKey>(&spendingkey) == nullptr) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Only works with Sprout spending keys");
         }
-        SproutSpendingKey k = boost::get<libzelcash::SproutSpendingKey>(spendingkey);
+        SproutSpendingKey k = boost::get<libflux::SproutSpendingKey>(spendingkey);
 
         keys.push_back(k);
 
@@ -3152,12 +3152,12 @@ UniValue zc_raw_joinsplit(const UniValue& params, bool fHelp)
         if (!IsValidPaymentAddress(addrTo)) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid recipient address.");
         }
-        if (boost::get<libzelcash::SproutPaymentAddress>(&addrTo) == nullptr) {
+        if (boost::get<libflux::SproutPaymentAddress>(&addrTo) == nullptr) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Only works with Sprout payment addresses");
         }
         CAmount nAmount = AmountFromValue(outputs[name_]);
 
-        vjsout.push_back(JSOutput(boost::get<libzelcash::SproutPaymentAddress>(addrTo), nAmount));
+        vjsout.push_back(JSOutput(boost::get<libflux::SproutPaymentAddress>(addrTo), nAmount));
     }
 
     while (vjsout.size() < ZC_NUM_JS_OUTPUTS) {
@@ -3187,7 +3187,7 @@ UniValue zc_raw_joinsplit(const UniValue& params, bool fHelp)
                          vpub_new);
 
     {
-        auto verifier = libzelcash::ProofVerifier::Strict();
+        auto verifier = libflux::ProofVerifier::Strict();
         assert(jsdesc.Verify(*pfluxParams, verifier, joinSplitPubKey));
     }
 
@@ -3348,7 +3348,7 @@ UniValue z_listaddresses(const UniValue& params, bool fHelp)
 
     UniValue ret(UniValue::VARR);
     {
-        std::set<libzelcash::SproutPaymentAddress> addresses;
+        std::set<libflux::SproutPaymentAddress> addresses;
         pwalletMain->GetSproutPaymentAddresses(addresses);
         for (auto addr : addresses) {
             if (fIncludeWatchonly || pwalletMain->HaveSproutSpendingKey(addr)) {
@@ -3357,10 +3357,10 @@ UniValue z_listaddresses(const UniValue& params, bool fHelp)
         }
     }
     {
-        std::set<libzelcash::SaplingPaymentAddress> addresses;
+        std::set<libflux::SaplingPaymentAddress> addresses;
         pwalletMain->GetSaplingPaymentAddresses(addresses);
-        libzelcash::SaplingIncomingViewingKey ivk;
-        libzelcash::SaplingFullViewingKey fvk;
+        libflux::SaplingIncomingViewingKey ivk;
+        libflux::SaplingFullViewingKey fvk;
         for (auto addr : addresses) {
             if (fIncludeWatchonly || (
                 pwalletMain->GetSaplingIncomingViewingKey(addr, ivk) &&
@@ -3496,7 +3496,7 @@ UniValue z_listreceivedbyaddress(const UniValue& params, bool fHelp)
         nullifierSet = pwalletMain->GetNullifiersForAddresses({zaddr});
     }
 
-    if (boost::get<libzelcash::SproutPaymentAddress>(&zaddr) != nullptr) {
+    if (boost::get<libflux::SproutPaymentAddress>(&zaddr) != nullptr) {
         for (SproutNoteEntry & entry : sproutEntries) {
             UniValue obj(UniValue::VOBJ);
             obj.pushKV("txid", entry.jsop.hash.ToString());
@@ -3515,7 +3515,7 @@ UniValue z_listreceivedbyaddress(const UniValue& params, bool fHelp)
             }
             result.push_back(obj);
         }
-    } else if (boost::get<libzelcash::SaplingPaymentAddress>(&zaddr) != nullptr) {
+    } else if (boost::get<libflux::SaplingPaymentAddress>(&zaddr) != nullptr) {
         for (SaplingNoteEntry & entry : saplingEntries) {
             UniValue obj(UniValue::VOBJ);
             obj.pushKV("txid", entry.op.hash.ToString());
@@ -3825,7 +3825,7 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
         }
 
         // Remember whether this is a Sprout or Sapling address
-        fromSapling = boost::get<libzelcash::SaplingPaymentAddress>(&res) != nullptr;
+        fromSapling = boost::get<libflux::SaplingPaymentAddress>(&res) != nullptr;
     }
     // This logic will need to be updated if we add a new shielded pool
     bool fromSprout = !(fromTaddr || fromSapling);
@@ -3868,7 +3868,7 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
             if (IsValidPaymentAddress(res)) {
                 isZaddr = true;
 
-                bool toSapling = boost::get<libzelcash::SaplingPaymentAddress>(&res) != nullptr;
+                bool toSapling = boost::get<libflux::SaplingPaymentAddress>(&res) != nullptr;
                 bool toSprout = !toSapling;
                 noSproutAddrs = noSproutAddrs && toSapling;
 
@@ -3957,7 +3957,7 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
     for (int i = 0; i < zaddrRecipients.size(); i++) {
         auto address = std::get<0>(zaddrRecipients[i]);
         auto res = DecodePaymentAddress(address);
-        bool toSapling = boost::get<libzelcash::SaplingPaymentAddress>(&res) != nullptr;
+        bool toSapling = boost::get<libflux::SaplingPaymentAddress>(&res) != nullptr;
         if (toSapling) {
             mtx.vShieldedOutput.push_back(OutputDescription());
         } else {
@@ -4497,7 +4497,7 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
     bool useAnySprout = false;
     bool useAnySapling = false;
     std::set<CTxDestination> taddrs = {};
-    std::set<libzelcash::PaymentAddress> zaddrs = {};
+    std::set<libflux::PaymentAddress> zaddrs = {};
 
     UniValue addresses = params[0].get_array();
     if (addresses.size()==0)
@@ -4557,7 +4557,7 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
     if (!IsValidDestination(taddr)) {
         auto decodeAddr = DecodePaymentAddress(destaddress);
         if (IsValidPaymentAddress(decodeAddr)) {
-            if (boost::get<libzelcash::SaplingPaymentAddress>(&decodeAddr) != nullptr) {
+            if (boost::get<libflux::SaplingPaymentAddress>(&decodeAddr) != nullptr) {
                 isToSaplingZaddr = true;
                 // If Sapling is not active, do not allow sending to a sapling addresses.
                 if (!saplingActive) {
@@ -4753,7 +4753,7 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp)
                     maxedOutNotesFlag = true;
                 } else {
                     estimatedTxSize += increase;
-                    libzelcash::SaplingExtendedSpendingKey extsk;
+                    libflux::SaplingExtendedSpendingKey extsk;
                     if (!pwalletMain->GetSaplingExtendedSpendingKey(entry.address, extsk)) {
                         throw JSONRPCError(RPC_INVALID_PARAMETER, "Could not find spending key for payment address.");
                     }

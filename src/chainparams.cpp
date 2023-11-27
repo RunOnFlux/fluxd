@@ -138,6 +138,11 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nProtocolVersion = 170018;
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight = 1076532; // Around March 12 2022
+        consensus.vUpgrades[Consensus::UPGRADE_HALVING].hashActivationBlock =
+                uint256S("000000111f8643ce24d9753dbc324220877299075a8a6102da61ef4460296325");
+
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight = 1549500;
 
 
         consensus.nZawyLWMAAveragingWindow = 60;
@@ -210,13 +215,15 @@ public:
 
         networkID = CBaseChainParams::Network::MAIN;
 
-        nStartFluxnodePaymentsHeight = 560000; // Start paying deterministic zelnodes on height
+        nStartFluxnodePaymentsHeight = 560000; // Start paying deterministic fluxnodes on height
 
         // These are the benchmarking public keys, if you are adding a key, you must increase the resize integer
-        vecBenchmarkingPublicKeys.resize(3);
+        vecBenchmarkingPublicKeys.resize(4);
         vecBenchmarkingPublicKeys[0] = std::make_pair("042e79d7dd1483996157df6b16c831be2b14b31c69944ea2a585c63b5101af1f9517ba392cee5b1f45a62e9d936488429374535a2f76870bfa8eea6667b13eb39e", 0);
         vecBenchmarkingPublicKeys[1] = std::make_pair("04517413e51fa9b2e94f200b254cca69beb86f2d74bf66ca53854ba66bc376dde9b52e9b4403731d9a4f3e8edd9687f1e1824b688fe26454bd9fb823a3307b4682", 1618113600); // Sun Apr 11 2021 04:00:00 UTC
         vecBenchmarkingPublicKeys[2] = std::make_pair("0480dff65aa9d4b4c4234e4723a5e7c5bf527ca683b53aa26a7225cc5eb16e6e79f9629eb5f96c12b173de7a20e9823b2d36575759f3490864922f7ed04e171fad", 1647262800); // Mon Mar 14 2022 13:00:00 UTC
+        vecBenchmarkingPublicKeys[3] = std::make_pair("0437d58236a849ebe0e6558c1517e1f5c56749e04a2f7a7daedd4ef7c9fb6a773f32a33fe5ddad88b9af3ff496ee5ce79ce245c258bafa4e8d287baa3d54c6c65f", 1706209200); // Thu Jan 25 2024 19:00:00 UTC
+
         assert(vecBenchmarkingPublicKeys.size() > 0);
 
 
@@ -238,11 +245,13 @@ public:
             (1040000, uint256S("0x00000007f3b465bd4b0e161e43c05a3d946144330e33ea3a91cb952e6ef86b7d"))
             (1040577, uint256S("0x000000071fe89682ac260bc0a49621344eb28ae01659c9e7ce86e3762e45f52d"))
             (1042126, uint256S("0x0000000295e4663178fd9e533787e74206645910a2bfb61938db5f67796eaad0"))
-            (1060000, uint256S("0x0000000fd721d8d381c4b24a4f78fc036955d7a0f98d2765b8c7badad8b66c1b")),
-            1645201099,     // * UNIX timestamp of last checkpoint block
-            17772234,              // * total number of transactions between genesis and last checkpoint
+            (1060000, uint256S("0x0000000fd721d8d381c4b24a4f78fc036955d7a0f98d2765b8c7badad8b66c1b"))
+            (1442798, uint256S("0x0000000cc561fecb2ecfd22ba7af09450ca8cf270f407ce8b948195ff2aa0d13"))
+            (1518503, uint256S("0x0000000dba41dc84c52a3933af49d316fff49a76b49d42bd5b6d20c4e451a0ef")),
+            1700669818,     // * UNIX timestamp of last checkpoint block
+            66906216,              // * total number of transactions between genesis and last checkpoint
                             //   (the tx=... number in the SetBestChain debug.log lines)
-            24683            // * estimated number of transactions per day
+            31723            // * estimated number of transactions per day
                             //   total number of tx / (checkpoint block height / (24 * 30))
         };
 
@@ -306,7 +315,7 @@ public:
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
-        consensus.nPowTargetSpacing = 15;
+        consensus.nPowTargetSpacing = 60;
 
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
@@ -335,8 +344,10 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 420;
 
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nProtocolVersion = 170018;
-        consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight = 18000;
+        consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight = 520;
 
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight = 600;
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 10;
@@ -410,8 +421,10 @@ public:
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
-            (0, consensus.hashGenesisBlock),
-            1582228940,  // * UNIX timestamp of last checkpoint block
+            (0, consensus.hashGenesisBlock)
+            (10, uint256S("0x0a2b47f2b29dbd6f0befc7f0a5a6359b7e2cd9f2f18c7bd19dfdebfc516b661c"))
+            (1249, uint256S("0x00c364ea9772696665c857e3967c7c5d3345a8df8671b4b504565131a9efa5ed")),
+            1693928849,  // * UNIX timestamp of last checkpoint block
             0,           // * total number of transactions between genesis and last checkpoint
                          //   (the tx=... number in the SetBestChain debug.log lines)
             750          // * estimated number of transactions per day after checkpoint 720 newly mined +30 for txs that users are doing
@@ -433,14 +446,14 @@ public:
         nSwapPoolInterval = 100;
         nSwapPoolMaxTimes = 10;
 
-        nBeginCumulusTransition = 18000;
-        nEndCumulusTransition = 24000;
+        nBeginCumulusTransition = 420;
+        nEndCumulusTransition = 520;
 
-        nBeginNimbusTransition = 22000;
-        nEndNimbusTransition = 28000;
+        nBeginNimbusTransition = 420;
+        nEndNimbusTransition = 520;
 
-        nBeginStratusTransition = 26000;
-        nEndStratusTransition = 32000;
+        nBeginStratusTransition = 420;
+        nEndStratusTransition = 520;
 
         vecP2SHPublicKeys.resize(1);
         vecP2SHPublicKeys[0] = std::make_pair("04276f105ff36a670a56e75c2462cff05a4a7864756e6e1af01022e32752d6fe57b1e13cab4f2dbe3a6a51b4e0de83a5c4627345f5232151867850018c9a3c3a1d", 0);
@@ -517,6 +530,10 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight =
                 Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
@@ -563,7 +580,7 @@ public:
 
         checkpointData = (CCheckpointData){
             boost::assign::map_list_of
-            ( 0, uint256S("94c7aed6b2c67f1718006684bfc3b92081a2f19d59075691b189160d6f3aa13a")),
+            ( 0, uint256S("0x01998760a88dc2b5715f69d2f18c1d90e0b604612242d9099eaff3048dd1e0ce")),
             0,
             0,
             0
@@ -599,14 +616,14 @@ public:
         nSwapPoolInterval = 10;
         nSwapPoolMaxTimes = 5;
 
-        nBeginCumulusTransition = 999999999;
-        nEndCumulusTransition = 999999999;
+        nBeginCumulusTransition = 0;
+        nEndCumulusTransition = 1000;
 
-        nBeginNimbusTransition = 999999999;
-        nEndNimbusTransition = 999999999;
+        nBeginNimbusTransition = 0;
+        nEndNimbusTransition = 1000;
 
-        nBeginStratusTransition = 999999999;
-        nEndStratusTransition = 999999999;
+        nBeginStratusTransition = 0;
+        nEndStratusTransition = 100;
 
         vecP2SHPublicKeys.resize(1);
         vecP2SHPublicKeys[0] = std::make_pair("04276f105ff36a670a56e75c2462cff05a4a7864756e6e1af01022e32752d6fe57b1e13cab4f2dbe3a6a51b4e0de83a5c4627345f5232151867850018c9a3c3a1d", 0);

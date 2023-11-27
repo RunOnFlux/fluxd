@@ -14,7 +14,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "asyncrpcqueue.h"
-#include "zelnode/benchmarks.h"
+#include "fluxnode/benchmarks.h"
 
 #include <memory>
 

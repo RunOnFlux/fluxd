@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <zelcash/zip32.h>
+#include <flux/zip32.h>
 
 // From https://github.com/zcash-hackworks/zcash-test-vectors/blob/master/sapling_zip32.py
 // Sapling consistently uses little-endian encoding, but uint256S takes its input in
@@ -16,7 +16,7 @@ TEST(ZIP32, TestVectors) {
         17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
     HDSeed seed(rawSeed);
 
-    auto m = libzelcash::SaplingExtendedSpendingKey::Master(seed);
+    auto m = libflux::SaplingExtendedSpendingKey::Master(seed);
     EXPECT_EQ(m.depth, 0);
     EXPECT_EQ(m.parentFVKTag, 0);
     EXPECT_EQ(m.childIndex, 0);

@@ -19,7 +19,7 @@
 #include "httpserver.h"
 #include "httprpc.h"
 #include "key.h"
-#include "zelnode/benchmarks.h"
+#include "fluxnode/benchmarks.h"
 #ifdef ENABLE_MINING
 #include "key_io.h"
 #endif
@@ -39,10 +39,10 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
-#include "zelnode/zelnodeconfig.h"
-#include "zelnode/zelnode.h"
-#include "zelnode/obfuscation.h"
-#include "zelnode/activezelnode.h"
+#include "fluxnode/fluxnodeconfig.h"
+#include "fluxnode/fluxnode.h"
+#include "fluxnode/obfuscation.h"
+#include "fluxnode/activefluxnode.h"
 #include "snapshot/snapshotdb.h"
 
 #ifdef ENABLE_WALLET
@@ -1103,8 +1103,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Check Sapling migration address if set and is a valid Sapling address
     if (mapArgs.count("-migrationdestaddress")) {
         std::string migrationDestAddress = mapArgs["-migrationdestaddress"];
-        libzelcash::PaymentAddress address = DecodePaymentAddress(migrationDestAddress);
-        if (boost::get<libzelcash::SaplingPaymentAddress>(&address) == nullptr) {
+        libflux::PaymentAddress address = DecodePaymentAddress(migrationDestAddress);
+        if (boost::get<libflux::SaplingPaymentAddress>(&address) == nullptr) {
             return InitError(_("-migrationdestaddress must be a valid Sapling address."));
         }
     }

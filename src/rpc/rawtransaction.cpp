@@ -21,7 +21,7 @@
 #include "script/sign.h"
 #include "script/standard.h"
 #include "uint256.h"
-#include "zelnode/zelnode.h"
+#include "fluxnode/fluxnode.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif
@@ -156,17 +156,17 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
 
     if (tx.IsFluxnodeTx()) {
         entry.pushKV("type", tx.TypeToString());
-        entry.pushKV("collateral_output", tx.collateralOut.ToString());
-        entry.pushKV("collateral", tx.collateralOut.ToFullString());
-        entry.pushKV("txhash", tx.collateralOut.GetTxHash());
-        entry.pushKV("outidx", tx.collateralOut.GetTxIndex());
+        entry.pushKV("collateral_output", tx.collateralIn.ToString());
+        entry.pushKV("collateral", tx.collateralIn.ToFullString());
+        entry.pushKV("txhash", tx.collateralIn.GetTxHash());
+        entry.pushKV("outidx", tx.collateralIn.GetTxIndex());
         entry.pushKV("sigtime", tx.sigTime);
         entry.pushKV("sig", EncodeBase64(&tx.sig[0], tx.sig.size()));
         entry.pushKV("ip", tx.ip);
 
         /* Commented until furter investigation - possible cause of daemon crash
         // shall always be true otherwise invalid tx
-        COutPoint outPoint = tx.collateralOut;
+        COutPoint outPoint = tx.collateralIn;
         CCoins coins;
         CTxDestination destination;
         pcoinsTip->GetCoins(outPoint.hash, coins);
@@ -174,12 +174,26 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
         entry.pushKV("payment_address", EncodeDestination(destination));
         */
 
-        if (tx.nType & FLUXNODE_START_TX_TYPE) {
-            entry.pushKV("collateral_pubkey", EncodeBase64(tx.collateralPubkey.begin(), tx.collateralPubkey.size()));
+        if (tx.nType == FLUXNODE_START_TX_TYPE) {
+            if (tx.IsFluxnodeUpgradeTx()) {
+                entry.pushKV("fluxnode_upgraded_tx_version", tx.nFluxTxVersion);
+                if (tx.IsFluxnodeUpgradedNormalTx()) {
+                    entry.pushKV("collateral_pubkey", EncodeBase64(tx.collateralPubkey.begin(), tx.collateralPubkey.size()));
+                }
+                if (tx.IsFluxnodeUpgradedP2SHTx()) {
+                    entry.pushKV("redeemscript", tx.P2SHRedeemScript.ToString());
+                }
+            } else {
+                // Needed only if not upgraded and not p2sh
+                entry.pushKV("collateral_pubkey",
+                             EncodeBase64(tx.collateralPubkey.begin(), tx.collateralPubkey.size()));
+            }
+            // Always needed
             entry.pushKV("zelnode_pubkey", EncodeBase64(tx.pubKey.begin(), tx.pubKey.size()));
+
         }
 
-        if (tx.nType & FLUXNODE_CONFIRM_TX_TYPE) {
+        if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
             entry.pushKV("update_type", tx.nUpdateType);
             entry.pushKV("benchmark_tier", TierToString(tx.benchmarkTier));
             entry.pushKV("benchmark_sigtime", tx.benchmarkSigTime);
