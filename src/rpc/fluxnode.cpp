@@ -800,9 +800,9 @@ UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp, strin
                 "\nExamples:\n" +
                 HelpExampleCli(cmdname, ""));
 
-//    if (IsInitialBlockDownload(Params())) {
-//        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Wait until chain is synced closer to tip");
-//    }
+    if (IsInitialBlockDownload(Params())) {
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Wait until chain is synced closer to tip");
+    }
 
     // Get filter if any
     std::string strFilter = "";
