@@ -11,9 +11,9 @@ matrix:
     - os: linux
       dist: xenial
       env: PLATFORM="win"
-#    - os: osx
-#      osx_image: xcode10.2
-#      env: $PLATFORM="osx"
+   - os: osx
+     osx_image: xcode10.2
+     env: $PLATFORM="osx"
 before_install:
   - if [[ "$PLATFORM" == "linux" ]]; then sudo apt-get update; fi
   - if [[ "$PLATFORM" == "linux" ]]; then sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python python-zmq zlib1g-dev wget curl bsdmainutils automake libtinfo5; fi
