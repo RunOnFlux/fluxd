@@ -28,7 +28,7 @@ If you have the dependencies you can build Flux Daemon from source by running:
 
 * :blue_book: See the documentation at the [Zel GitBook](https://zel.gitbook.io/zelcurrency/installing-zel-daemon)
   for help and more information.
-* :mag: Join us on [Discord.io/RunOnFlux](https://discord.io/runonflux) for support and to join the community conversation. 
+* :mag: Join us on [Discord.gg/RunOnFlux](https://discord.gg/runonflux) for support and to join the community conversation. 
 
 #### :lock: Security Warnings
 
