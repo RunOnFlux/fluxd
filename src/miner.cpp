@@ -165,6 +165,8 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         // This vector will be sorted into a priority queue:
         vector<TxPriority> vecPriority;
         vecPriority.reserve(mempool.mapTx.size());
+        vector<CTransaction> vecInvalidFluxnodeTransactions;
+        vecInvalidFluxnodeTransactions.reserve(mempool.mapTx.size());
         for (CTxMemPool::indexed_transaction_set::iterator mi = mempool.mapTx.begin();
              mi != mempool.mapTx.end(); ++mi)
         {
@@ -226,8 +228,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                 const CCoins* coins = view.AccessCoins(tx.collateralIn.hash);
                 if (!coins) {
                     LogPrintf("Remove fluxnode transaction because its collateral is not found. %s\n", tx.GetHash().GetHex());
-                    std::list<CTransaction> removed;
-                    mempool.remove(tx, removed, false);
+                    vecInvalidFluxnodeTransactions.push_back(tx);
                     continue;
                 }
 
@@ -237,16 +238,14 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
                     if (data.IsNull()) {
                         LogPrintf("Remove fluxnode transaction because its confirm isn't ready. %s\n", tx.GetHash().GetHex());
-                        std::list<CTransaction> removed;
-                        mempool.remove(tx, removed, false);
+                        vecInvalidFluxnodeTransactions.push_back(tx);
                         continue;
                     }
 
                     if (tx.nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM) {
                          if (nNeedLocation != FLUXNODE_TX_STARTED) {
                              LogPrintf("Remove fluxnode transaction because its not started %s\n", tx.GetHash().GetHex());
-                             std::list<CTransaction> removed;
-                             mempool.remove(tx, removed, false);
+                             vecInvalidFluxnodeTransactions.push_back(tx);
                              continue;
                          }
                     }
@@ -256,8 +255,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
                             LOCK(g_fluxnodeCache.cs);
                             if (!g_fluxnodeCache.CheckConfirmationHeights(nHeight, tx.collateralIn, tx.ip)) {
                                 LogPrintf("Remove fluxnode transaction if failed CheckConfirmationHeights %s\n", tx.GetHash().GetHex());
-                                std::list<CTransaction> removed;
-                                mempool.remove(tx, removed, false);
+                                vecInvalidFluxnodeTransactions.push_back(tx);
                                 continue;
                             }
                         }
@@ -293,6 +291,12 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             }
             else
                 vecPriority.push_back(TxPriority(dPriority, feeRate, &(mi->GetTx())));
+        }
+
+        // Remove invalid fluxnode transactions
+        for (const auto& badtx: vecInvalidFluxnodeTransactions) {
+            std::list<CTransaction> listRemoved;
+            mempool.remove(badtx,listRemoved,false);
         }
 
         // Collect transactions into block
