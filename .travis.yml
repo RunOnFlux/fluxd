@@ -12,7 +12,7 @@ matrix:
       dist: xenial
       env: PLATFORM="win"
     - os: osx
-      osx_image: xcode10.2
+      osx_image: xcode9.4
       env: $PLATFORM="osx"
 before_install:
   - if [[ "$PLATFORM" == "linux" ]]; then sudo apt-get update; fi
