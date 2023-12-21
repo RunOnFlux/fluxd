@@ -118,6 +118,30 @@ string AccountFromValue(const UniValue& value)
     return strAccount;
 }
 
+// Use the default change address from flux.conf
+// If we aren't sending from a specific address
+// We can use a default change address that the user can provide
+// in the flux.conf
+void CheckAndAssignDefaultChangeAddress(CCoinControl& coinControl)
+{
+    if (coinControl.fFromOnlyIsSet == false) {
+        std::string strDefaultChangeAddress = "";
+        if (Params().NetworkIDString() == "main") {
+            strDefaultChangeAddress = GetArg("-defaultchangeaddressmainnet", "");
+        } else if (Params().NetworkIDString() == "test") {
+            strDefaultChangeAddress = GetArg("-defaultchangeaddresstestnet", "");
+        }
+
+        if (IsValidDestinationString(strDefaultChangeAddress, Params())) {
+            CTxDestination changeDest = DecodeDestination(strDefaultChangeAddress);
+            if (IsValidDestination(changeDest)) {
+                coinControl.destChange = changeDest;
+                coinControl.fDefaultChangeIsSet = true;
+            }
+        }
+    }
+}
+
 UniValue getnewaddress(const UniValue& params, bool fHelp)
 {
     if (!EnsureWalletIsAvailable(fHelp))
@@ -406,10 +430,16 @@ static void SendMoney(const CTxDestination &address, CAmount nValue, bool fSubtr
         coinControl.destChange = DecodeDestination(wtxNew.strFromAccount);
     }
 
+    // We can use a default change address that the user can provide
+    // in the flux.conf
+    CheckAndAssignDefaultChangeAddress(coinControl);
+
     CRecipient recipient = {scriptPubKey, nValue, fSubtractFeeFromAmount};
     vecSend.push_back(recipient);
 
-    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strError, coinControl.fFromOnlyIsSet ? &coinControl : NULL)) {
+    bool fSendCoinControl = coinControl.fFromOnlyIsSet || coinControl.fDefaultChangeIsSet;
+
+    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strError, fSendCoinControl ? &coinControl : NULL)) {
         if (!fSubtractFeeFromAmount && nValue + nFeeRequired > pwalletMain->GetBalance())
             strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
@@ -1174,18 +1204,23 @@ UniValue sendmany(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Address has insufficient funds");
 
     // Send
-    CCoinControl coincontrol;
+    CCoinControl coinControl;
     if (!wtx.strFromAccount.empty()) {
-        coincontrol.fromOnlyDest = DecodeDestination(wtx.strFromAccount);
-        coincontrol.fFromOnlyIsSet = true;
-        coincontrol.destChange = DecodeDestination(wtx.strFromAccount);
+        coinControl.fromOnlyDest = DecodeDestination(wtx.strFromAccount);
+        coinControl.fFromOnlyIsSet = true;
+        coinControl.destChange = DecodeDestination(wtx.strFromAccount);
     }
+
+    //We can use a default change address that the user can provide
+    // in the flux.conf
+    CheckAndAssignDefaultChangeAddress(coinControl);
 
     CReserveKey keyChange(pwalletMain);
     CAmount nFeeRequired = 0;
     int nChangePosRet = -1;
     string strFailReason;
-    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, nChangePosRet, strFailReason, coincontrol.fFromOnlyIsSet ? &coincontrol : NULL);
+    bool fSendCoinControl = coinControl.fFromOnlyIsSet || coinControl.fDefaultChangeIsSet;
+    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, nChangePosRet, strFailReason, fSendCoinControl ? &coinControl : NULL);
     if (!fCreated)
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, strFailReason);
     if (!pwalletMain->CommitTransaction(wtx, keyChange))

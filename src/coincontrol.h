@@ -19,6 +19,7 @@ public:
     //! Ability to send only from a specific address
     CTxDestination fromOnlyDest;
     bool fFromOnlyIsSet;
+    bool fDefaultChangeIsSet;
 
     CCoinControl()
     {
@@ -30,6 +31,7 @@ public:
         destChange = CNoDestination();
         fromOnlyDest = CNoDestination();
         fFromOnlyIsSet = false;
+        fDefaultChangeIsSet = false;
         fAllowOtherInputs = false;
         setSelected.clear();
     }
