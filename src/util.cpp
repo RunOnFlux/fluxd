@@ -693,6 +693,12 @@ boost::filesystem::path GetConfigFile()
 
 boost::filesystem::path GetFluxnodeConfigFile()
 {
+    boost::filesystem::path pathConfigFile(GetArg("-znconf", "zelnode.conf"));
+    if (!pathConfigFile.is_complete()) {
+        pathConfigFile = GetDataDir() / pathConfigFile;
+        return pathConfigFile;
+    }
+
     boost::filesystem::path pathConfigFile(GetArg("-znconf", "fluxnode.conf"));
     if (!pathConfigFile.is_complete())
         pathConfigFile = GetDataDir() / pathConfigFile;
