@@ -693,16 +693,31 @@ boost::filesystem::path GetConfigFile()
 
 boost::filesystem::path GetFluxnodeConfigFile()
 {
-    boost::filesystem::path pathConfigFile(GetArg("-znconf", "zelnode.conf"));
-    if (!pathConfigFile.is_complete()) {
-        pathConfigFile = GetDataDir() / pathConfigFile;
-        return pathConfigFile;
+    namespace fs = boost::filesystem;
+
+    // If zelnode.conf exists use this file instead of fluxnode.conf
+    boost::filesystem::path pathZelnodeConfigFile(GetArg("-znconf", "zelnode.conf"));
+    if (!pathZelnodeConfigFile.is_complete()) {
+        pathZelnodeConfigFile = GetDataDir() / pathZelnodeConfigFile;
+        if (fs::exists(pathZelnodeConfigFile)) {
+            LogPrintf("Using zelnode.conf Config File\n");
+            return pathZelnodeConfigFile;
+        }
     }
 
-    boost::filesystem::path pathConfigFile(GetArg("-znconf", "fluxnode.conf"));
-    if (!pathConfigFile.is_complete())
-        pathConfigFile = GetDataDir() / pathConfigFile;
-    return pathConfigFile;
+    // Use fluxnode.conf as the next option
+    boost::filesystem::path pathFluxnodeConfigFile(GetArg("-znconf", "fluxnode.conf"));
+    if (!pathFluxnodeConfigFile.is_complete()) {
+        pathFluxnodeConfigFile = GetDataDir() / pathFluxnodeConfigFile;
+        if (fs::exists(pathFluxnodeConfigFile)) {
+            LogPrintf("Using fluxnode.conf Config File\n");
+            return pathFluxnodeConfigFile;
+        }
+    }
+
+    // If no file exists yet. It needs to be created. Returning the location and filename so it can be created
+    // Newly created files should be in the format of fluxnode.conf
+    return pathFluxnodeConfigFile;
 }
 
 void ReadConfigFile(map<string, string>& mapSettingsRet,
