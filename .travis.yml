@@ -72,6 +72,7 @@ deploy:
     on:
       condition: $PLATFORM = linux
       all_branches: true
+      tags: true
   - provider: releases
     skip_cleanup: true
     draft: true
@@ -83,6 +84,7 @@ deploy:
     on:
       condition: $PLATFORM = arm
       all_branches: true
+      tags: true
   - provider: releases
     skip_cleanup: true
     draft: true
@@ -94,6 +96,7 @@ deploy:
     on:
       condition: $PLATFORM = osx
       all_branches: true
+      tags: true
   - provider: releases
     skip_cleanup: true
     draft: true
@@ -105,3 +108,4 @@ deploy:
     on:
       condition: $PLATFORM = win
       all_branches: true
+      tags: true
