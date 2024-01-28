@@ -527,6 +527,9 @@ std::string HelpMessage(HelpMessageMode mode)
  #endif
             ));
 #endif
+    strUsage += HelpMessageOpt("-defaultchangeaddressmainnet", _("Default Change address to be used when sendmany rpc call is used (Mainnet Only)"));
+    strUsage += HelpMessageOpt("-defaultchangeaddresstestnet", _("Default Change address to be used when sendmany rpc call is used (Testnet Only)"));
+
 
     strUsage += HelpMessageGroup(_("RPC server options:"));
     strUsage += HelpMessageOpt("-server", _("Accept command line and JSON-RPC commands"));
