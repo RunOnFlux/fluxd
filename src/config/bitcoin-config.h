@@ -18,10 +18,10 @@
 #define CLIENT_VERSION_MAJOR 7
 
 /* Minor version */
-#define CLIENT_VERSION_MINOR 0
+#define CLIENT_VERSION_MINOR 1
 
 /* Build revision */
-#define CLIENT_VERSION_REVISION 1
+#define CLIENT_VERSION_REVISION 0
 
 /* Version is release */
 #define COPYRIGHT_YEAR 2022
@@ -290,7 +290,7 @@
 #define PACKAGE_NAME "Flux"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Flux 7.0.1"
+#define PACKAGE_STRING "Flux 7.1.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "flux"
@@ -299,7 +299,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "7.0.1"
+#define PACKAGE_VERSION "7.1.0"
 
 /* Define to necessary symbol if this constant uses a non-standard name on
    your system. */
