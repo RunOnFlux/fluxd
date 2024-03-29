@@ -26,7 +26,7 @@ sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoco
 For other targets or additional information see the Flux Daemon build and installation guide is [here](https://zel.gitbook.io/zelcurrency/installing-zel-daemon).
 
 
-If you have the dependencies you can build Flux Daemon from source by running:
+Once you have the dependencies you can build Flux Daemon from source by running:
 
 ```
 ./zcutil/build.sh -j$(nproc)
