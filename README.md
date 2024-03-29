@@ -16,14 +16,15 @@ To setup a FluxNode please follow this [guide](https://medium.com/@mmalik4/flux-
 
 ### Building
 
-Flux Daemon build and installation guide is [here](https://zel.gitbook.io/zelcurrency/installing-zel-daemon).
-
 If you are building for Ubuntu 20.04 or Ubuntu 22.04 use the following to install the dependencies:
 
 ```
 sudo apt-get update && sudo apt-get upgrade -y
 sudo apt-get install build-essential pkg-config libc6-dev m4 g++-multilib autoconf2.64 libtool ncurses-dev unzip git python-ispython3 zlib1g-dev wget curl bsdmainutils automake
 ```
+
+For other targets or additional information see the Flux Daemon build and installation guide is [here](https://zel.gitbook.io/zelcurrency/installing-zel-daemon).
+
 
 If you have the dependencies you can build Flux Daemon from source by running:
 
