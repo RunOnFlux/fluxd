@@ -25,7 +25,7 @@ fi
 
 AM_PROG_CC_C_O
 
-AC_PROG_CC_C89
+AC_PROG_CC
 if test x"$ac_cv_prog_cc_c89" = x"no"; then
   AC_MSG_ERROR([c89 compiler support required])
 fi
