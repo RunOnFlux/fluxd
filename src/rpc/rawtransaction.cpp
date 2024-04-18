@@ -1139,7 +1139,7 @@ UniValue sendrawtransaction(const UniValue& params, bool fHelp)
 
     bool fOverrideFees = false;
     if (params.size() > 1)
-        fOverrideFees = true;
+        fOverrideFees = params[1].get_bool();
 
     CCoinsViewCache &view = *pcoinsTip;
     const CCoins* existingCoins = view.AccessCoins(hashTx);

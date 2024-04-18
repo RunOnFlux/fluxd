@@ -1137,7 +1137,10 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
         throw runtime_error(
                 cmdname + "\n"
                 "\nGet fluxnode count values\n"
-                ""
+
+                  "\nArguments:\n"
+                  "1. history         (boolean, optional) Specifiy if you want all fluxnode counts from all blocks (-fluxnodecount=1 required)\n"
+                  "2. timetable       (number, optional) Default=360 How often you want the fluxnode count. 360 = 12 Hours, 720 = 1 Day. Range is (1, 99999999)\n"
 
                 "\nResult:\n"
                 "{\n"
@@ -1159,10 +1162,18 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
        fAll = params[0].get_bool();
     }
 
-    // Get Global Data
+    if (fAll && !fFluxNodeCountIndex) {
+        throw JSONRPCError(RPC_INVALID_REQUEST, "history was requested but fluxnodecount is not enabled. You must have fluxnodecount=1 in flux.conf");
+    }
+
+    // Get Global Data instead of current blocks count
     if (fAll) {
         if (params.size() == 2) {
             nSpread = params[1].get_int();
+        }
+
+        if (nSpread <= 0 || nSpread >= 100000000) {
+            nSpread = 360;
         }
 
         LOCK(cs_main);
