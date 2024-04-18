@@ -154,6 +154,7 @@ extern bool fImporting;
 extern bool fReindex;
 extern int nScriptCheckThreads;
 extern bool fTxIndex;
+extern bool fFluxNodeCountIndex;
 
 extern bool fIsVerifying;
 

@@ -76,6 +76,7 @@ bool fExperimentalMode = false;
 bool fImporting = false;
 bool fReindex = false;
 bool fTxIndex = false;
+bool fFluxNodeCountIndex = false;
 bool fInsightExplorer = false;  // insightexplorer
 bool fAddressIndex = false;     // insightexplorer
 bool fSpentIndex = false;       // insightexplorer
@@ -4425,6 +4426,23 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     }
     pindexNew->nChainWork = (pindexNew->pprev ? pindexNew->pprev->nChainWork : 0) + GetBlockProof(*pindexNew);
     pindexNew->RaiseValidity(BLOCK_VALID_TREE);
+
+    if (fFluxNodeCountIndex) {
+        int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0;
+        std::vector<int> vNodeCount(GetNumberOfTiers());
+        g_fluxnodeCache.CountNetworks(ipv4, ipv6, onion, vNodeCount);
+
+        if (g_fluxnodeCache.mapFluxnodeList.count(Tier::STRATUS)) {
+            pindexNew->nStratus = vNodeCount[Tier::STRATUS - 1];
+        }
+        if (g_fluxnodeCache.mapFluxnodeList.count(Tier::NIMBUS)) {
+            pindexNew->nNimbus = vNodeCount[Tier::NIMBUS - 1];
+        }
+        if (g_fluxnodeCache.mapFluxnodeList.count(Tier::CUMULUS)) {
+            pindexNew->nCumulus = vNodeCount[Tier::CUMULUS - 1];
+        }
+    }
+
     if (pindexBestHeader == NULL || pindexBestHeader->nChainWork < pindexNew->nChainWork)
         pindexBestHeader = pindexNew;
 
@@ -5384,6 +5402,10 @@ bool static LoadBlockIndexDB()
     pblocktree->ReadFlag("txindex", fTxIndex);
     LogPrintf("%s: transaction index %s\n", __func__, fTxIndex ? "enabled" : "disabled");
 
+    // Check whether we have a fluxnodecount index
+    pblocktree->ReadFlag("fluxnodecount", fFluxNodeCountIndex);
+    LogPrintf("%s: fluxnodecount index %s\n", __func__, fFluxNodeCountIndex ? "enabled" : "disabled");
+
     // insightexplorer
     // Check whether block explorer features are enabled
     pblocktree->ReadFlag("insightexplorer", fInsightExplorer);
@@ -5726,6 +5748,10 @@ bool InitBlockIndex(const CChainParams& chainparams)
     // Use the provided setting for -txindex in the new database
     fTxIndex = GetBoolArg("-txindex", false);
     pblocktree->WriteFlag("txindex", fTxIndex);
+
+    // Use the provided setting for -fluxnodecount in the new database
+    fFluxNodeCountIndex = GetBoolArg("-fluxnodecount", false);
+    pblocktree->WriteFlag("fluxnodecount", fFluxNodeCountIndex);
 
     // Use the provided setting for -insightexplorer in the new database
     fInsightExplorer = GetBoolArg("-insightexplorer", false);

@@ -1133,10 +1133,11 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
 
 UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
 {
-    if (fHelp || (params.size() > 0))
+    if (fHelp || (params.size() > 2))
         throw runtime_error(
                 cmdname + "\n"
                 "\nGet fluxnode count values\n"
+                ""
 
                 "\nResult:\n"
                 "{\n"
@@ -1150,6 +1151,36 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
                 HelpExampleCli(cmdname, "") + HelpExampleRpc(cmdname, ""));
 
     UniValue obj(UniValue::VOBJ);
+
+    // Global Numbers
+    bool fAll = false;
+    uint16_t nSpread = 360; // 360 = 12 hours with 2 minute blocks. 720 blocks a day
+    if (params.size() >= 1) {
+       fAll = params[0].get_bool();
+    }
+
+    // Get Global Data
+    if (fAll) {
+        if (params.size() == 2) {
+            nSpread = params[1].get_int();
+        }
+
+        LOCK(cs_main);
+        CBlockIndex *index = nullptr;
+        index = chainActive[Params().GetConsensus().vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight];
+
+        while (index) {
+            UniValue amounts(UniValue::VOBJ);
+            amounts.pushKV("stratus", index->nStratus);
+            amounts.pushKV("nimbus", index->nNimbus);
+            amounts.pushKV("cumulus", index->nCumulus);
+            obj.pushKV(std::to_string(index->nHeight), amounts);
+
+            index = chainActive[index->nHeight + nSpread];
+        }
+
+        return obj;
+    }
 
     int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0;
     std::vector<int> vNodeCount(GetNumberOfTiers());
