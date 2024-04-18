@@ -1157,7 +1157,7 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
 
     // Global Numbers
     bool fAll = false;
-    uint16_t nSpread = 360; // 360 = 12 hours with 2 minute blocks. 720 blocks a day
+    uint32_t nSpread = 360; // 360 = 12 hours with 2 minute blocks. 720 blocks a day
     if (params.size() >= 1) {
        fAll = params[0].get_bool();
     }
