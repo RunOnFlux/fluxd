@@ -16,7 +16,7 @@ To setup a FluxNode please follow this [guide](https://medium.com/@mmalik4/flux-
 
 ### Building
 
-If you are building for Ubuntu 20.04 or Ubuntu 22.04 use the following to install the dependencies:
+If you are building for Ubuntu 20.04, Ubuntu 22.04 or Ubuntu 24.04 use the following to install the dependencies:
 
 ```
 sudo apt-get update && sudo apt-get upgrade -y
