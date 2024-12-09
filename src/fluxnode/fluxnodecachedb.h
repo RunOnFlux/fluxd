@@ -35,6 +35,9 @@ public:
 
     bool WriteBlockUndoFluxnodeData(const uint256& p_blockHash, CFluxnodeTxBlockUndo& p_undoData);
     bool ReadBlockUndoFluxnodeData(const uint256 &p_blockHash, CFluxnodeTxBlockUndo& p_undoData);
+
+    bool CleanupOldFluxnodeData();
+
 };
 
 #endif //ZELCASH_FLUXNODECACHEDB_H

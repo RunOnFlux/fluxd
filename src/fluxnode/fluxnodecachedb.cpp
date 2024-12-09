@@ -85,3 +85,44 @@ bool CDeterministicFluxnodeDB::ReadBlockUndoFluxnodeData(const uint256 &p_blockH
     // If it doesn't exist, we just return true because we don't want to fail just because it didn't exist in the db
     return true;
 }
+
+bool CDeterministicFluxnodeDB::CleanupOldFluxnodeData()
+{
+    LOCK(cs_main);
+    // Get the latest 500 block hashes from the active chain.
+    std::set<uint256> recentHashes;
+    const CBlockIndex* pindex = chainActive.Tip();
+    int count = 0;
+
+    while (pindex && count < 500) {
+        recentHashes.insert(pindex->GetBlockHash());
+        pindex = pindex->pprev;
+        count++;
+    }
+
+    // Iterate through the database entries with BLOCK_FLUXNODE_UNDO_DATA.
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(std::make_pair(BLOCK_FLUXNODE_UNDO_DATA, uint256()));
+
+    std::pair<char, uint256> key;
+    int64_t erased = 0;
+    while (pcursor->Valid()) {
+        if (pcursor->GetKey(key) && key.first == BLOCK_FLUXNODE_UNDO_DATA) {
+            uint256 blockHash = key.second;
+
+            // If the block hash is not in the recentHashes set, erase it.
+            if (recentHashes.find(blockHash) == recentHashes.end()) {
+                Erase(key);
+                erased++;
+            }
+        }
+        pcursor->Next();
+    }
+
+    // If we removed over 500000 records, lets compact the database
+    if (erased > 500000) {
+        CompactDatabase();
+    }
+
+    return true;
+}

@@ -218,11 +218,12 @@ public:
         nStartFluxnodePaymentsHeight = 560000; // Start paying deterministic fluxnodes on height
 
         // These are the benchmarking public keys, if you are adding a key, you must increase the resize integer
-        vecBenchmarkingPublicKeys.resize(4);
+        vecBenchmarkingPublicKeys.resize(5);
         vecBenchmarkingPublicKeys[0] = std::make_pair("042e79d7dd1483996157df6b16c831be2b14b31c69944ea2a585c63b5101af1f9517ba392cee5b1f45a62e9d936488429374535a2f76870bfa8eea6667b13eb39e", 0);
         vecBenchmarkingPublicKeys[1] = std::make_pair("04517413e51fa9b2e94f200b254cca69beb86f2d74bf66ca53854ba66bc376dde9b52e9b4403731d9a4f3e8edd9687f1e1824b688fe26454bd9fb823a3307b4682", 1618113600); // Sun Apr 11 2021 04:00:00 UTC
         vecBenchmarkingPublicKeys[2] = std::make_pair("0480dff65aa9d4b4c4234e4723a5e7c5bf527ca683b53aa26a7225cc5eb16e6e79f9629eb5f96c12b173de7a20e9823b2d36575759f3490864922f7ed04e171fad", 1647262800); // Mon Mar 14 2022 13:00:00 UTC
         vecBenchmarkingPublicKeys[3] = std::make_pair("0437d58236a849ebe0e6558c1517e1f5c56749e04a2f7a7daedd4ef7c9fb6a773f32a33fe5ddad88b9af3ff496ee5ce79ce245c258bafa4e8d287baa3d54c6c65f", 1706209200); // Thu Jan 25 2024 19:00:00 UTC
+        vecBenchmarkingPublicKeys[4] = std::make_pair("0437d58236a849ebe0e6558c1517e1f5c56749e04a2f7a7daedd4ef7c9fb6a773f32a33fe5ddad88b9af3ff496ee5ce79ce245c258bafa4e8d287baa3d54c6c65f", 1743534000); // Tue Apr 01 2025 19:00:00 UTC
 
         assert(vecBenchmarkingPublicKeys.size() > 0);
 
@@ -247,11 +248,12 @@ public:
             (1042126, uint256S("0x0000000295e4663178fd9e533787e74206645910a2bfb61938db5f67796eaad0"))
             (1060000, uint256S("0x0000000fd721d8d381c4b24a4f78fc036955d7a0f98d2765b8c7badad8b66c1b"))
             (1442798, uint256S("0x0000000cc561fecb2ecfd22ba7af09450ca8cf270f407ce8b948195ff2aa0d13"))
-            (1518503, uint256S("0x0000000dba41dc84c52a3933af49d316fff49a76b49d42bd5b6d20c4e451a0ef")),
-            1700669818,     // * UNIX timestamp of last checkpoint block
-            66906216,              // * total number of transactions between genesis and last checkpoint
+            (1518503, uint256S("0x0000000dba41dc84c52a3933af49d316fff49a76b49d42bd5b6d20c4e451a0ef"))
+            (1791720, uint256S("0x0000000abc7bd62a213e0dab43c9c01220b031a568fdfb5c2ef89e6b30054bdc")),
+            1733760519,     // * UNIX timestamp of last checkpoint block
+            96202836,              // * total number of transactions between genesis and last checkpoint
                             //   (the tx=... number in the SetBestChain debug.log lines)
-            31723            // * estimated number of transactions per day
+            38658            // * estimated number of transactions per day
                             //   total number of tx / (checkpoint block height / (24 * 30))
         };
 
