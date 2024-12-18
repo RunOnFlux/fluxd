@@ -223,7 +223,7 @@ public:
         vecBenchmarkingPublicKeys[1] = std::make_pair("04517413e51fa9b2e94f200b254cca69beb86f2d74bf66ca53854ba66bc376dde9b52e9b4403731d9a4f3e8edd9687f1e1824b688fe26454bd9fb823a3307b4682", 1618113600); // Sun Apr 11 2021 04:00:00 UTC
         vecBenchmarkingPublicKeys[2] = std::make_pair("0480dff65aa9d4b4c4234e4723a5e7c5bf527ca683b53aa26a7225cc5eb16e6e79f9629eb5f96c12b173de7a20e9823b2d36575759f3490864922f7ed04e171fad", 1647262800); // Mon Mar 14 2022 13:00:00 UTC
         vecBenchmarkingPublicKeys[3] = std::make_pair("0437d58236a849ebe0e6558c1517e1f5c56749e04a2f7a7daedd4ef7c9fb6a773f32a33fe5ddad88b9af3ff496ee5ce79ce245c258bafa4e8d287baa3d54c6c65f", 1706209200); // Thu Jan 25 2024 19:00:00 UTC
-        vecBenchmarkingPublicKeys[4] = std::make_pair("0437d58236a849ebe0e6558c1517e1f5c56749e04a2f7a7daedd4ef7c9fb6a773f32a33fe5ddad88b9af3ff496ee5ce79ce245c258bafa4e8d287baa3d54c6c65f", 1743534000); // Tue Apr 01 2025 19:00:00 UTC
+        vecBenchmarkingPublicKeys[4] = std::make_pair("04e54965119e89861f80135b13f56c3b5cc55ad2b916d9705052fc91d2894f9cb19151a8d61c6e9ea4812075dd32f06fde5965589ffa1517ab1bd2ddbc66a39f42", 1743534000); // Tue Apr 01 2025 19:00:00 UTC
 
         assert(vecBenchmarkingPublicKeys.size() > 0);
 

@@ -15,6 +15,13 @@
 static const char DB_FLUXNODE_CACHE_DATA = 'd';
 static const char BLOCK_FLUXNODE_UNDO_DATA = 'u';
 
+// EST 720 blocks * 7 Days
+static const int ONE_WEEK_OF_BLOCK_COUNT = 5040;
+
+// If we remove this or more things from the deterministic database
+// We do a compact database call
+static const int FORCE_DB_COMPACT_REMOVAL = 500000;
+
 CDeterministicFluxnodeDB::CDeterministicFluxnodeDB(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "determ_zelnodes", nCacheSize, fMemory, fWipe) {}
 
 bool CDeterministicFluxnodeDB::WriteFluxnodeCacheData(const FluxnodeCacheData& data)
@@ -94,7 +101,7 @@ bool CDeterministicFluxnodeDB::CleanupOldFluxnodeData()
     const CBlockIndex* pindex = chainActive.Tip();
     int count = 0;
 
-    while (pindex && count < 500) {
+    while (pindex && count < ONE_WEEK_OF_BLOCK_COUNT) {
         recentHashes.insert(pindex->GetBlockHash());
         pindex = pindex->pprev;
         count++;
@@ -120,7 +127,7 @@ bool CDeterministicFluxnodeDB::CleanupOldFluxnodeData()
     }
 
     // If we removed over 500000 records, lets compact the database
-    if (erased > 500000) {
+    if (erased > FORCE_DB_COMPACT_REMOVAL) {
         CompactDatabase();
     }
 

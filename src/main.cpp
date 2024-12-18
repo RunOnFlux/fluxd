@@ -4125,7 +4125,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
                 cleanupCounter = 0; // Reset counter
             }
 
-            // This triggers a data compact comand around every day.
+            // This triggers a data compact command around every day.
             // Randomized with a 1/10 chance, so the entire network doesn't do this at the
             // same time.
             static int compactCounter = 0;
