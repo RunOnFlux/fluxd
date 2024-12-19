@@ -1049,7 +1049,14 @@ UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
         info.pushKV("last_confirmed_height", data.nLastConfirmedBlockHeight);
         info.pushKV("last_paid_height", data.nLastPaidHeight);
         info.pushKV("tier", data.TierToString());
-        info.pushKV("payment_address", EncodeDestination(data.collateralPubkey.GetID()));
+        if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+            CScriptID inner;
+            inner = CScriptID(data.P2SHRedeemScript);
+            info.pushKV("payment_address", EncodeDestination(inner));
+        } else {
+            info.pushKV("payment_address", EncodeDestination(data.collateralPubkey.GetID()));
+        }
+
         info.pushKV("pubkey", HexStr(data.pubKey));
         if (chainActive.Height() >= data.nAddedBlockHeight)
             info.pushKV("activesince", std::to_string(chainActive[data.nAddedBlockHeight]->nTime));

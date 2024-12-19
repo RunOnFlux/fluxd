@@ -15,6 +15,13 @@
 static const char DB_FLUXNODE_CACHE_DATA = 'd';
 static const char BLOCK_FLUXNODE_UNDO_DATA = 'u';
 
+// EST 720 blocks * 7 Days
+static const int ONE_WEEK_OF_BLOCK_COUNT = 5040;
+
+// If we remove this or more things from the deterministic database
+// We do a compact database call
+static const int FORCE_DB_COMPACT_REMOVAL = 500000;
+
 CDeterministicFluxnodeDB::CDeterministicFluxnodeDB(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "determ_zelnodes", nCacheSize, fMemory, fWipe) {}
 
 bool CDeterministicFluxnodeDB::WriteFluxnodeCacheData(const FluxnodeCacheData& data)
@@ -83,5 +90,46 @@ bool CDeterministicFluxnodeDB::ReadBlockUndoFluxnodeData(const uint256 &p_blockH
         return Read(std::make_pair(BLOCK_FLUXNODE_UNDO_DATA, p_blockHash), p_undoData);
 
     // If it doesn't exist, we just return true because we don't want to fail just because it didn't exist in the db
+    return true;
+}
+
+bool CDeterministicFluxnodeDB::CleanupOldFluxnodeData()
+{
+    LOCK(cs_main);
+    // Get the latest 500 block hashes from the active chain.
+    std::set<uint256> recentHashes;
+    const CBlockIndex* pindex = chainActive.Tip();
+    int count = 0;
+
+    while (pindex && count < ONE_WEEK_OF_BLOCK_COUNT) {
+        recentHashes.insert(pindex->GetBlockHash());
+        pindex = pindex->pprev;
+        count++;
+    }
+
+    // Iterate through the database entries with BLOCK_FLUXNODE_UNDO_DATA.
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(std::make_pair(BLOCK_FLUXNODE_UNDO_DATA, uint256()));
+
+    std::pair<char, uint256> key;
+    int64_t erased = 0;
+    while (pcursor->Valid()) {
+        if (pcursor->GetKey(key) && key.first == BLOCK_FLUXNODE_UNDO_DATA) {
+            uint256 blockHash = key.second;
+
+            // If the block hash is not in the recentHashes set, erase it.
+            if (recentHashes.find(blockHash) == recentHashes.end()) {
+                Erase(key);
+                erased++;
+            }
+        }
+        pcursor->Next();
+    }
+
+    // If we removed over 500000 records, lets compact the database
+    if (erased > FORCE_DB_COMPACT_REMOVAL) {
+        CompactDatabase();
+    }
+
     return true;
 }

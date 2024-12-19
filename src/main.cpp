@@ -4103,13 +4103,39 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     // Update cached incremental witnesses
     GetMainSignals().ChainTip(pindexNew, pblock, oldSproutTree, oldSaplingTree, true);
 
-    EnforceNodeDeprecation(pindexNew->nHeight);
+//    EnforceNodeDeprecation(pindexNew->nHeight);
 
     if (fFluxnode && pindexNew->nHeight - nFluxnodeLastManaged >= numberOfBlocksBeforeNextCheck) {
         nFluxnodeLastManaged = pindexNew->nHeight;
         //getrand(1,4) is used to get a number between 1 and 4 with same probability, this is used to prevent fluxnode grouping transactions
         numberOfBlocksBeforeNextCheck = getrand(1,6);
         activeFluxnode.ManageDeterministricFluxnode();
+    }
+
+    if(!IsInitialBlockDownload(chainparams)) {
+        if (fFluxnode) {
+            // This triggers the code to clean up fluxnode undo data in the database
+            // About every 10 blocks, with a randomized 1/10 chance. So the entire network doesn't
+            // all do this at the same time
+            static int cleanupCounter = 0;
+            cleanupCounter++;
+            if (cleanupCounter >= 10 && (std::rand() % 10 == 0)) {
+                LogPrintf("Cleaning up fluxnode undo data from database\n");
+                pFluxnodeDB->CleanupOldFluxnodeData();
+                cleanupCounter = 0; // Reset counter
+            }
+
+            // This triggers a data compact command around every day.
+            // Randomized with a 1/10 chance, so the entire network doesn't do this at the
+            // same time.
+            static int compactCounter = 0;
+            compactCounter++;
+            if (compactCounter >= 720 && (std::rand() % 10 == 0)) {
+                LogPrintf("Compacting Fluxnode database\n");
+                pFluxnodeDB->CompactDatabase();
+                compactCounter = 0; // Reset counter
+            }
+        }
     }
 
     int64_t nTime6 = GetTimeMicros(); nTimePostConnect += nTime6 - nTime5; nTimeTotal += nTime6 - nTime1;
@@ -5421,7 +5447,8 @@ bool static LoadBlockIndexDB()
         DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
         Checkpoints::GuessVerificationProgress(chainparams.Checkpoints(), chainActive.Tip()));
 
-    EnforceNodeDeprecation(chainActive.Height(), true);
+    // Remove deprecation requirement
+    // EnforceNodeDeprecation(chainActive.Height(), true);
 
     return true;
 }

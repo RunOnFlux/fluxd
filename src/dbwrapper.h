@@ -260,6 +260,14 @@ public:
      * Return true if the database managed by this class contains no entries.
      */
     bool IsEmpty();
+
+    void CompactDatabase()
+    {
+        if (pdb) {
+            // Compact the entire range of keys
+            pdb->CompactRange(nullptr, nullptr);
+        }
+    }
 };
 
 #endif // BITCOIN_DBWRAPPER_H
