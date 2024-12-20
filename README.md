@@ -1,4 +1,4 @@
-# Flux 7.1.0
+# Flux 7.2.0
 [![Build Status](https://app.travis-ci.com/RunOnFlux/fluxd.svg?branch=master)](https://app.travis-ci.com/github/RunOnFlux/fluxd)
 
 What is Flux?
