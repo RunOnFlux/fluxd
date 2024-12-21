@@ -265,7 +265,6 @@ public:
         strFoundationFundingAddress = "t3XjYMBvwxnXVv9jqg4CgokZ3f7kAoXPQL8";
         nFoundationFundingHeight = 836994;  // Around 11th April 2021
         nFoundationFundingAmount = 2500000 * COIN; // 2.5 Million
-
         strSwapPoolAddress = "t3ThbWogDoAjGuS6DEnmN1GWJBRbVjSUK4T";
         nSwapPoolStartHeight = 837714; //  // Around 12th April 2021
         nSwapPoolAmount = 22000000 * COIN; // 22 Million every time

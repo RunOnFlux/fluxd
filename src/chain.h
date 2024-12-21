@@ -241,6 +241,10 @@ public:
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
 
+    int nStratus = 0;
+    int nNimbus = 0;
+    int nCumulus = 0;
+
     void SetNull()
     {
         phashBlock = NULL;
@@ -270,6 +274,10 @@ public:
         nBits          = 0;
         nNonce         = uint256();
         nSolution.clear();
+
+        nStratus = 0;
+        nNimbus = 0;
+        nCumulus = 0;
     }
 
     CBlockIndex()
@@ -454,6 +462,10 @@ public:
         if ((s.GetType() & SER_DISK) && (nVersion >= SAPLING_VALUE_VERSION)) {
             READWRITE(nSaplingValue);
         }
+
+        READWRITE(nStratus);
+        READWRITE(nNimbus);
+        READWRITE(nCumulus);
 
         // If you have just added new serialized fields above, remember to add
         // them to CBlockTreeDB::LoadBlockIndexGuts() in txdb.cpp :)

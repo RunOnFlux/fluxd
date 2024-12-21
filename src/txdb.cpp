@@ -527,6 +527,10 @@ bool CBlockTreeDB::LoadBlockIndexGuts(boost::function<CBlockIndex*(const uint256
                 pindexNew->nSproutValue   = diskindex.nSproutValue;
                 pindexNew->nSaplingValue  = diskindex.nSaplingValue;
 
+                pindexNew->nStratus = diskindex.nStratus;
+                pindexNew->nNimbus = diskindex.nNimbus;
+                pindexNew->nCumulus = diskindex.nCumulus;
+
                 // Consistency checks
                 auto header = pindexNew->GetBlockHeader();
                 if (header.GetHash() != pindexNew->GetBlockHash())
