@@ -35,8 +35,9 @@ script:
   - if [[ "$PLATFORM" == "osx" ]]; then ./zcutil/build.sh; fi
   - if [[ "$PLATFORM" == "win" ]]; then ./zcutil/build-win.sh; fi
 before_deploy:
-  - yes | gem update --system --force
+  - yes | gem update --system --force # fix deployment error
   - gem install bundler
+  - gem install faraday-net_http -v '3.3.0' # Fix faraday version
   - gem install uri
   - gem install logger
   - if [[ "$PLATFORM" == "linux" ]]; then ls -l ./src; fi
