@@ -96,6 +96,7 @@ size_t nCoinCacheUsage = 5000 * 300;
 uint64_t nPruneTarget = 0;
 bool fAlerts = DEFAULT_ALERTS;
 bool fIsVerifying = false;
+bool fJustDisconnectedTip = false;
 /* If the tip is older than this (in seconds), the node is considered to be in initial block download.
  */
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
@@ -4456,9 +4457,13 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
     LogPrint("bench", "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
     uint256 sproutAnchorAfterDisconnect = pcoinsTip->GetBestAnchor(SPROUT);
     uint256 saplingAnchorAfterDisconnect = pcoinsTip->GetBestAnchor(SAPLING);
+
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
+
+    // Tracking when recently disconnecting the tip of the chain.
+    fJustDisconnectedTip = true;
 
     if (!fBare) {
         // Resurrect mempool transactions from the disconnected block.
@@ -4578,9 +4583,14 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     }
     int64_t nTime4 = GetTimeMicros(); nTimeFlush += nTime4 - nTime3;
     LogPrint("bench", "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
+
     // Write the chain state to disk, if necessary.
-    if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
+    // If fJustDisconnectedTip force a disk write
+    if (!FlushStateToDisk(state, fJustDisconnectedTip ? FLUSH_STATE_ALWAYS : FLUSH_STATE_IF_NEEDED))
         return false;
+
+    fJustDisconnectedTip = false;
+
     int64_t nTime5 = GetTimeMicros(); nTimeChainState += nTime5 - nTime4;
     LogPrint("bench", "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
     // Remove conflicting transactions from the mempool.
