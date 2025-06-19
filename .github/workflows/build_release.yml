@@ -1,0 +1,191 @@
+name: CI Workflow
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runs-on: runonflux
+            ubuntu-version: "20.04"
+            container: ubuntu:20.04
+          - arch: arm64
+            runs-on: runonflux-arm64
+            ubuntu-version: "20.04"
+            container: ubuntu:20.04
+          - arch: i386
+            runs-on: ubuntu-24.04
+            ubuntu-version: "20.04"
+            container: ubuntu:20.04
+          - arch: windows
+            runs-on: ubuntu-24.04
+            ubuntu-version: "20.04"
+            container: ubuntu:20.04
+    
+    runs-on: ${{ matrix.runs-on }}
+    container: ${{ matrix.container }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up environment
+        shell: bash
+        run: |
+          # Set timezone non-interactively to avoid prompts
+          export DEBIAN_FRONTEND=noninteractive
+          ln -fs /usr/share/zoneinfo/UTC /etc/localtime
+          
+          apt-get update
+          if [[ "${{ matrix.arch }}" == "amd64" ]]; then
+            apt-get install -y build-essential pkg-config libc6-dev m4 autoconf libtool unzip git wget curl bsdmainutils automake g++-multilib ncurses-dev python3 python3-zmq zlib1g-dev
+          elif [[ "${{ matrix.arch }}" == "arm64" ]]; then
+            apt-get install -y build-essential pkg-config libc6-dev m4 autoconf libtool unzip git wget curl bsdmainutils automake g++-aarch64-linux-gnu ncurses-dev python3 python3-zmq zlib1g-dev
+          elif [[ "${{ matrix.arch }}" == "i386" ]]; then
+            # Enable i386 architecture for 32-bit packages
+            dpkg --add-architecture i386
+            apt-get update
+            apt-get install -y build-essential pkg-config libc6-dev:i386 m4 autoconf libtool unzip git wget curl bsdmainutils automake g++-multilib gcc-multilib ncurses-dev python3 python3-zmq zlib1g-dev
+          elif [[ "${{ matrix.arch }}" == "windows" ]]; then
+            apt-get install -y build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python3 python3-zmq zlib1g-dev wget curl bsdmainutils automake mingw-w64 mingw-w64-tools gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 cmake zip
+          fi
+
+      - name: Set version and branch
+        shell: bash
+        run: |
+          # Extract version from README.md or use a default method
+          if [ -f README.md ]; then
+            VERSION=$(head -n 1 README.md | cut -c 8-)
+          else
+            VERSION="dev"
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
+          echo "UBUNTU_VERSION=${{ matrix.ubuntu-version }}" >> $GITHUB_ENV
+
+      - name: Build
+        shell: bash
+        run: |
+          if [[ "${{ matrix.arch }}" == "amd64" ]]; then
+            ./zcutil/build.sh
+          elif [[ "${{ matrix.arch }}" == "arm64" ]]; then
+            HOST=aarch64-linux-gnu ./zcutil/build.sh
+          elif [[ "${{ matrix.arch }}" == "i386" ]]; then
+            HOST=i686-pc-linux-gnu ./zcutil/build.sh
+          elif [[ "${{ matrix.arch }}" == "windows" ]]; then
+            ./zcutil/build-win.sh
+          fi
+
+      - name: Create deb package
+        if: (matrix.arch != 'windows') && (github.event_name == 'workflow_dispatch' || github.event_name == 'release')
+        shell: bash
+        run: |
+          # Create working directory for this architecture
+          DEB_DIR="deb_package_${{ matrix.arch }}"
+          cp -r deb_file/flux_${{ matrix.arch }} $DEB_DIR
+          
+          # Create the bin directory if it doesn't exist
+          mkdir -p $DEB_DIR/usr/local/bin
+          
+          # Copy the binaries
+          cp src/fluxd $DEB_DIR/usr/local/bin/
+          cp src/flux-cli $DEB_DIR/usr/local/bin/
+          cp src/flux-tx $DEB_DIR/usr/local/bin/
+          
+          # Strip binaries to reduce size
+          strip $DEB_DIR/usr/local/bin/fluxd
+          strip $DEB_DIR/usr/local/bin/flux-cli
+          strip $DEB_DIR/usr/local/bin/flux-tx
+          
+          # Copy fetch-params script if it exists (renamed to flux-fetch-params in deb)
+          if [ -f zcutil/fetch-params.sh ]; then
+            cp zcutil/fetch-params.sh $DEB_DIR/usr/local/bin/flux-fetch-params
+            chmod 755 $DEB_DIR/usr/local/bin/flux-fetch-params
+          fi
+          
+          # Set correct permissions
+          chmod 755 $DEB_DIR/usr/local/bin/fluxd
+          chmod 755 $DEB_DIR/usr/local/bin/flux-cli
+          chmod 755 $DEB_DIR/usr/local/bin/flux-tx
+          
+          # Set DEBIAN script permissions if they exist
+          for script in postinst postrm preinst prerm; do
+            if [ -f $DEB_DIR/DEBIAN/$script ]; then
+              chmod 755 $DEB_DIR/DEBIAN/$script
+            fi
+          done
+          
+          # Update version in control file
+          sed -i "s/Version: .*/Version: ${{ env.VERSION }}/" $DEB_DIR/DEBIAN/control
+          
+          # Build the deb package
+          dpkg-deb --build $DEB_DIR flux-${{ matrix.arch }}-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.deb
+
+      - name: Package binaries (tar.gz)
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
+        shell: bash
+        run: |
+          if [[ "${{ matrix.arch }}" == "windows" ]]; then
+            # Strip binaries to reduce size
+            strip ./src/fluxd.exe ./src/flux-cli.exe ./src/flux-tx.exe
+            
+            # Copy binaries and scripts
+            cp ./src/fluxd.exe .
+            cp ./src/flux-cli.exe .
+            cp ./src/flux-tx.exe .
+            if [ -f ./zcutil/fetch-params.bat ]; then
+              cp ./zcutil/fetch-params.bat .
+            fi
+            
+            # Create zip archive for Windows
+            zip Flux-Windows-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.zip fluxd.exe flux-cli.exe flux-tx.exe $([ -f fetch-params.bat ] && echo fetch-params.bat)
+          else
+            # Strip binaries to reduce size
+            strip ./src/fluxd ./src/flux-cli ./src/flux-tx
+            if [ -f ./src/flux-gtest ]; then
+              strip ./src/flux-gtest
+            fi
+            
+            # Copy binaries to root directory to avoid nested paths in tar
+            cp ./src/fluxd .
+            cp ./src/flux-cli .
+            cp ./src/flux-tx .
+            if [ -f ./src/flux-gtest ]; then
+              cp ./src/flux-gtest .
+            fi
+            # Keep original fetch-params.sh name in tar.gz
+            if [ -f ./zcutil/fetch-params.sh ]; then
+              cp ./zcutil/fetch-params.sh .
+            fi
+            
+            if [[ "${{ matrix.arch }}" == "amd64" ]]; then
+              tar -cvzf Flux-Linux-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.tar.gz fluxd flux-cli flux-tx $([ -f flux-gtest ] && echo flux-gtest) $([ -f fetch-params.sh ] && echo fetch-params.sh)
+            elif [[ "${{ matrix.arch }}" == "arm64" ]]; then
+              tar -cvzf Flux-arm-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.tar.gz fluxd flux-cli flux-tx $([ -f flux-gtest ] && echo flux-gtest) $([ -f fetch-params.sh ] && echo fetch-params.sh)
+            elif [[ "${{ matrix.arch }}" == "i386" ]]; then
+              tar -cvzf Flux-i386-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.tar.gz fluxd flux-cli flux-tx $([ -f flux-gtest ] && echo flux-gtest) $([ -f fetch-params.sh ] && echo fetch-params.sh)
+            fi
+          fi
+
+      - name: Upload to Release
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event_name == 'release' && github.event.release.tag_name || format('v{0}-{1}-{2}', env.VERSION, env.BRANCH, github.run_id) }}
+          name: ${{ github.event_name == 'release' && github.event.release.name || format('Flux v{0}-{1}-{2}', env.VERSION, env.BRANCH, github.run_id) }}
+          prerelease: ${{ github.event_name != 'release' }}
+          files: |
+            *.deb
+            *.tar.gz
+            *.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
