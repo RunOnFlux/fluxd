@@ -78,9 +78,9 @@ jobs:
           if [[ "${{ matrix.arch }}" == "amd64" ]]; then
             ./zcutil/build.sh
           elif [[ "${{ matrix.arch }}" == "arm64" ]]; then
-            HOST=aarch64-linux-gnu CONFIGURE_FLAGS="--disable-rust"./zcutil/build.sh
+            HOST=aarch64-linux-gnu ./zcutil/build.sh
           elif [[ "${{ matrix.arch }}" == "i386" ]]; then
-            HOST=i686-pc-linux-gnu CONFIGURE_FLAGS="--disable-rust" ./zcutil/build.sh
+            HOST=i386-pc-linux-gnu ./zcutil/build.sh
           elif [[ "${{ matrix.arch }}" == "windows" ]]; then
             ./zcutil/build-win.sh
           fi
