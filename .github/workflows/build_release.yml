@@ -47,10 +47,6 @@ jobs:
           
           apt-get update
           
-          # Install Rust for all architectures to avoid depends system download issues
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          source ~/.cargo/env
-          
           if [[ "${{ matrix.arch }}" == "amd64" ]]; then
             apt-get install -y build-essential pkg-config libc6-dev m4 autoconf libtool unzip git wget curl bsdmainutils automake g++-multilib ncurses-dev python3 python3-zmq zlib1g-dev
           elif [[ "${{ matrix.arch }}" == "arm64" ]]; then
@@ -60,11 +56,18 @@ jobs:
             dpkg --add-architecture i386
             apt-get update
             apt-get install -y build-essential pkg-config libc6-dev:i386 m4 autoconf libtool unzip git wget curl bsdmainutils automake g++-multilib gcc-multilib ncurses-dev python3 python3-zmq zlib1g-dev
-            # Install i686 target for Rust
-            rustup target add i686-unknown-linux-gnu
           elif [[ "${{ matrix.arch }}" == "windows" ]]; then
             apt-get install -y build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python3 python3-zmq zlib1g-dev wget curl bsdmainutils automake mingw-w64 mingw-w64-tools gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 cmake zip
-            # Install Windows target for Rust
+          fi
+          
+          # Install Rust for all architectures to avoid depends system download issues (after curl is installed)
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          source ~/.cargo/env
+          
+          # Install architecture-specific Rust targets
+          if [[ "${{ matrix.arch }}" == "i386" ]]; then
+            rustup target add i686-unknown-linux-gnu
+          elif [[ "${{ matrix.arch }}" == "windows" ]]; then
             rustup target add x86_64-pc-windows-gnu
           fi
 
