@@ -19,13 +19,13 @@ jobs:
             ubuntu-version: "20.04"
             container: ubuntu:20.04
           - arch: arm64
-            runs-on: runonflux-arm64
-            ubuntu-version: "20.04"
-            container: ubuntu:20.04
-          - arch: i386
             runs-on: ubuntu-24.04
             ubuntu-version: "20.04"
             container: ubuntu:20.04
+          # - arch: i386
+          #   runs-on: ubuntu-24.04
+          #   ubuntu-version: "20.04"
+          #   container: ubuntu:20.04
           - arch: windows
             runs-on: ubuntu-24.04
             ubuntu-version: "20.04"
@@ -80,7 +80,7 @@ jobs:
           elif [[ "${{ matrix.arch }}" == "arm64" ]]; then
             HOST=aarch64-linux-gnu ./zcutil/build.sh
           elif [[ "${{ matrix.arch }}" == "i386" ]]; then
-            HOST=i386-pc-linux-gnu ./zcutil/build.sh
+            HOST=i686-pc-linux-gnu ./zcutil/build.sh
           elif [[ "${{ matrix.arch }}" == "windows" ]]; then
             ./zcutil/build-win.sh
           fi
