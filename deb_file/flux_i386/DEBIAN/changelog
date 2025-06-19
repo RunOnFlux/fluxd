@@ -1,0 +1,503 @@
+flux (7.2.0) stable; urgency=medium
+
+  * 7.2.0 release.
+
+ -- Flux Foundation <info@runonflux.io>  Fri, 20 Dec 2024 15:57:22 +0800
+
+flux (7.1.0) stable; urgency=medium
+
+  * 7.1.0 release.
+
+ -- Flux Foundation <info@runonflux.io>  Tue, 30 Jan 2024 22:44:15 +0800
+
+flux (7.0.1) stable; urgency=medium
+
+  * 7.0.1 release.
+
+ -- Flux Foundation <info@runonflux.io>  Sat, 09 Dec 2023 23:01:44 +0800
+
+flux (7.0.0) stable; urgency=medium
+
+  * 7.0.0 release.
+
+ -- Flux Foundation <info@runonflux.io>  Wed, 29 Nov 2023 23:45:29 +0800
+
+flux (6.2.0) stable; urgency=medium
+
+  * 6.2.0 release.
+
+ -- Flux Foundation <info@runonflux.io>  Thu, 04 May 2023 21:37:37 +0800
+
+flux (6.1.0) stable; urgency=medium
+
+  * 6.1.0 release.
+
+ -- Flux Foundation <info@runonflux.io>  Sun, 23 Oct 2022 13:24:45 +0800
+
+flux (6.0.0) stable; urgency=medium
+
+  * 6.0.0 release.
+
+ -- Flux Foundation <info@runonflux.io>  Thu, 24 Feb 2022 12:20:56 +0800
+
+flux (5.2.1) stable; urgency=medium
+
+  * 5.2.1 release.
+
+ -- Flux Foundation <info@runonflux.io>  Wed, 26 Jan 2022 12:14:41 +0800
+
+flux (5.2.0) stable; urgency=medium
+
+  * 5.2.0 release.
+
+ -- Flux Foundation <info@runonflux.io>  Sun, 23 Jan 2022 12:05:24 +0800
+
+flux (5.1.1) stable; urgency=medium
+
+  * 5.1.1 release.
+
+ -- Flux Foundation <info@runonflux.io>  Tue, 11 Jan 2022 12:41:13 +0800
+
+flux (5.1.0) stable; urgency=medium
+
+  * 5.1.0 release.
+
+ -- Flux Foundation <info@runonflux.io>  Thu, 06 Jan 2022 15:09:26 +0800
+
+flux (5.0.2) stable; urgency=medium
+
+  * 5.0.2 release.
+
+ -- Flux Foundation <info@runonflux.io>  Mon, 31 May 2021 13:56:44 +0200
+
+flux (5.0.1) stable; urgency=medium
+
+  * 5.0.1 release.
+
+ -- Flux Foundation <info@runonflux.io>  Sat, 01 May 2021 15:56:38 +0200
+
+flux (5.0.0) stable; urgency=medium
+
+  * 5.0.0 release.
+
+ -- Flux Foundation <info@runonflux.io>  Sat, 27 Mar 2021 11:19:58 +0800
+
+zelcash (4.0.5) stable; urgency=medium
+
+  * 4.0.5 release.
+
+ -- Zel Foundation <info@zel.cash>  Fri, 18 Dec 2020 03:22:05 +0100
+
+zelcash (4.0.4) stable; urgency=medium
+
+  * 4.0.4 release.
+
+ -- Zel Foundation <info@zel.cash>  Thu, 03 Dec 2020 14:50:11 +0100
+
+zelcash (4.0.3) stable; urgency=medium
+
+  * 4.0.3 release.
+
+ -- Zel Foundation <info@zel.cash>  Fri, 21 Aug 2020 22:32:29 +0200
+
+zelcash (4.0.2) stable; urgency=medium
+
+  * 4.0.2 release.
+
+ -- Zel Foundation <info@zel.cash>  Mon, 13 Jul 2020 19:02:26 +0200
+
+zelcash (4.0.1) stable; urgency=medium
+
+  * 4.0.1 release.
+
+ -- Zel Foundation <info@zel.cash>  Fri, 20 Mar 2020 12:00:00 +0000
+
+zelcash (4.0.0) stable; urgency=medium
+
+  * 4.0.0 release.
+
+ -- Zel Foundation <info@zel.cash>  Sun, 27 Feb 2020 12:00:00 +0000
+
+zelcash (3.3.3) stable; urgency=critical
+
+  * 3.3.3 release.
+
+ -- Zel Foundation <info@zel.cash>  Fri, 8 Nov 2019 12:00:00 +0000
+
+zelcash (3.3.2) stable; urgency=critical
+
+  * 3.3.2 release.
+
+ -- Zel Foundation <info@zel.cash>  Tue, 1 Oct 2019 12:00:00 +0900
+
+zelcash (3.3.1) stable; urgency=medium
+
+  * 3.3.1 release.
+
+ -- Zel Foundation <info@zel.cash>  Wed, 28 Aug 2019 12:00:00 +0100
+
+zelcash (3.3.0) stable; urgency=medium
+
+  * 3.3.0 release.
+
+ -- Zel Foundation <info@zel.cash>  Thu, 4 July 2019 12:00:00 +0100
+
+zelcash (3.2.0) stable; urgency=medium
+
+  * 3.2.0 release.
+
+ -- Zel Foundation <info@zel.cash>  Wed, 5 June 2019 12:00:00 +0100
+
+zelcash (3.1.1) stable; urgency=medium
+
+  * 3.1.1 release.
+
+ -- Zel Foundation <info@zel.cash>  Fri, 5 Apr 2019 12:00:00 +0100
+
+zelcash (3.1.0) stable; urgency=medium
+
+  * 3.1.0 release.
+
+ -- Zel Foundation <info@zel.cash>  Fri, 1 Mar 2019 12:00:00 +0100
+
+zelcash (3.0.0) stable; urgency=medium
+
+  * 3.0.0 release.
+
+ -- Zel Foundation <info@zel.cash>  Mon, 18 Feb 2019 12:00:00 +0100
+
+zelcash (2.0.0) stable; urgency=medium
+
+  * 2.0.0 release.
+
+ -- Zel Foundation <info@zel.cash>  Wed, 5 Dec 2018 12:00:00 +0100
+
+zcash (2.0.7+2) stable; urgency=medium
+
+  * 2.0.7-2 release.
+
+ -- Electric Coin Company <team@z.cash>  Fri, 30 Aug 2019 17:47:52 -0600
+
+zcash (2.0.7+1) stable; urgency=medium
+
+  * 2.0.7-1 release.
+
+ -- Electric Coin Company <team@z.cash>  Thu, 29 Aug 2019 13:07:52 -0600
+
+zcash (2.0.7) stable; urgency=medium
+
+  * 2.0.7 release.
+
+ -- Electric Coin Company <team@z.cash>  Mon, 19 Aug 2019 15:09:14 -0600
+
+zcash (2.0.7~rc1) stable; urgency=medium
+
+  * 2.0.7-rc1 release.
+
+ -- Electric Coin Company <team@z.cash>  Fri, 09 Aug 2019 17:05:51 -0600
+
+zcash (2.0.6) stable; urgency=medium
+
+  * 2.0.6 release.
+
+ -- Electric Coin Company <team@z.cash>  Wed, 19 Jun 2019 00:28:06 +0100
+
+zcash (2.0.6~rc1) stable; urgency=medium
+
+  * 2.0.6-rc1 release.
+
+ -- Electric Coin Company <team@z.cash>  Wed, 12 Jun 2019 16:36:57 +0100
+
+zcash (2.0.5+2) stable; urgency=medium
+
+  * 2.0.5-2 release.
+
+ -- Electric Coin Company <team@z.cash>  Wed, 15 May 2019 09:56:01 -0600
+
+zcash (2.0.5+1) stable; urgency=medium
+
+  * 2.0.5-1 release.
+
+ -- Electric Coin Company <team@z.cash>  Wed, 08 May 2019 06:57:28 -0600
+
+zcash (2.0.5) stable; urgency=medium
+
+  * 2.0.5 release.
+
+ -- Electric Coin Company <team@z.cash>  Fri, 03 May 2019 16:35:30 -0600
+
+zcash (2.0.5~rc1) stable; urgency=medium
+
+  * 2.0.5-rc1 release.
+
+ -- Electric Coin Company <team@z.cash>  Wed, 01 May 2019 14:16:08 -0600
+
+zcash (2.0.4) stable; urgency=medium
+
+  * 2.0.4 release.
+
+ -- Electric Coin Company <team@z.cash>  Tue, 26 Mar 2019 11:29:21 -0700
+
+zcash (2.0.4~rc1) stable; urgency=medium
+
+  * 2.0.4-rc1 release.
+
+ -- Zcash Company <team@z.cash>  Wed, 20 Mar 2019 09:39:43 -0700
+
+zcash (2.0.3) stable; urgency=medium
+
+  * 2.0.3 release.
+
+ -- Zcash Company <team@z.cash>  Mon, 11 Feb 2019 09:16:09 -0800
+
+zcash (2.0.3~rc1) stable; urgency=medium
+
+  * 2.0.3-rc1 release.
+
+ -- Zcash Company <team@z.cash>  Mon, 04 Feb 2019 12:05:43 -0800
+
+zcash (2.0.2) stable; urgency=medium
+
+  * 2.0.2 release.
+
+ -- Zcash Company <team@z.cash>  Wed, 28 Nov 2018 11:09:08 -0800
+
+zcash (2.0.2~rc1) stable; urgency=medium
+
+  * 2.0.2-rc1 release.
+
+ -- Zcash Company <team@z.cash>  Sun, 18 Nov 2018 10:19:49 -0800
+
+zcash (2.0.1) stable; urgency=medium
+
+  * 2.0.1 release.
+
+ -- Zcash Company <team@z.cash>  Sun, 14 Oct 2018 13:40:30 -0700
+
+zcash (2.0.1~rc1) stable; urgency=medium
+
+  * 2.0.1-rc1 release.
+
+ -- Zcash Company <team@z.cash>  Mon, 08 Oct 2018 12:40:54 -0700
+
+zcash (2.0.0) stable; urgency=medium
+
+  * 2.0.0 release.
+
+ -- Zcash Company <team@z.cash>  Wed, 15 Aug 2018 17:57:50 -0700
+
+zcash (2.0.0~rc1) stable; urgency=medium
+
+  * 2.0.0-rc1 release.
+
+ -- Zcash Company <team@z.cash>  Thu, 09 Aug 2018 16:56:56 +0000
+
+zcash (1.1.2) stable; urgency=medium
+
+  * 1.1.2 release.
+
+ -- Zcash Company <team@z.cash>  Sun, 01 Jul 2018 20:12:33 -0700
+
+zcash (1.1.2~rc1) stable; urgency=medium
+
+  * 1.1.2-rc1 release.
+
+ -- Zcash Company <team@z.cash>  Fri, 22 Jun 2018 17:03:41 -0700
+
+zcash (1.1.1) stable; urgency=medium
+
+  * 1.1.1 release.
+
+ -- Zcash Company <team@z.cash>  Fri, 25 May 2018 15:49:34 +1200
+
+zcash (1.1.1~rc2) stable; urgency=medium
+
+  * 1.1.1-rc2 release.
+
+ -- Zcash Company <team@z.cash>  Wed, 23 May 2018 09:28:50 -0700
+
+zcash (1.1.1~rc1) stable; urgency=medium
+
+  * 1.1.1-rc1 release.
+
+ -- Zcash Company <team@z.cash>  Sat, 19 May 2018 10:16:14 +1200
+
+zcash (1.1.0) stable; urgency=medium
+
+  * 1.1.0 release.
+
+ -- Zcash Company <team@z.cash>  Sat, 19 May 2018 10:16:14 +1200
+
+Zelcash (1.1.0) Initial stable; urgency=medium
+
+  * 1.1.0 release.
+
+  -- Zel Foundation <info@zel.cash>  Fri, 13 Jul 2018 12:00:00 +0000
+
+Zelcash (1.0.14) Initial stable; urgency=medium
+
+  * 1.0.14 release.
+
+  <info@zel.cash>
+
+zcash (1.0.14) stable; urgency=medium
+
+  * 1.0.14 release.
+
+ -- Zcash Company <team@z.cash>  Wed, 03 Jan 2018 23:54:16 +0100
+
+zcash (1.0.14~rc1) stable; urgency=medium
+
+  * 1.0.14-rc1 release.
+
+ -- Zcash Company <team@z.cash>  Fri, 22 Dec 2017 10:12:41 +0000
+
+zcash (1.0.13) stable; urgency=medium
+
+  * 1.0.13 release.
+
+ -- Zcash Company <team@z.cash>  Mon, 20 Nov 2017 12:31:53 +0000
+
+zcash (1.0.13~rc2) stable; urgency=medium
+
+  * 1.0.13-rc2 release.
+
+ -- Zcash Company <team@z.cash>  Fri, 17 Nov 2017 18:01:08 +0000
+
+zcash (1.0.13~rc1) stable; urgency=medium
+
+  * 1.0.13-rc1 release.
+
+ -- Zcash Company <team@z.cash>  Wed, 15 Nov 2017 00:02:21 +0000
+
+zcash (1.0.12) stable; urgency=medium
+
+  * 1.0.12 release.
+
+ -- Zcash Company <team@z.cash>  Thu, 28 Sep 2017 01:26:44 +0100
+
+zcash (1.0.12~rc1) stable; urgency=medium
+
+  * 1.0.12-rc1 release.
+
+ -- Zcash Company <team@z.cash>  Sat, 23 Sep 2017 10:51:36 +0100
+
+zcash (1.0.11) stable; urgency=medium
+
+  * 1.0.11 release.
+
+ -- Zcash Company <team@z.cash>  Tue, 15 Aug 2017 10:06:25 +0100
+
+zcash (1.0.11~rc1) stable; urgency=medium
+
+  * 1.0.11-rc1 release.
+
+ -- Zcash Company <team@z.cash>  Tue, 01 Aug 2017 17:12:52 +0200
+
+zcash (1.0.10+1) stable; urgency=medium
+
+  * 1.0.10-1 release.
+
+ -- Zcash Company <team@z.cash>  Fri, 23 Jun 2017 19:50:41 -0700
+
+zcash (1.0.10) stable; urgency=medium
+
+  * 1.0.10 release.
+
+ -- Zcash Company <team@z.cash>  Thu, 22 Jun 2017 15:13:04 +1200
+
+zcash (1.0.9) stable; urgency=medium
+
+  * 1.0.9 release.
+
+ -- Zcash Company <team@z.cash>  Wed, 24 May 2017 12:51:06 -0700
+
+zcash (1.0.8+1) jessie; urgency=high
+
+  * 1.0.8-1 release.
+
+ -- Zcash Company <team@z.cash>  Thu, 13 Apr 2017 20:20:37 -0700
+
+zcash (1.0.8) jessie; urgency=medium
+
+  * 1.0.8 release.
+
+ -- Zcash Company <team@z.cash>  Mon, 27 Mar 2017 21:30:07 +0100
+
+zcash (1.0.7+1) jessie; urgency=medium
+
+  * 1.0.7-1 release.
+
+ -- Zcash Company <team@z.cash>  Wed, 08 Mar 2017 13:51:11 -0800
+
+zcash (1.0.7) jessie; urgency=medium
+
+  * 1.0.7 release.
+
+ -- Zcash Company <team@z.cash>  Fri, 03 Mar 2017 20:55:04 -0800
+
+zcash (1.0.6) jessie; urgency=medium
+
+  * 1.0.6 release.
+
+ -- Zcash Company <team@z.cash>  Fri, 10 Feb 2017 10:23:00 -0800
+
+zcash (1.0.5) jessie; urgency=medium
+
+  * 1.0.5 release.
+
+ -- Zcash Company <team@z.cash>  Thu, 19 Jan 2017 19:23:40 -0700
+
+zcash (1.0.4) jessie; urgency=medium
+
+  * 1.0.4 release.
+
+ -- Zcash Company <team@z.cash>  Thu, 15 Dec 2016 16:46:14 +1300
+
+zcash (1.0.3) jessie; urgency=medium
+
+  * 1.0.3 release.
+
+ -- Zcash Company <team@z.cash>  Wed, 17 Nov 2016 15:56:00 -0700
+
+zcash (1.0.2) jessie; urgency=medium
+
+  * 1.0.2 release.
+
+ -- Zcash Company <team@z.cash>  Mon, 07 Nov 2016 19:01:35 -0600
+
+zcash (1.0.1) jessie; urgency=medium
+
+  * 1.0.1 release.
+
+ -- Zcash Company <team@z.cash>  Thu, 03 Nov 2016 23:21:09 -0500
+
+zcash (1.0.0-sprout) jessie; urgency=medium
+
+  * 1.0.0 release.
+
+ -- Zcash Company <team@z.cash>  Fri, 28 Oct 2016 03:00:50 -0700
+
+zcash (1.0.0-rc4) jessie; urgency=medium
+
+  * 1.0.0-rc4 release.
+
+ -- Zcash Company <team@z.cash>  Thu, 27 Oct 2016 13:36:00 +0100
+
+zcash (1.0.0-rc3) jessie; urgency=medium
+
+  * 1.0.0-rc3 release.
+
+ -- Zcash Company <team@z.cash>  Wed, 26 Oct 2016 23:17:03 +0100
+
+zcash (1.0.0-rc2) jessie; urgency=medium
+
+  * 1.0.0-rc2 release.
+
+ -- Zcash Company <team@z.cash>  Sun, 23 Oct 2016 01:51:27 +0100
+
+zcash (1.0.0-rc1) jessie; urgency=medium
+
+  * Initial packaging for Debian.
+
+ -- Zcash Company <team@z.cash>  Mon, 17 Oct 2016 11:47:02 -0700

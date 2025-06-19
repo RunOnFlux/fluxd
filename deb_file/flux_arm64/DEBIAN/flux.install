@@ -1,0 +1,4 @@
+usr/local/bin/fluxd
+usr/local/bin/flux-cli
+usr/local/bin/flux-tx
+usr/local/bin/flux-fetch-params.sh

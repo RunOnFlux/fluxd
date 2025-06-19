@@ -1,0 +1,13 @@
+Package: flux
+Version: 7.2.0
+Source: flux
+Section: utils
+Priority: optional
+Maintainer: Flux Foundation <info@runonflux.io>
+Homepage: https://runonflux.io
+Build-Depends: autoconf, automake, bsdmainutils, build-essential, git, g++-multilib, libc6-dev, libtool, m4, ncurses-dev, pkg-config, python, unzip, wget, zlib1g-dev
+Vcs-Git: https://github.com/runonflux/fluxd.git
+Vcs-Browser: https://github.com/runonflux/fluxd
+Architecture: i386
+Depends: libc6 (>= 2.17), libgcc1 (>= 1:3.0), libgomp1 (>= 4.9), libstdc++6 (>= 5.2)
+Description: Flux is a cryptocurrency that empowers Flux - Your gateway to a decetralized world.
