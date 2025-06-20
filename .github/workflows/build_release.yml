@@ -101,10 +101,19 @@ jobs:
           cp src/flux-cli $DEB_DIR/usr/local/bin/
           cp src/flux-tx $DEB_DIR/usr/local/bin/
           
-          # Strip binaries to reduce size
-          strip $DEB_DIR/usr/local/bin/fluxd
-          strip $DEB_DIR/usr/local/bin/flux-cli
-          strip $DEB_DIR/usr/local/bin/flux-tx
+          # Set the correct strip command based on architecture
+          if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+            STRIP_CMD="aarch64-linux-gnu-strip"
+          elif [[ "${{ matrix.arch }}" == "i386" ]]; then
+            STRIP_CMD="strip"
+          else
+            STRIP_CMD="strip"  # amd64 uses native strip
+          fi
+          
+          # Strip binaries to reduce size using the correct strip command
+          $STRIP_CMD $DEB_DIR/usr/local/bin/fluxd
+          $STRIP_CMD $DEB_DIR/usr/local/bin/flux-cli
+          $STRIP_CMD $DEB_DIR/usr/local/bin/flux-tx
           
           # Copy fetch-params script if it exists (renamed to flux-fetch-params in deb)
           if [ -f zcutil/fetch-params.sh ]; then
@@ -149,10 +158,19 @@ jobs:
             # Create zip archive for Windows
             zip Flux-Windows-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.zip fluxd.exe flux-cli.exe flux-tx.exe $([ -f fetch-params.bat ] && echo fetch-params.bat)
           else
-            # Strip binaries to reduce size
-            strip ./src/fluxd ./src/flux-cli ./src/flux-tx
+            # Set the correct strip command based on architecture
+            if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+              STRIP_CMD="aarch64-linux-gnu-strip"
+            elif [[ "${{ matrix.arch }}" == "i386" ]]; then
+              STRIP_CMD="strip"
+            else
+              STRIP_CMD="strip"  # amd64 uses native strip
+            fi
+            
+            # Strip binaries to reduce size using the correct strip command
+            $STRIP_CMD ./src/fluxd ./src/flux-cli ./src/flux-tx
             if [ -f ./src/flux-gtest ]; then
-              strip ./src/flux-gtest
+              $STRIP_CMD ./src/flux-gtest
             fi
             
             # Copy binaries to root directory to avoid nested paths in tar
