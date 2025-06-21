@@ -1140,10 +1140,14 @@ UniValue zelnodecurrentwinner (const UniValue& params, bool fHelp)
 
 UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
 {
-    if (fHelp || (params.size() > 0))
+    if (fHelp || (params.size() > 2))
         throw runtime_error(
                 cmdname + "\n"
                 "\nGet fluxnode count values\n"
+
+                  "\nArguments:\n"
+                  "1. history         (boolean, optional) Specifiy if you want all fluxnode counts from all blocks (-fluxnodecount=1 required)\n"
+                  "2. timetable       (number, optional) Default=360 How often you want the fluxnode count. 360 = 12 Hours, 720 = 1 Day. Range is (1, 99999999)\n"
 
                 "\nResult:\n"
                 "{\n"
@@ -1157,6 +1161,44 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
                 HelpExampleCli(cmdname, "") + HelpExampleRpc(cmdname, ""));
 
     UniValue obj(UniValue::VOBJ);
+
+    // Global Numbers
+    bool fAll = false;
+    uint32_t nSpread = 360; // 360 = 12 hours with 2 minute blocks. 720 blocks a day
+    if (params.size() >= 1) {
+       fAll = params[0].get_bool();
+    }
+
+    if (fAll && !fFluxNodeCountIndex) {
+        throw JSONRPCError(RPC_INVALID_REQUEST, "history was requested but fluxnodecount is not enabled. You must have fluxnodecount=1 in flux.conf");
+    }
+
+    // Get Global Data instead of current blocks count
+    if (fAll) {
+        if (params.size() == 2) {
+            nSpread = params[1].get_int();
+        }
+
+        if (nSpread <= 0 || nSpread >= 100000000) {
+            nSpread = 360;
+        }
+
+        LOCK(cs_main);
+        CBlockIndex *index = nullptr;
+        index = chainActive[Params().GetConsensus().vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight];
+
+        while (index) {
+            UniValue amounts(UniValue::VOBJ);
+            amounts.pushKV("stratus", index->nStratus);
+            amounts.pushKV("nimbus", index->nNimbus);
+            amounts.pushKV("cumulus", index->nCumulus);
+            obj.pushKV(std::to_string(index->nHeight), amounts);
+
+            index = chainActive[index->nHeight + nSpread];
+        }
+
+        return obj;
+    }
 
     int ipv4 = 0, ipv6 = 0, onion = 0, nTotal = 0;
     std::vector<int> vNodeCount(GetNumberOfTiers());

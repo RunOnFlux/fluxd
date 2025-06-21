@@ -1564,6 +1564,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                     break;
                 }
 
+                // Check for changed -fluxnodecount state
+                if (fFluxNodeCountIndex != GetBoolArg("-fluxnodecount", false)) {
+                    strLoadError = _("You need to rebuild the database using -reindex to change -fluxnodecount");
+                    break;
+                }
+
                 // Check for changed -insightexplorer state
                 if (fInsightExplorer != GetBoolArg("-insightexplorer", false)) {
                     strLoadError = _("You need to rebuild the database using -reindex to change -insightexplorer");
