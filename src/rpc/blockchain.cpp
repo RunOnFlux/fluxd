@@ -1091,11 +1091,14 @@ struct CompareBlocksByHeight
 
 UniValue getchaintips(const UniValue& params, bool fHelp)
 {
-    if (fHelp || params.size() != 0)
+    if (fHelp || params.size() > 1)
         throw runtime_error(
             "getchaintips\n"
             "Return information about all known tips in the block tree,"
             " including the main chain as well as orphaned branches.\n"
+            "getchaintips now accepts 1 parameter. If a parameter is passed in, it will search\n"
+            " the entire chain for chaintips. If no parameter is given, it will search the most recent\n"
+            " 100,000 block heights\n"
             "\nResult:\n"
             "[\n"
             "  {\n"
@@ -1124,17 +1127,33 @@ UniValue getchaintips(const UniValue& params, bool fHelp)
 
     LOCK(cs_main);
 
-    /* Build up a list of chain tips.  We start with the list of all
-       known blocks, and successively remove blocks that appear as pprev
-       of another block.  */
+    int currentHeight = chainActive.Height();
+    int minHeight = std::max(0, currentHeight - 100000);
+
+    if (params.size() == 1) {
+        minHeight = 0;
+    }
+
+    // First, collect only relevant blocks
+    std::set<const CBlockIndex*> referenced;
+    std::vector<const CBlockIndex*> recentBlocks;
+
+    for (const auto& item : mapBlockIndex) {
+        const CBlockIndex* block = item.second;
+        if (block->nHeight >= minHeight) {
+            recentBlocks.push_back(block);
+            if (block->pprev && block->pprev->nHeight >= minHeight) {
+                referenced.insert(block->pprev);
+            }
+        }
+    }
+
+    // Then, filter to find tips among them
     std::set<const CBlockIndex*, CompareBlocksByHeight> setTips;
-    BOOST_FOREACH(const PAIRTYPE(const uint256, CBlockIndex*)& item, mapBlockIndex)
-        setTips.insert(item.second);
-    BOOST_FOREACH(const PAIRTYPE(const uint256, CBlockIndex*)& item, mapBlockIndex)
-    {
-        const CBlockIndex* pprev = item.second->pprev;
-        if (pprev)
-            setTips.erase(pprev);
+    for (const CBlockIndex* block : recentBlocks) {
+        if (referenced.find(block) == referenced.end()) {
+            setTips.insert(block);
+        }
     }
 
     // Always report the currently active tip.
