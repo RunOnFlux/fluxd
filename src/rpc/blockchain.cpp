@@ -1096,9 +1096,8 @@ UniValue getchaintips(const UniValue& params, bool fHelp)
             "getchaintips\n"
             "Return information about all known tips in the block tree,"
             " including the main chain as well as orphaned branches.\n"
-            "getchaintips now accepts 1 parameter. If a parameter is passed in, it will search\n"
-            " the entire chain for chaintips. If no parameter is given, it will search the most recent\n"
-            " 100,000 block heights\n"
+            "\nArguments:\n"
+            "1. blockheight   (numeric, optional, default=0) What block height to start checking at if valid\n"
             "\nResult:\n"
             "[\n"
             "  {\n"
@@ -1128,10 +1127,17 @@ UniValue getchaintips(const UniValue& params, bool fHelp)
     LOCK(cs_main);
 
     int currentHeight = chainActive.Height();
-    int minHeight = std::max(0, currentHeight - 100000);
+    int minHeight = 0;
 
+    int pBlockHeight = 0;
     if (params.size() == 1) {
-        minHeight = 0;
+        pBlockHeight = params[0].get_int();
+
+        if (pBlockHeight < 0 || pBlockHeight > currentHeight) {
+            minHeight = 0;
+        } else {
+            minHeight = std::max(0, pBlockHeight);
+        }
     }
 
     // First, collect only relevant blocks
