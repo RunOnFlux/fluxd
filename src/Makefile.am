@@ -610,3 +610,10 @@ if ENABLE_TESTS
 include Makefile.test.include
 include Makefile.gtest.include
 endif
+
+bin_PROGRAMS += flux_sign
+flux_sign_SOURCES = flux_sign.cpp
+flux_sign_LDADD = $(LIBBITCOIN_SERVER) $(LIBBITCOIN_COMMON) $(LIBSECP256K1) \
+                  $(LIBBITCOIN_UTIL) $(LIBBITCOIN_WALLET) $(LIBBITCOIN_CRYPTO) \
+                  $(SSL_LIBS) $(BOOST_LIBS) $(LIBFLUX) $(LIBFLUX_LIBS) -lstdc++
+

@@ -1,0 +1,35 @@
+{
+  "wif_keys": [
+    "keydata"
+  ],
+  "unsigned_txs": [
+    "0400008085...output from createrawtransaction",
+    "0400008085...",
+    "0400008085...",
+    "0400008085...",
+    "0400008085..."
+  ],
+  "prevouts": {
+    "4f0da0dee7e535e03fc429300df5c02819a18bd74adceef1d3a527c0126e186f:0": {
+      "script": "76a91412f92f93ce4e4b0a24bd2051a32f79c7569aba5e88ac",
+      "amount": 1000000000
+    },
+    "2fbebcf1384e280e56470114ca3c8d2ce45c9390253bd1eac96a826f5c4a23ac:0": {
+      "script": "76a91412f92f93ce4e4b0a24bd2051a32f79c7569aba5e88ac",
+      "amount": 1000000000
+    },
+    "6be688dc0198a03419af90014bdb07023a47ceca6705cb4b4561c593f14514ad:0": {
+      "script": "76a91412f92f93ce4e4b0a24bd2051a32f79c7569aba5e88ac",
+      "amount": 2000000000
+    },
+    "9cf430ff0d1809f52ca8dac39b76776cc92e847f39b82a119987fe2aa9307619:0": {
+      "script": "76a91412f92f93ce4e4b0a24bd2051a32f79c7569aba5e88ac",
+      "amount": 1000000000
+    },
+    "76075a95044711c3253dec8349da877148f8aad5fbc05861e18329142f35f04f:0": {
+      "script": "76a91412f92f93ce4e4b0a24bd2051a32f79c7569aba5e88ac",
+      "amount": 1000000
+    }
+  }
+}
+
