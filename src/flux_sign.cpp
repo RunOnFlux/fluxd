@@ -168,8 +168,7 @@ bool WIFToCKey(const std::string& wif, CKey& keyOut)
 }
 
 std::string signTransaction(const CBasicKeyStore& keystore, const std::string& Arg_unsigned_tx,
-                            const std::map<std::string, std::pair<std::string, CAmount>>& prevouts,
-                            uint32_t height)
+                            const std::map<std::string, std::pair<std::string, CAmount>>& prevouts)
 {
     std::vector<unsigned char> txData = ParseHex(Arg_unsigned_tx);
     CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
@@ -190,8 +189,6 @@ std::string signTransaction(const CBasicKeyStore& keystore, const std::string& A
             throw std::runtime_error("Failed to sign input " + std::to_string(i));
         }
     }
-    //tx.nLockTime = height - 10;
-    tx.nExpiryHeight = height + DEFAULT_TX_EXPIRY_DELTA;
     CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
     ssTx << tx;
     return HexStr(ssTx.begin(), ssTx.end());
@@ -204,7 +201,6 @@ std::string signTransaction(const CBasicKeyStore& keystore, const std::string& A
 using boost::property_tree::ptree;
 
 int main(int argc, char* argv[]) {
-    uint32_t height = 1937765;
 
     if (argc < 2) {
         std::cerr << "Usage: " << argv[0] << " <test_data.json>" << std::endl;
@@ -248,13 +244,14 @@ int main(int argc, char* argv[]) {
 
     for (const auto& tx : unsigned_txs) {
         try {
-            std::string signedHex = signTransaction(keystore, tx, prevouts, height);
+            std::string signedHex = signTransaction(keystore, tx, prevouts);
             std::cout << "Signed TX: " << signedHex << std::endl;
         } catch (const std::exception& ex) {
             std::cerr << "Error: " << ex.what() << std::endl;
             return 1;
         }
     }
+    ECC_Stop();
 
     return 0;
 }
