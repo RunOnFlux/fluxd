@@ -1885,6 +1885,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     fFluxnode = GetBoolArg("-zelnode", false);
+    fArcane = getenv("UNMANAGED_FLUXBENCHD") != NULL;
 
     if ((fFluxnode || fluxnodeConfig.getCount() > -1) && fTxIndex == false) {
         return InitError("Enabling Fluxnode support requires turning on transaction indexing."
@@ -1984,7 +1985,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         
     }
 
-    if (fFluxnode) {
+    if (fFluxnode && !fArcane) {
         // Check if the benchmark application is running
         if (!IsFluxBenchdRunning()) {
             StartFluxBenchd();

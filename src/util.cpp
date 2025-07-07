@@ -103,6 +103,7 @@ using namespace std;
 string strFluxnodeAddr = "";
 string strFluxnodePrivKey = "";
 bool fFluxnode = false;
+bool fArcane = false;
 
 CCriticalSection cs_args;
 map<string, string> mapArgs;

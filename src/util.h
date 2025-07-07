@@ -36,6 +36,7 @@ static const bool DEFAULT_LOGTIMESTAMPS = true;
 
 /** Fluxnode features */
 extern bool fFluxnode;
+extern bool fArcane;
 extern std::string strFluxnodeAddr;
 
 
