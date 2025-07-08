@@ -1,3 +1,9 @@
+flux (8.0.0) stable; urgency=medium
+
+  * 8.0.0 release.
+
+ -- Flux Foundation <info@runonflux.io>  Tue, 8 Jul 2025 15:57:22 +0800
+
 flux (7.2.0) stable; urgency=medium
 
   * 7.2.0 release.
