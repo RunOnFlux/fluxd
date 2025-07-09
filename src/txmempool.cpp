@@ -300,7 +300,7 @@ void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction>& rem
         }
 
         if (origTx.IsFluxnodeTx()) {
-            LogPrint("fluxnode", "%s: Remove fluxnode tx from mempool %s\n", __func__, origTx.GetHash().GetHex());
+            LogPrint("dfluxnode", "%s: Remove fluxnode tx from mempool %s\n", __func__, origTx.GetHash().GetHex());
             mapFluxnodeTxMempool.erase(origTx.collateralIn);
         }
     }
