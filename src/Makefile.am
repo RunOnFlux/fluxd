@@ -611,9 +611,13 @@ include Makefile.test.include
 include Makefile.gtest.include
 endif
 
-bin_PROGRAMS += flux_sign
-flux_sign_SOURCES = flux_sign.cpp
-flux_sign_LDADD = $(LIBBITCOIN_SERVER) $(LIBBITCOIN_COMMON) $(LIBSECP256K1) \
+libfluxsign_a_SOURCES = flux_sign.cpp
+noinst_LIBRARIES = libfluxsign.a
+
+bin_PROGRAMS += flux_sign_test
+flux_sign_test_SOURCES = flux_sign_test.cpp flux_sign.h
+flux_sign_test_LDADD = libfluxsign.a \
+                  $(LIBBITCOIN_SERVER) $(LIBBITCOIN_COMMON) $(LIBSECP256K1) \
                   $(LIBBITCOIN_UTIL) $(LIBBITCOIN_WALLET) $(LIBBITCOIN_CRYPTO) \
                   $(SSL_LIBS) $(BOOST_LIBS) $(LIBFLUX) $(LIBFLUX_LIBS) -lstdc++
 

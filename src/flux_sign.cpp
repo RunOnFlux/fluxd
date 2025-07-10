@@ -11,10 +11,11 @@
 #include <core_io.h>
 #include <map>
 #include <string>
+#include "flux_sign.h"
 
-/** Default for -txexpirydelta, in number of blocks - from main.h */
-static const unsigned int DEFAULT_TX_EXPIRY_DELTA = 20;
+/** Default for consensus from main.h */
 static const unsigned int SAPLING_CONSENSUS_BRANCH = 0x76b809bb;
+static CBasicKeyStore keystore;
 
 bool MatchPayToPubKeyHash(const CScript& script, std::vector<unsigned char>& pubKeyHashOut)
 {
@@ -167,7 +168,7 @@ bool WIFToCKey(const std::string& wif, CKey& keyOut)
     return keyOut.IsValid();
 }
 
-std::string signTransaction(const CBasicKeyStore& keystore, const std::string& Arg_unsigned_tx,
+std::string signTransaction(const std::string& Arg_unsigned_tx,
                             const std::map<std::string, std::pair<std::string, CAmount>>& prevouts)
 {
     std::vector<unsigned char> txData = ParseHex(Arg_unsigned_tx);
@@ -194,65 +195,17 @@ std::string signTransaction(const CBasicKeyStore& keystore, const std::string& A
     return HexStr(ssTx.begin(), ssTx.end());
 }
 
-#include <fstream>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
-
-using boost::property_tree::ptree;
-
-int main(int argc, char* argv[]) {
-
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <test_data.json>" << std::endl;
-        return 1;
-    }
-
-    ptree pt;
-    try {
-        read_json(argv[1], pt);
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to parse JSON: " << e.what() << std::endl;
-        return 1;
-    }
-
-    std::vector<std::string> wif_keys;
-    for (auto& key : pt.get_child("wif_keys"))
-        wif_keys.push_back(key.second.get_value<std::string>());
-
-    std::vector<std::string> unsigned_txs;
-    for (auto& tx : pt.get_child("unsigned_txs"))
-        unsigned_txs.push_back(tx.second.get_value<std::string>());
-
-    std::map<std::string, std::pair<std::string, int64_t>> prevouts;
-    for (auto& po : pt.get_child("prevouts")) {
-        std::string key = po.first;
-        std::string script = po.second.get<std::string>("script");
-        int64_t amount = po.second.get<int64_t>("amount");
-        prevouts[key] = {script, amount};
-    }
-
+bool flux_sign_init(std::string wifKey) {
+    bool ok = false;
     ECC_Start();
-    CBasicKeyStore keystore;
-    for (const auto& wif : wif_keys) {
-        CKey key;
-        if (!WIFToCKey(wif, key)) {
-            std::cerr << wif << " WIF Private key not valid!" << std::endl;
-        } else {
-            keystore.AddKey(key);
-        }
-    }
 
-    for (const auto& tx : unsigned_txs) {
-        try {
-            std::string signedHex = signTransaction(keystore, tx, prevouts);
-            std::cout << "Signed TX: " << signedHex << std::endl;
-        } catch (const std::exception& ex) {
-            std::cerr << "Error: " << ex.what() << std::endl;
-            return 1;
-        }
+    CKey key;
+    if (!WIFToCKey(wifKey, key)) {
+        std::cerr << wifKey << " WIF Private key not valid!" << std::endl;
+    } else {
+        keystore.AddKey(key);
+        ok = true;
     }
-    ECC_Stop();
-
-    return 0;
+    return ok;
 }
 
