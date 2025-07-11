@@ -15,7 +15,7 @@
 
 /** Default for consensus from main.h */
 static const unsigned int SAPLING_CONSENSUS_BRANCH = 0x76b809bb;
-static CBasicKeyStore keystore;
+static CBasicKeyStore* _keystore = nullptr;
 
 bool MatchPayToPubKeyHash(const CScript& script, std::vector<unsigned char>& pubKeyHashOut)
 {
@@ -186,7 +186,7 @@ std::string signTransaction(const std::string& Arg_unsigned_tx,
         CAmount amount = it->second.second;
         std::string str(scriptBytes.begin(), scriptBytes.end());
         std::cout << HexStr(str.begin(), str.end()) << std::endl;
-        if (!SignInput(tx, i, scriptPubKey, amount, keystore)) {
+        if (!SignInput(tx, i, scriptPubKey, amount, *_keystore)) {
             throw std::runtime_error("Failed to sign input " + std::to_string(i));
         }
     }
@@ -195,17 +195,28 @@ std::string signTransaction(const std::string& Arg_unsigned_tx,
     return HexStr(ssTx.begin(), ssTx.end());
 }
 
-bool flux_sign_init(std::string wifKey) {
+bool fluxsignAddKey(std::string wifKey) {
     bool ok = false;
-    ECC_Start();
 
+    if (_keystore == nullptr) {
+        std::cerr << "No keystore defined!" << std::endl;
+    }
     CKey key;
     if (!WIFToCKey(wifKey, key)) {
         std::cerr << wifKey << " WIF Private key not valid!" << std::endl;
     } else {
-        keystore.AddKey(key);
+        _keystore->AddKey(key);
         ok = true;
     }
     return ok;
 }
 
+void fluxsignStart(void) {
+    _keystore = new CBasicKeyStore();
+    ECC_Start();
+}
+
+void fluxsignStop(void) {
+    ECC_Stop();
+    delete _keystore;
+}

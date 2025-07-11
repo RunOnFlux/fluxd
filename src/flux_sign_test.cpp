@@ -6,6 +6,12 @@
 using boost::property_tree::ptree;
 
 int main(int argc, char* argv[]) {
+    std::cout << "Boost thread is working\n";
+    boost::mutex m;
+    {
+        boost::lock_guard<boost::mutex> lock(m);
+        std::cout << "Mutex lock succeeded\n";
+    }
 
     if (argc < 2) {
         std::cerr << "Usage: " << argv[0] << " <test_data.json>" << std::endl;
@@ -20,6 +26,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    fluxsignStart();
     std::vector<std::string> wif_keys;
     for (auto& key : pt.get_child("wif_keys"))
         wif_keys.push_back(key.second.get_value<std::string>());
@@ -37,7 +44,7 @@ int main(int argc, char* argv[]) {
     }
 
     for (const auto& wif : wif_keys) {
-        if (!flux_sign_init(wif)) {
+        if (!fluxsignAddKey(wif)) {
             std::cerr << wif << " WIF Private key not valid!" << std::endl;
         }
         break; // only take first key for now
@@ -52,7 +59,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     }
-    ECC_Stop();
+    fluxsignStop();
 
     return 0;
 }
