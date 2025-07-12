@@ -11,7 +11,7 @@
 #include <core_io.h>
 #include <map>
 #include <string>
-#include "flux_sign.h"
+#include "fluxsign.h"
 
 /** Default for consensus from main.h */
 static const unsigned int SAPLING_CONSENSUS_BRANCH = 0x76b809bb;

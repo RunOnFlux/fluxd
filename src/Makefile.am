@@ -4,6 +4,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
+SUBDIRS = fluxsign
+
 DIST_SUBDIRS = secp256k1 univalue
 
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS) $(SAN_LDFLAGS) $(HARDENED_LDFLAGS)
@@ -611,13 +613,13 @@ include Makefile.test.include
 include Makefile.gtest.include
 endif
 
-libfluxsign_a_SOURCES = flux_sign.cpp
-noinst_LIBRARIES = libfluxsign.a
+#libfluxsign_a_SOURCES = flux_sign.cpp
+#noinst_LIBRARIES = libfluxsign.a
 
-bin_PROGRAMS += flux_sign_test
-flux_sign_test_SOURCES = flux_sign_test.cpp flux_sign.h
-flux_sign_test_LDADD = libfluxsign.a \
-                  $(LIBBITCOIN_SERVER) $(LIBBITCOIN_COMMON) $(LIBSECP256K1) \
-                  $(LIBBITCOIN_UTIL) $(LIBBITCOIN_WALLET) $(LIBBITCOIN_CRYPTO) \
-                  $(SSL_LIBS) $(BOOST_LIBS) $(LIBFLUX) $(LIBFLUX_LIBS) -lstdc++
+#bin_PROGRAMS += flux_sign_test
+#flux_sign_test_SOURCES = flux_sign_test.cpp flux_sign.h
+#flux_sign_test_LDADD = libfluxsign.a \
+#                  $(LIBBITCOIN_SERVER) $(LIBBITCOIN_COMMON) $(LIBSECP256K1) \
+#                  $(LIBBITCOIN_UTIL) $(LIBBITCOIN_WALLET) $(LIBBITCOIN_CRYPTO) \
+#                  $(SSL_LIBS) $(BOOST_LIBS) $(LIBFLUX) $(LIBFLUX_LIBS) -lstdc++
 

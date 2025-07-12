@@ -881,7 +881,7 @@ AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(ZMQ_LIBS)
 AC_SUBST(LIBFLUX_LIBS)
 AC_SUBST(PROTON_LIBS)
-AC_CONFIG_FILES([Makefile src/Makefile doc/man/Makefile src/test/buildenv.py])
+AC_CONFIG_FILES([Makefile src/Makefile doc/man/Makefile src/test/buildenv.py src/fluxsign/Makefile])
 AC_CONFIG_FILES([qa/pull-tester/run-bitcoind-for-test.sh],[chmod +x qa/pull-tester/run-bitcoind-for-test.sh])
 AC_CONFIG_FILES([qa/pull-tester/tests-config.sh],[chmod +x qa/pull-tester/tests-config.sh])
 
