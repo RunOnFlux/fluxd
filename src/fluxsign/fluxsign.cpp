@@ -168,7 +168,7 @@ bool WIFToCKey(const std::string& wif, CKey& keyOut)
     return keyOut.IsValid();
 }
 
-std::string signTransaction(const std::string& Arg_unsigned_tx,
+std::string fluxsignTransaction(const std::string& Arg_unsigned_tx,
                             const std::map<std::string, std::pair<std::string, CAmount>>& prevouts)
 {
     std::vector<unsigned char> txData = ParseHex(Arg_unsigned_tx);

@@ -1,7 +1,9 @@
-#include "fluxsign.h"
+#include <key.h>
+#include <keystore.h>
 #include <fstream>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
+#include "fluxsign.h"
 
 using boost::property_tree::ptree;
 
@@ -47,12 +49,11 @@ int main(int argc, char* argv[]) {
         if (!fluxsignAddKey(wif)) {
             std::cerr << wif << " WIF Private key not valid!" << std::endl;
         }
-        break; // only take first key for now
     }
 
     for (const auto& tx : unsigned_txs) {
         try {
-            std::string signedHex = signTransaction(tx, prevouts);
+            std::string signedHex = fluxsignTransaction(tx, prevouts);
             std::cout << "Signed TX: " << signedHex << std::endl;
         } catch (const std::exception& ex) {
             std::cerr << "Error: " << ex.what() << std::endl;
