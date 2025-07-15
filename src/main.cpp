@@ -2477,14 +2477,6 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
     if (halvings >= 64)
         return 0;
 
-    // As of June 27th, 2025 we are at 2 halvings
-    // This will be a temp solution while we work on the next
-    // blockchain improvement protocols
-    if (halvings >= 2) {
-        nSubsidy >>= 2;
-        return nSubsidy;
-    }
-
     // Subsidy is cut in half every 655,350 blocks which will occur approximately every 2.5 years.
     nSubsidy >>= halvings;
     return nSubsidy;
