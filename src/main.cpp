@@ -936,8 +936,29 @@ bool ContextualCheckTransaction(
     bool kamataActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_KAMATA);
     bool fluxRebrandActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_FLUX);
     bool fluxP2SHNodesActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_P2SHNODES);
+    bool fluxPONActive = NetworkUpgradeActive(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_PON);
 
     if (tx.IsCoinBase()) {
+        if (fluxPONActive) {
+            // Enforce Dev Payment address is paid
+            CAmount nMinimumDevFunAmount = GetMinDevFundAmount(nHeight, chainparams.GetConsensus());
+            if (nMinimumDevFunAmount > 0) {
+                bool fFoundDevFund = false;
+                for (const auto& out : tx.vout) {
+                    if (out.scriptPubKey == GetScriptForDestination(DecodeDestination(Params().GetDevFundAddress()))) {
+                        if (out.nValue >= nMinimumDevFunAmount) {
+                            fFoundDevFund = true;
+                            break;
+                        }
+                    }
+                }
+                if (!fFoundDevFund) {
+                    return state.DoS(dosLevel, error("ContextualCheckTransaction(): dev fund not correct in coinbase"),
+                                     REJECT_INVALID, "tx-coinbase-missing-dev-funding");
+                }
+            }
+        }
+
         // Check for exchange address funding
         CAmount nExchangeAmount = GetExchangeFundAmount(nHeight, chainparams.GetConsensus());
         CAmount nFoundationAmount = GetFoundationFundAmount(nHeight, chainparams.GetConsensus());
@@ -2538,6 +2559,15 @@ CAmount GetFoundationFundAmount(int nHeight, const Consensus::Params& consensusP
     }
 
     return 0;
+}
+
+CAmount GetMinDevFundAmount(const int& nHeight, const Consensus::Params& consensusParams ) {
+    const CAmount nBlockSubsidy = GetBlockSubsidy(nHeight, consensusParams);
+    const CAmount nCumulus = GetFluxnodeSubsidy(nHeight, nBlockSubsidy, 1);
+    const CAmount nNimbus = GetFluxnodeSubsidy(nHeight, nBlockSubsidy, 2);
+    const CAmount nStratus = GetFluxnodeSubsidy(nHeight, nBlockSubsidy, 3);
+
+    return nBlockSubsidy - nStratus - nNimbus - nCumulus;
 }
 
 CAmount GetFluxnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier)
