@@ -441,6 +441,7 @@ public:
     void CheckForUndoExpiredStartTx(const int& p_nHeight);
     bool CheckIfStarted(const COutPoint& out);
     bool CheckIfConfirmed(const COutPoint& out);
+    bool GetPubkeyIfConfirmed(const COutPoint& out, CPubKey& pubKey);
     bool CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight = 0);
 
     bool CheckFluxnodePayout(const CTransaction& coinbase, const int p_Height, FluxnodeCache* p_fluxnodeCache = nullptr);

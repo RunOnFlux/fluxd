@@ -306,6 +306,17 @@ bool FluxnodeCache::CheckIfConfirmed(const COutPoint& out)
     return false;
 }
 
+bool FluxnodeCache::GetPubkeyIfConfirmed(const COutPoint& out, CPubKey& pubKey)
+{
+    LOCK(cs);
+    if (mapConfirmedFluxnodeData.count(out)) {
+        pubKey = mapConfirmedFluxnodeData.at(out).pubKey;
+        return true;
+    }
+
+    return false;
+}
+
 bool FluxnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight)
 {
     int nCurrentHeight;
