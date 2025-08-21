@@ -237,6 +237,10 @@ public:
     unsigned int nBits;
     uint256 nNonce;
     std::vector<unsigned char> nSolution;
+    
+    //! PON fields
+    COutPoint nodesCollateral;
+    std::vector<unsigned char> vchBlockSig;
 
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
@@ -270,6 +274,8 @@ public:
         nBits          = 0;
         nNonce         = uint256();
         nSolution.clear();
+        nodesCollateral.SetNull();
+        vchBlockSig.clear();
     }
 
     CBlockIndex()
@@ -288,6 +294,8 @@ public:
         nBits          = block.nBits;
         nNonce         = block.nNonce;
         nSolution      = block.nSolution;
+        nodesCollateral = block.nodesCollateral;
+        vchBlockSig    = block.vchBlockSig;
     }
 
     CDiskBlockPos GetBlockPos() const {
@@ -320,6 +328,8 @@ public:
         block.nBits          = nBits;
         block.nNonce         = nNonce;
         block.nSolution      = nSolution;
+        block.nodesCollateral = nodesCollateral;
+        block.vchBlockSig    = vchBlockSig;
         return block;
     }
 
@@ -442,6 +452,12 @@ public:
         READWRITE(nBits);
         READWRITE(nNonce);
         READWRITE(nSolution);
+        
+        // Only read/write PON fields if this is a PON block
+        if (this->nVersion >= CBlockHeader::PON_VERSION) {
+            READWRITE(nodesCollateral);
+            READWRITE(vchBlockSig);
+        }
 
         // Only read/write nSproutValue if the client version used to create
         // this index was storing them.
@@ -470,18 +486,19 @@ public:
         block.nBits           = nBits;
         block.nNonce          = nNonce;
         block.nSolution       = nSolution;
+        block.nodesCollateral = nodesCollateral;
+        block.vchBlockSig     = vchBlockSig;
         return block.GetHash();
     }
 
 
     std::string ToString() const
     {
-        std::string str = "CDiskBlockIndex(";
-        str += CBlockIndex::ToString();
-        str += strprintf("\n                hashBlock=%s, hashPrev=%s)",
+        return strprintf("CDiskBlockIndex(pprev=%p, nHeight=%d, merkle=%s, hashBlock=%s, hashPrev=%s)",
+            pprev, nHeight,
+            hashMerkleRoot.ToString(),
             GetBlockHash().ToString(),
             hashPrev.ToString());
-        return str;
     }
 };
 

@@ -10,6 +10,9 @@
 #include "primitives/transaction.h"
 #include "serialize.h"
 #include "uint256.h"
+#include "key.h"
+
+class CChainParams;
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
@@ -24,14 +27,22 @@ public:
     // header
     static const size_t HEADER_SIZE=4+32+32+32+4+4+32; // excluding Equihash solution
     static const int32_t CURRENT_VERSION=4;
+    // PON blocks use version 100 - high enough that POW miners won't accidentally use it
+    static const int32_t PON_VERSION = 100;
     int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
     uint256 hashFinalSaplingRoot;
     uint32_t nTime;
     uint32_t nBits;
+    
+    // POW fields (version < 100)
     uint256 nNonce;
     std::vector<unsigned char> nSolution;
+    
+    // PON fields (version >= 100)
+    COutPoint nodesCollateral;     // The UTXO used as collateral
+    std::vector<unsigned char> vchBlockSig;  // Signature proving ownership
 
     CBlockHeader()
     {
@@ -48,8 +59,22 @@ public:
         READWRITE(hashFinalSaplingRoot);
         READWRITE(nTime);
         READWRITE(nBits);
-        READWRITE(nNonce);
-        READWRITE(nSolution);
+        
+        // Serialize based on version
+        if (nVersion >= PON_VERSION) {
+            // PON block
+            READWRITE(nodesCollateral);
+            
+            // Exclude signature when computing hash for signing (SER_GETHASH)
+            // This prevents circular dependency when signing the block
+            if (!(s.GetType() & SER_GETHASH)) {
+                READWRITE(vchBlockSig);
+            }
+        } else {
+            // POW block
+            READWRITE(nNonce);
+            READWRITE(nSolution);
+        }
     }
 
     void SetNull()
@@ -62,7 +87,13 @@ public:
         nBits = 0;
         nNonce = uint256();
         nSolution.clear();
+        nodesCollateral.SetNull();
+        vchBlockSig.clear();
     }
+    
+    // Helper functions for PON
+    bool IsPON() const { return nVersion >= PON_VERSION; }
+    bool IsPOW() const { return nVersion < PON_VERSION; }
 
     bool IsNull() const
     {
@@ -122,8 +153,17 @@ public:
         block.hashFinalSaplingRoot   = hashFinalSaplingRoot;
         block.nTime          = nTime;
         block.nBits          = nBits;
-        block.nNonce         = nNonce;
-        block.nSolution      = nSolution;
+        
+        // Copy POW or PON fields based on version
+        if (nVersion >= CBlockHeader::PON_VERSION) {
+            // PON block
+            block.nodesCollateral = nodesCollateral;
+            block.vchBlockSig    = vchBlockSig;
+        } else {
+            // POW block
+            block.nNonce         = nNonce;
+            block.nSolution      = nSolution;
+        }
         return block;
     }
 
