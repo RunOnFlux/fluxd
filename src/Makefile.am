@@ -157,6 +157,9 @@ BITCOIN_CORE_H = \
   netbase.h \
   noui.h \
   policy/fees.h \
+  pon/pon.h \
+  pon/pon-fork.h \
+  pon/pon-minter.h \
   pow.h \
   prevector.h \
   primitives/block.h \
@@ -263,6 +266,9 @@ libbitcoin_server_a_SOURCES = \
   net.cpp \
   noui.cpp \
   policy/fees.cpp \
+  pon/pon.cpp \
+  pon/pon-fork.cpp \
+  pon/pon-minter.cpp \
   pow.cpp \
   rest.cpp \
   rpc/blockchain.cpp \
