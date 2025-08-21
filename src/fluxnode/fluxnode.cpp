@@ -15,6 +15,7 @@
 #include "util.h"
 #include "key_io.h"
 #include "fluxnode/activefluxnode.h"
+#include "pon/pon-fork.h"
 
 FluxnodeCache g_fluxnodeCache;
 
@@ -590,6 +591,7 @@ bool FluxnodeCache::CheckFluxnodePayout(const CTransaction& coinbase, const int 
 {
     LOCK(cs);
     CAmount blockValue = GetBlockSubsidy(p_Height, Params().GetConsensus());
+    CAmount nRemainerLeft = blockValue;
     std::map<Tier, FluxnodePayoutInfo> mapFluxnodePayouts;
 
     // Gather all correct payout data
@@ -599,8 +601,14 @@ bool FluxnodeCache::CheckFluxnodePayout(const CTransaction& coinbase, const int 
             info.script = GetScriptForDestination(info.dest);
             info.amount = GetFluxnodeSubsidy(p_Height, blockValue, currentTier);
             mapFluxnodePayouts[(Tier)currentTier] = info;
+            nRemainerLeft -= info.amount; // Deduce remainer
         }
     }
+
+    // Dev fund checking, we we are already going through the coinbase vouts
+    bool fDevFundPaid = false;
+    bool fCheckDevFundPayment = IsPONActive(p_Height);
+    CScript devFundScript = GetScriptForDestination(DecodeDestination(Params().GetDevFundAddress()));
 
     // Compare it to what is in the block
     // Loop through Tx to make sure they all got paid
@@ -614,9 +622,23 @@ bool FluxnodeCache::CheckFluxnodePayout(const CTransaction& coinbase, const int 
                 }
             }
         }
+
+        // Check Dev Fund Payment (Strict)
+        if (fCheckDevFundPayment && !fDevFundPaid) {
+            if (out.scriptPubKey == devFundScript) {
+                if (out.nValue >= nRemainerLeft) {
+                    fDevFundPaid = true;
+                }
+            }
+        }
     }
 
     // Check for failed payouts and add the paid nodes if approved
+    if (fCheckDevFundPayment && !fDevFundPaid) {
+        error("Invalid block dev fund payment. Should be paying : %s -> %u", Params().GetDevFundAddress(), nRemainerLeft);
+        return false;
+    }
+
     bool fFail = false;
     for (const auto payout : mapFluxnodePayouts) {
         if (!payout.second.approvedpayout) {
