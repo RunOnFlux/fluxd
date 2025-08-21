@@ -153,17 +153,10 @@ public:
         block.hashFinalSaplingRoot   = hashFinalSaplingRoot;
         block.nTime          = nTime;
         block.nBits          = nBits;
-        
-        // Copy POW or PON fields based on version
-        if (nVersion >= CBlockHeader::PON_VERSION) {
-            // PON block
-            block.nodesCollateral = nodesCollateral;
-            block.vchBlockSig    = vchBlockSig;
-        } else {
-            // POW block
-            block.nNonce         = nNonce;
-            block.nSolution      = nSolution;
-        }
+        block.nodesCollateral = nodesCollateral;
+        block.vchBlockSig    = vchBlockSig;
+        block.nNonce         = nNonce;
+        block.nSolution      = nSolution;
         return block;
     }
 

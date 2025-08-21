@@ -485,11 +485,6 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             FillBlockPayeeWithDeterministicPayouts(txNew, nFees, fluxnodePayouts);
         }
 
-        //Fluxnode payments
-        if (pindexPrev->nHeight + 1 >= chainparams.StartFluxnodePayments()) {
-            FillBlockPayeeWithDeterministicPayouts(txNew, nFees, fluxnodePayouts);
-        }
-
         // Exchange Fund
         if (pindexPrev->nHeight + 1 == chainparams.GetExchangeFundingHeight()) {
             CTxDestination exchangeDestination = DecodeDestination(Params().GetExchangeFundingAddress());

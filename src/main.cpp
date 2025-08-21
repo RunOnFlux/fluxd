@@ -4519,16 +4519,6 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     }
 
     pindexNew->nChainWork = (pindexNew->pprev ? pindexNew->pprev->nChainWork : 0) + GetBlockProof(*pindexNew);
-//    arith_uint256 blockProof = GetBlockProof(*pindexNew);
-//    arith_uint256 parentWork = pindexNew->pprev ? pindexNew->pprev->nChainWork : 0;
-//    pindexNew->nChainWork = parentWork + blockProof;
-//
-//    // Debug logging for PON transition
-//    if (pindexNew->nVersion >= 100 || (pindexNew->pprev && pindexNew->pprev->nVersion >= 100)) {
-//        LogPrintf("AddToBlockIndex: height=%d, version=%d, nBits=%08x, blockProof=%s, parentWork=%s, newChainWork=%s\n",
-//                  pindexNew->nHeight, pindexNew->nVersion, pindexNew->nBits,
-//                  blockProof.ToString(), parentWork.ToString(), pindexNew->nChainWork.ToString());
-//    }
     
     pindexNew->RaiseValidity(BLOCK_VALID_TREE);
     if (pindexBestHeader == NULL || pindexBestHeader->nChainWork < pindexNew->nChainWork)
