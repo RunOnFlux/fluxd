@@ -27,6 +27,7 @@
 #include "mempool_limit.h"
 #include "metrics.h"
 #include "miner.h"
+#include "pon/pon-minter.h"
 #include "net.h"
 #include "rpc/server.h"
 #include "rpc/register.h"
@@ -215,6 +216,7 @@ void Shutdown()
 #ifdef ENABLE_MINING
     GenerateBitcoins(false, 0, Params());
 #endif
+    StopPONMinter();
     StopNode();
     StopTorControl();
 
@@ -516,6 +518,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageGroup(_("Mining options:"));
     strUsage += HelpMessageOpt("-gen", strprintf(_("Generate coins (default: %u)"), 0));
     strUsage += HelpMessageOpt("-genproclimit=<n>", strprintf(_("Set the number of threads for coin generation if enabled (-1 = all cores, default: %d)"), 1));
+    strUsage += HelpMessageOpt("-ponminter", _("Enable PON minting for testing (testnet only, allows minting without being a fluxnode, default: false)"));
     strUsage += HelpMessageOpt("-equihashsolver=<name>", _("Specify the Equihash solver to be used if enabled (default: \"default\")"));
     strUsage += HelpMessageOpt("-mineraddress=<addr>", _("Send mined coins to a specific single address"));
     strUsage += HelpMessageOpt("-minetolocalwallet", strprintf(
@@ -2033,6 +2036,23 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Generate coins in the background
     GenerateBitcoins(GetBoolArg("-gen", false), GetArg("-genproclimit", 1), chainparams);
 #endif
+
+    // Start PON minter if this is an active fluxnode or if explicitly enabled for testing
+    bool fPONMinter = GetBoolArg("-ponminter", false);
+    bool isMainnet = (chainparams.NetworkIDString() == "main");
+    bool isRegtest = (chainparams.NetworkIDString() == "regtest");
+    
+    // Only allow -ponminter flag on testnet, not mainnet or regtest
+    if (fPONMinter && isMainnet) {
+        return InitError(_("Error: -ponminter flag is only allowed on testnet"));
+    }
+    if (fPONMinter && isRegtest) {
+        return InitError(_("Error: -ponminter flag is not allowed on regtest. Use 'generate' RPC command instead"));
+    }
+    
+    if (fFluxnode || fPONMinter) {
+        StartPONMinter(chainparams);
+    }
 
     // ********************************************************* Step 12: finished
 

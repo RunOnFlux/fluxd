@@ -27,6 +27,9 @@ struct CBlockTemplate
 /** Generate a new block, without valid proof-of-work */
 CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, std::map<int, std::pair<CScript, CAmount>>* fluxnodePayouts = nullptr);
 
+/** Generate a new block, with the ability to give PON variables */
+CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, const COutPoint& ponNodeCollateral, const uint32_t& enforceTime, std::map<int, std::pair<CScript, CAmount>>* fluxnodePayouts = nullptr);
+
 #ifdef ENABLE_MINING
 /** Get script for -mineraddress */
 void GetScriptForMinerAddress(boost::shared_ptr<CReserveScript> &script);

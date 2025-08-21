@@ -16,6 +16,7 @@
 #include "streams.h"
 #include "sync.h"
 #include "util.h"
+#include "pon/pon-fork.h"
 
 #include <stdint.h>
 
@@ -42,7 +43,7 @@ double GetDifficultyINTERNAL(const CBlockIndex* blockindex, bool networkDifficul
 
     uint32_t bits;
     if (networkDifficulty) {
-        bits = GetNextWorkRequired(blockindex, nullptr, Params().GetConsensus());
+        bits = GetNextWorkRequiredByFork(blockindex, nullptr, Params().GetConsensus());
     } else {
         bits = blockindex->nBits;
     }
@@ -113,8 +114,20 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
     result.pushKV("merkleroot", blockindex->hashMerkleRoot.GetHex());
     result.pushKV("finalsaplingroot", blockindex->hashFinalSaplingRoot.GetHex());
     result.pushKV("time", (int64_t)blockindex->nTime);
-    result.pushKV("nonce", blockindex->nNonce.GetHex());
-    result.pushKV("solution", HexStr(blockindex->nSolution));
+    
+    // Add POW or PON fields based on block version
+    if (blockindex->nVersion >= CBlockHeader::PON_VERSION) {
+        // PON block fields
+        result.pushKV("type", "PON");
+        result.pushKV("collateral", blockindex->nodesCollateral.ToString());
+        result.pushKV("blocksig", HexStr(blockindex->vchBlockSig));
+    } else {
+        // POW block fields
+        result.pushKV("type", "POW");
+        result.pushKV("nonce", blockindex->nNonce.GetHex());
+        result.pushKV("solution", HexStr(blockindex->nSolution));
+    }
+    
     result.pushKV("bits", strprintf("%08x", blockindex->nBits));
     result.pushKV("difficulty", GetDifficulty(blockindex));
     result.pushKV("chainwork", blockindex->nChainWork.GetHex());
@@ -244,8 +257,20 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool tx
     }
     result.pushKV("tx", txs);
     result.pushKV("time", block.GetBlockTime());
-    result.pushKV("nonce", block.nNonce.GetHex());
-    result.pushKV("solution", HexStr(block.nSolution));
+    
+    // Add POW or PON fields based on block type
+    if (block.IsPON()) {
+        // PON block fields
+        result.pushKV("type", "PON");
+        result.pushKV("collateral", block.nodesCollateral.ToString());
+        result.pushKV("blocksig", HexStr(block.vchBlockSig));
+    } else {
+        // POW block fields
+        result.pushKV("type", "POW");
+        result.pushKV("nonce", block.nNonce.GetHex());
+        result.pushKV("solution", HexStr(block.nSolution));
+    }
+    
     result.pushKV("bits", strprintf("%08x", block.nBits));
     result.pushKV("difficulty", GetDifficulty(blockindex));
     result.pushKV("chainwork", blockindex->nChainWork.GetHex());
