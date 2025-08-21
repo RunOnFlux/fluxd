@@ -22,6 +22,8 @@
 #include "metrics.h"
 #include "net.h"
 #include "pow.h"
+#include "pon/pon.h"
+#include "pon/pon-fork.h"
 #include "rpc/cache.h"
 #include "txmempool.h"
 #include "ui_interface.h"
@@ -58,6 +60,7 @@ using namespace std;
 
 #include "librustzcash.h"
 #include "key_io.h"
+#include "pon/pon-fork.h"
 
 /**
  * Global state
@@ -2432,11 +2435,16 @@ bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus:
     catch (const std::exception& e) {
         return error("%s: Deserialize or I/O error - %s at %s", __func__, e.what(), pos.ToString());
     }
-
-    // Check the header
-    if (!(CheckEquihashSolution(&block, consensusParams) &&
-          CheckProofOfWork(block.GetHash(), block.nBits, consensusParams)))
-        return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
+    if (block.IsPOW()) {
+        // Check the header
+        if (!(CheckEquihashSolution(&block, consensusParams) &&
+              CheckProofOfWork(block.GetHash(), block.nBits, consensusParams)))
+            return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
+    } else {
+        if (!CheckProofOfNode(GetPONHash(block), block.nBits, consensusParams)) {
+            return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
+        }
+    }
 
     return true;
 }
@@ -2453,6 +2461,26 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus
 
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
 {
+    // Once Proof of Node goes active.
+    if (IsPONActive(nHeight)) {
+        CAmount nSubsidy = consensusParams.nPONInitialSubsidy * COIN;
+        
+        // Calculate years since PON activation for reward reduction
+        int ponActivationHeight = GetPONActivationHeight();
+        int blocksSincePON = nHeight - ponActivationHeight;
+        
+        // Annual reduction: 10% per year
+        // Blocks per year = 365 * 24 * 60 * 2 = 1,051,200 (30 second blocks)
+        int yearsElapsed = blocksSincePON / consensusParams.nPONSubsidyReductionInterval;
+        
+        // Apply 10% annual reduction
+        for (int i = 0; i < yearsElapsed && i < consensusParams.nPONMaxReductions; i++) {
+            nSubsidy = (nSubsidy * 9) / 10;  // 90% of previous = 10% reduction
+        }
+        
+        return nSubsidy;
+    }
+
     CAmount nSubsidy = 150 * COIN;
 
     if (nHeight == 1) {
@@ -2514,26 +2542,57 @@ CAmount GetFoundationFundAmount(int nHeight, const Consensus::Params& consensusP
 
 CAmount GetFluxnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier)
 {
+    // PON (Proof of Node) reward distribution
+    if (IsPONActive(nHeight)) {
+        // Define base amounts (at initial 14 FLUX block reward)
+        // These ratios will be maintained as the reward reduces
+        const CAmount PON_INITIAL_TOTAL = 14 * COIN;
+        const CAmount PON_CUMULUS_BASE = 1.0 * COIN;   // 1.0 FLUX
+        const CAmount PON_NIMBUS_BASE = 3.5 * COIN;    // 3.5 FLUX
+        const CAmount PON_STRATUS_BASE = 9.0 * COIN;   // 9.0 FLUX
+        
+        // Get the current PON block subsidy (which includes the annual 10% reduction)
+        const Consensus::Params& consensusParams = Params().GetConsensus();
+        CAmount currentPONSubsidy = GetBlockSubsidy(nHeight, consensusParams);
+        
+        // Calculate the tier reward based on the ratio to the initial subsidy
+        CAmount tierReward = 0;
+        switch (nNodeTier) {
+            case CUMULUS:
+                // Cumulus gets 1.0/14 of the current subsidy
+                tierReward = (currentPONSubsidy * PON_CUMULUS_BASE) / PON_INITIAL_TOTAL;
+                break;
+            case NIMBUS:
+                // Nimbus gets 3.5/14 of the current subsidy
+                tierReward = (currentPONSubsidy * PON_NIMBUS_BASE) / PON_INITIAL_TOTAL;
+                break;
+            case STRATUS:
+                // Stratus gets 9.0/14 of the current subsidy
+                tierReward = (currentPONSubsidy * PON_STRATUS_BASE) / PON_INITIAL_TOTAL;
+                break;
+            default:
+                LogPrintf("GetFluxnodeSubsidy: Invalid node tier %d at height %d\n", nNodeTier, nHeight);
+                return 0;
+        }
+        
+        LogPrint("pon", "PON subsidy for tier %d at height %d: %lld (block subsidy: %lld)\n", 
+                 nNodeTier, nHeight, tierReward, currentPONSubsidy);
+        return tierReward;
+    }
+    
+    // Pre-PON calculation (existing POW logic)
     float fMultiple = 1.0;
     bool fluxRebrandActive = NetworkUpgradeActive(nHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
     if (fluxRebrandActive) {
         fMultiple = 2.0;
     }
 
-//    std::cout << "Testing Fluxnode Subsidy" << std::endl;
-//    CAmount tb = blockValue * (V1_FLUXNODE_PERCENT_CUMULUS * fMultiple);
-//    CAmount ts = blockValue * (V1_FLUXNODE_PERCENT_NIMBUS * fMultiple);
-//    CAmount tba = blockValue * (V1_FLUXNODE_PERCENT_STRATUS * fMultiple);
-//
-//    CAmount total = tb + ts + tba;
-//    std::cout << "Got total of: " << total << std::endl;
+    double percentage = FLUXNODE_PERCENT_NULL;
+    if (GetCoinTierPercentage(nNodeTier, percentage)) {
+        return blockValue * (percentage * fMultiple);
+    }
 
-     double percentage = FLUXNODE_PERCENT_NULL;
-     if (GetCoinTierPercentage(nNodeTier, percentage)) {
-         return blockValue * (percentage * fMultiple);
-     }
-
-     return 0;
+    return 0;
 }
 
 bool IsSwapPoolInterval(const int64_t nHeight) {
@@ -2559,6 +2618,7 @@ bool IsSwapPoolInterval(const int64_t nHeight) {
 
 }
 
+// This must watch the declaration in main.h, if not project will not compile
 bool IsInitialBlockDownload(const CChainParams& chainParams)
 {
     // Once this function has returned false, it must remain false.
@@ -4457,7 +4517,19 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
         pindexNew->nHeight = pindexNew->pprev->nHeight + 1;
         pindexNew->BuildSkip();
     }
+
     pindexNew->nChainWork = (pindexNew->pprev ? pindexNew->pprev->nChainWork : 0) + GetBlockProof(*pindexNew);
+//    arith_uint256 blockProof = GetBlockProof(*pindexNew);
+//    arith_uint256 parentWork = pindexNew->pprev ? pindexNew->pprev->nChainWork : 0;
+//    pindexNew->nChainWork = parentWork + blockProof;
+//
+//    // Debug logging for PON transition
+//    if (pindexNew->nVersion >= 100 || (pindexNew->pprev && pindexNew->pprev->nVersion >= 100)) {
+//        LogPrintf("AddToBlockIndex: height=%d, version=%d, nBits=%08x, blockProof=%s, parentWork=%s, newChainWork=%s\n",
+//                  pindexNew->nHeight, pindexNew->nVersion, pindexNew->nBits,
+//                  blockProof.ToString(), parentWork.ToString(), pindexNew->nChainWork.ToString());
+//    }
+    
     pindexNew->RaiseValidity(BLOCK_VALID_TREE);
     if (pindexBestHeader == NULL || pindexBestHeader->nChainWork < pindexNew->nChainWork)
         pindexBestHeader = pindexNew;
@@ -4693,15 +4765,23 @@ bool CheckBlockHeader(
         return state.DoS(100, error("CheckBlockHeader(): block version too low"),
                          REJECT_INVALID, "version-too-low");
 
-    // Check Equihash solution is valid
-    if (fCheckPOW && !CheckEquihashSolution(&block, chainparams.GetConsensus()))
-        return state.DoS(100, error("CheckBlockHeader(): Equihash solution invalid"),
-                         REJECT_INVALID, "invalid-solution");
+    // PON blocks have different validation rules
+    if (block.IsPON()) {
+        // Check proof of work matches claimed amount
+        if (fCheckPOW && !CheckProofOfNode(GetPONHash(block), block.nBits, chainparams.GetConsensus()))
+            return state.DoS(50, error("CheckBlockHeader(): proof of node failed"),
+                             REJECT_INVALID, "high-hash");
+    } else {
+        // Check Equihash solution is valid
+        if (fCheckPOW && !CheckEquihashSolution(&block, chainparams.GetConsensus()))
+            return state.DoS(100, error("CheckBlockHeader(): Equihash solution invalid"),
+                             REJECT_INVALID, "invalid-solution");
 
-    // Check proof of work matches claimed amount
-    if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits, chainparams.GetConsensus()))
-        return state.DoS(50, error("CheckBlockHeader(): proof of work failed"),
-                         REJECT_INVALID, "high-hash");
+        // Check proof of work matches claimed amount
+        if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits, chainparams.GetConsensus()))
+            return state.DoS(50, error("CheckBlockHeader(): proof of work failed"),
+                             REJECT_INVALID, "high-hash");
+    }
 
     // Check timestamp
     unsigned int nHeight = chainActive.Height();
@@ -4846,15 +4926,55 @@ bool ContextualCheckBlockHeader(
     if(!nSolSize)
         solutionInvalid=0;
 
-    if(solutionInvalid){
-        return state.DoS(100,error("ContextualCheckBlockHeader: Equihash solution size %d for block %d does not match a valid length",nSolSize, nHeight),
-           REJECT_INVALID,"bad-equihash-solution-size");
+    // Check if this should be a PON block
+    if (IsPONActive(nHeight)) {
+        // After PON activation
+        bool isMainNet = (chainParams.NetworkIDString() == "main");
+        
+        if (block.IsPON()) {
+            // Validate PON block header
+            if (!ContextualCheckPONBlockHeader(&block, pindexPrev, consensusParams)) {
+                return state.DoS(100, error("ContextualCheckBlockHeader: Invalid PON block header"),
+                                 REJECT_INVALID, "bad-pon-header");
+            }
+            
+            // Check PON difficulty
+            if (block.nBits != GetNextPONWorkRequired(pindexPrev)) {
+                return state.DoS(100, error("%s: incorrect proof of node difficulty", __func__),
+                                 REJECT_INVALID, "bad-pon-diffbits");
+            }
+        } else {
+            // POW block after PON activation
+            if (isMainNet) {
+                // Mainnet/regtest: PON-only after activation
+                return state.DoS(100, error("ContextualCheckBlockHeader: Block at height %d must be PON but isn't", nHeight),
+                                 REJECT_INVALID, "not-pon-block");
+            }
+            // Testnet: Allow both POW and PON blocks - POW validation continues below
+        }
+    } else {
+        // Pre-PON blocks
+        if (block.IsPON()) {
+            return state.DoS(100, error("ContextualCheckBlockHeader: PON block before activation height %d", nHeight),
+                             REJECT_INVALID, "premature-pon-block");
+        }
     }
-
-    // Check proof of work
-    if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
-        return state.DoS(100, error("%s: incorrect proof of work", __func__),
-                         REJECT_INVALID, "bad-diffbits");
+    
+    // POW validation for POW blocks (pre-PON or testnet parallel mining)
+    if (!block.IsPON()) {
+        if(solutionInvalid){
+            return state.DoS(100,
+                             error("ContextualCheckBlockHeader: Equihash solution size %d for block %d does not match a valid length",
+                                   nSolSize, nHeight),
+                             REJECT_INVALID, "bad-equihash-solution-size");
+        }
+        
+        // Check proof of work
+        if (block.nBits != GetNextWorkRequiredByFork(pindexPrev, &block, consensusParams)) {
+            return state.DoS(100, error("%s: incorrect proof of work", __func__),
+                             REJECT_INVALID, "bad-diffbits");
+        }
+    }
 
     // Check timestamp against prev
     if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())
@@ -4880,6 +5000,13 @@ bool ContextualCheckBlockHeader(
         return state.Invalid(error("%s : rejected nVersion<4 block", __func__),
                              REJECT_OBSOLETE, "bad-version");
 
+    if (IsPONActive(nHeight)) {
+        if (block.nVersion > 100) {
+            return state.Invalid(error("%s : rejected nVersion>100 block", __func__),
+                                 REJECT_OBSOLETE, "bad-version");
+        }
+    }
+
     return true;
 }
 
@@ -4889,6 +5016,25 @@ bool ContextualCheckBlock(
 {
     const int nHeight = pindexPrev == NULL ? 0 : pindexPrev->nHeight + 1;
     const Consensus::Params& consensusParams = chainparams.GetConsensus();
+
+    // PON-specific validation if PON is active
+    if (IsPONActive(nHeight)) {
+        if (block.IsPON()) {
+            // Validate the full PON block (including signature)
+            if (!ContextualCheckPONBlockHeader(&block, pindexPrev, consensusParams)) {
+                return state.DoS(100, error("ContextualCheckBlock: Invalid PON block"),
+                                 REJECT_INVALID, "bad-pon-block");
+            }
+        } else {
+            // Non-PON block when PON is required
+            bool isGenesisException = (chainparams.NetworkID() == CBaseChainParams::REGTEST &&
+                                       block.GetHash() == consensusParams.hashGenesisBlock);
+            if (!isGenesisException) {
+                return state.DoS(100, error("ContextualCheckBlock: Expected PON block at height %d", nHeight),
+                                 REJECT_INVALID, "not-pon-block");
+            }
+        }
+    }
 
     // Check that all transactions are finalized
     BOOST_FOREACH(const CTransaction& tx, block.vtx) {
