@@ -146,6 +146,7 @@ public:
     int64_t GetSwapPoolInterval() const { return nSwapPoolInterval; }
     int GetSwapPoolMaxTimes() const { return nSwapPoolMaxTimes; }
 
+    std::string GetDevFundAddress() const { return strDevFundAddress; }
 
     int GetCumulusStartTransitionHeight() const { return nBeginCumulusTransition; }
     int GetCumulusEndTransitionHeight() const { return nEndCumulusTransition; }
@@ -212,6 +213,8 @@ protected:
     int64_t nSwapPoolStartHeight;
     int64_t nSwapPoolInterval;
     int64_t nSwapPoolMaxTimes;
+
+    std::string strDevFundAddress;
 
 
     /** Flux new fluxnode start block heights **/

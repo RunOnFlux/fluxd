@@ -102,6 +102,11 @@ public:
 	    consensus.nPowAllowMinDifficultyBlocksAfterHeight = boost::none;
         consensus.nPowTargetSpacing = 2 * 60;
 
+        consensus.ponLimit = uint256S("0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // ~1/16 chance minimum (after fork's first period)
+        consensus.ponStartLimit = uint256S("00028fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");  // ~1/10000 chance (during first fork period)
+        consensus.nPonTargetSpacing = 30; // Proof of node spacing (seconds)
+        consensus.nPonDifficultyWindow = 30; // Proof of node difficulty adjustment window (30 blocks = 15 minutes)
+
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
             Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
@@ -143,7 +148,16 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight = 1549500;
+        consensus.vUpgrades[Consensus::UPGRADE_HALVING].hashActivationBlock =
+                uint256S("00000009f9178347f3dea495a089400050c3388e07f9c871fb1ebddcab1f8044");
 
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight = 2000000;
+        
+        // PON subsidy parameters
+        consensus.nPONInitialSubsidy = 14;  // 14 FLUX per block initially
+        consensus.nPONSubsidyReductionInterval = 1051200;  // ~1 year in 30-second blocks (365*24*60*2)
+        consensus.nPONMaxReductions = 20;  // Max 20 years of reductions
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 11;
@@ -272,6 +286,8 @@ public:
         nSwapPoolInterval = 21600; // Avg Block per day (720) *  - Trying to get to around once a month
         nSwapPoolMaxTimes = 10;
 
+        strDevFundAddress = ""; // TODO NODE FIll this out before releasing
+
         nBeginCumulusTransition = 1076532;
         nEndCumulusTransition = 1086612;
 
@@ -319,6 +335,12 @@ public:
         consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
         consensus.nPowTargetSpacing = 60;
 
+        // Proof of node variables
+        consensus.ponLimit = uint256S("019999999999999999999999999999999999999999999999999999999999999a"); // ~1/10 chance minimum for testnet
+        consensus.ponStartLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // Very easy for testnet initial fork
+        consensus.nPonTargetSpacing = 30; // Proof of node spacing (seconds)
+        consensus.nPonDifficultyWindow = 60; // Proof of node difficulty adjustment window (blocks)
+
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
         Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
@@ -350,6 +372,14 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight = 600;
+
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight = 800;
+        
+        // PON subsidy parameters (testnet)
+        consensus.nPONInitialSubsidy = 14;  // 14 FLUX per block initially
+        consensus.nPONSubsidyReductionInterval = 525600;  // ~6 months for testnet (365/2*24*60*2)
+        consensus.nPONMaxReductions = 20;  // Max 20 reductions
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 10;
@@ -448,6 +478,8 @@ public:
         nSwapPoolInterval = 100;
         nSwapPoolMaxTimes = 10;
 
+        strDevFundAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
+
         nBeginCumulusTransition = 420;
         nEndCumulusTransition = 520;
 
@@ -488,13 +520,21 @@ public:
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 1000;
         consensus.powLimit = uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
+
         consensus.nDigishieldAveragingWindow = 17;
         assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
         consensus.nDigishieldMaxAdjustDown = 0; // Turn off adjustment down
         consensus.nDigishieldMaxAdjustUp = 0; // Turn off adjustment up
-
         consensus.nPowTargetSpacing = 2 * 60;
-	    consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
+        consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
+
+        // Proof of node variables
+        consensus.ponLimit = uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"); // Easy for regtest
+        consensus.ponStartLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // Very easy for regtest
+
+
+        consensus.nPonTargetSpacing = 30; // Proof of node spacing (seconds)
+        consensus.nPonDifficultyWindow = 60; // Proof of node difficulty adjustment window (blocks)
 
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
@@ -536,6 +576,15 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight =
                 Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
+
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        
+        // PON subsidy parameters (regtest)
+        consensus.nPONInitialSubsidy = 14;  // 14 FLUX per block initially
+        consensus.nPONSubsidyReductionInterval = 100;  // Quick reduction for testing
+        consensus.nPONMaxReductions = 10;  // Max 10 reductions for testing
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
@@ -618,6 +667,8 @@ public:
         nSwapPoolInterval = 10;
         nSwapPoolMaxTimes = 5;
 
+        strDevFundAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
+
         nBeginCumulusTransition = 0;
         nEndCumulusTransition = 1000;
 
@@ -629,7 +680,6 @@ public:
 
         vecP2SHPublicKeys.resize(1);
         vecP2SHPublicKeys[0] = std::make_pair("04276f105ff36a670a56e75c2462cff05a4a7864756e6e1af01022e32752d6fe57b1e13cab4f2dbe3a6a51b4e0de83a5c4627345f5232151867850018c9a3c3a1d", 0);
-
     }
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)
