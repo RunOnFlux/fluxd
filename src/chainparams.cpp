@@ -148,7 +148,7 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight = 1549500;
-        consensus.vUpgrades[Consensus::UPGRADE_HALVING].hashActivationBlock =
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].hashActivationBlock =
                 uint256S("00000009f9178347f3dea495a089400050c3388e07f9c871fb1ebddcab1f8044");
 
         consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
