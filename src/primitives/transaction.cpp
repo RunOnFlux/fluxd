@@ -11,6 +11,13 @@
 #include "utilstrencodings.h"
 #include "librustzcash.h"
 
+// Define static members of CFluxnodeDelegates
+const int CFluxnodeDelegates::MAX_PUBKEYS_LENGTH;
+const int8_t CFluxnodeDelegates::INITIAL_VERSION;
+const int8_t CFluxnodeDelegates::NONE;
+const int8_t CFluxnodeDelegates::UPDATE;
+const int8_t CFluxnodeDelegates::SIGNING;
+
 JSDescription::JSDescription(
     ZCJoinSplit& params,
     const uint256& joinSplitPubKey,
