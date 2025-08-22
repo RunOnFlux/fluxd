@@ -15,6 +15,7 @@
 #include "key_io.h"
 #include "fluxnode/benchmarks.h"
 #include "util.h"
+#include "pon/pon-fork.h"
 
 #include <univalue.h>
 #include "rpc/cache.h"
@@ -715,7 +716,7 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
 
 
             CTxDestination payment_destination;
-            if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+            if (IsFluxTxP2SHType(data.nFluxTxVersion, true)) {
                 CScriptID inner(data.P2SHRedeemScript);
                 payment_destination = inner;
             } else if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
@@ -882,7 +883,7 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
         CTxDestination payment_destination;
 
         // If this is P2SH node, we need to generate the payment destination from the redeemscript
-        if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+        if (IsFluxTxP2SHType(data.nFluxTxVersion, true)) {
             CScriptID innerID(data.P2SHRedeemScript);
             payment_destination = innerID;
         } else if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
@@ -953,7 +954,7 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
         const FluxnodeCacheData data = item.second;
 
         CTxDestination payment_destination;
-        if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+        if (IsFluxTxP2SHType(data.nFluxTxVersion, true)) {
             CScriptID inner(data.P2SHRedeemScript);
             payment_destination = inner;
         } else if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
@@ -1049,7 +1050,7 @@ UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
         info.pushKV("last_confirmed_height", data.nLastConfirmedBlockHeight);
         info.pushKV("last_paid_height", data.nLastPaidHeight);
         info.pushKV("tier", data.TierToString());
-        if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+        if (IsFluxTxP2SHType(data.nFluxTxVersion, true)) {
             CScriptID inner;
             inner = CScriptID(data.P2SHRedeemScript);
             info.pushKV("payment_address", EncodeDestination(inner));
@@ -1210,9 +1211,9 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 
                 "\nArguments:\n"
                 "1. \"redeemscript\"        (string, required) The redeemscript of the multisig address that hold the collateral for the fluxnode\n"
-                "3. \"vpspubkey\"           (string, required) The pubkey the the fluxnode server will use to confirm fluxnode transactions\n"
-                "4. \"txid\"                (string, required) the transaction hash of the collateral input\n"
-                "5. \"index\"               (number, required) the index of the transaction collateral input\n"
+                "2. \"vpspubkey\"           (string, required) The pubkey the the fluxnode server will use to confirm fluxnode transactions\n"
+                "3. \"txid\"                (string, required) the transaction hash of the collateral input\n"
+                "4. \"index\"               (number, required) the index of the transaction collateral input\n"
 
                 "\nResult:\n"
                 "\"transaction\"            (string) hex string of the transaction\n"
@@ -1252,7 +1253,12 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 
     // Set the data for the P2SH Node Transaction
     mutableTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
-    mutableTransaction.nFluxTxVersion = FLUXNODE_INTERNAL_P2SH_TX_VERSION;
+    // Use bit-based version after PON fork, legacy version before
+    if (IsPONActive(chainActive.Height() + 1)) {
+        mutableTransaction.nFluxTxVersion = FLUXNODE_TX_TYPE_P2SH_BIT;  // Can OR with other feature bits as needed
+    } else {
+        mutableTransaction.nFluxTxVersion = FLUXNODE_INTERNAL_P2SH_TX_VERSION;
+    }
     mutableTransaction.nType = FLUXNODE_START_TX_TYPE;
     mutableTransaction.collateralIn = collateralIn;
     mutableTransaction.P2SHRedeemScript = redeemScript;

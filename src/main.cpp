@@ -1032,6 +1032,22 @@ bool ContextualCheckTransaction(
                 return state.DoSTx(dosLevel, error("ContextualCheckTransaction(): P2SHNodes tx seen before active"),
                                  REJECT_INVALID, "tx-p2shnodes-not-active", false, tx);
             }
+            
+            // Check bit-based features are only used after PON fork
+            if (!fluxPONActive) {
+                // Before PON, only allow exact version matches (1 or 2)
+                if (tx.nFluxTxVersion != FLUXNODE_INTERNAL_NORMAL_TX_VERSION && 
+                    tx.nFluxTxVersion != FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+                    return state.DoSTx(dosLevel, error("ContextualCheckTransaction(): bit-based tx version features used before PON active"),
+                                     REJECT_INVALID, "tx-bit-features-not-active", false, tx);
+                }
+                
+                // Specifically check for delegate feature
+                if (HasFluxTxDelegatesFeature(tx.nFluxTxVersion)) {
+                    return state.DoSTx(dosLevel, error("ContextualCheckTransaction(): delegate feature used before PON active"),
+                                     REJECT_INVALID, "tx-delegates-not-active", false, tx);
+                }
+            }
         }
     }
 
@@ -1475,6 +1491,13 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
             if (!IsMultiSigRedeemScript(tx.P2SHRedeemScript)) {
                 return state.DoS(10, error("CheckTransaction(): P2SH RedeemScript is not multisig"),
                                  REJECT_INVALID, "bad-txns-fluxnode-tx-redeemscript-not-multisig");
+            }
+        }
+
+        if (tx.HasDelegates()) {
+            if (!tx.delegateData.IsValid()) {
+                return state.DoS(10, error("CheckTransaction(): Delegate Data not valid"),
+                                 REJECT_INVALID, "bad-txns-fluxnode-tx-delegate-data-invalid");
             }
         }
 
@@ -3120,6 +3143,9 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
 
     bool fClean = true;
 
+    std::set<COutPoint> setDelegatesToRemove;
+    std::map<COutPoint, CFluxnodeDelegates> mapDelegatesToAdd;
+
     CBlockUndo blockUndo;
     CDiskBlockPos pos = pindex->GetUndoPos();
     if (pos.IsNull()) {
@@ -3188,6 +3214,18 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
             if (tx.nType == FLUXNODE_START_TX_TYPE) {
                 // Undo the start from the list
                 p_fluxnodeCache->UndoNewStart(tx, pindex->nHeight);
+                if (tx.HasDelegates() && tx.fUsingDelegates && tx.IsUpdatingDelegate()) {
+                    LogPrint("fluxnode", "DisconnectBlock: Undoing delegate change for %s\n", tx.collateralIn.ToString());
+                    auto it = fluxnodeBlockUndo.mapOldDelegates.find(tx.collateralIn);
+
+                    if (it != fluxnodeBlockUndo.mapOldDelegates.end()) {
+                        // Had old delegates - restore them
+                        mapDelegatesToAdd[tx.collateralIn] = it->second;
+                    } else {
+                        // No old delegates - this was a new addition, erase it
+                        setDelegatesToRemove.insert(tx.collateralIn);
+                    }
+                }
             } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
                 if (tx.nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM) {
                     p_fluxnodeCache->UndoNewConfirm(tx);
@@ -3299,6 +3337,26 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
             return DISCONNECT_FAILED;
         }
     }
+
+    if (!mapDelegatesToAdd.empty()) {
+        for (const auto& pair : mapDelegatesToAdd) {
+            // Had old delegates - restore them
+            if (!pFluxnodeDB->WriteFluxnodeDelegates(pair.first, pair.second)) {
+                AbortNode(state, "Failed to write delegates");
+                return DISCONNECT_FAILED;
+            }
+        }
+    }
+
+    if (!setDelegatesToRemove.empty()) {
+        for (const auto& outpoint : setDelegatesToRemove) {
+            if (!pFluxnodeDB->EraseFluxnodeDelegate(outpoint)) {
+                AbortNode(state, "Failed to remove delegates");
+                return DISCONNECT_FAILED;
+            }
+        }
+    }
+
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
@@ -3501,6 +3559,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     CBlockUndo blockundo;
     CFluxnodeTxBlockUndo fluxnodeTxBlockUndo;
+    std::map<COutPoint, CFluxnodeDelegates> mapNewDelegates;
 
     std::set<COutPoint> setSpentOutPoints;
 
@@ -3579,6 +3638,18 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
                         // Add new Fluxnode Start Tx into local cache
                         p_fluxnodeCache->AddNewStart(tx, pindex->nHeight, nTier, nCollateralAmount);
+
+                        if (tx.HasDelegates() && tx.fUsingDelegates && tx.IsUpdatingDelegate()) {
+                            // Check if delegates existed before
+                            if (pFluxnodeDB->FluxnodeDelegateExists(tx.collateralIn)) {
+                                // Save the old state
+                                CFluxnodeDelegates oldDelegates;
+                                pFluxnodeDB->ReadFluxnodeDelegates(tx.collateralIn, oldDelegates);
+                                fluxnodeTxBlockUndo.mapOldDelegates[tx.collateralIn] = oldDelegates;
+                            }
+
+                            mapNewDelegates[tx.collateralIn] = tx.delegateData;
+                        }
                     }
                 } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
                     if (tx.nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM) {
@@ -3784,6 +3855,20 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         {
             if (!pFluxnodeDB->WriteBlockUndoFluxnodeData(block.GetHash(), fluxnodeTxBlockUndo))
                 return AbortNode(state, "Failed to write fluxnodetx undo data");
+        }
+
+        if (!mapNewDelegates.empty()) {
+            for (const auto& item : mapNewDelegates) {
+                if (item.second.delegateStartingKeys.empty()) {
+                    if (!pFluxnodeDB->EraseFluxnodeDelegate(item.first)) {
+                        return AbortNode(state, "Failed to remove delegates for fluxnode");
+                    }
+                } else {
+                    if (!pFluxnodeDB->WriteFluxnodeDelegates(item.first, item.second)) {
+                        return AbortNode(state, "Failed to add delegates for fluxnode");
+                    }
+                }
+            }
         }
 
         // Now that all consensus rules have been validated, set nCachedBranchId.

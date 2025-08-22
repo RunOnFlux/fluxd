@@ -154,6 +154,7 @@ TEST(Transaction, FluxNodeP2SHStartTransaction) {
 
     // Set the data for the P2SH Node Transaction
     mutableTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
+    // For tests, use the legacy value for now (can be updated when testing PON fork)
     mutableTransaction.nFluxTxVersion = FLUXNODE_INTERNAL_P2SH_TX_VERSION;
     mutableTransaction.nType = FLUXNODE_START_TX_TYPE;
 

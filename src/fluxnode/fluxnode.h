@@ -242,7 +242,7 @@ public:
             READWRITE(nTier);
             READWRITE(nStatus);
             READWRITE(nCollateral);
-            if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+            if (IsFluxTxP2SHType(nFluxTxVersion, true)) {
                 READWRITE(*(CScriptBase*)(&P2SHRedeemScript));
             }
         } else {

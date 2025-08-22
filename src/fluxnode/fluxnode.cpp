@@ -50,6 +50,40 @@ bool CheckFluxnodeTxSignatures(const CTransaction&  transaction)
         std::string errorMessage;
         std::string strMessage = transaction.GetHash().GetHex();
 
+        bool fAllowDelegatesToSign = false;
+        if (transaction.IsSigningAsDelegate()) {
+            fAllowDelegatesToSign = true;
+        }
+
+        // Double check permissions on update delegates. Signature will fail, causing tx to fail.
+        if (transaction.IsUpdatingDelegate()) {
+            fAllowDelegatesToSign = false;
+        }
+
+        if (fAllowDelegatesToSign) {
+            // Checking if delegates signed this start transaction
+            CFluxnodeDelegates storedDelegates;
+
+            // Using existing delegates - check if signer is authorized
+            if (pFluxnodeDB) {
+                if (pFluxnodeDB->FluxnodeDelegateExists(transaction.collateralIn)) {
+                    if (!pFluxnodeDB->ReadFluxnodeDelegates(transaction.collateralIn, storedDelegates)) {
+                        return error("fluxnode-tx-delegates-failed-to-load-from-db");
+                    }
+                    for (const auto& delegateKey : storedDelegates.delegateStartingKeys) {
+                        if (obfuScationSigner.VerifyMessage(delegateKey, transaction.sig, strMessage, errorMessage)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            // If fIsVerifying we are verifying from the database, meaning we might not have the delegate data
+            // Assume if we saved a transaction to the database this was already verified
+            if (!fIsVerifying) {
+                return error("fluxnode-tx-signing-as-delegate-failed-to-verify");
+            }
+        }
+
         /**
          * P2SH NODES CORE CHECK 3
          * We must verify the signature of the transaction.
@@ -525,7 +559,7 @@ bool FluxnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPo
 
 
                         // We can get the destination from the Hash of the RedeemScript.
-                        if (mapConfirmedFluxnodeData.at(p_fluxnodeOut).nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+                        if (IsFluxTxP2SHType(mapConfirmedFluxnodeData.at(p_fluxnodeOut).nFluxTxVersion, true)) {
                            CScriptID inner(mapConfirmedFluxnodeData.at(p_fluxnodeOut).P2SHRedeemScript);
                            dest = inner;
                            return true;
