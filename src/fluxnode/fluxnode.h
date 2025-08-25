@@ -21,9 +21,11 @@
 
 // If the fluxnode isn't confirmed within this amount of blocks, the fluxnode is moved to a DoS list
 #define FLUXNODE_START_TX_EXPIRATION_HEIGHT 60
+#define FLUXNODE_START_TX_EXPIRATION_HEIGHT_V2 240
 
 // How long the fluxnode will stay in the DoS list. Is the calculated from that height the start transaction was added to the chain
 #define FLUXNODE_DOS_REMOVE_AMOUNT 180
+#define FLUXNODE_DOS_REMOVE_AMOUNT_V2 720
 
 // How often a new confirmation transaction needs to be seen on chain to keep a node up and running
 #define FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V1 60

@@ -901,6 +901,9 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
 
         int nCurrentHeight = chainActive.Height();
         int nEligibleIn = FLUXNODE_DOS_REMOVE_AMOUNT - (nCurrentHeight - data.nAddedBlockHeight);
+        if (IsPONActive(nCurrentHeight)) {
+            nEligibleIn = FLUXNODE_DOS_REMOVE_AMOUNT_V2 - (nCurrentHeight - data.nAddedBlockHeight);
+        }
         info.pushKV("eligible_in",  nEligibleIn);
 
         if (data.nCollateral > 0) {
@@ -911,7 +914,7 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
     }
 
     if (mapOrderedDosList.size()) {
-        for (int i = 0; i < FLUXNODE_DOS_REMOVE_AMOUNT + 1; i++) {
+        for (int i = 0; i < FLUXNODE_DOS_REMOVE_AMOUNT_V2 + 1; i++) {
             if (mapOrderedDosList.count(i)) {
                 for (const auto& item : mapOrderedDosList.at(i)) {
                     wholelist.push_back(item);

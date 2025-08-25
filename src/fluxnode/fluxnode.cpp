@@ -162,11 +162,25 @@ bool CheckBenchmarkSignature(const CTransaction& transaction)
 void GetUndoDataForExpiredFluxnodeDosScores(CFluxnodeTxBlockUndo& p_fluxnodeTxUndoData, const int& p_nHeight)
 {
     LOCK(g_fluxnodeCache.cs);
+
+    bool fPONActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_PON);
     int nUndoHeight = p_nHeight - FLUXNODE_DOS_REMOVE_AMOUNT;
 
+    if (fPONActive) {
+        nUndoHeight = p_nHeight - FLUXNODE_DOS_REMOVE_AMOUNT_V2;
+    }
+
     for (const auto& item: g_fluxnodeCache.mapStartTxDOSTracker) {
-        if (item.second.nAddedBlockHeight == nUndoHeight) {
-            p_fluxnodeTxUndoData.vecExpiredDosData.emplace_back(item.second);
+        if (fPONActive) {
+            // If there are nodes in DOSTracker with heights less than our new nUndoHeight
+            // Include these by using less than or equal.
+            if (item.second.nAddedBlockHeight <= nUndoHeight) {
+                p_fluxnodeTxUndoData.vecExpiredDosData.emplace_back(item.second);
+            }
+        } else {
+            if (item.second.nAddedBlockHeight == nUndoHeight) {
+                p_fluxnodeTxUndoData.vecExpiredDosData.emplace_back(item.second);
+            }
         }
     }
 }
@@ -404,6 +418,10 @@ void FluxnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
     LOCK2(cs, g_fluxnodeCache.cs);
     int removalHeight = p_nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT;
 
+    if (IsPONActive(p_nHeight)) {
+        removalHeight = p_nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT_V2;
+    }
+
     std::vector<COutPoint> vecOutPoints;
     std::set<COutPoint> setNewDosHeights;
     for (const auto& object: g_fluxnodeCache.mapStartTxTracker) {
@@ -427,6 +445,10 @@ void FluxnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
 {
     LOCK2(cs, g_fluxnodeCache.cs);
     int removalHeight = p_nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT;
+
+    if (IsPONActive(p_nHeight)) {
+        removalHeight = p_nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT_V2;
+    }
 
     for (const auto& item : g_fluxnodeCache.mapStartTxDOSTracker) {
         if (item.second.nAddedBlockHeight == removalHeight) {
