@@ -26,9 +26,6 @@ uint256 GetPONHash(const COutPoint& collateral, const uint256& prevBlockHash, ui
 // Calculate the slot number for a given timestamp relative to genesis
 uint32_t GetSlotNumber(int64_t timestamp, int64_t genesisTimestamp, const Consensus::Params& params);
 
-// Get the timestamp for a given slot number
-int64_t GetSlotTimestamp(uint32_t slot, int64_t genesisTimestamp, const Consensus::Params& params);
-
 // Get next PON work required (difficulty adjustment)
 unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast);
 

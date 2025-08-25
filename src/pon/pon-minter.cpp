@@ -144,18 +144,6 @@ void PONMinter(const CChainParams& chainparams)
                 continue;
             }
             
-            // Get slot timestamp
-            int64_t slotTime = GetSlotTimestamp(currentSlot, genesisTime, consensusParams);
-            
-            // Wait if we're too early for this slot (shouldn't happen but be safe)
-            if (now < slotTime - 5) { // 5 second buffer
-                int64_t waitTime = (slotTime - now - 5) * 1000;
-                if (waitTime > 0 && waitTime < 30000) { // Max 30 second wait
-                    MilliSleep(waitTime);
-                }
-                continue;
-            }
-            
             // Don't try if we're too late for this slot
             if (now > slotTime + 10) { // More than 10 seconds late
                 lastAttemptedSlot = currentSlot;

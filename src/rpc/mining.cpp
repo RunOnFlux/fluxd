@@ -229,13 +229,7 @@ UniValue generate(const UniValue& params, bool fHelp)
             
             // Find the first slot that's >= minTime
             uint32_t slot = GetSlotNumber(minTime, genesisTime, chainparams.GetConsensus());
-            enforceTime = GetSlotTimestamp(slot, genesisTime, chainparams.GetConsensus());
-            
-            // If the slot time is still too early, use next slot
-            while (enforceTime < minTime) {
-                slot++;
-                enforceTime = GetSlotTimestamp(slot, genesisTime, chainparams.GetConsensus());
-            }
+            enforceTime = GetAdjustedTime();
         }
         
         std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(Params(), coinbaseScript->reserveScript, collateral, enforceTime));

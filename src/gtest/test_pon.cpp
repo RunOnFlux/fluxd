@@ -283,13 +283,6 @@ TEST_F(PONTest, SlotCalculation) {
     
     uint32_t slot10 = GetSlotNumber(genesisTime + 10 * ponTargetSpacing, genesisTime, consensusParams);
     EXPECT_EQ(slot10, 10);
-    
-    // Test reverse calculation (slot to timestamp)
-    int64_t timestamp0 = GetSlotTimestamp(0, genesisTime, consensusParams);
-    EXPECT_EQ(timestamp0, genesisTime);
-    
-    int64_t timestamp10 = GetSlotTimestamp(10, genesisTime, consensusParams);
-    EXPECT_EQ(timestamp10, genesisTime + 10 * ponTargetSpacing);
 }
 
 TEST_F(PONTest, PONDifficultyAdjustmentInitial) {

@@ -80,12 +80,6 @@ uint32_t GetSlotNumber(int64_t timestamp, int64_t genesisTimestamp, const Consen
     return static_cast<uint32_t>(timeSinceGenesis / params.nPonTargetSpacing);
 }
 
-int64_t GetSlotTimestamp(uint32_t slot, int64_t genesisTimestamp, const Consensus::Params& params)
-{
-    // Calculate the timestamp for a given slot
-    return genesisTimestamp + (static_cast<int64_t>(slot) * params.nPonTargetSpacing);
-}
-
 unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
 {
     const Consensus::Params& params = Params().GetConsensus();
@@ -190,15 +184,6 @@ bool CheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex* pindexPr
     // 1. Verify this is a PON block
     if (!pblock->IsPON()) {
         return error("CheckPONBlockHeader: Block version %d is not PON", pblock->nVersion);
-    }
-
-    uint32_t slot = GetSlotNumber(pblock->nTime, Params().GenesisBlock().nTime, params);
-    int64_t expectedTimestamp = GetSlotTimestamp(slot, Params().GenesisBlock().nTime, params);
-    
-    // Allow some tolerance for clock drift (±5 seconds)
-    if (abs(pblock->nTime - expectedTimestamp) > 5) {
-        return error("CheckPONBlockHeader: timestamp %d not aligned with slot %d (expected %d)",
-                    pblock->nTime, slot, expectedTimestamp);
     }
 
     if (!CheckProofOfNode(GetPONHash(*pblock), pblock->nBits, Params().GetConsensus())) {
