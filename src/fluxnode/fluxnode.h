@@ -29,10 +29,12 @@
 #define FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V1 60
 #define FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V2 80
 #define FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V3 160
+#define FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V4 640 // PON activation - targeting 30 second blocks
 
 // Nodes are allowed to send a update confirm notification only after this many blocks past there last confirm
 #define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1 40
 #define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2 120
+#define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V3 500 // PON activation - targeting 30 second blocks
 #define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 5
 
 // Maximum ip address size in fluxnode confirm transaction

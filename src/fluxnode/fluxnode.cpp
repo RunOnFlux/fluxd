@@ -464,21 +464,20 @@ bool FluxnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COu
     }
 
     bool fHalvingActive = NetworkUpgradeActive(nCurrentHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
-    if (fHalvingActive) {
-        if (nCurrentHeight - data.nLastConfirmedBlockHeight <= FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2) {
-            error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
-                  __LINE__,
-                  out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
-            return false;
-        }
-    } else {
-        if (nCurrentHeight - data.nLastConfirmedBlockHeight <= FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1) {
-            // TODO - Remove this error message after release + 1 month and we don't see any problems
-            error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
-                  __LINE__,
-                  out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
-            return false;
-        }
+    bool fPONActive = NetworkUpgradeActive(nCurrentHeight, Params().GetConsensus(), Consensus::UPGRADE_PON);
+
+    int nDistanceToCheck = FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1; // Default - Legacy
+    if (fPONActive) {
+        nDistanceToCheck = FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V3;
+    } else if (fHalvingActive) {
+        nDistanceToCheck = FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2;
+    }
+
+    if (nCurrentHeight - data.nLastConfirmedBlockHeight <= nDistanceToCheck) {
+        error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
+              __LINE__,
+              out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
+        return false;
     }
 
     return true;
@@ -507,9 +506,13 @@ bool FluxnodeCache::CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_n
     LOCK(cs);
 
     bool fHalvingActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
+    bool fPONActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_PON);
 
     if (mapConfirmedFluxnodeData.count(out)) {
-        if (fHalvingActive) {
+        if (fPONActive) {
+            return p_nHeight - mapConfirmedFluxnodeData.at(out).nLastConfirmedBlockHeight > FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V3;
+        }
+        else if (fHalvingActive) {
             return p_nHeight - mapConfirmedFluxnodeData.at(out).nLastConfirmedBlockHeight > FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2;
         } else {
             return p_nHeight - mapConfirmedFluxnodeData.at(out).nLastConfirmedBlockHeight > FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1;
@@ -1344,8 +1347,11 @@ int GetFluxnodeExpirationCount(const int& p_nHeight)
     // Get the status on if Fluxnode params1 is activated
     bool fFluxActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
     bool fHalvingActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
+    bool fPONActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_PON);
 
-    if (fHalvingActive) {
+    if (fPONActive) {
+        return FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V4;
+    } else if (fHalvingActive) {
         return FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V3;
     } else if (fFluxActive) {
         return FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V2;
