@@ -4899,9 +4899,16 @@ bool CheckBlockHeader(
             return state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),
                          REJECT_INVALID, "time-too-new");
     } else {
-        if (block.GetBlockTime() > GetAdjustedTime() + 360)
-            return state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),
-                         REJECT_INVALID, "time-too-new");
+        if (block.IsPON()) {
+            // 2 minute max future block header timing.
+            if (block.GetBlockTime() > GetAdjustedTime() + 120)
+                return state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),
+                                     REJECT_INVALID, "time-too-new");
+        } else {
+            if (block.GetBlockTime() > GetAdjustedTime() + 360)
+                return state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),
+                                     REJECT_INVALID, "time-too-new");
+        }
     }
 
     return true;
@@ -5082,9 +5089,15 @@ bool ContextualCheckBlockHeader(
     }
 
     // Check timestamp against prev
-    if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())
-        return state.Invalid(error("%s: block's timestamp is too early", __func__),
-                             REJECT_INVALID, "time-too-old");
+    if (block.IsPON()) {
+        if (block.GetBlockTime() <= pindexPrev->GetBlockTime())
+            return state.Invalid(error("%s: pon check - block's timestamp is too early", __func__),
+                                 REJECT_INVALID, "time-too-old");
+    } else {
+        if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())
+            return state.Invalid(error("%s: block's timestamp is too early", __func__),
+                                 REJECT_INVALID, "time-too-old");
+    }
 
     if (fCheckpointsEnabled)
     {
@@ -5106,8 +5119,8 @@ bool ContextualCheckBlockHeader(
                              REJECT_OBSOLETE, "bad-version");
 
     if (IsPONActive(nHeight)) {
-        if (block.nVersion > 100) {
-            return state.Invalid(error("%s : rejected nVersion>100 block", __func__),
+        if (block.nVersion < 100) {
+            return state.Invalid(error("%s : rejected nVersion<100 block", __func__),
                                  REJECT_OBSOLETE, "bad-version");
         }
     }

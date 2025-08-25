@@ -143,9 +143,11 @@ void PONMinter(const CChainParams& chainparams)
                 MilliSleep(1000);
                 continue;
             }
-            
-            // Don't try if we're too late for this slot
-            if (now > slotTime + 10) { // More than 10 seconds late
+
+            // CHeck is slot changes in the next 10 seconds, if it does. lets wait
+            uint32_t nextSlotIn10 = GetSlotNumber(now+10, genesisTime, consensusParams);
+            // Don't try if we're within 10 seconds of the next slot
+            if (currentSlot != nextSlotIn10) {
                 lastAttemptedSlot = currentSlot;
                 continue;
             }
@@ -206,7 +208,7 @@ void PONMinter(const CChainParams& chainparams)
             
             // Create the block with enforced slot time
             std::unique_ptr<CBlockTemplate> pblocktemplate(
-                CreateNewBlock(chainparams, scriptPubKey, collateral, slotTime)
+                CreateNewBlock(chainparams, scriptPubKey, collateral, now)
             );
             
             if (!pblocktemplate) {
