@@ -42,7 +42,7 @@ bool CheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex* pindexPr
 // 1. Signature matches collateral owner
 // 2. Fluxnode is active in the network
 bool ContextualCheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex* pindexPrev,
-                     const Consensus::Params& params);
+                     const Consensus::Params& params, bool fCheckSignature = true);
 
 
 #endif // BITCOIN_PON_H

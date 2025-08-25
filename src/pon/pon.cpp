@@ -187,15 +187,19 @@ bool CheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex* pindexPr
     }
 
     if (!CheckProofOfNode(GetPONHash(*pblock), pblock->nBits, Params().GetConsensus())) {
+        int64_t genesisTimestamp = Params().GenesisBlock().nTime;
+        uint32_t slot = GetSlotNumber(pblock->nTime, genesisTimestamp, Params().GetConsensus());
         return error("CheckPONBlockHeader: stake hash doesn't meet target for slot %d", slot);
     }
 
+    int64_t genesisTimestamp = Params().GenesisBlock().nTime;
+    uint32_t slot = GetSlotNumber(pblock->nTime, genesisTimestamp, Params().GetConsensus());
     LogPrint("pon", "CheckPONBlockHeader: Valid PON header for slot %d\n", slot);
     return true;
 }
 
 bool ContextualCheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex* pindexPrev,
-                     const Consensus::Params& params)
+                     const Consensus::Params& params, bool fCheckSignature)
 {
     // First do all header validations
     if (!CheckPONBlockHeader(pblock, pindexPrev, params)) {
@@ -219,51 +223,26 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex
     }
     
     // 1. Verify the signature matches the collateral owner
-    CPubKey pubkey;
-    if (g_fluxnodeCache.GetPubkeyIfConfirmed(pblock->nodesCollateral, pubkey)) {
-        // We have the fluxnode in our current state - verify signature
-        
+    if (fCheckSignature) {
+        FluxnodeCacheData data = g_fluxnodeCache.GetFluxnodeData(pblock->nodesCollateral);
+        if (data.IsNull()) {
+            // This is a recent block and we should have the fluxnode data
+            return error("ContextualCheckPONBlockHeader: Fluxnode %s not found when signature required for block %s",
+                         pblock->nodesCollateral.ToString(), pblock->GetHash().GetHex());
+        }
         // Create the message that was signed (block hash)
         uint256 hashToSign = pblock->GetHash();
-        
+
         // Verify the block signature matches the fluxnode's public key
-        if (!pubkey.Verify(hashToSign, pblock->vchBlockSig)) {
+        if (!data.pubKey.Verify(hashToSign, pblock->vchBlockSig)) {
             return error("ContextualCheckPONBlockHeader: Block signature verification failed for fluxnode %s",
-                        pblock->nodesCollateral.ToString());
+                         pblock->nodesCollateral.ToString());
         }
-        
+
         LogPrint("pon", "ContextualCheckPONBlockHeader: Signature verified for fluxnode %s\n",
                  pblock->nodesCollateral.ToString());
-                 
-    } else {
-        // We don't have this fluxnode in our current state
-        // This is expected during sync for older blocks
-        
-        // Check if we're syncing and this is an old block
-        if (IsInitialBlockDownload(Params())) {
-            // During IBD, we can't verify signatures for old blocks
-            // because we don't have historical fluxnode state
-            LogPrint("pon", "ContextualCheckPONBlockHeader: Skipping signature check during IBD at height %d\n",
-                     pindexPrev ? pindexPrev->nHeight + 1 : 0);
-                     
-        } else if (pindexPrev && pindexPrev->nHeight < chainActive.Height() - 500) {
-            // For blocks more than 500 blocks old, skip signature check
-            // as we may not have the historical fluxnode data
-            LogPrint("pon", "ContextualCheckPONBlockHeader: Skipping signature check for old block at height %d\n",
-                     pindexPrev->nHeight + 1);
-                     
-        } else {
-            // This is a recent block and we should have the fluxnode data
-            return error("ContextualCheckPONBlockHeader: Fluxnode %s not found in confirmed list for recent block",
-                        pblock->nodesCollateral.ToString());
-        }
     }
 
-    // 2. Slot uniqueness is enforced by:
-    // - Only one block per height (blockchain rule)
-    // - Timestamp must align with slot (already validated)
-    // - Network consensus on longest chain
-    
     LogPrint("pon", "ContextualCheckPONBlockHeader: Full validation passed for block %s\n", pblock->GetHash().GetHex());
     return true;
 }

@@ -5038,7 +5038,7 @@ bool ContextualCheckBlockHeader(
         
         if (block.IsPON()) {
             // Validate PON block header
-            if (!ContextualCheckPONBlockHeader(&block, pindexPrev, consensusParams)) {
+            if (!ContextualCheckPONBlockHeader(&block, pindexPrev, consensusParams, false)) {
                 return state.DoS(100, error("ContextualCheckBlockHeader: Invalid PON block header"),
                                  REJECT_INVALID, "bad-pon-header");
             }
@@ -5125,8 +5125,8 @@ bool ContextualCheckBlock(
     // PON-specific validation if PON is active
     if (IsPONActive(nHeight)) {
         if (block.IsPON()) {
-            // Validate the full PON block (including signature)
-            if (!ContextualCheckPONBlockHeader(&block, pindexPrev, consensusParams)) {
+            // Validate the full PON block!  (Including signature - If not coming from fFromAccept)
+            if (!ContextualCheckPONBlockHeader(&block, pindexPrev, consensusParams, fFromAccept ? false : true)) {
                 return state.DoS(100, error("ContextualCheckBlock: Invalid PON block"),
                                  REJECT_INVALID, "bad-pon-block");
             }
