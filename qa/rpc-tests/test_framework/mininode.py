@@ -90,14 +90,14 @@ def ser_string(s):
         return chr(len(s)) + s
     elif len(s) < 0x10000:
         return chr(253) + struct.pack("<H", len(s)) + s
-    elif len(s) < 0x100000000L:
+    elif len(s) < 0x100000000:
         return chr(254) + struct.pack("<I", len(s)) + s
     return chr(255) + struct.pack("<Q", len(s)) + s
 
 
 def deser_uint256(f):
-    r = 0L
-    for i in xrange(8):
+    r = 0
+    for i in range(8):
         t = struct.unpack("<I", f.read(4))[0]
         r += t << (i * 32)
     return r
@@ -105,23 +105,23 @@ def deser_uint256(f):
 
 def ser_uint256(u):
     rs = ""
-    for i in xrange(8):
-        rs += struct.pack("<I", u & 0xFFFFFFFFL)
+    for i in range(8):
+        rs += struct.pack("<I", u & 0xFFFFFFFF)
         u >>= 32
     return rs
 
 
 def uint256_from_str(s):
-    r = 0L
+    r = 0
     t = struct.unpack("<IIIIIIII", s[:32])
-    for i in xrange(8):
+    for i in range(8):
         r += t[i] << (i * 32)
     return r
 
 
 def uint256_from_compact(c):
     nbytes = (c >> 24) & 0xFF
-    v = (c & 0xFFFFFFL) << (8 * (nbytes - 3))
+    v = (c & 0xFFFFFF) << (8 * (nbytes - 3))
     return v
 
 
@@ -134,7 +134,7 @@ def deser_vector(f, c):
     elif nit == 255:
         nit = struct.unpack("<Q", f.read(8))[0]
     r = []
-    for i in xrange(nit):
+    for i in range(nit):
         t = c()
         t.deserialize(f)
         r.append(t)
@@ -147,7 +147,7 @@ def ser_vector(l):
         r = chr(len(l))
     elif len(l) < 0x10000:
         r = chr(253) + struct.pack("<H", len(l))
-    elif len(l) < 0x100000000L:
+    elif len(l) < 0x100000000:
         r = chr(254) + struct.pack("<I", len(l))
     else:
         r = chr(255) + struct.pack("<Q", len(l))
@@ -165,7 +165,7 @@ def deser_uint256_vector(f):
     elif nit == 255:
         nit = struct.unpack("<Q", f.read(8))[0]
     r = []
-    for i in xrange(nit):
+    for i in range(nit):
         t = deser_uint256(f)
         r.append(t)
     return r
@@ -177,7 +177,7 @@ def ser_uint256_vector(l):
         r = chr(len(l))
     elif len(l) < 0x10000:
         r = chr(253) + struct.pack("<H", len(l))
-    elif len(l) < 0x100000000L:
+    elif len(l) < 0x100000000:
         r = chr(254) + struct.pack("<I", len(l))
     else:
         r = chr(255) + struct.pack("<Q", len(l))
@@ -195,7 +195,7 @@ def deser_string_vector(f):
     elif nit == 255:
         nit = struct.unpack("<Q", f.read(8))[0]
     r = []
-    for i in xrange(nit):
+    for i in range(nit):
         t = deser_string(f)
         r.append(t)
     return r
@@ -207,7 +207,7 @@ def ser_string_vector(l):
         r = chr(len(l))
     elif len(l) < 0x10000:
         r = chr(253) + struct.pack("<H", len(l))
-    elif len(l) < 0x100000000L:
+    elif len(l) < 0x100000000:
         r = chr(254) + struct.pack("<I", len(l))
     else:
         r = chr(255) + struct.pack("<Q", len(l))
@@ -225,7 +225,7 @@ def deser_int_vector(f):
     elif nit == 255:
         nit = struct.unpack("<Q", f.read(8))[0]
     r = []
-    for i in xrange(nit):
+    for i in range(nit):
         t = struct.unpack("<i", f.read(4))[0]
         r.append(t)
     return r
@@ -237,7 +237,7 @@ def ser_int_vector(l):
         r = chr(len(l))
     elif len(l) < 0x10000:
         r = chr(253) + struct.pack("<H", len(l))
-    elif len(l) < 0x100000000L:
+    elif len(l) < 0x100000000:
         r = chr(254) + struct.pack("<I", len(l))
     else:
         r = chr(255) + struct.pack("<Q", len(l))
@@ -255,7 +255,7 @@ def deser_char_vector(f):
     elif nit == 255:
         nit = struct.unpack("<Q", f.read(8))[0]
     r = []
-    for i in xrange(nit):
+    for i in range(nit):
         t = struct.unpack("<B", f.read(1))[0]
         r.append(t)
     return r
@@ -267,7 +267,7 @@ def ser_char_vector(l):
         r = chr(len(l))
     elif len(l) < 0x10000:
         r = chr(253) + struct.pack("<H", len(l))
-    elif len(l) < 0x100000000L:
+    elif len(l) < 0x100000000:
         r = chr(254) + struct.pack("<I", len(l))
     else:
         r = chr(255) + struct.pack("<Q", len(l))
@@ -868,7 +868,7 @@ class CBlock(CBlockHeader):
             hashes.append(ser_uint256(tx.sha256))
         while len(hashes) > 1:
             newhashes = []
-            for i in xrange(0, len(hashes), 2):
+            for i in range(0, len(hashes), 2):
                 i2 = min(i+1, len(hashes)-1)
                 newhashes.append(hash256(hashes[i] + hashes[i2]))
             hashes = newhashes
@@ -1157,7 +1157,7 @@ class msg_getblocks(object):
 
     def __init__(self):
         self.locator = CBlockLocator()
-        self.hashstop = 0L
+        self.hashstop = 0
 
     def deserialize(self, f):
         self.locator = CBlockLocator()
@@ -1303,7 +1303,7 @@ class msg_getheaders(object):
 
     def __init__(self):
         self.locator = CBlockLocator()
-        self.hashstop = 0L
+        self.hashstop = 0
 
     def deserialize(self, f):
         self.locator = CBlockLocator()
@@ -1350,7 +1350,7 @@ class msg_reject(object):
         self.message = ""
         self.code = ""
         self.reason = ""
-        self.data = 0L
+        self.data = 0
 
     def deserialize(self, f):
         self.message = deser_string(f)
@@ -1438,8 +1438,8 @@ class NodeConnCB(object):
             try:
                 self.cbmap[message.command](conn, message)
             except:
-                print "ERROR delivering %r (%s)" % (message,
-                                                    sys.exc_info()[0])
+                print("ERROR delivering %r (%s)" % (message,
+                                                    sys.exc_info()[0]))
 
     def on_version(self, conn, message):
         if message.nVersion >= 209:
