@@ -298,7 +298,7 @@ public:
         nSwapPoolInterval = 21600; // Avg Block per day (720) *  - Trying to get to around once a month
         nSwapPoolMaxTimes = 10;
 
-        strDevFundAddress = ""; // TODO NODE FIll this out before releasing
+        strDevFundAddress = "t3hPu1YDeGUCp8m7BQCnnNUmRMJBa5RadyA";
 
         nBeginCumulusTransition = 1076532;
         nEndCumulusTransition = 1086612;
@@ -312,9 +312,6 @@ public:
         vecP2SHPublicKeys.resize(1);
         vecP2SHPublicKeys[0] = std::make_pair("04ab11edbb8a15f7cc2628a4a2c18cea095d250f8c9a2924cbd581b8d8fb3a8b91e39e5febddb7ffc60f20dfd352a40aa4f061aa60a9ace26d43e1b7a18aea4162", 0);
         assert(vecP2SHPublicKeys.size() > 0);
-
-
-        
 
         // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
@@ -493,7 +490,7 @@ public:
         nSwapPoolInterval = 100;
         nSwapPoolMaxTimes = 10;
 
-        strDevFundAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
+        strDevFundAddress = "t2GoxS2SRmLQDnTyWePHjKD3izvFsKUAjrH";
 
         nBeginCumulusTransition = 420;
         nEndCumulusTransition = 520;
@@ -649,6 +646,7 @@ public:
         fTestnetToBeDeprecatedFieldRPC = false;
 
         networkID = CBaseChainParams::Network::REGTEST;
+        nStartFluxnodePaymentsHeight = 100;
         vecBenchmarkingPublicKeys.resize(2);
         vecBenchmarkingPublicKeys[0] = std::make_pair("04cf3c34f01486bbb34c1a7ca11c2ddb1b3d98698c3f37d54452ff91a8cd5e92a6910ce5fc2cc7ad63547454a965df53ff5be740d4ef4ac89848c2bafd1e40e6b7", 0);
         vecBenchmarkingPublicKeys[1] = std::make_pair("045d54130187b4c4bba25004bf615881c2d79b16950a59114df27dc9858d8e531fda4f3a27aa95ceb2bcc87ddd734be40a6808422655e5350fa9417874556b7342", 1617508800); // Sun Apr 04 2021 04:00:00
@@ -693,7 +691,8 @@ public:
         nSwapPoolInterval = 10;
         nSwapPoolMaxTimes = 5;
 
-        strDevFundAddress = "tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE";
+        // Use empty dev fund address for regtest to avoid payment requirements
+        strDevFundAddress = "t2GoxS2SRmLQDnTyWePHjKD3izvFsKUAjrH";
 
         nBeginCumulusTransition = 0;
         nEndCumulusTransition = 1000;

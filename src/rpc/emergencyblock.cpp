@@ -147,12 +147,20 @@ UniValue signemergencyblock(const UniValue& params, bool fHelp)
     std::string strPubKey = HexStr(pubKey.begin(), pubKey.end());
 
     // Check if this public key is authorized
-    const std::vector<std::string>& authorizedKeys = Params().GetEmergencyPublicKeys();
     bool isAuthorized = false;
-    for (const auto& authKey : authorizedKeys) {
-        if (authKey == strPubKey) {
-            isAuthorized = true;
-            break;
+
+    // For regtest, allow any key to sign emergency blocks for testing
+    if (Params().NetworkIDString() == "regtest") {
+        isAuthorized = true;
+        LogPrintf("Emergency block signing: Using regtest bypass, allowing any key\n");
+    } else {
+        // For mainnet/testnet, check against authorized keys
+        const std::vector<std::string>& authorizedKeys = Params().GetEmergencyPublicKeys();
+        for (const auto& authKey : authorizedKeys) {
+            if (authKey == strPubKey) {
+                isAuthorized = true;
+                break;
+            }
         }
     }
 

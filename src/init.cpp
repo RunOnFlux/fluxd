@@ -1956,47 +1956,55 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
     }
 
-    if (fFluxnode) {
+    // TODO - Remove before main net release
+    bool fTestNet = GetBoolArg("-testnet", false);
+    bool fBenchCheckBypass = GetBoolArg("-testnetbenchbypass", false);
+    bool bypassTestNet = fTestNet && fBenchCheckBypass;
+    
+    if (!bypassTestNet) {
+        if (fFluxnode) {
+            strPath = GetSelfPath();
+            LogPrintf("Path: %s\n",strPath);
         
-        strPath = GetSelfPath();
-        LogPrintf("Path: %s\n",strPath);
-       
-         if (FindBenchmarkPath("fluxbenchd",strPath)) {
+            if (FindBenchmarkPath("fluxbenchd",strPath)) {
 
-            LogPrintf("Found fluxbenchd in %s\n",strPath);
+                LogPrintf("Found fluxbenchd in %s\n",strPath);
 
-            if (FindBenchmarkPath("fluxbench-cli",strPath)) {
-                 LogPrintf("Found fluxbench-cli in %s\n",strPath);
+                if (FindBenchmarkPath("fluxbench-cli",strPath)) {
+                    LogPrintf("Found fluxbench-cli in %s\n",strPath);
+                } else {
+                    return InitError("Failed to find benchmark cli application");
+                }
+
             } else {
-                 return InitError("Failed to find benchmark cli application");
+
+                if (FindBenchmarkPath("zelbenchd", strPath)) {
+                    LogPrintf("Found zelbenchd in %s\n",strPath);
+                } else {
+                    return InitError("Failed to find benchmark application");
+                }
+
+                if (FindBenchmarkPath("zelbench-cli", strPath)) {
+                    LogPrintf("Found zelbench-cli in %s\n",strPath);
+                } else {
+                    return InitError("Failed to find benchmark cli application");
+                }
             }
-
-        } else {
-
-             if (FindBenchmarkPath("zelbenchd", strPath)) {
-                  LogPrintf("Found zelbenchd in %s\n",strPath);
-             } else {
-                 return InitError("Failed to find benchmark application");
-             }
-
-             if (FindBenchmarkPath("zelbench-cli", strPath)) {
-                  LogPrintf("Found zelbench-cli in %s\n",strPath);
-             } else {
-                 return InitError("Failed to find benchmark cli application");
-             }
+            
         }
-        
     }
 
-    if (fFluxnode && !fArcane) {
-        // Check if the benchmark application is running
-        if (!IsFluxBenchdRunning()) {
-            StartFluxBenchd();
-        }
+    if (!bypassTestNet) {
+        if (fFluxnode && !fArcane) {
+            // Check if the benchmark application is running
+            if (!IsFluxBenchdRunning()) {
+                StartFluxBenchd();
+            }
 
-        // Make sure that fluxbenchd is running and stop flux if it isn't
-        if (!IsFluxBenchdRunning()) {
-            return InitError("Failed to start benchmark application");
+            // Make sure that fluxbenchd is running and stop flux if it isn't
+            if (!IsFluxBenchdRunning()) {
+                return InitError("Failed to start benchmark application");
+            }
         }
     }
 

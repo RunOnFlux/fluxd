@@ -223,13 +223,21 @@ UniValue generate(const UniValue& params, bool fHelp)
             // Calculate the slot time for deterministic block generation
             int64_t genesisTime = chainparams.GenesisBlock().nTime;
             
-            // For regtest, ensure slot time is after median time past
+            // For regtest, ensure slot time is after previous block time
             LOCK(cs_main);
-            int64_t minTime = chainActive.Tip()->GetMedianTimePast() + 1;
-            
-            // Find the first slot that's >= minTime
-            uint32_t slot = GetSlotNumber(minTime, genesisTime, chainparams.GetConsensus());
-            enforceTime = GetAdjustedTime();
+            // PON blocks need timestamp strictly greater than previous block
+            int64_t minTime = chainActive.Tip()->GetBlockTime() + 1;
+
+            // Use the minimum valid time for PON blocks
+            enforceTime = std::max(GetTime(), minTime);
+
+            // Try to get the dev fund address
+            CTxDestination dest = DecodeDestination(Params().GetDevFundAddress());
+            if (!IsValidDestination(dest)) {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to create block template: Invalid dev payout address");
+            }
+
+            coinbaseScript->reserveScript = GetScriptForDestination(dest);
         }
         
         std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(Params(), coinbaseScript->reserveScript, false, collateral, enforceTime));
