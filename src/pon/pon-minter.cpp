@@ -187,7 +187,7 @@ void PONMinter(const CChainParams& chainparams)
             CScript scriptPubKey;
             {
 
-                // Try to get the fluxnode payout address
+                // Try to get the dev fund address
                 CTxDestination dest = DecodeDestination(Params().GetDevFundAddress());
                 if (!IsValidDestination(dest)) {
                     LogPrintf("PON: Invalid Dev Fund Address\n");
@@ -208,7 +208,7 @@ void PONMinter(const CChainParams& chainparams)
             
             // Create the block with enforced slot time
             std::unique_ptr<CBlockTemplate> pblocktemplate(
-                CreateNewBlock(chainparams, scriptPubKey, collateral, now)
+                CreateNewBlock(chainparams, scriptPubKey, false, collateral, now)
             );
             
             if (!pblocktemplate) {

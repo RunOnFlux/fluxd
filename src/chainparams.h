@@ -158,6 +158,11 @@ public:
 
     std::vector<std::pair<std::string, uint32_t> > GetP2SHFluxnodePublicKeys() const { return vecP2SHPublicKeys; }
 
+    /** Emergency Block Creation getters **/
+    const std::vector<std::string>& GetEmergencyPublicKeys() const { return vecEmergencyPublicKeys; }
+    const uint256& GetEmergencyCollateralHash() const { return emergencyCollateralHash; }
+    int GetEmergencyMinSignatures() const { return nEmergencyMinSignatures; }
+
 
 protected:
     CChainParams() {}
@@ -227,6 +232,11 @@ protected:
 
 
     std::vector< std::pair<std::string, uint32_t> > vecP2SHPublicKeys;
+
+    /** Emergency Block Creation params **/
+    std::vector<std::string> vecEmergencyPublicKeys;
+    uint256 emergencyCollateralHash;
+    int nEmergencyMinSignatures = 2; // Require 2-of-N signatures
 };
 
 /**

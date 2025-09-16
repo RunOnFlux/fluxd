@@ -138,6 +138,7 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   deprecation.h \
+  emergencyblock.h \
   hash.h \
   httprpc.h \
   httpserver.h \
@@ -255,6 +256,7 @@ libbitcoin_server_a_SOURCES = \
   chain.cpp \
   checkpoints.cpp \
   deprecation.cpp \
+  emergencyblock.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
@@ -273,6 +275,7 @@ libbitcoin_server_a_SOURCES = \
   rest.cpp \
   rpc/blockchain.cpp \
   rpc/cache.cpp \
+  rpc/emergencyblock.cpp \
   rpc/mining.cpp \
   rpc/misc.cpp \
   rpc/net.cpp \

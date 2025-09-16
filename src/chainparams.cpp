@@ -241,6 +241,18 @@ public:
 
         assert(vecBenchmarkingPublicKeys.size() > 0);
 
+        // Emergency block creation public keys (requires 2-of-4 signatures)
+        // These keys can create blocks when the network is failing to produce them
+        // Using special collateral pattern (all 1's) for identification
+        vecEmergencyPublicKeys.resize(4);  // 4 keys, requiring 2 signatures
+        vecEmergencyPublicKeys[0] = "025ee73f72d6996f94fe6ec9fac3f9ba6dcb947ed46dfbda530fc73ff99c667a4e";
+        vecEmergencyPublicKeys[1] = "026f4281124d10eb90589831bac405d715ad79051ac5243d21c322d2abf2fd81e2";
+        vecEmergencyPublicKeys[2] = "03083d65c2f57cfe4d1c34eb575bd9d836f5111dd0de86405d48211bf42ea30403";
+        vecEmergencyPublicKeys[3] = "03674c29f348124e998fd838228a3ff050ca26fe0c13ad98698585cbbf796b461e";
+
+        // Special collateral hash pattern (all 1's) for emergency blocks
+        emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
+        nEmergencyMinSignatures = 2; // Require 2 signatures minimum
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
@@ -300,6 +312,9 @@ public:
         vecP2SHPublicKeys.resize(1);
         vecP2SHPublicKeys[0] = std::make_pair("04ab11edbb8a15f7cc2628a4a2c18cea095d250f8c9a2924cbd581b8d8fb3a8b91e39e5febddb7ffc60f20dfd352a40aa4f061aa60a9ace26d43e1b7a18aea4162", 0);
         assert(vecP2SHPublicKeys.size() > 0);
+
+
+        
 
         // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
@@ -492,6 +507,17 @@ public:
         vecP2SHPublicKeys.resize(1);
         vecP2SHPublicKeys[0] = std::make_pair("04276f105ff36a670a56e75c2462cff05a4a7864756e6e1af01022e32752d6fe57b1e13cab4f2dbe3a6a51b4e0de83a5c4627345f5232151867850018c9a3c3a1d", 0);
 
+        // Emergency block creation public keys for testnet (requires 2-of-4 signatures)
+        vecEmergencyPublicKeys.resize(4);
+        vecEmergencyPublicKeys[0] = "029a1c55fa7e69dd99087f7ca799797052ae21327b94159e60b8cc5704eb188583";
+        vecEmergencyPublicKeys[1] = "023c806b01f35a18b42b08f23f5c7e8490801a7da8fd6f6e77708d9f26f22c423e";
+        vecEmergencyPublicKeys[2] = "02615c78e21078c21a63cb21cc4d29eaa148d97c3dcbe7be5d9d4dda4e969bb05a";
+        vecEmergencyPublicKeys[3] = "033d301dc7ef7ab653da36da1285063ea9be1448d601e3c9f99185476b9d4ae1d1";
+
+        // Special collateral hash pattern (all 1's) for emergency blocks
+        emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
+        nEmergencyMinSignatures = 2; // Require 2 signatures minimum
+
     // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
         // in #2795.
@@ -680,6 +706,15 @@ public:
 
         vecP2SHPublicKeys.resize(1);
         vecP2SHPublicKeys[0] = std::make_pair("04276f105ff36a670a56e75c2462cff05a4a7864756e6e1af01022e32752d6fe57b1e13cab4f2dbe3a6a51b4e0de83a5c4627345f5232151867850018c9a3c3a1d", 0);
+
+        // Emergency block parameters (same as testnet)
+        emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
+        nEmergencyMinSignatures = 1;
+        vecEmergencyPublicKeys.resize(4);
+        vecEmergencyPublicKeys[0] = "029a1c55fa7e69dd99087f7ca799797052ae21327b94159e60b8cc5704eb188583";
+        vecEmergencyPublicKeys[1] = "023c806b01f35a18b42b08f23f5c7e8490801a7da8fd6f6e77708d9f26f22c423e";
+        vecEmergencyPublicKeys[2] = "02615c78e21078c21a63cb21cc4d29eaa148d97c3dcbe7be5d9d4dda4e969bb05a";
+        vecEmergencyPublicKeys[3] = "033d301dc7ef7ab653da36da1285063ea9be1448d601e3c9f99185476b9d4ae1d1";
     }
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)

@@ -7,6 +7,7 @@
 #include "../arith_uint256.h"
 #include "../chain.h"
 #include "../chainparams.h"
+#include "../emergencyblock.h"
 #include "../fluxnode/fluxnode.h"
 #include "../hash.h"
 #include "../primitives/block.h"
@@ -186,6 +187,10 @@ bool CheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex* pindexPr
         return error("CheckPONBlockHeader: Block version %d is not PON", pblock->nVersion);
     }
 
+    if (IsEmergencyBlock(*pblock)) {
+        return true;
+    }
+
     if (!CheckProofOfNode(GetPONHash(*pblock), pblock->nBits, Params().GetConsensus())) {
         int64_t genesisTimestamp = Params().GenesisBlock().nTime;
         uint32_t slot = GetSlotNumber(pblock->nTime, genesisTimestamp, Params().GetConsensus());
@@ -207,11 +212,28 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex
     }
     
     // Now do additional validation that requires chain state
-    
+
+    // Check if this is an emergency block first
+    if (IsEmergencyBlock(*pblock)) {
+        if (!ValidateEmergencyBlockSignatures(*pblock)) {
+            return error("ContextualCheckPONBlockHeader: Emergency block signature validation failed");
+        }
+
+        // Check if emergency blocks are allowed at this height/time
+        int nHeight = pindexPrev ? pindexPrev->nHeight + 1 : 0;
+        if (!IsEmergencyBlockAllowed(nHeight, pblock->nTime)) {
+            return error("ContextualCheckPONBlockHeader: Emergency block not allowed at height %d, time %d",
+                        nHeight, pblock->nTime);
+        }
+
+        LogPrint("pon", "ContextualCheckPONBlockHeader: Emergency block validated successfully\n");
+        return true;
+    }
+
     // Special testnet/regtest bypass for development
     bool isTestnet = (Params().NetworkIDString() == "test");
     bool isRegtest = (Params().NetworkIDString() == "regtest");
-    
+
     if (isTestnet || isRegtest) {
         // Allow a special collateral that doesn't need to be a confirmed node
         // This is the hash of "TESTPON" - recognizable but unlikely to collide

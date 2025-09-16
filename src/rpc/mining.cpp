@@ -232,7 +232,7 @@ UniValue generate(const UniValue& params, bool fHelp)
             enforceTime = GetAdjustedTime();
         }
         
-        std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(Params(), coinbaseScript->reserveScript, collateral, enforceTime));
+        std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(Params(), coinbaseScript->reserveScript, false, collateral, enforceTime));
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         CBlock *pblock = &pblocktemplate->block;

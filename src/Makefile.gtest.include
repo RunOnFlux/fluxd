@@ -45,7 +45,8 @@ flux_gtest_SOURCES += \
 	gtest/test_checkblock.cpp \
 	gtest/test_zip32.cpp \
 	gtest/test_pon.cpp \
-	gtest/test_delegates.cpp
+	gtest/test_delegates.cpp \
+	gtest/test_emergencyblock.cpp
 if ENABLE_WALLET
 flux_gtest_SOURCES += \
 	wallet/gtest/test_paymentdisclosure.cpp \

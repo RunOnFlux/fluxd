@@ -112,11 +112,11 @@ void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, 
 }
 CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, std::map<int, std::pair<CScript, CAmount>>* fluxnodePayouts)
 {
-    return CreateNewBlock(chainparams, scriptPubKeyIn, COutPoint(), 0, fluxnodePayouts);
+    return CreateNewBlock(chainparams, scriptPubKeyIn, false, COutPoint(), 0, fluxnodePayouts);
 }
 
 
-CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, const COutPoint& ponNodeCollateral, const uint32_t& enforceTime, std::map<int, std::pair<CScript, CAmount>>* fluxnodePayouts)
+CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, const bool fForEmergency, const COutPoint& ponNodeCollateral, const uint32_t& enforceTime, std::map<int, std::pair<CScript, CAmount>>* fluxnodePayouts)
 {
     // Create new block
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
@@ -561,6 +561,10 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         pblock->nBits = GetNextWorkRequiredByFork(pindexPrev, pblock, chainparams.GetConsensus());
         pblock->nSolution.clear();
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
+
+        if (fForEmergency) {
+            return pblocktemplate.release();
+        }
 
         CValidationState state;
         if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false)) {

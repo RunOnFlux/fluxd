@@ -125,6 +125,13 @@ bool DecodeHexBlk(CBlock& block, const std::string& strHexBlk)
     return true;
 }
 
+std::string EncodeHexBlock(const CBlock& block)
+{
+    CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
+    ssBlock << block;
+    return HexStr(ssBlock.begin(), ssBlock.end());
+}
+
 uint256 ParseHashUV(const UniValue& v, const string& strName)
 {
     string strHex;
