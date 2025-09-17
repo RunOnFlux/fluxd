@@ -701,7 +701,7 @@ bool FluxnodeCache::CheckFluxnodePayout(const CTransaction& coinbase, const int 
             }
         }
     }
-
+ 
     // Check for failed payouts and add the paid nodes if approved
     if (fCheckDevFundPayment && !fDevFundPaid) {
         error("Invalid block dev fund payment. Should be paying : %s -> %u", Params().GetDevFundAddress(), nRemainerLeft);

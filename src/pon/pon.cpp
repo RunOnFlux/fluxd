@@ -231,6 +231,7 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex
     }
 
     // Special testnet/regtest bypass for development
+    // TODO - remove before release
     bool isTestnet = (Params().NetworkIDString() == "test");
     bool isRegtest = (Params().NetworkIDString() == "regtest");
 
@@ -247,22 +248,42 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex
     // 1. Verify the signature matches the collateral owner
     if (fCheckSignature) {
         FluxnodeCacheData data = g_fluxnodeCache.GetFluxnodeData(pblock->nodesCollateral);
+
         if (data.IsNull()) {
-            // This is a recent block and we should have the fluxnode data
-            return error("ContextualCheckPONBlockHeader: Fluxnode %s not found when signature required for block %s",
-                         pblock->nodesCollateral.ToString(), pblock->GetHash().GetHex());
+            // Try to refresh cache if we're validating a recent block
+            int currentHeight = pindexPrev ? pindexPrev->nHeight + 1 : 0;
+            bool isRecentBlock = (chainActive.Height() - currentHeight) < 10;
+
+            if (isRecentBlock) {
+                LogPrint("pon", "FluxNode not found in cache, attempting refresh for %s (height=%d)\n",
+                        pblock->nodesCollateral.ToString(), currentHeight);
+
+                // Small delay to allow cache sync
+                MilliSleep(100);
+
+                // Retry cache lookup
+                data = g_fluxnodeCache.GetFluxnodeData(pblock->nodesCollateral);
+            }
+
+            if (data.IsNull()) {
+                return error("ContextualCheckPONBlockHeader: FluxNode %s not found in cache for block %s (height=%d, recent=%s)",
+                            pblock->nodesCollateral.ToString(), pblock->GetHash().GetHex(),
+                            currentHeight, isRecentBlock ? "yes" : "no");
+            }
         }
+
         // Create the message that was signed (block hash)
         uint256 hashToSign = pblock->GetHash();
 
         // Verify the block signature matches the fluxnode's public key
         if (!data.pubKey.Verify(hashToSign, pblock->vchBlockSig)) {
-            return error("ContextualCheckPONBlockHeader: Block signature verification failed for fluxnode %s",
-                         pblock->nodesCollateral.ToString());
+            return error("ContextualCheckPONBlockHeader: Block signature verification failed for fluxnode %s (block=%s, pubkey=%s)",
+                        pblock->nodesCollateral.ToString(), pblock->GetHash().GetHex(),
+                        HexStr(data.pubKey.begin(), data.pubKey.end()));
         }
 
-        LogPrint("pon", "ContextualCheckPONBlockHeader: Signature verified for fluxnode %s\n",
-                 pblock->nodesCollateral.ToString());
+        LogPrint("pon", "ContextualCheckPONBlockHeader: Signature verified for fluxnode %s (tier=%d)\n",
+             pblock->nodesCollateral.ToString(), data.nTier);
     }
 
     LogPrint("pon", "ContextualCheckPONBlockHeader: Full validation passed for block %s\n", pblock->GetHash().GetHex());

@@ -58,6 +58,15 @@ bool ValidateEmergencyBlockSignatures(const CBlockHeader& block) {
         return false;
     }
 
+    // NEW: Log emergency block usage for transparency
+    int currentHeight = chainActive.Height() + 1;
+    LogPrintf("=== EMERGENCY BLOCK DETECTED ===\n");
+    LogPrintf("Height: %d\n", currentHeight);
+    LogPrintf("Hash: %s\n", block.GetHash().ToString());
+    LogPrintf("Timestamp: %d (%s)\n", block.nTime, DateTimeStrFormat("%Y-%m-%d %H:%M:%S", block.nTime));
+    LogPrintf("Previous: %s\n", block.hashPrevBlock.ToString());
+    LogPrintf("================================\n");
+
     const std::vector<std::string>& emergencyPubKeys = Params().GetEmergencyPublicKeys();
     const int nMinSigs = Params().GetEmergencyMinSignatures();
 
@@ -116,12 +125,13 @@ bool ValidateEmergencyBlockSignatures(const CBlockHeader& block) {
         }
 
         if (validSigs >= nMinSigs) {
-            LogPrintf("Emergency block validation successful: %d valid signatures\n", validSigs);
+            LogPrintf("Emergency block validation successful: %d/%d valid signatures\n",
+                     validSigs, nMinSigs);
             return true;
         }
     }
 
-    LogPrintf("Emergency block validation failed: only %d valid signatures (need %d)\n",
+    LogPrintf("Emergency block validation failed: only %d/%d valid signatures\n",
               validSigs, nMinSigs);
     return false;
 }
