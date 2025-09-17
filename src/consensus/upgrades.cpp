@@ -61,7 +61,7 @@ const struct NUInfo NetworkUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
             /*.strInfo =*/ "Multisig Node Upgrade",
     },
     {
-            /*.nBranchId =*/ 0x504f4e20,  // "PON " in hex
+            /*.nBranchId =*/ 0x76b809bb,  // "PON " in hex
             /*.strName =*/ "PON",
             /*.strInfo =*/ "Proof of Node activation",
     }
