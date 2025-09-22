@@ -4183,7 +4183,7 @@ int getrand(int min,int max){
 }
 
 // Set the number of blocks since last check to check again
-static int numberOfBlocksBeforeNextCheck = getrand(1,4);
+static int numberOfBlocksBeforeNextCheck = getrand(1,2);
 
 /**
  * Connect a new block to chainActive. pblock is either NULL or a pointer to a CBlock
@@ -4291,7 +4291,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     if (fFluxnode && pindexNew->nHeight - nFluxnodeLastManaged >= numberOfBlocksBeforeNextCheck) {
         nFluxnodeLastManaged = pindexNew->nHeight;
         //getrand(1,4) is used to get a number between 1 and 4 with same probability, this is used to prevent fluxnode grouping transactions
-        numberOfBlocksBeforeNextCheck = getrand(1,6);
+        numberOfBlocksBeforeNextCheck = getrand(1,2);
         activeFluxnode.ManageDeterministricFluxnode();
     }
 
