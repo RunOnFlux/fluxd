@@ -5032,6 +5032,13 @@ bool ContextualCheckBlockHeader(
 //        LogPrint("pow", "ContextCheckBlockHeader index %d n:%d k:%d Solsize: %d \n",i, ehparams[i].n, ehparams[i].k , ehparams[i].nSolSize);
         if(ehparams[i].nSolSize==nSolSize)
             solutionInvalid=0;
+
+        if (solutionInvalid == 1) {
+            bool isTestnet = (Params().NetworkIDString() == "test");
+            if (nHeight <= 320 && isTestnet) {
+                solutionInvalid = 0;
+            }
+        }
     }
 
     //Block will be validated prior to mining, and will have a zero length equihash solution. These need to be let through. Checkequihashsolution will catch them.

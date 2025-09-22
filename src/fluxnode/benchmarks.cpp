@@ -14,6 +14,13 @@
 #include "fluxnode/fluxnode.h"
 #include "benchmarks.h"
 
+#include "activefluxnode.h"
+#include "fluxnode.h"
+#include "../coins.h"
+#include "../main.h"
+#include "../timedata.h"
+#include "../primitives/transaction.h"
+
 #if defined(__linux)
 #  include <libgen.h>         // dirname
 #  include <unistd.h>         // readlink
@@ -228,7 +235,15 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
     bool bypassTestNet = fTestNet && fBenchCheckBypass;
 
     if (bypassTestNet) {
-        signedTx = tx;
+        CMutableTransaction mutTx(tx);
+        const CCoins* coins = pcoinsTip->AccessCoins(activeFluxnode.deterministicOutPoint.hash);
+        if (coins && coins->IsAvailable(activeFluxnode.deterministicOutPoint.n)) {
+            int nTier = 0;
+            GetCoinTierFromAmount(chainActive.Height(), coins->vout[activeFluxnode.deterministicOutPoint.n].nValue, nTier);
+            mutTx.benchmarkTier = nTier;
+            mutTx.benchmarkSigTime = GetAdjustedTime();
+        }
+        signedTx = CTransaction(mutTx);
         LogPrintf("Testnet - Bypass Benchmark Request for signature\n");
         return true;
     }

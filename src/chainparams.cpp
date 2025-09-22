@@ -398,7 +398,7 @@ public:
 
         eh_epoch_1 = eh48_5;
         eh_epoch_2 = eh48_5;
-        eh_epoch_3 = zelHash;
+        eh_epoch_3 = eh48_5;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -466,8 +466,8 @@ public:
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
             (0, consensus.hashGenesisBlock)
-            (10, uint256S("0x0a2b47f2b29dbd6f0befc7f0a5a6359b7e2cd9f2f18c7bd19dfdebfc516b661c"))
-            (1249, uint256S("0x00c364ea9772696665c857e3967c7c5d3345a8df8671b4b504565131a9efa5ed")),
+            (320, uint256S("0x0237bf16aba912b0c68933809a7e7fe9553ddff1bc0782d2463fc5d161af1c46")),
+            // (1249, uint256S("0x00c364ea9772696665c857e3967c7c5d3345a8df8671b4b504565131a9efa5ed")),
             1693928849,  // * UNIX timestamp of last checkpoint block
             0,           // * total number of transactions between genesis and last checkpoint
                          //   (the tx=... number in the SetBestChain debug.log lines)
