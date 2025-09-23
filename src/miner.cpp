@@ -567,7 +567,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         }
 
         CValidationState state;
-        if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false)) {
+        if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false, false)) {
             if (state.IsInvalidTx()) {
                 LogPrintf("Removing transaction from mempool that is causing block to fail validity check. %s\n", state.GetInvalidTx().GetHash().GetHex());
                 std::list<CTransaction> removed;
@@ -707,7 +707,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
             // Create new block
             //
             unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
-            
+
             // Get the height of current tip
             int nHeight = chainActive.Height();
             if (nHeight == -1) {
@@ -793,7 +793,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
                         // Ignore chain updates caused by us
                         std::lock_guard<std::mutex> lock{m_cs};
                         cancelSolver = false;
-                        MilliSleep(120000);
+                        MilliSleep(600000);
 
                     }
                     SetThreadPriority(THREAD_PRIORITY_LOWEST);

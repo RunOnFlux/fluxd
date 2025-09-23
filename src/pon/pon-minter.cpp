@@ -3,6 +3,7 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "pon-minter.h"
+#include "../arith_uint256.h"
 #include "../miner.h"
 #include "pon.h"
 #include "pon-fork.h"
@@ -34,10 +35,10 @@ bool SignPONBlock(CBlock& block, const COutPoint& collateral)
         LogPrintf("PON: No valid fluxnode private key available\n");
         return false;
     }
-    
+
     // Sign the block hash (which includes all fields except signature)
     uint256 blockHash = block.GetHash();
-    
+
     if (!key.Sign(blockHash, block.vchBlockSig)) {
         LogPrintf("PON: Failed to sign block hash\n");
         return false;
@@ -51,7 +52,7 @@ bool SignPONBlock(CBlock& block, const COutPoint& collateral)
 bool ProcessPONBlock(CBlock* pblock, const CChainParams& chainparams)
 {
     LogPrintf("PON: Generated block %s\n", pblock->GetHash().ToString());
-    
+
     // Check if we're still on the same chain
     {
         LOCK(cs_main);
@@ -60,16 +61,16 @@ bool ProcessPONBlock(CBlock* pblock, const CChainParams& chainparams)
             return false;
         }
     }
-    
+
     // Inform about the new block
     GetMainSignals().BlockFound(pblock->GetHash());
-    
+
     // Process this block
     CValidationState state;
     if (!ProcessNewBlock(state, chainparams, NULL, pblock, true, NULL)) {
         return error("PON: ProcessNewBlock failed: %s", state.GetRejectReason());
     }
-    
+
     return true;
 }
 
@@ -78,14 +79,14 @@ void PONMinter(const CChainParams& chainparams)
     LogPrintf("PON Minter started\n");
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
     RenameThread("pon-minter");
-    
+
     // Cache some values
     const int64_t genesisTime = chainparams.GenesisBlock().nTime;
     const Consensus::Params& consensusParams = chainparams.GetConsensus();
-    
+
     // Track last slot we tried to avoid retrying same slot
     uint32_t lastAttemptedSlot = 0;
-    
+
     try {
         while (fPONMinter) {
             boost::this_thread::interruption_point();
@@ -104,10 +105,10 @@ void PONMinter(const CChainParams& chainparams)
                     MilliSleep(30000);
                 } while (true);
             }
-            
+
             // Check if we're an active fluxnode (on mainnet)
             bool isMainnet = (chainparams.NetworkIDString() == "main");
-            
+
             if (!g_fluxnodeCache.CheckIfConfirmed(activeFluxnode.deterministicOutPoint)) {
                 // For testnet/regtest, allow bypass mode
                 if (isMainnet) {
@@ -117,7 +118,7 @@ void PONMinter(const CChainParams& chainparams)
                 // Continue with bypass mode for testnet/regtest
                 LogPrint("pon", "PON: Running in testnet/regtest bypass mode\n");
             }
-            
+
             // Check if PON is active
             int nHeight;
             {
@@ -128,16 +129,16 @@ void PONMinter(const CChainParams& chainparams)
                 }
                 nHeight = chainActive.Height() + 1;
             }
-            
+
             if (!IsPONActive(nHeight)) {
                 MilliSleep(10000); // Check every 10 seconds until PON activates
                 continue;
             }
-            
+
             // Calculate current slot
             int64_t now = GetAdjustedTime();
             uint32_t currentSlot = GetSlotNumber(now, genesisTime, consensusParams);
-            
+
             // Skip if we already tried this slot
             if (currentSlot <= lastAttemptedSlot) {
                 MilliSleep(1000);
@@ -151,10 +152,10 @@ void PONMinter(const CChainParams& chainparams)
                 lastAttemptedSlot = currentSlot;
                 continue;
             }
-            
+
             // Get our collateral
             COutPoint collateral = activeFluxnode.deterministicOutPoint;
-            
+
             if (collateral.IsNull() && !isMainnet) {
                 // Use test bypass collateral
                 collateral.hash = uint256S("0x544553544e4f4400000000000000000000000000000000000000000000000000");
@@ -165,7 +166,7 @@ void PONMinter(const CChainParams& chainparams)
                 MilliSleep(30000);
                 continue;
             }
-            
+
             // Check if we're eligible for this slot
             CBlockIndex* pindexPrev;
             {
@@ -175,8 +176,11 @@ void PONMinter(const CChainParams& chainparams)
 
             uint256 ponHash = GetPONHash(collateral, pindexPrev->GetBlockHash(), currentSlot);
             unsigned int nBits = GetNextPONWorkRequired(pindexPrev);
-            if (!CheckProofOfNode(ponHash, nBits, Params().GetConsensus())) {
-                LogPrint("pon", "PON: Not eligible for slot %d\n", currentSlot);
+            if (!CheckProofOfNode(ponHash, nBits, Params().GetConsensus(), pindexPrev->nHeight + 1)) {
+                arith_uint256 target;
+                target.SetCompact(nBits);
+                LogPrint("pon", "PON: Not eligible for slot %d - hash=%s target=%s (nBits=%08x)\n",
+                         currentSlot, ponHash.GetHex(), target.GetHex(), nBits);
                 lastAttemptedSlot = currentSlot;
                 MilliSleep(1000);
                 continue;
@@ -197,7 +201,7 @@ void PONMinter(const CChainParams& chainparams)
                 }
 
                 scriptPubKey = GetScriptForDestination(dest);
-                
+
                 if (scriptPubKey.empty()) {
                     LogPrintf("PON: No valid payout script available\n");
                     lastAttemptedSlot = currentSlot;
@@ -205,21 +209,21 @@ void PONMinter(const CChainParams& chainparams)
                     continue;
                 }
             }
-            
+
             // Create the block with enforced slot time
             std::unique_ptr<CBlockTemplate> pblocktemplate(
                 CreateNewBlock(chainparams, scriptPubKey, false, collateral, now)
             );
-            
+
             if (!pblocktemplate) {
                 LogPrintf("PON: CreateNewBlock failed\n");
                 lastAttemptedSlot = currentSlot;
                 MilliSleep(1000);
                 continue;
             }
-            
+
             CBlock* pblock = &pblocktemplate->block;
-            
+
             // Sign the block
             if (!SignPONBlock(*pblock, collateral)) {
                 LogPrintf("PON: Failed to sign block\n");

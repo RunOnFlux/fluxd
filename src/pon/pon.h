@@ -17,7 +17,7 @@ class CBlockHeader;
 class CBlock;
 
 // Check is hash meetings target
-bool CheckProofOfNode(const uint256& hash, unsigned int nBits, const Consensus::Params& params);
+bool CheckProofOfNode(const uint256& hash, unsigned int nBits, const Consensus::Params& params, int nHeightToCheckWith = 0);
 
 // Calculate the pon hash
 uint256 GetPONHash(const CBlockHeader& blockHeader);

@@ -17,6 +17,8 @@
 
 #include <boost/thread.hpp>
 
+#include "pon/pon.h"
+
 using namespace std;
 
 // NOTE: Per issue #3277, do not use the prefix 'X' or 'x' as they were
@@ -534,8 +536,13 @@ bool CBlockTreeDB::LoadBlockIndexGuts(boost::function<CBlockIndex*(const uint256
                 if (header.GetHash() != pindexNew->GetBlockHash())
                     return error("LoadBlockIndex(): block header inconsistency detected: on-disk = %s, in-memory = %s",
                        diskindex.ToString(),  pindexNew->ToString());
-                if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, Params().GetConsensus()))
-                    return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
+                if (header.IsPON()) {
+                    if (!CheckProofOfNode(GetPONHash(header), pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight))
+                        return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
+                } else {
+                    if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, Params().GetConsensus()))
+                        return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
+                }
 
                 pcursor->Next();
             } else {

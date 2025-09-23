@@ -3484,7 +3484,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (!CheckBlock(block, state, chainparams, fExpensiveChecks ? verifier : disabledVerifier, !fJustCheck, !fJustCheck))
         return false;
 
-    if (!ContextualCheckBlock(block,state, chainparams,pindex->pprev, false))
+    if (!ContextualCheckBlock(block,state, chainparams,pindex->pprev, false, !fJustCheck))
         return false;
 
     // verify that the view's current state corresponds to the previous block
@@ -5137,7 +5137,7 @@ bool ContextualCheckBlockHeader(
 
 bool ContextualCheckBlock(
     const CBlock& block, CValidationState& state,
-    const CChainParams& chainparams, CBlockIndex * const pindexPrev, bool fFromAccept)
+    const CChainParams& chainparams, CBlockIndex * const pindexPrev, bool fFromAccept, bool fCheckPONSignature)
 {
     const int nHeight = pindexPrev == NULL ? 0 : pindexPrev->nHeight + 1;
     const Consensus::Params& consensusParams = chainparams.GetConsensus();
@@ -5146,7 +5146,7 @@ bool ContextualCheckBlock(
     if (IsPONActive(nHeight)) {
         if (block.IsPON()) {
             // Validate the full PON block!  (Including signature - If not coming from fFromAccept)
-            if (!ContextualCheckPONBlockHeader(&block, pindexPrev, consensusParams, fFromAccept ? false : true)) {
+            if (!ContextualCheckPONBlockHeader(&block, pindexPrev, consensusParams, fCheckPONSignature)) {
                 return state.DoS(100, error("ContextualCheckBlock: Invalid PON block"),
                                  REJECT_INVALID, "bad-pon-block");
             }
@@ -5358,7 +5358,7 @@ bool ProcessNewBlock(CValidationState& state, const CChainParams& chainparams, c
     return true;
 }
 
-bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams, const CBlock& block, CBlockIndex* pindexPrev, bool fCheckPOW, bool fCheckMerkleRoot)
+bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams, const CBlock& block, CBlockIndex* pindexPrev, bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckPONSignature)
 {
     AssertLockHeld(cs_main);
     assert(pindexPrev == chainActive.Tip());
@@ -5376,7 +5376,7 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
         return false;
     if (!CheckBlock(block, state, chainparams, verifier, fCheckPOW, fCheckMerkleRoot))
         return false;
-    if (!ContextualCheckBlock(block, state, chainparams, pindexPrev, false))
+    if (!ContextualCheckBlock(block, state, chainparams, pindexPrev, false, fCheckPONSignature))
         return false;
     if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true, &cache))
         return false;

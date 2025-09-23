@@ -23,7 +23,7 @@ extern CChain chainActive;
 // This must watch the declaration in main.cpp.
 bool IsInitialBlockDownload(const CChainParams& chainParams);
 
-bool CheckProofOfNode(const uint256& hash, unsigned int nBits, const Consensus::Params& params)
+bool CheckProofOfNode(const uint256& hash, unsigned int nBits, const Consensus::Params& params, int nHeightToCheckWith)
 {
     bool fNegative;
     bool fOverflow;
@@ -34,10 +34,21 @@ bool CheckProofOfNode(const uint256& hash, unsigned int nBits, const Consensus::
     if (Params().NetworkID() == CBaseChainParams::REGTEST) {
         return true;
     }
-    
+
+    arith_uint256 maximumTargetAllowed;
+    if (nHeightToCheckWith) {
+        if (nHeightToCheckWith >= params.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight + params.nPonDifficultyWindow) {
+            maximumTargetAllowed = UintToArith256(params.ponLimit);
+        } else {
+            maximumTargetAllowed = UintToArith256(params.ponStartLimit);
+        }
+    } else {
+        maximumTargetAllowed = UintToArith256(params.ponLimit) < UintToArith256(params.ponStartLimit) ? UintToArith256(params.ponStartLimit) : UintToArith256(params.ponLimit);
+    }
+
     // Check range - similar to CheckProofOfWork but using ponLimit
-    if (fNegative || target == 0 || fOverflow || target > UintToArith256(params.ponLimit)) {
-        return error("CheckProofOfNode(): nBits below minimum work or invalid");
+    if (fNegative || target == 0 || fOverflow || target > maximumTargetAllowed) {
+        return error("CheckProofOfNode(): nBits below minimum work (work is too easy) or invalid");
     }
 
     // Convert hash to arith_uint256 for comparison
@@ -61,16 +72,16 @@ uint256 GetPONHash(const COutPoint& collateral, const uint256& prevBlockHash, ui
     // Create a deterministic hash from the three inputs
     // This ensures that the same fluxnode will always get the same hash for the same slot
     CHashWriter ss(SER_GETHASH, 0);
-    
+
     // Add collateral outpoint (txid + vout index)
     ss << collateral;
-    
+
     // Add previous block hash for unpredictability
     ss << prevBlockHash;
-    
+
     // Add slot number to ensure different hash for each slot
     ss << slot;
-    
+
     return ss.GetHash();
 }
 
@@ -89,27 +100,27 @@ unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
 
     unsigned int nProofOfNodeLimit = ponLimit.GetCompact();
     unsigned int nProofOfNodeStartLimit = ponStartLimit.GetCompact();
-    
+
     // Genesis block or nullptr
     if (pindexLast == nullptr) {
         return nProofOfNodeStartLimit;
     }
-    
+
     int ponActivationHeight = GetPONActivationHeight();
     int nextHeight = pindexLast->nHeight + 1;
     int lookbackWindow = params.nPonDifficultyWindow;
-    
+
     // Before PON activation, use existing difficulty
     if (nextHeight < ponActivationHeight) {
         return pindexLast->nBits;
     }
-    
+
     // For the first few blocks after PON activation, use start limit
     // Need at least lookbackWindow blocks to calculate difficulty
     if (nextHeight < ponActivationHeight + lookbackWindow) {
         return nProofOfNodeStartLimit;
     }
-    
+
     // Now adjust difficulty every block based on the lookback window
     // Find the first block in the lookback window
     const CBlockIndex* pindexFirst = pindexLast;
@@ -120,46 +131,50 @@ unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
             return nProofOfNodeStartLimit;
         }
     }
-    
+
     // Calculate actual timespan over the window
     int64_t actualTimespan = pindexLast->GetBlockTime() - pindexFirst->GetBlockTime();
     // Target timespan = (window - 1) * target spacing (because we're measuring intervals)
     int64_t targetTimespan = (lookbackWindow - 1) * params.nPonTargetSpacing;
-    
+
     LogPrintf("PON: Adjustment at height %d: first=%d, last=%d, actualTimespan=%d, targetTimespan=%d\n",
               nextHeight, pindexFirst->nHeight, pindexLast->nHeight, actualTimespan, targetTimespan);
-    
+
     // Sanity check
     if (targetTimespan <= 0) {
         LogPrintf("PON: Invalid target timespan %d\n", targetTimespan);
         return nProofOfNodeLimit;
     }
-    
-    // Limit adjustment to prevent large swings (2x max)
-    if (actualTimespan < targetTimespan / 2) {
-        actualTimespan = targetTimespan / 2;
+
+    // Limit adjustment to prevent large swings (1.25x max)
+    // 4/5 = 0.8 for harder difficulty (blocks too fast)
+    // 5/4 = 1.25 for easier difficulty (blocks too slow)
+    if (actualTimespan < targetTimespan * 4 / 5) {
+        actualTimespan = targetTimespan * 4 / 5;
     }
-    if (actualTimespan > targetTimespan * 2) {
-        actualTimespan = targetTimespan * 2;
+    if (actualTimespan > targetTimespan * 5 / 4) {
+        actualTimespan = targetTimespan * 5 / 4;
     }
-    
+
     // Calculate new target based on the last block's difficulty
-    // (Could average over the window like POW does, but keeping it simple for now)
+    // Use Digishield-style calculation to avoid overflow
     arith_uint256 newTarget;
     bool fNegative;
     bool fOverflow;
     newTarget.SetCompact(pindexLast->nBits, &fNegative, &fOverflow);
-    
+
     // Check for invalid compact representation
     if (fNegative || fOverflow || newTarget == 0) {
-        LogPrintf("PON: Invalid previous target, using start limit\n");
-        return nProofOfNodeStartLimit;
+        LogPrintf("PON: Invalid previous target, using ponLimit\n");
+        return nProofOfNodeLimit;
     }
-    
+
     // Adjust the target based on actual vs target timespan
+    // Use Digishield approach: divide first, then multiply to avoid overflow
     // newTarget = oldTarget * actualTimespan / targetTimespan
-    newTarget = newTarget * actualTimespan / targetTimespan;
-    
+    newTarget /= targetTimespan;
+    newTarget *= actualTimespan;
+
     // Don't allow target to exceed maximum (easiest difficulty)
     if (newTarget > ponLimit) {
         newTarget = ponLimit;
@@ -173,9 +188,9 @@ unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
     }
 
     LogPrintf("PON difficulty adjustment: height=%d, actualTimespan=%d, targetTimespan=%d, before=%08x, after=%08x\n",
-              pindexLast->nHeight + 1, actualTimespan, targetTimespan, 
+              pindexLast->nHeight + 1, actualTimespan, targetTimespan,
               pindexLast->nBits, newTarget.GetCompact());
-    
+
     return newTarget.GetCompact();
 }
 
@@ -191,7 +206,7 @@ bool CheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex* pindexPr
         return true;
     }
 
-    if (!CheckProofOfNode(GetPONHash(*pblock), pblock->nBits, Params().GetConsensus())) {
+    if (!CheckProofOfNode(GetPONHash(*pblock), pblock->nBits, Params().GetConsensus(), pindexPrev->nHeight + 1)) {
         int64_t genesisTimestamp = Params().GenesisBlock().nTime;
         uint32_t slot = GetSlotNumber(pblock->nTime, genesisTimestamp, Params().GetConsensus());
         return error("CheckPONBlockHeader: stake hash doesn't meet target for slot %d", slot);
@@ -210,7 +225,7 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex
     if (!CheckPONBlockHeader(pblock, pindexPrev, params)) {
         return false;
     }
-    
+
     // Now do additional validation that requires chain state
 
     // Check if this is an emergency block first
@@ -244,7 +259,7 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex
             return true;  // Skip signature verification for test collateral
         }
     }
-    
+
     // 1. Verify the signature matches the collateral owner
     if (fCheckSignature) {
         FluxnodeCacheData data = g_fluxnodeCache.GetFluxnodeData(pblock->nodesCollateral);
