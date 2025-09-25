@@ -679,21 +679,27 @@ bool FluxnodeCache::CheckFluxnodePayout(const CTransaction& coinbase, const int 
     bool fCheckDevFundPayment = IsPONActive(p_Height);
     CScript devFundScript = GetScriptForDestination(DecodeDestination(Params().GetDevFundAddress()));
 
+    // Track which outputs have been used for fluxnode payments to prevent double-counting
+    std::set<size_t> setUsedOutputs;
+
     // Compare it to what is in the block
     // Loop through Tx to make sure they all got paid
-    for (const auto& out : coinbase.vout) {
+    for (size_t i = 0; i < coinbase.vout.size(); i++) {
+        const auto& out = coinbase.vout[i];
         for (auto& payout : mapFluxnodePayouts) {
             if (!payout.second.approvedpayout) {
                 if (out.scriptPubKey == payout.second.script) {
                     if (out.nValue == payout.second.amount) {
                         payout.second.approvedpayout = true;
+                        setUsedOutputs.insert(i); // Mark this output as used for fluxnode payment
+                        break;
                     }
                 }
             }
         }
 
-        // Check Dev Fund Payment (Strict)
-        if (fCheckDevFundPayment && !fDevFundPaid) {
+        // Check Dev Fund Payment (Strict) - but only if this output hasn't been used for fluxnode payment
+        if (fCheckDevFundPayment && !fDevFundPaid && !setUsedOutputs.count(i)) {
             if (out.scriptPubKey == devFundScript) {
                 if (out.nValue >= nRemainerLeft) {
                     fDevFundPaid = true;
