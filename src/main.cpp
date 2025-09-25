@@ -5063,8 +5063,13 @@ bool ContextualCheckBlockHeader(
             
             // Check PON difficulty
             if (block.nBits != GetNextPONWorkRequired(pindexPrev)) {
-                return state.DoS(100, error("%s: incorrect proof of node difficulty", __func__),
-                                 REJECT_INVALID, "bad-pon-diffbits");
+                bool fTestNet = GetBoolArg("-testnet", false);
+                if (fTestNet && nHeight >= 800 && nHeight <= 1800) {
+                    LogPrintf("SKipping nBits check on testnet during fix phase: At height : %d\n", nHeight);
+                } else {
+                    return state.DoS(100, error("%s: incorrect proof of node difficulty", __func__),
+                                     REJECT_INVALID, "bad-pon-diffbits");
+                }
             }
         } else {
             // POW block after PON activation
