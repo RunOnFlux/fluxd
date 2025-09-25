@@ -103,7 +103,7 @@ public:
         consensus.nPowTargetSpacing = 2 * 60;
 
         consensus.ponLimit = uint256S("0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // ~1/16 chance minimum (after fork's first period)
-        consensus.ponStartLimit = uint256S("00028fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");  // ~1/10000 chance (during first fork period)
+        consensus.ponStartLimit = uint256S("000bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");  // ~1/10000 chance (during first fork period)
         consensus.nPonTargetSpacing = 30; // Proof of node spacing (seconds)
         consensus.nPonDifficultyWindow = 30; // Proof of node difficulty adjustment window (30 blocks = 15 minutes)
 
@@ -348,7 +348,7 @@ public:
         consensus.nPowTargetSpacing = 60;
 
         // Proof of node variables
-        consensus.ponLimit = uint256S("019999999999999999999999999999999999999999999999999999999999999a"); // ~1/10 chance minimum for testnet
+        consensus.ponLimit = uint256S("0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // ~1/10 chance minimum for testnet
         consensus.ponStartLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // Very easy for testnet initial fork
         consensus.nPonTargetSpacing = 30; // Proof of node spacing (seconds)
         consensus.nPonDifficultyWindow = 60; // Proof of node difficulty adjustment window (blocks)
