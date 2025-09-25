@@ -136,7 +136,7 @@ void PONMinter(const CChainParams& chainparams)
             }
 
             // Calculate current slot
-            int64_t now = GetAdjustedTime();
+            int64_t now = GetTime();
             uint32_t currentSlot = GetSlotNumber(now, genesisTime, consensusParams);
 
             // Skip if we already tried this slot
