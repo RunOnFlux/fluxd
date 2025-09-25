@@ -112,7 +112,7 @@ void PONMinter(const CChainParams& chainparams)
             if (!g_fluxnodeCache.CheckIfConfirmed(activeFluxnode.deterministicOutPoint)) {
                 // For testnet/regtest, allow bypass mode
                 if (isMainnet) {
-                    MilliSleep(30000); // Check every 30 seconds
+                    MilliSleep(getrand(30000,60000)); // Check every 30-60 seconds
                     continue;
                 }
                 // Continue with bypass mode for testnet/regtest
@@ -124,14 +124,14 @@ void PONMinter(const CChainParams& chainparams)
             {
                 LOCK(cs_main);
                 if (!chainActive.Tip()) {
-                    MilliSleep(1000);
+                    MilliSleep(getrand(30000,60000));
                     continue;
                 }
                 nHeight = chainActive.Height() + 1;
             }
 
             if (!IsPONActive(nHeight)) {
-                MilliSleep(10000); // Check every 10 seconds until PON activates
+                MilliSleep(getrand(10000,30000)); // Check every 10-30 seconds until PON activates
                 continue;
             }
 
@@ -141,14 +141,14 @@ void PONMinter(const CChainParams& chainparams)
 
             // Skip if we already tried this slot
             if (currentSlot <= lastAttemptedSlot) {
-                MilliSleep(1000);
+                MilliSleep(getrand(1000,10000)); // Check every 1-10 seconds
                 continue;
             }
 
-            // CHeck is slot changes in the next 10 seconds, if it does. lets wait
-            uint32_t nextSlotIn10 = GetSlotNumber(now+10, genesisTime, consensusParams);
+            // CHeck is slot changes in the next 5 seconds, if it does. lets wait
+            uint32_t nextSlotIn5 = GetSlotNumber(now+5, genesisTime, consensusParams);
             // Don't try if we're within 10 seconds of the next slot
-            if (currentSlot != nextSlotIn10) {
+            if (currentSlot != nextSlotIn5) {
                 lastAttemptedSlot = currentSlot;
                 continue;
             }
@@ -182,7 +182,6 @@ void PONMinter(const CChainParams& chainparams)
                 LogPrint("pon", "PON: Not eligible for slot %d - hash=%s target=%s (nBits=%08x)\n",
                          currentSlot, ponHash.GetHex(), target.GetHex(), nBits);
                 lastAttemptedSlot = currentSlot;
-                MilliSleep(1000);
                 continue;
             }
 
@@ -196,7 +195,6 @@ void PONMinter(const CChainParams& chainparams)
                 if (!IsValidDestination(dest)) {
                     LogPrintf("PON: Invalid Dev Fund Address\n");
                     lastAttemptedSlot = currentSlot;
-                    MilliSleep(5000);
                     continue;
                 }
 
@@ -205,7 +203,6 @@ void PONMinter(const CChainParams& chainparams)
                 if (scriptPubKey.empty()) {
                     LogPrintf("PON: No valid payout script available\n");
                     lastAttemptedSlot = currentSlot;
-                    MilliSleep(5000);
                     continue;
                 }
             }
@@ -218,7 +215,6 @@ void PONMinter(const CChainParams& chainparams)
             if (!pblocktemplate) {
                 LogPrintf("PON: CreateNewBlock failed\n");
                 lastAttemptedSlot = currentSlot;
-                MilliSleep(1000);
                 continue;
             }
 
@@ -238,9 +234,6 @@ void PONMinter(const CChainParams& chainparams)
             }
             
             lastAttemptedSlot = currentSlot;
-            
-            // Wait a bit before checking next slot
-            MilliSleep(5000);
         }
     }
     catch (const boost::thread_interrupted&) {
