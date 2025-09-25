@@ -17,6 +17,7 @@
 
 #include <boost/thread.hpp>
 
+#include "emergencyblock.h"
 #include "pon/pon.h"
 
 using namespace std;
@@ -537,7 +538,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts(boost::function<CBlockIndex*(const uint256
                     return error("LoadBlockIndex(): block header inconsistency detected: on-disk = %s, in-memory = %s",
                        diskindex.ToString(),  pindexNew->ToString());
                 if (header.IsPON()) {
-                    if (!CheckProofOfNode(GetPONHash(header), pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight))
+                    if (!CheckProofOfNode(GetPONHash(header), pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight) && !IsEmergencyBlock(header))
                         return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
                 } else {
                     if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, Params().GetConsensus()))

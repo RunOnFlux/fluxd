@@ -52,6 +52,8 @@
 #include <boost/thread.hpp>
 #include <boost/static_assert.hpp>
 
+#include "emergencyblock.h"
+
 using namespace std;
 
 #if defined(NDEBUG)
@@ -2485,7 +2487,7 @@ bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus:
               CheckProofOfWork(block.GetHash(), block.nBits, consensusParams)))
             return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
     } else {
-        if (!CheckProofOfNode(GetPONHash(block), block.nBits, consensusParams)) {
+        if (!CheckProofOfNode(GetPONHash(block), block.nBits, consensusParams) && !IsEmergencyBlock(block)) {
             return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
         }
     }
@@ -4872,10 +4874,12 @@ bool CheckBlockHeader(
 
     // PON blocks have different validation rules
     if (block.IsPON()) {
-        // Check proof of work matches claimed amount
-        if (fCheckPOW && !CheckProofOfNode(GetPONHash(block), block.nBits, chainparams.GetConsensus()))
-            return state.DoS(50, error("CheckBlockHeader(): proof of node failed"),
-                             REJECT_INVALID, "high-hash");
+        if (!IsEmergencyBlock((block))) {
+            // Check proof of work matches claimed amount
+            if (fCheckPOW && !CheckProofOfNode(GetPONHash(block), block.nBits, chainparams.GetConsensus()))
+                return state.DoS(50, error("CheckBlockHeader(): proof of node failed"),
+                                 REJECT_INVALID, "high-hash");
+        }
     } else {
         // Check Equihash solution is valid
         if (fCheckPOW && !CheckEquihashSolution(&block, chainparams.GetConsensus()))
