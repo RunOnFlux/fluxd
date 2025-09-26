@@ -845,7 +845,6 @@ UniValue startfluxnodewithdelegates(const UniValue& params, bool fHelp)
 
             // Build the start transaction with delegate support
             CMutableTransaction mutTransaction;
-            mutTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
 
             bool result = activeFluxnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(),
                                                                   zne.getOutputIndex(), errorMessage, mutTransaction);
@@ -855,6 +854,8 @@ UniValue startfluxnodewithdelegates(const UniValue& params, bool fHelp)
                 returnObj.pushKV("error", errorMessage);
                 return returnObj;
             }
+
+            mutTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
 
             // Set the FluxTx version with delegate feature bit
             mutTransaction.nFluxTxVersion = FLUXNODE_TX_TYPE_NORMAL_BIT | FLUXNODE_TX_FEATURE_DELEGATES_BIT;
@@ -1336,6 +1337,7 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
 
     std::map<int, std::vector<UniValue>> mapOrderedStartList;
 
+    int nCurrentHeight = chainActive.Height();
     for (const auto& item : g_fluxnodeCache.mapStartTxTracker) {
 
         // Get the data from the item in the map of dox tracking
@@ -1357,8 +1359,11 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
         info.pushKV("added_height", data.nAddedBlockHeight);
         info.pushKV("payment_address", EncodeDestination(payment_destination));
 
-        int nCurrentHeight = chainActive.Height();
+
         int nExpiresIn = FLUXNODE_START_TX_EXPIRATION_HEIGHT - (nCurrentHeight - data.nAddedBlockHeight);
+        if (IsPONActive(nCurrentHeight)) {
+            nExpiresIn = FLUXNODE_START_TX_EXPIRATION_HEIGHT_V2 - (nCurrentHeight - data.nAddedBlockHeight);
+        }
 
         info.pushKV("expires_in",  nExpiresIn);
 
@@ -1370,7 +1375,11 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
     }
 
     if (mapOrderedStartList.size()) {
-        for (int i = 0; i < FLUXNODE_START_TX_EXPIRATION_HEIGHT + 1; i++) {
+        int nExpirationHeightToCheckAgainst = FLUXNODE_START_TX_EXPIRATION_HEIGHT;
+        if (IsPONActive(nCurrentHeight)) {
+            nExpirationHeightToCheckAgainst = FLUXNODE_START_TX_EXPIRATION_HEIGHT_V2;
+        }
+        for (int i = 0; i < nExpirationHeightToCheckAgainst + 1; i++) {
             if (mapOrderedStartList.count(i)) {
                 for (const auto& item : mapOrderedStartList.at(i)) {
                     wholelist.push_back(item);
@@ -1589,9 +1598,9 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
 
 UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 {
-    if (fHelp || (params.size() != 4))
+    if (fHelp || (params.size() < 4 || params.size() > 5))
         throw runtime_error(
-                "createp2shstarttx \"redeemscript\" \"vpspubkey\" \"txid\" index\n"
+                "createp2shstarttx \"redeemscript\" \"vpspubkey\" \"txid\" index ( [\"delegatepubkey1\", \"delegatepubkey2\", ...] )\n"
                 "\nCreate a transaction spending the given inputs and sending to the given addresses.\n"
                 "Returns hex-encoded raw transaction.\n"
                 "Note that the transaction's inputs are not signed, and\n"
@@ -1602,6 +1611,7 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
                 "2. \"vpspubkey\"           (string, required) The pubkey the the fluxnode server will use to confirm fluxnode transactions\n"
                 "3. \"txid\"                (string, required) the transaction hash of the collateral input\n"
                 "4. \"index\"               (number, required) the index of the transaction collateral input\n"
+                "5. \"delegates\"           (array, optional) Array of delegate public keys (compressed, up to 4) who can start the node\n"
 
                 "\nResult:\n"
                 "\"transaction\"            (string) hex string of the transaction\n"
@@ -1610,12 +1620,21 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
                 + HelpExampleCli("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
                                                       " \"02d8ada61e8847722e91cc652082174e8b6b2844661d518e0eb78e65790f3b451c\""
                                                       " \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\" 0")
-                + HelpExampleRpc("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
+                + HelpExampleCli("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
                                                       " \"02d8ada61e8847722e91cc652082174e8b6b2844661d518e0eb78e65790f3b451c\""
-                                                      " \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\" 0"));
+                                                      " \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\" 0"
+                                                      " '[\"02b3e8d5c47d2d968de255e9e81a6e1eaa5a186ae64de6ec5cc2aa24e50e7c2c1a\"]'")
+                + HelpExampleRpc("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
+                                                      ", \"02d8ada61e8847722e91cc652082174e8b6b2844661d518e0eb78e65790f3b451c\""
+                                                      ", \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\", 0"
+                                                      ", [\"02b3e8d5c47d2d968de255e9e81a6e1eaa5a186ae64de6ec5cc2aa24e50e7c2c1a\"]"));
 
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR)(UniValue::VSTR)(UniValue::VNUM), false);
+    if (params.size() == 4) {
+        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR)(UniValue::VSTR)(UniValue::VNUM), false);
+    } else {
+        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR)(UniValue::VSTR)(UniValue::VNUM)(UniValue::VARR), false);
+    }
 
 
     // Get data from the parameters
@@ -1636,6 +1655,46 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 
     COutPoint collateralIn(uint256S(strCollateralTransactionHash), nCollateralIndex);
 
+    // Process delegate keys if provided
+    std::vector<CPubKey> delegatePubKeys;
+    bool useDelegates = false;
+
+    if (params.size() > 4) {
+        UniValue delegates = params[4].get_array();
+
+        if (delegates.size() > 0) {
+            useDelegates = true;
+
+            // Validate delegate count (max 4)
+            if (delegates.size() > CFluxnodeDelegates::MAX_PUBKEYS_LENGTH) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Too many delegates. Maximum is %d", CFluxnodeDelegates::MAX_PUBKEYS_LENGTH));
+            }
+
+            // Parse and validate delegate public keys
+            for (size_t i = 0; i < delegates.size(); i++) {
+                std::string strPubKey = delegates[i].get_str();
+                CPubKey pubKey(ParseHex(strPubKey));
+
+                if (!pubKey.IsValid()) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid delegate public key at index %d", i));
+                }
+
+                if (!pubKey.IsCompressed()) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Delegate public key at index %d must be compressed", i));
+                }
+
+                // Check for duplicates
+                for (size_t j = 0; j < delegatePubKeys.size(); j++) {
+                    if (delegatePubKeys[j] == pubKey) {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Duplicate delegate public key at index %d", i));
+                    }
+                }
+
+                delegatePubKeys.push_back(pubKey);
+            }
+        }
+    }
+
     // Create the transaction
     CMutableTransaction mutableTransaction;
 
@@ -1643,7 +1702,12 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
     mutableTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
     // Use bit-based version after PON fork, legacy version before
     if (IsPONActive(chainActive.Height() + 1)) {
-        mutableTransaction.nFluxTxVersion = FLUXNODE_TX_TYPE_P2SH_BIT;  // Can OR with other feature bits as needed
+        if (useDelegates) {
+            // Include delegate feature bit if delegates are being used
+            mutableTransaction.nFluxTxVersion = FLUXNODE_TX_TYPE_P2SH_BIT | FLUXNODE_TX_FEATURE_DELEGATES_BIT;
+        } else {
+            mutableTransaction.nFluxTxVersion = FLUXNODE_TX_TYPE_P2SH_BIT;  // Can OR with other feature bits as needed
+        }
     } else {
         mutableTransaction.nFluxTxVersion = FLUXNODE_INTERNAL_P2SH_TX_VERSION;
     }
@@ -1651,6 +1715,14 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
     mutableTransaction.collateralIn = collateralIn;
     mutableTransaction.P2SHRedeemScript = redeemScript;
     mutableTransaction.pubKey = vpsPubKey;
+
+    // Add delegate data if delegates were provided
+    if (useDelegates) {
+        mutableTransaction.fUsingDelegates = true;
+        mutableTransaction.delegateData.nDelegateVersion = 1;
+        mutableTransaction.delegateData.nType = CFluxnodeDelegates::UPDATE;
+        mutableTransaction.delegateData.delegateStartingKeys = delegatePubKeys;
+    }
 
     // Variables needed for List PubKeys Call
     txnouttype type;
@@ -1701,7 +1773,7 @@ UniValue signp2shstarttx(const UniValue& params, bool fHelp)
                 "\"SignedTx\"     (string) The raw hex of the signed transaction\n"
 
                 "\nExamples:\n" +
-                HelpExampleCli("signp2shstarttx", "\"rawtransactionhex\" \"privatekey\"") + HelpExampleRpc("signp2shstarttx", ""));
+                HelpExampleCli("signp2shstarttx", "\"rawtransactionhex\" \"privatekey\"") + HelpExampleRpc("signp2shstarttx", "\"rawtransactionhex\" \"privatekey\""));
 
 #ifdef ENABLE_WALLET
     LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);

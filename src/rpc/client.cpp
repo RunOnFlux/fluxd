@@ -148,6 +148,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "spork", 1},
     { "printsnapshot", 0},
     { "createp2shstarttx", 3},
+    { "createp2shstarttx", 4},
     { "getchaintips", 0 },
     { "startfluxnodewithdelegates", 1 },  // delegates array
     { "startfluxnodewithdelegates", 2 }   // lockwallet boolean
