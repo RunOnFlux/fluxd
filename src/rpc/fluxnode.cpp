@@ -1054,8 +1054,7 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
     mutTransaction.sigTime = GetAdjustedTime();
 
     // Use the same signing message format as in fluxnode.cpp verification
-    std::string strMessage = mutTransaction.collateralIn.ToString() + std::to_string(mutTransaction.collateralIn.n) +
-                            std::to_string(mutTransaction.nUpdateType) + std::to_string(mutTransaction.sigTime);
+    std::string strMessage = mutTransaction.GetHash().GetHex();
     std::string errorMessage;
 
     if (!obfuScationSigner.SignMessage(strMessage, errorMessage, mutTransaction.sig, delegateKey)) {
@@ -1085,6 +1084,197 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
     returnObj.pushKV("result", "success");
     returnObj.pushKV("txid", tx.GetHash().GetHex());
     returnObj.pushKV("delegate", EncodeDestination(CTxDestination(delegatePubKey.GetID())));
+
+    return returnObj;
+}
+
+UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
+{
+    if (!IsFluxnodeTransactionsActive()) {
+        throw runtime_error("deterministic fluxnodes transactions is not active yet");
+    }
+
+    if (fHelp || params.size() != 4)
+        throw runtime_error(
+                "startp2shasdelegate \"redeemscript\" \"collateraltxid\" \"outputindex\" \"delegatekey\"\n"
+                "\nStart a P2SH (multisig) Fluxnode as an authorized delegate.\n"
+                "\nArguments:\n"
+                "1. redeemscript    (string, required) The hex-encoded redeem script of the P2SH address.\n"
+                "2. collateraltxid  (string, required) The transaction ID of the collateral.\n"
+                "3. outputindex     (string, required) The output index of the collateral.\n"
+                "4. delegatekey     (string, required) The private key of an authorized delegate.\n"
+                "\nResult:\n"
+                "{\n"
+                "  \"result\": \"xxxx\",     (string) 'success' or 'failed'\n"
+                "  \"txid\": \"xxxx\",       (string) The transaction ID if successful\n"
+                "  \"delegate\": \"xxxx\",   (string) The delegate address used\n"
+                "  \"error\": \"xxxx\"       (string) Error message, if failed\n"
+                "}\n"
+                "\nNote: The delegate must first be authorized using 'updatefluxnodedelegates'.\n"
+                "\nExamples:\n" +
+                HelpExampleCli("startp2shasdelegate", "\"512103...\" \"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\"") +
+                HelpExampleRpc("startp2shasdelegate", "\"512103...\", \"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\""));
+
+    std::string strRedeemScript = params[0].get_str();
+    std::string strTxHash = params[1].get_str();
+    std::string strOutputIndex = params[2].get_str();
+    std::string strDelegateKey = params[3].get_str();
+
+    UniValue returnObj(UniValue::VOBJ);
+
+    // Parse the redeem script
+    std::vector<unsigned char> redeemScriptData = ParseHex(strRedeemScript);
+    CScript redeemScript(redeemScriptData.begin(), redeemScriptData.end());
+
+    // Validate the transaction hash
+    uint256 txHash = uint256S(strTxHash);
+    if (txHash.IsNull()) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid transaction hash");
+        return returnObj;
+    }
+
+    // Validate the output index
+    int nOutputIndex;
+    try {
+        nOutputIndex = std::stoi(strOutputIndex);
+    } catch (const std::exception& e) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid output index");
+        return returnObj;
+    }
+
+    COutPoint outpoint(txHash, nOutputIndex);
+
+    // Check if already in mempool or tracker
+    if (mempool.mapFluxnodeTxMempool.count(outpoint)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Mempool already has a fluxnode transaction using this outpoint");
+        return returnObj;
+    } else if (g_fluxnodeCache.InStartTracker(outpoint)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Fluxnode already started, waiting to be confirmed");
+        return returnObj;
+    } else if (g_fluxnodeCache.InDoSTracker(outpoint)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Fluxnode already started then not confirmed, in DoS tracker");
+        return returnObj;
+    } else if (g_fluxnodeCache.InConfirmTracker(outpoint)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Fluxnode already confirmed and in fluxnode list");
+        return returnObj;
+    }
+
+    // Parse and validate delegate private key
+    CKey delegateKey = DecodeSecret(strDelegateKey);
+    if (!delegateKey.IsValid()) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid delegate private key");
+        return returnObj;
+    }
+
+    CPubKey delegatePubKey = delegateKey.GetPubKey();
+
+    // Check if this delegate is authorized
+    CFluxnodeDelegates storedDelegates;
+    bool hasDelegates = false;
+    bool isDelegateAuthorized = false;
+
+    // Use cache-aware GetDelegates function
+    if (g_fluxnodeCache.GetDelegates(outpoint, storedDelegates)) {
+        hasDelegates = true;
+
+        // Check if the delegate public key is in the authorized list
+        for (const auto& authorizedKey : storedDelegates.delegateStartingKeys) {
+            if (authorizedKey == delegatePubKey) {
+                isDelegateAuthorized = true;
+                break;
+            }
+        }
+    }
+
+    if (hasDelegates && !isDelegateAuthorized) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "This delegate key is not authorized for this collateral");
+        return returnObj;
+    }
+
+    if (!hasDelegates) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "No delegates are authorized for this collateral");
+        return returnObj;
+    }
+
+    // Get the collateral transaction
+    CTransaction collateralTx;
+    uint256 hashBlock;
+    if (!GetTransaction(txHash, collateralTx, Params().GetConsensus(), hashBlock, true)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Collateral transaction not found");
+        return returnObj;
+    }
+
+    if (nOutputIndex >= (int)collateralTx.vout.size()) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid output index for transaction");
+        return returnObj;
+    }
+
+    // Create the P2SH fluxnode start transaction
+    CMutableTransaction mutTransaction;
+    mutTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
+    mutTransaction.nType = FLUXNODE_START_TX_TYPE;
+    mutTransaction.collateralIn = outpoint;
+
+    // For P2SH, we use a dummy public key as placeholder
+    mutTransaction.collateralPubkey = CPubKey();
+    mutTransaction.pubKey = delegatePubKey; // Use delegate's pubkey for VPS verification
+
+    // Set the FluxTx version with P2SH and delegate feature bits
+    mutTransaction.nFluxTxVersion = FLUXNODE_TX_TYPE_P2SH_BIT | FLUXNODE_TX_FEATURE_DELEGATES_BIT;
+
+    // Set the redeem script
+    mutTransaction.P2SHRedeemScript = redeemScript;
+
+    // Set up delegate signing flag
+    mutTransaction.fUsingDelegates = true;
+    mutTransaction.delegateData.nDelegateVersion = 1;
+    mutTransaction.delegateData.nType = CFluxnodeDelegates::SIGNING;
+
+    // Sign the transaction with delegate key
+    mutTransaction.sigTime = GetAdjustedTime();
+
+    std::string strMessage = mutTransaction.GetHash().GetHex();
+    std::string errorMessage;
+
+    if (!obfuScationSigner.SignMessage(strMessage, errorMessage, mutTransaction.sig, delegateKey)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Failed to sign transaction: " + errorMessage);
+        return returnObj;
+    }
+
+    // Verify the signature
+    if (!obfuScationSigner.VerifyMessage(delegatePubKey, mutTransaction.sig, strMessage, errorMessage)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Failed to verify signature: " + errorMessage);
+        return returnObj;
+    }
+
+    // Commit the transaction
+    CTransaction tx(mutTransaction);
+    CReserveKey reservekey(pwalletMain);
+    CWalletTx walletTx(pwalletMain, tx);
+
+    if (!pwalletMain->CommitTransaction(walletTx, reservekey)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Failed to commit transaction");
+        return returnObj;
+    }
+
+    returnObj.pushKV("result", "success");
+    returnObj.pushKV("txid", tx.GetHash().GetHex());
+    returnObj.pushKV("delegate", EncodeDestination(CTxDestination(delegatePubKey.GetID())));
+    returnObj.pushKV("p2sh", EncodeDestination(CTxDestination(CScriptID(redeemScript))));
 
     return returnObj;
 }
@@ -2232,6 +2422,7 @@ static const CRPCCommand commands[] =
                 { "fluxnode",   "startdeterministicfluxnode", &startdeterministicfluxnode, false },
                 { "fluxnode",   "startfluxnodewithdelegates", &startfluxnodewithdelegates, false },
                 { "fluxnode",   "startfluxnodeasdelegate", &startfluxnodeasdelegate, false },
+                { "fluxnode",   "startp2shasdelegate", &startp2shasdelegate, false },
                 { "fluxnode",   "viewdeterministicfluxnodelist", &viewdeterministicfluxnodelist, false },
 
                 { "benchmarks", "getbenchmarks",         &getbenchmarks,           false  },
