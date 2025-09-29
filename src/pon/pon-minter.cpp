@@ -141,15 +141,15 @@ void PONMinter(const CChainParams& chainparams)
 
             // Skip if we already tried this slot
             if (currentSlot <= lastAttemptedSlot) {
-                MilliSleep(getrand(1000,10000)); // Check every 1-10 seconds
+                MilliSleep(getrand(1000,3000)); // Check every 1-10 seconds
                 continue;
             }
 
-            // CHeck is slot changes in the next 5 seconds, if it does. lets wait
+            // Check if slot changes in the next 5 seconds, if it does. lets wait
             uint32_t nextSlotIn5 = GetSlotNumber(now+5, genesisTime, consensusParams);
             // Don't try if we're within 10 seconds of the next slot
             if (currentSlot != nextSlotIn5) {
-                lastAttemptedSlot = currentSlot;
+                //lastAttemptedSlot = currentSlot;
                 continue;
             }
 

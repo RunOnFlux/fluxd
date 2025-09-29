@@ -15,6 +15,8 @@
 #include "util.h"
 #include "key_io.h"
 #include "fluxnode/activefluxnode.h"
+#include "fluxnode/fluxnodecachedb.h"
+#include "primitives/transaction.h"
 #include "pon/pon-fork.h"
 
 FluxnodeCache g_fluxnodeCache;
@@ -64,16 +66,11 @@ bool CheckFluxnodeTxSignatures(const CTransaction&  transaction)
             // Checking if delegates signed this start transaction
             CFluxnodeDelegates storedDelegates;
 
-            // Using existing delegates - check if signer is authorized
-            if (pFluxnodeDB) {
-                if (pFluxnodeDB->FluxnodeDelegateExists(transaction.collateralIn)) {
-                    if (!pFluxnodeDB->ReadFluxnodeDelegates(transaction.collateralIn, storedDelegates)) {
-                        return error("fluxnode-tx-delegates-failed-to-load-from-db");
-                    }
-                    for (const auto& delegateKey : storedDelegates.delegateStartingKeys) {
-                        if (obfuScationSigner.VerifyMessage(delegateKey, transaction.sig, strMessage, errorMessage)) {
-                            return true;
-                        }
+            // Using existing delegates - check if signer is authorized (cache-aware)
+            if (g_fluxnodeCache.GetDelegates(transaction.collateralIn, storedDelegates)) {
+                for (const auto& delegateKey : storedDelegates.delegateStartingKeys) {
+                    if (obfuScationSigner.VerifyMessage(delegateKey, transaction.sig, strMessage, errorMessage)) {
+                        return true;
                     }
                 }
             }
@@ -1174,6 +1171,24 @@ bool FluxnodeCache::Flush()
             }
     }
 
+    /**
+     * Handle delegate cache operations
+     * Move delegate changes from local cache to global cache
+     */
+    for (const auto& item : mapDelegateToWrite) {
+        // Add/update delegate to dirty writes map
+        g_fluxnodeCache.mapDirtyDelegateWrites[item.first] = item.second;
+        // Remove from erase set if it was there
+        g_fluxnodeCache.setDirtyDelegateErases.erase(item.first);
+    }
+
+    for (const auto& outpoint : setDelegateToErase) {
+        // Add to dirty erase set
+        g_fluxnodeCache.setDirtyDelegateErases.insert(outpoint);
+        // Remove from writes map if it was there
+        g_fluxnodeCache.mapDirtyDelegateWrites.erase(outpoint);
+    }
+
     //! DO ALL REMOVAL FROM THE ITEMS IN THE LIST HERE (using iterators so we can remove items while going over the list a single time
     // Currently only have to do this when moving from CONFIRM->START (undo blocks only)
     if (setRemoveFromList.size()) {
@@ -1199,6 +1214,8 @@ bool FluxnodeCache::Flush()
                 g_fluxnodeCache.SortList(currentTier);
         }
     }
+
+    
 
     return true;
 }
@@ -1298,6 +1315,29 @@ void FluxnodeCache::EraseFromList(const std::set<COutPoint>& setToRemove, const 
     }
 }
 
+bool FluxnodeCache::GetDelegates(const COutPoint& outpoint, CFluxnodeDelegates& delegates)
+{
+    LOCK(cs);
+
+    // First check if it's marked for erasure
+    if (setDirtyDelegateErases.count(outpoint)) {
+        return false; // Delegates have been erased
+    }
+
+    // Check if we have a pending write for this outpoint
+    if (mapDirtyDelegateWrites.count(outpoint)) {
+        delegates = mapDirtyDelegateWrites.at(outpoint);
+        return true;
+    }
+
+    // Not in cache, read from database
+    if (pFluxnodeDB) {
+        return pFluxnodeDB->ReadFluxnodeDelegates(outpoint, delegates);
+    }
+
+    return false;
+}
+
 void FluxnodeCache::DumpFluxnodeCache()
 {
     LOCK(cs);
@@ -1318,6 +1358,15 @@ void FluxnodeCache::DumpFluxnodeCache()
         if (!found) {
             pFluxnodeDB->EraseFluxnodeCacheData(item);
         }
+    }
+
+    // Write dirty delegates to database
+    for (const auto& item : mapDirtyDelegateWrites) {
+        pFluxnodeDB->WriteFluxnodeDelegates(item.first, item.second);
+    }
+
+    for (const auto& outpoint : setDirtyDelegateErases) {
+        pFluxnodeDB->EraseFluxnodeDelegate(outpoint);
     }
 }
 

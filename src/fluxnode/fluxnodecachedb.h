@@ -33,6 +33,7 @@ public:
     bool FluxnodeCacheDataExists(const COutPoint& outpoint);
 
     bool LoadFluxnodeCacheData();
+    bool LogFluxnodeDelegateData();
 
     bool WriteBlockUndoFluxnodeData(const uint256& p_blockHash, CFluxnodeTxBlockUndo& p_undoData);
     bool ReadBlockUndoFluxnodeData(const uint256 &p_blockHash, CFluxnodeTxBlockUndo& p_undoData);

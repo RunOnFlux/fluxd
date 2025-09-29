@@ -76,6 +76,7 @@
 class FluxnodeCache;
 class CFluxnodeTxBlockUndo;
 class ActiveFluxnode;
+class CFluxnodeDelegates;
 
 extern FluxnodeCache g_fluxnodeCache;
 extern ActiveFluxnode activeFluxnode;
@@ -374,7 +375,18 @@ public:
     std::map<int, std::pair<int, COutPoint>> mapPaidNodes;
     std::map<COutPoint, int> mapUndoPaidNodes;
 
+    //! DELEGATE CACHE ITEMS (LOCAL)
+    // Map of delegates to write when flushing
+    std::map<COutPoint, CFluxnodeDelegates> mapDelegateToWrite;
+    // Set of delegates to erase when flushing
+    std::set<COutPoint> setDelegateToErase;
+
     //! GLOBAL CACHE ITEMS ONLY
+    // Map of delegates that need to be written to database (dirty delegates)
+    std::map<COutPoint, CFluxnodeDelegates> mapDirtyDelegateWrites;
+    // Set of delegates that need to be erased from database
+    std::set<COutPoint> setDirtyDelegateErases;
+
     // Global tracking of Started Fluxnodes
     std::map<COutPoint, FluxnodeCacheData> mapStartTxTracker;
 
@@ -414,6 +426,10 @@ public:
         mapFluxnodeList.clear();
 
         mapPaidNodes.clear();
+        mapDelegateToWrite.clear();
+        setDelegateToErase.clear();
+        mapDirtyDelegateWrites.clear();
+        setDirtyDelegateErases.clear();
     }
 
     void AddNewStart(const CTransaction& p_transaction, const int p_nHeight, int nTier = 0, const CAmount nCollateral = 0);
@@ -467,6 +483,9 @@ public:
     void EraseFromList(const std::set<COutPoint>& setToRemove, const Tier nTier);
 
     void DumpFluxnodeCache();
+
+    // Delegate helper - checks cache first, then database
+    bool GetDelegates(const COutPoint& outpoint, CFluxnodeDelegates& delegates);
 
     void CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<int>& vNodeCount);
     void CountMigration(int& nOldTotal, int& nNewTotal, std::vector<int>& vOldNodeCount, std::vector<int>& vNewNodeCount);

@@ -993,13 +993,11 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
     // Check if this delegate is authorized
     CFluxnodeDelegates storedDelegates;
     bool isDelegateAuthorized = false;
+    bool hasDelegates = false;
 
-    if (pFluxnodeDB && pFluxnodeDB->FluxnodeDelegateExists(outpoint)) {
-        if (!pFluxnodeDB->ReadFluxnodeDelegates(outpoint, storedDelegates)) {
-            returnObj.pushKV("result", "failed");
-            returnObj.pushKV("error", "Failed to read delegate information from database");
-            return returnObj;
-        }
+    // Use cache-aware GetDelegates function
+    if (g_fluxnodeCache.GetDelegates(outpoint, storedDelegates)) {
+        hasDelegates = true;
 
         // Check if the delegate public key is in the authorized list (up to 4 delegates)
         for (const auto& authorizedKey : storedDelegates.delegateStartingKeys) {
@@ -1008,13 +1006,15 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
                 break;
             }
         }
+    }
 
-        if (!isDelegateAuthorized) {
-            returnObj.pushKV("result", "failed");
-            returnObj.pushKV("error", "This delegate key is not authorized for this collateral. Use 'updatefluxnodedelegates' first.");
-            return returnObj;
-        }
-    } else {
+    if (hasDelegates && !isDelegateAuthorized) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "This delegate key is not authorized for this collateral. Use 'updatefluxnodedelegates' first.");
+        return returnObj;
+    }
+
+    if (!hasDelegates) {
         returnObj.pushKV("result", "failed");
         returnObj.pushKV("error", "No delegates are authorized for this collateral. Use 'updatefluxnodedelegates' first.");
         return returnObj;

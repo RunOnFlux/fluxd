@@ -79,8 +79,53 @@ bool CDeterministicFluxnodeDB::LoadFluxnodeCacheData()
     return true;
 }
 
+bool CDeterministicFluxnodeDB::LogFluxnodeDelegateData()
+{
+    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+
+    // Seek to the start of FLUXNODE_DELEGATE_DATA entries
+    pcursor->Seek(std::make_pair(FLUXNODE_DELEGATE_DATA, COutPoint()));
+
+    LOCK(g_fluxnodeCache.cs);
+
+    int count = 0;
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+        std::pair<char, COutPoint> key;
+        if (pcursor->GetKey(key) && key.first == FLUXNODE_DELEGATE_DATA) {
+            CFluxnodeDelegates delegates;
+            if (pcursor->GetValue(delegates)) {
+                // Print the outpoint and delegate information
+                LogPrintf("Outpoint: %s\n", key.second.ToString());
+                LogPrintf("  Delegate Version: %d\n", delegates.nDelegateVersion);
+                LogPrintf("  Type: %d\n", delegates.nType);
+
+                // Print pubkeys if available
+                for (size_t i = 0; i < delegates.delegateStartingKeys.size(); i++) {
+                    LogPrintf("  Delegate PubKey %zu: %s\n", i, HexStr(delegates.delegateStartingKeys[i]));
+                }
+
+                count++;
+                pcursor->Next();
+            } else {
+                return error("LogFluxnodeDelegateData() : failed to read value");
+            }
+        } else {
+            break;
+        }
+    }
+
+    LogPrintf("Total delegate entries found: %d\n", count);
+    return true;
+}
+
 bool CDeterministicFluxnodeDB::WriteFluxnodeDelegates(const COutPoint& outpoint, const CFluxnodeDelegates& delegates)
 {
+    LogPrintf("Writing Delgate data for : %s n", outpoint.ToFullString());
+    for (auto key : delegates.delegateStartingKeys) {
+        LogPrintf("Key: %s\n", HexStr(key));
+    }
+
     return Write(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint), delegates);
 }
 
@@ -96,6 +141,7 @@ bool CDeterministicFluxnodeDB::ReadFluxnodeDelegates(const COutPoint& outpoint, 
 
 bool CDeterministicFluxnodeDB::EraseFluxnodeDelegate(const COutPoint& outpoint)
 {
+    LogPrintf("Erasing Delgate data for : %s n", outpoint.ToFullString());
     return Erase(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint));
 }
 

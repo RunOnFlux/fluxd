@@ -152,7 +152,7 @@ public:
                 uint256S("00000009f9178347f3dea495a089400050c3388e07f9c871fb1ebddcab1f8044");
 
         consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
-        consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight = 2000000;
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight = 2900000;
         
         // PON subsidy parameters
         consensus.nPONInitialSubsidy = 14;  // 14 FLUX per block initially

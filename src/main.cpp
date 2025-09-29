@@ -3340,21 +3340,25 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
         }
     }
 
+    // Add delegate restore/removal operations to the cache instead of writing directly to database
     if (!mapDelegatesToAdd.empty()) {
         for (const auto& pair : mapDelegatesToAdd) {
-            // Had old delegates - restore them
-            if (!pFluxnodeDB->WriteFluxnodeDelegates(pair.first, pair.second)) {
-                AbortNode(state, "Failed to write delegates");
-                return DISCONNECT_FAILED;
+            // Had old delegates - restore them to cache
+            if (p_fluxnodeCache) {
+                p_fluxnodeCache->mapDelegateToWrite[pair.first] = pair.second;
+                // Remove from erase set if it was there
+                p_fluxnodeCache->setDelegateToErase.erase(pair.first);
             }
         }
     }
 
     if (!setDelegatesToRemove.empty()) {
         for (const auto& outpoint : setDelegatesToRemove) {
-            if (!pFluxnodeDB->EraseFluxnodeDelegate(outpoint)) {
-                AbortNode(state, "Failed to remove delegates");
-                return DISCONNECT_FAILED;
+            // Mark for erasure in cache
+            if (p_fluxnodeCache) {
+                p_fluxnodeCache->setDelegateToErase.insert(outpoint);
+                // Remove from write map if it was there
+                p_fluxnodeCache->mapDelegateToWrite.erase(outpoint);
             }
         }
     }
@@ -3642,11 +3646,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                         p_fluxnodeCache->AddNewStart(tx, pindex->nHeight, nTier, nCollateralAmount);
 
                         if (tx.HasDelegates() && tx.fUsingDelegates && tx.IsUpdatingDelegate()) {
-                            // Check if delegates existed before
-                            if (pFluxnodeDB->FluxnodeDelegateExists(tx.collateralIn)) {
-                                // Save the old state
-                                CFluxnodeDelegates oldDelegates;
-                                pFluxnodeDB->ReadFluxnodeDelegates(tx.collateralIn, oldDelegates);
+                            // Check if delegates currently exist
+                            CFluxnodeDelegates oldDelegates;
+                            // Use global cache with dot operator (it's an object, not a pointer)
+                            if (g_fluxnodeCache.GetDelegates(tx.collateralIn, oldDelegates)) {
+                                // Save the old state for undo
                                 fluxnodeTxBlockUndo.mapOldDelegates[tx.collateralIn] = oldDelegates;
                             }
 
@@ -3859,16 +3863,21 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 return AbortNode(state, "Failed to write fluxnodetx undo data");
         }
 
-        if (!mapNewDelegates.empty()) {
-            for (const auto& item : mapNewDelegates) {
-                if (item.second.delegateStartingKeys.empty()) {
-                    if (!pFluxnodeDB->EraseFluxnodeDelegate(item.first)) {
-                        return AbortNode(state, "Failed to remove delegates for fluxnode");
-                    }
-                } else {
-                    if (!pFluxnodeDB->WriteFluxnodeDelegates(item.first, item.second)) {
-                        return AbortNode(state, "Failed to add delegates for fluxnode");
-                    }
+        // Add delegate updates to the cache instead of writing directly to database
+        for (const auto& item : mapNewDelegates) {
+            if (item.second.delegateStartingKeys.empty()) {
+                // If no keys, mark for erasure
+                if (p_fluxnodeCache) {
+                    p_fluxnodeCache->setDelegateToErase.insert(item.first);
+                    // Remove from write map if it was there
+                    p_fluxnodeCache->mapDelegateToWrite.erase(item.first);
+                }
+            } else {
+                // Add to write map
+                if (p_fluxnodeCache) {
+                    p_fluxnodeCache->mapDelegateToWrite[item.first] = item.second;
+                    // Remove from erase set if it was there
+                    p_fluxnodeCache->setDelegateToErase.erase(item.first);
                 }
             }
         }
