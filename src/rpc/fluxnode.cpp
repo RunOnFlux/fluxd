@@ -915,14 +915,15 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
         throw runtime_error("deterministic fluxnodes transactions is not active yet");
     }
 
-    if (fHelp || params.size() != 3)
+    if (fHelp || params.size() != 4)
         throw runtime_error(
-                "startfluxnodeasdelegate \"txhash\" \"outputindex\" \"delegatekey\"\n"
+                "startfluxnodeasdelegate \"txhash\" \"outputindex\" \"delegatekey\" \"vpspubkey\"\n"
                 "\nStart a Fluxnode as an authorized delegate instead of the collateral owner.\n"
                 "\nArguments:\n"
                 "1. txhash         (string, required) The transaction hash of the collateral.\n"
                 "2. outputindex    (string, required) The output index of the collateral.\n"
                 "3. delegatekey    (string, required) The private key of an authorized delegate.\n"
+                "4. vpspubkey      (string, required) The public key for VPS verification.\n"
                 "\nResult:\n"
                 "{\n"
                 "  \"result\": \"xxxx\",     (string) 'success' or 'failed'\n"
@@ -932,12 +933,13 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
                 "}\n"
                 "\nNote: The delegate must first be authorized by the collateral owner using 'startfluxnodewithdelegates'.\n"
                 "\nExamples:\n" +
-                HelpExampleCli("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\"") +
-                HelpExampleRpc("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\""));
+                HelpExampleCli("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\" \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\"") +
+                HelpExampleRpc("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\", \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\""));
 
     std::string strTxHash = params[0].get_str();
     std::string strOutputIndex = params[1].get_str();
     std::string strDelegateKey = params[2].get_str();
+    std::string strVpsPubKey = params[3].get_str();
 
     UniValue returnObj(UniValue::VOBJ);
 
@@ -990,6 +992,14 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
 
     CPubKey delegatePubKey = delegateKey.GetPubKey();
 
+    // Parse and validate VPS public key
+    CPubKey vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
+    if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid VPS public key");
+        return returnObj;
+    }
+
     // Check if this delegate is authorized
     CFluxnodeDelegates storedDelegates;
     bool isDelegateAuthorized = false;
@@ -1040,7 +1050,7 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
     mutTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION; // Use upgradeable version for delegate support
     mutTransaction.nType = FLUXNODE_START_TX_TYPE;
     mutTransaction.collateralIn = outpoint;
-    mutTransaction.pubKey = delegatePubKey;
+    mutTransaction.pubKey = vpsPubKey; // Use VPS pubkey for VPS verification
 
     // Set the FluxTx version with delegate feature bit
     mutTransaction.nFluxTxVersion = FLUXNODE_TX_TYPE_NORMAL_BIT | FLUXNODE_TX_FEATURE_DELEGATES_BIT;
