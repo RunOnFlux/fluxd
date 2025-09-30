@@ -1104,15 +1104,16 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
         throw runtime_error("deterministic fluxnodes transactions is not active yet");
     }
 
-    if (fHelp || params.size() != 4)
+    if (fHelp || params.size() != 5)
         throw runtime_error(
-                "startp2shasdelegate \"redeemscript\" \"collateraltxid\" \"outputindex\" \"delegatekey\"\n"
+                "startp2shasdelegate \"redeemscript\" \"collateraltxid\" \"outputindex\" \"delegatekey\" \"vpspubkey\"\n"
                 "\nStart a P2SH (multisig) Fluxnode as an authorized delegate.\n"
                 "\nArguments:\n"
                 "1. redeemscript    (string, required) The hex-encoded redeem script of the P2SH address.\n"
                 "2. collateraltxid  (string, required) The transaction ID of the collateral.\n"
                 "3. outputindex     (string, required) The output index of the collateral.\n"
                 "4. delegatekey     (string, required) The private key of an authorized delegate.\n"
+                "5. vpspubkey       (string, required) The public key for VPS verification.\n"
                 "\nResult:\n"
                 "{\n"
                 "  \"result\": \"xxxx\",     (string) 'success' or 'failed'\n"
@@ -1122,13 +1123,14 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
                 "}\n"
                 "\nNote: The delegate must first be authorized using 'updatefluxnodedelegates'.\n"
                 "\nExamples:\n" +
-                HelpExampleCli("startp2shasdelegate", "\"512103...\" \"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\"") +
-                HelpExampleRpc("startp2shasdelegate", "\"512103...\", \"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\""));
+                HelpExampleCli("startp2shasdelegate", "\"512103...\" \"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\" \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\"") +
+                HelpExampleRpc("startp2shasdelegate", "\"512103...\", \"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\", \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\""));
 
     std::string strRedeemScript = params[0].get_str();
     std::string strTxHash = params[1].get_str();
     std::string strOutputIndex = params[2].get_str();
     std::string strDelegateKey = params[3].get_str();
+    std::string strVpsPubKey = params[4].get_str();
 
     UniValue returnObj(UniValue::VOBJ);
 
@@ -1185,6 +1187,14 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
 
     CPubKey delegatePubKey = delegateKey.GetPubKey();
 
+    // Parse and validate VPS public key
+    CPubKey vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
+    if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid VPS public key");
+        return returnObj;
+    }
+
     // Check if this delegate is authorized
     CFluxnodeDelegates storedDelegates;
     bool hasDelegates = false;
@@ -1238,7 +1248,7 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
 
     // For P2SH, we use a dummy public key as placeholder
     mutTransaction.collateralPubkey = CPubKey();
-    mutTransaction.pubKey = delegatePubKey; // Use delegate's pubkey for VPS verification
+    mutTransaction.pubKey = vpsPubKey; // Use VPS pubkey for VPS verification
 
     // Set the FluxTx version with P2SH and delegate feature bits
     mutTransaction.nFluxTxVersion = FLUXNODE_TX_TYPE_P2SH_BIT | FLUXNODE_TX_FEATURE_DELEGATES_BIT;
