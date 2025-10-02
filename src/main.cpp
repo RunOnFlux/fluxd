@@ -943,12 +943,12 @@ bool ContextualCheckTransaction(
     if (tx.IsCoinBase()) {
         if (fluxPONActive) {
             // Enforce Dev Payment address is paid
-            CAmount nMinimumDevFunAmount = GetMinDevFundAmount(nHeight, chainparams.GetConsensus());
-            if (nMinimumDevFunAmount > 0) {
+            CAmount nMinimumDevFundAmount = GetMinDevFundAmount(nHeight, chainparams.GetConsensus());
+            if (nMinimumDevFundAmount > 0) {
                 bool fFoundDevFund = false;
                 for (const auto& out : tx.vout) {
                     if (out.scriptPubKey == GetScriptForDestination(DecodeDestination(Params().GetDevFundAddress()))) {
-                        if (out.nValue >= nMinimumDevFunAmount) {
+                        if (out.nValue >= nMinimumDevFundAmount) {
                             fFoundDevFund = true;
                             break;
                         }
@@ -2673,7 +2673,7 @@ bool IsSwapPoolInterval(const int64_t nHeight) {
 
 }
 
-// This must watch the declaration in main.h, if not project will not compile
+// This must match the declaration in main.h, if not project will not compile
 bool IsInitialBlockDownload(const CChainParams& chainParams)
 {
     // Once this function has returned false, it must remain false.
@@ -4194,7 +4194,7 @@ int getrand(int min,int max){
 }
 
 // Set the number of blocks since last check to check again
-static int numberOfBlocksBeforeNextCheck = getrand(1,2);
+static int numberOfBlocksBeforeNextCheck = getrand(1,4);
 
 /**
  * Connect a new block to chainActive. pblock is either NULL or a pointer to a CBlock
@@ -4301,8 +4301,8 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
     if (fFluxnode && pindexNew->nHeight - nFluxnodeLastManaged >= numberOfBlocksBeforeNextCheck) {
         nFluxnodeLastManaged = pindexNew->nHeight;
-        //getrand(1,4) is used to get a number between 1 and 4 with same probability, this is used to prevent fluxnode grouping transactions
-        numberOfBlocksBeforeNextCheck = getrand(1,2);
+        //getrand(1,6) is used to get a number between 1 and 4 with same probability, this is used to prevent fluxnode grouping transactions
+        numberOfBlocksBeforeNextCheck = getrand(1,6);
         activeFluxnode.ManageDeterministricFluxnode();
     }
 
@@ -4645,7 +4645,6 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     }
 
     pindexNew->nChainWork = (pindexNew->pprev ? pindexNew->pprev->nChainWork : 0) + GetBlockProof(*pindexNew);
-    
     pindexNew->RaiseValidity(BLOCK_VALID_TREE);
     if (pindexBestHeader == NULL || pindexBestHeader->nChainWork < pindexNew->nChainWork)
         pindexBestHeader = pindexNew;
@@ -4913,8 +4912,8 @@ bool CheckBlockHeader(
                          REJECT_INVALID, "time-too-new");
     } else {
         if (block.IsPON()) {
-            // 2 minute max future block header timing.
-            if (block.GetBlockTime() > GetAdjustedTime() + 120)
+            // 5 minute max future block header timing.
+            if (block.GetBlockTime() > GetAdjustedTime() + 300)
                 return state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),
                                      REJECT_INVALID, "time-too-new");
         } else {
@@ -5042,11 +5041,12 @@ bool ContextualCheckBlockHeader(
     int listlength=validEHparameterList(ehparams,nHeight,chainParams);
     int solutionInvalid=1;
         for(int i=0; i<listlength; i++){
-//        LogPrint("pow", "ContextCheckBlockHeader index %d n:%d k:%d Solsize: %d \n",i, ehparams[i].n, ehparams[i].k , ehparams[i].nSolSize);
         if(ehparams[i].nSolSize==nSolSize)
             solutionInvalid=0;
 
         if (solutionInvalid == 1) {
+            // Can keep in code, to ensure testnet syncs. (caused by devs changing equishhash parms mid test from
+            // zelhash to 48_5
             bool isTestnet = (Params().NetworkIDString() == "test");
             if (nHeight <= 320 && isTestnet) {
                 solutionInvalid = 0;
@@ -5060,12 +5060,9 @@ bool ContextualCheckBlockHeader(
 
     // Check if this should be a PON block
     if (IsPONActive(nHeight)) {
-        // After PON activation
-        bool isMainNet = (chainParams.NetworkIDString() == "main");
-        
         if (block.IsPON()) {
             // Validate PON block header
-            if (!ContextualCheckPONBlockHeader(&block, pindexPrev, consensusParams, false)) {
+            if (!ContextualCheckPONBlockHeader(block, pindexPrev, consensusParams, false)) {
                 return state.DoS(100, error("ContextualCheckBlockHeader: Invalid PON block header"),
                                  REJECT_INVALID, "bad-pon-header");
             }
@@ -5081,13 +5078,8 @@ bool ContextualCheckBlockHeader(
                 }
             }
         } else {
-            // POW block after PON activation
-            if (isMainNet) {
-                // Mainnet/regtest: PON-only after activation
-                return state.DoS(100, error("ContextualCheckBlockHeader: Block at height %d must be PON but isn't", nHeight),
+            return state.DoS(100, error("ContextualCheckBlockHeader: Block at height %d must be PON but isn't", nHeight),
                                  REJECT_INVALID, "not-pon-block");
-            }
-            // Testnet: Allow both POW and PON blocks - POW validation continues below
         }
     } else {
         // Pre-PON blocks
@@ -5164,7 +5156,7 @@ bool ContextualCheckBlock(
     if (IsPONActive(nHeight)) {
         if (block.IsPON()) {
             // Validate the full PON block!  (Including signature - If not coming from fFromAccept)
-            if (!ContextualCheckPONBlockHeader(&block, pindexPrev, consensusParams, fCheckPONSignature)) {
+            if (!ContextualCheckPONBlockHeader(block, pindexPrev, consensusParams, fCheckPONSignature)) {
                 return state.DoS(100, error("ContextualCheckBlock: Invalid PON block"),
                                  REJECT_INVALID, "bad-pon-block");
             }

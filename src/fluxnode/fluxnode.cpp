@@ -145,16 +145,6 @@ bool CheckFluxnodeTxSignatures(const CTransaction&  transaction)
 
 bool CheckBenchmarkSignature(const CTransaction& transaction)
 {
-    // TODO - Remove before main net release
-    bool fTestNet = GetBoolArg("-testnet", false);
-    bool fBenchCheckBypass = GetBoolArg("-testnetbenchbypass", false);
-    bool bypassTestNet = fTestNet && fBenchCheckBypass;
-
-    if (bypassTestNet) {
-        LogPrintf("Testnet - Bypass Benchmark Signature requirment\n");
-        return true;
-    }
-
     std::string public_key = GetFluxnodeBenchmarkPublicKey(transaction);
     CPubKey pubkey(ParseHex(public_key));
     std::string errorMessage = "";

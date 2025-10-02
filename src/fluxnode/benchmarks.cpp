@@ -229,25 +229,6 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
     if (GetBoolArg("-testnet", false))
         testnet = strTestnetSring;
 
-    // TODO - Remove before main net release
-    bool fTestNet = GetBoolArg("-testnet", false);
-    bool fBenchCheckBypass = GetBoolArg("-testnetbenchbypass", false);
-    bool bypassTestNet = fTestNet && fBenchCheckBypass;
-
-    if (bypassTestNet) {
-        CMutableTransaction mutTx(tx);
-        const CCoins* coins = pcoinsTip->AccessCoins(activeFluxnode.deterministicOutPoint.hash);
-        if (coins && coins->IsAvailable(activeFluxnode.deterministicOutPoint.n)) {
-            int nTier = 0;
-            GetCoinTierFromAmount(chainActive.Height(), coins->vout[activeFluxnode.deterministicOutPoint.n].nValue, nTier);
-            mutTx.benchmarkTier = nTier;
-            mutTx.benchmarkSigTime = GetAdjustedTime();
-        }
-        signedTx = CTransaction(mutTx);
-        LogPrintf("Testnet - Bypass Benchmark Request for signature\n");
-        return true;
-    }
-
     if (IsFluxBenchdRunning()) {
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         ss << tx;

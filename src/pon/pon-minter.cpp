@@ -141,7 +141,7 @@ void PONMinter(const CChainParams& chainparams)
 
             // Skip if we already tried this slot
             if (currentSlot <= lastAttemptedSlot) {
-                MilliSleep(3000); // Check every 1-10 seconds
+                MilliSleep(3000); // Check every 3 seconds
                 continue;
             }
 

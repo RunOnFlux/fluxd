@@ -34,14 +34,14 @@ unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast);
 // 1. Block version indicates PON
 // 2. Timestamp aligns with slot
 // 3. Stake hash meets difficulty target
-bool CheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex* pindexPrev,
+bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPrev,
                             const Consensus::Params& params);
 
 // Full PON block header validation (requires chain state - for blocks near tip)
 // This additionally validates:
 // 1. Signature matches collateral owner
 // 2. Fluxnode is active in the network
-bool ContextualCheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex* pindexPrev,
+bool ContextualCheckPONBlockHeader(const CBlockHeader& pblock, const CBlockIndex* pindexPrev,
                      const Consensus::Params& params, bool fCheckSignature = true);
 
 

@@ -793,8 +793,6 @@ void static BitcoinMiner(const CChainParams& chainparams)
                         // Ignore chain updates caused by us
                         std::lock_guard<std::mutex> lock{m_cs};
                         cancelSolver = false;
-                        MilliSleep(600000);
-
                     }
                     SetThreadPriority(THREAD_PRIORITY_LOWEST);
                     coinbaseScript->KeepScript();

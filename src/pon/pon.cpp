@@ -20,7 +20,7 @@
 // Forward declarations to avoid circular dependency with main.h
 extern CChain chainActive;
 
-// This must watch the declaration in main.cpp.
+// This must match the declaration in main.cpp.
 bool IsInitialBlockDownload(const CChainParams& chainParams);
 
 bool CheckProofOfNode(const uint256& hash, unsigned int nBits, const Consensus::Params& params, int nHeightToCheckWith)
@@ -194,59 +194,60 @@ unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
     return newTarget.GetCompact();
 }
 
-bool CheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex* pindexPrev,
+bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPrev,
                             const Consensus::Params& params)
 {
     // 1. Verify this is a PON block
-    if (!pblock->IsPON()) {
-        return error("CheckPONBlockHeader: Block version %d is not PON", pblock->nVersion);
+    if (!block.IsPON()) {
+        return error("CheckPONBlockHeader: Block version %d is not PON", block.nVersion);
     }
 
-    if (IsEmergencyBlock(*pblock)) {
+    if (IsEmergencyBlock(block)) {
         return true;
     }
 
-    if (!CheckProofOfNode(GetPONHash(*pblock), pblock->nBits, Params().GetConsensus(), pindexPrev->nHeight + 1)) {
+    int nHeight = pindexPrev ? pindexPrev->nHeight + 1 : 0;
+
+    if (!CheckProofOfNode(GetPONHash(block), block.nBits, Params().GetConsensus(), nHeight)) {
         int64_t genesisTimestamp = Params().GenesisBlock().nTime;
-        uint32_t slot = GetSlotNumber(pblock->nTime, genesisTimestamp, Params().GetConsensus());
+        uint32_t slot = GetSlotNumber(block.nTime, genesisTimestamp, Params().GetConsensus());
         return error("CheckPONBlockHeader: stake hash doesn't meet target for slot %d", slot);
     }
 
     int64_t genesisTimestamp = Params().GenesisBlock().nTime;
-    uint32_t slot = GetSlotNumber(pblock->nTime, genesisTimestamp, Params().GetConsensus());
+    uint32_t slot = GetSlotNumber(block.nTime, genesisTimestamp, Params().GetConsensus());
     LogPrint("pon", "CheckPONBlockHeader: Valid PON header for slot %d\n", slot);
     return true;
 }
 
-bool ContextualCheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex* pindexPrev,
+bool ContextualCheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPrev,
                      const Consensus::Params& params, bool fCheckSignature)
 {
     // First do all header validations
-    if (!CheckPONBlockHeader(pblock, pindexPrev, params)) {
+    if (!CheckPONBlockHeader(block, pindexPrev, params)) {
         return false;
     }
 
     // Now do additional validation that requires chain state
 
     // Check if this is an emergency block first
-    if (IsEmergencyBlock(*pblock)) {
-        if (!ValidateEmergencyBlockSignatures(*pblock)) {
+    if (IsEmergencyBlock(block)) {
+        if (!ValidateEmergencyBlockSignatures(block)) {
             return error("ContextualCheckPONBlockHeader: Emergency block signature validation failed");
         }
 
         // Check if emergency blocks are allowed at this height/time
         int nHeight = pindexPrev ? pindexPrev->nHeight + 1 : 0;
-        if (!IsEmergencyBlockAllowed(nHeight, pblock->nTime)) {
+        if (!IsEmergencyBlockAllowed(nHeight, block.nTime)) {
             return error("ContextualCheckPONBlockHeader: Emergency block not allowed at height %d, time %d",
-                        nHeight, pblock->nTime);
+                        nHeight, block.nTime);
         }
 
         LogPrint("pon", "ContextualCheckPONBlockHeader: Emergency block validated successfully\n");
         return true;
     }
 
-    // Special testnet/regtest bypass for development
-    // TODO - remove before release
+    // Special testnet/regtest collateral for PON for development
     bool isTestnet = (Params().NetworkIDString() == "test");
     bool isRegtest = (Params().NetworkIDString() == "regtest");
 
@@ -254,7 +255,7 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex
         // Allow a special collateral that doesn't need to be a confirmed node
         // This is the hash of "TESTPON" - recognizable but unlikely to collide
         static const uint256 TEST_BYPASS_HASH = uint256S("0x544553544e4f4400000000000000000000000000000000000000000000000000");
-        if (pblock->nodesCollateral.hash == TEST_BYPASS_HASH && pblock->nodesCollateral.n == 0) {
+        if (block.nodesCollateral.hash == TEST_BYPASS_HASH && block.nodesCollateral.n == 0) {
             LogPrint("pon", "ContextualCheckPONBlockHeader: Using testnet/regtest bypass for development\n");
             return true;  // Skip signature verification for test collateral
         }
@@ -262,7 +263,7 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex
 
     // 1. Verify the signature matches the collateral owner
     if (fCheckSignature) {
-        FluxnodeCacheData data = g_fluxnodeCache.GetFluxnodeData(pblock->nodesCollateral);
+        FluxnodeCacheData data = g_fluxnodeCache.GetFluxnodeData(block.nodesCollateral);
 
         if (data.IsNull()) {
             // Try to refresh cache if we're validating a recent block
@@ -271,36 +272,36 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader* pblock, const CBlockIndex
 
             if (isRecentBlock) {
                 LogPrint("pon", "FluxNode not found in cache, attempting refresh for %s (height=%d)\n",
-                        pblock->nodesCollateral.ToString(), currentHeight);
+                        block.nodesCollateral.ToString(), currentHeight);
 
                 // Small delay to allow cache sync
                 MilliSleep(100);
 
                 // Retry cache lookup
-                data = g_fluxnodeCache.GetFluxnodeData(pblock->nodesCollateral);
+                data = g_fluxnodeCache.GetFluxnodeData(block.nodesCollateral);
             }
 
             if (data.IsNull()) {
                 return error("ContextualCheckPONBlockHeader: FluxNode %s not found in cache for block %s (height=%d, recent=%s)",
-                            pblock->nodesCollateral.ToString(), pblock->GetHash().GetHex(),
+                            block.nodesCollateral.ToString(), block.GetHash().GetHex(),
                             currentHeight, isRecentBlock ? "yes" : "no");
             }
         }
 
         // Create the message that was signed (block hash)
-        uint256 hashToSign = pblock->GetHash();
+        uint256 hashToSign = block.GetHash();
 
         // Verify the block signature matches the fluxnode's public key
-        if (!data.pubKey.Verify(hashToSign, pblock->vchBlockSig)) {
+        if (!data.pubKey.Verify(hashToSign, block.vchBlockSig)) {
             return error("ContextualCheckPONBlockHeader: Block signature verification failed for fluxnode %s (block=%s, pubkey=%s)",
-                        pblock->nodesCollateral.ToString(), pblock->GetHash().GetHex(),
+                        block.nodesCollateral.ToString(), block.GetHash().GetHex(),
                         HexStr(data.pubKey.begin(), data.pubKey.end()));
         }
 
         LogPrint("pon", "ContextualCheckPONBlockHeader: Signature verified for fluxnode %s (tier=%d)\n",
-             pblock->nodesCollateral.ToString(), data.nTier);
+             block.nodesCollateral.ToString(), data.nTier);
     }
 
-    LogPrint("pon", "ContextualCheckPONBlockHeader: Full validation passed for block %s\n", pblock->GetHash().GetHex());
+    LogPrint("pon", "ContextualCheckPONBlockHeader: Full validation passed for block %s\n", block.GetHash().GetHex());
     return true;
 }

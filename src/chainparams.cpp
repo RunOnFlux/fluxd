@@ -691,7 +691,6 @@ public:
         nSwapPoolInterval = 10;
         nSwapPoolMaxTimes = 5;
 
-        // Use empty dev fund address for regtest to avoid payment requirements
         strDevFundAddress = "t2GoxS2SRmLQDnTyWePHjKD3izvFsKUAjrH";
 
         nBeginCumulusTransition = 0;
