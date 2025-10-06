@@ -1153,10 +1153,4 @@ struct CMutableTransaction
     }
 };
 
-// 1 Master key creates delgates.
-// 2 delegates can start nodes
-// 3 delegates cannot change delegates
-
-// Gate lock delegates to be changes with only the pubkey that matches the collateral.
-
 #endif // BITCOIN_PRIMITIVES_TRANSACTION_H

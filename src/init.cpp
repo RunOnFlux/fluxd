@@ -1967,7 +1967,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             if (FindBenchmarkPath("fluxbench-cli",strPath)) {
                 LogPrintf("Found fluxbench-cli in %s\n",strPath);
             } else {
-                return InitError("Failed to find benchmark cli application");
+                if (!IsTestnetBenchmarkBypassActive()) {
+                    return InitError("Failed to find benchmark cli application");
+                }
             }
 
         } else {
@@ -1975,13 +1977,17 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             if (FindBenchmarkPath("zelbenchd", strPath)) {
                 LogPrintf("Found zelbenchd in %s\n",strPath);
             } else {
-                return InitError("Failed to find benchmark application");
+                if (!IsTestnetBenchmarkBypassActive()) {
+                    return InitError("Failed to find benchmark application");
+                }
             }
 
             if (FindBenchmarkPath("zelbench-cli", strPath)) {
                 LogPrintf("Found zelbench-cli in %s\n",strPath);
             } else {
-                return InitError("Failed to find benchmark cli application");
+                if (!IsTestnetBenchmarkBypassActive()) {
+                    return InitError("Failed to find benchmark cli application");
+                }
             }
         }
         
@@ -1995,7 +2001,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         // Make sure that fluxbenchd is running and stop flux if it isn't
         if (!IsFluxBenchdRunning()) {
-            return InitError("Failed to start benchmark application");
+            if (!IsTestnetBenchmarkBypassActive()) {
+                return InitError("Failed to start benchmark application");
+            }
         }
     }
 

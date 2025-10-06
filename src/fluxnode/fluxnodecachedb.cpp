@@ -82,10 +82,6 @@ bool CDeterministicFluxnodeDB::LoadFluxnodeCacheData()
 bool CDeterministicFluxnodeDB::WriteFluxnodeDelegates(const COutPoint& outpoint, const CFluxnodeDelegates& delegates)
 {
     LogPrintf("Writing Delgate data for : %s n", outpoint.ToFullString());
-    for (auto key : delegates.delegateStartingKeys) {
-        LogPrintf("Key: %s\n", HexStr(key));
-    }
-
     return Write(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint), delegates);
 }
 

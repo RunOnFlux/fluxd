@@ -145,6 +145,12 @@ bool CheckFluxnodeTxSignatures(const CTransaction&  transaction)
 
 bool CheckBenchmarkSignature(const CTransaction& transaction)
 {
+    // TESTNET ONLY
+    if (IsTestnetBenchmarkBypassActive()) {
+        LogPrintf("Testnet - Bypass Benchmark Signature requirment\n");
+        return true;
+    }
+
     std::string public_key = GetFluxnodeBenchmarkPublicKey(transaction);
     CPubKey pubkey(ParseHex(public_key));
     std::string errorMessage = "";
@@ -1544,3 +1550,9 @@ void FluxnodeCache::LogDebugData(const int& nHeight, const uint256& blockhash, b
 
 }
 /** Fluxnode Tier code end **/
+
+bool IsTestnetBenchmarkBypassActive() {
+    bool fTestNet = GetBoolArg("-testnet", false);
+    bool fBenchCheckBypass = GetBoolArg("-testnetbenchbypass", false);
+    return fTestNet && fBenchCheckBypass;
+}

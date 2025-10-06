@@ -117,7 +117,7 @@ unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
 
     // For the first few blocks after PON activation, use start limit
     // Need at least lookbackWindow blocks to calculate difficulty
-    if (nextHeight < ponActivationHeight + lookbackWindow) {
+    if (nextHeight < (ponActivationHeight + lookbackWindow)) {
         return nProofOfNodeStartLimit;
     }
 

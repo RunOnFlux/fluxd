@@ -501,4 +501,6 @@ bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet);
 
 bool IsFluxnodeTransactionsActive();
 
+bool IsTestnetBenchmarkBypassActive();
+
 #endif //ZELCASHNODES_FLUXNODE_H

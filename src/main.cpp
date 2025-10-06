@@ -4301,7 +4301,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
     if (fFluxnode && pindexNew->nHeight - nFluxnodeLastManaged >= numberOfBlocksBeforeNextCheck) {
         nFluxnodeLastManaged = pindexNew->nHeight;
-        //getrand(1,6) is used to get a number between 1 and 4 with same probability, this is used to prevent fluxnode grouping transactions
+        //getrand(1,6) is used to get a number between 1 and 6 with same probability, this is used to prevent fluxnode grouping transactions
         numberOfBlocksBeforeNextCheck = getrand(1,6);
         activeFluxnode.ManageDeterministricFluxnode();
     }
