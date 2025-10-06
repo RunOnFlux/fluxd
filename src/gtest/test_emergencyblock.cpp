@@ -197,10 +197,10 @@ TEST_F(EmergencyBlockTest, TestEmergencyBlockTimeRestrictions) {
     // because the static lastBlockTime is only updated when height increases
     EXPECT_TRUE(IsEmergencyBlockAllowed(testnetHeight, currentTime));
 
-    // Test on mainnet (PON activates at height 2000000)
+    // Test on mainnet (PON activates at height 2900000)
     SelectParams(CBaseChainParams::MAIN);
     EXPECT_FALSE(IsEmergencyBlockAllowed(testnetHeight, currentTime)); // Too low for mainnet
-    EXPECT_TRUE(IsEmergencyBlockAllowed(2000001, currentTime)); // After PON activation
+    EXPECT_TRUE(IsEmergencyBlockAllowed(2900001, currentTime)); // After PON activation
 }
 
 TEST_F(EmergencyBlockTest, TestMultipleSignatureValidation) {

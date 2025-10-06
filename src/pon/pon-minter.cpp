@@ -112,7 +112,7 @@ void PONMinter(const CChainParams& chainparams)
             if (!g_fluxnodeCache.CheckIfConfirmed(activeFluxnode.deterministicOutPoint)) {
                 // For testnet/regtest, allow bypass mode
                 if (isMainnet) {
-                    MilliSleep(10000); // Check every 30 seconds
+                    MilliSleep(10000);
                     continue;
                 }
                 // Continue with bypass mode for testnet/regtest

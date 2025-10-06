@@ -1539,9 +1539,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 uiInterface.InitMessage(_("Loading fluxnodecache..."));
                 pFluxnodeDB->LoadFluxnodeCacheData();
 
-                // TODO - remove log before release
-                pFluxnodeDB->LogFluxnodeDelegateData();
-
                 uiInterface.InitMessage(_("Sorting fluxnode lists"));
                 for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
                     g_fluxnodeCache.SortList(currentTier);
