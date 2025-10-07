@@ -15,6 +15,7 @@
 class FluxnodeCacheData;
 class COutPoint;
 class CFluxnodeTxBlockUndo;
+class CFluxnodeDelegates;
 
 class CDeterministicFluxnodeDB : public CDBWrapper
 {
@@ -35,6 +36,11 @@ public:
 
     bool WriteBlockUndoFluxnodeData(const uint256& p_blockHash, CFluxnodeTxBlockUndo& p_undoData);
     bool ReadBlockUndoFluxnodeData(const uint256 &p_blockHash, CFluxnodeTxBlockUndo& p_undoData);
+
+    bool WriteFluxnodeDelegates(const COutPoint& outpoint, const CFluxnodeDelegates& delegates);
+    bool ReadFluxnodeDelegates(const COutPoint& outpoint, CFluxnodeDelegates& delegates);
+    bool EraseFluxnodeDelegate(const COutPoint& outpoint);
+    bool FluxnodeDelegateExists(const COutPoint& outpoint);
 
     bool CleanupOldFluxnodeData();
 

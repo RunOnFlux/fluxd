@@ -102,6 +102,11 @@ public:
 	    consensus.nPowAllowMinDifficultyBlocksAfterHeight = boost::none;
         consensus.nPowTargetSpacing = 2 * 60;
 
+        consensus.ponLimit = uint256S("0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // ~1/16 chance minimum (after fork's first period)
+        consensus.ponStartLimit = uint256S("000bffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");  // ~1/10000 chance (during first fork period)
+        consensus.nPonTargetSpacing = 30; // Proof of node spacing (seconds)
+        consensus.nPonDifficultyWindow = 30; // Proof of node difficulty adjustment window (30 blocks = 15 minutes)
+
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
             Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
@@ -143,7 +148,16 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight = 1549500;
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].hashActivationBlock =
+                uint256S("00000009f9178347f3dea495a089400050c3388e07f9c871fb1ebddcab1f8044");
 
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight = 2020000;
+        
+        // PON subsidy parameters
+        consensus.nPONInitialSubsidy = 14;  // 14 FLUX per block initially
+        consensus.nPONSubsidyReductionInterval = 1051200;  // ~1 year in 30-second blocks (365*24*60*2)
+        consensus.nPONMaxReductions = 20;  // Max 20 years of reductions
 
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 11;
@@ -227,6 +241,18 @@ public:
 
         assert(vecBenchmarkingPublicKeys.size() > 0);
 
+        // Emergency block creation public keys (requires 2-of-4 signatures)
+        // These keys can create blocks when the network is failing to produce them
+        // Using special collateral pattern (all 1's) for identification
+        vecEmergencyPublicKeys.resize(4);  // 4 keys, requiring 2 signatures
+        vecEmergencyPublicKeys[0] = "025ee73f72d6996f94fe6ec9fac3f9ba6dcb947ed46dfbda530fc73ff99c667a4e";
+        vecEmergencyPublicKeys[1] = "026f4281124d10eb90589831bac405d715ad79051ac5243d21c322d2abf2fd81e2";
+        vecEmergencyPublicKeys[2] = "03083d65c2f57cfe4d1c34eb575bd9d836f5111dd0de86405d48211bf42ea30403";
+        vecEmergencyPublicKeys[3] = "03674c29f348124e998fd838228a3ff050ca26fe0c13ad98698585cbbf796b461e";
+
+        // Special collateral hash pattern (all 1's) for emergency blocks
+        emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
+        nEmergencyMinSignatures = 2; // Require 2 signatures minimum
 
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
@@ -271,6 +297,8 @@ public:
         nSwapPoolAmount = 22000000 * COIN; // 22 Million every time
         nSwapPoolInterval = 21600; // Avg Block per day (720) *  - Trying to get to around once a month
         nSwapPoolMaxTimes = 10;
+
+        strDevFundAddress = "t3hPu1YDeGUCp8m7BQCnnNUmRMJBa5RadyA";
 
         nBeginCumulusTransition = 1076532;
         nEndCumulusTransition = 1086612;
@@ -319,6 +347,12 @@ public:
         consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
         consensus.nPowTargetSpacing = 60;
 
+        // Proof of node variables
+        consensus.ponLimit = uint256S("0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // ~1/10 chance minimum for testnet
+        consensus.ponStartLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // Very easy for testnet initial fork
+        consensus.nPonTargetSpacing = 30; // Proof of node spacing (seconds)
+        consensus.nPonDifficultyWindow = 60; // Proof of node difficulty adjustment window (blocks)
+
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
         Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
@@ -351,12 +385,20 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight = 600;
 
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight = 800;
+        
+        // PON subsidy parameters (testnet)
+        consensus.nPONInitialSubsidy = 14;  // 14 FLUX per block initially
+        consensus.nPONSubsidyReductionInterval = 525600;  // ~6 months for testnet (365/2*24*60*2)
+        consensus.nPONMaxReductions = 20;  // Max 20 reductions
+
         consensus.nZawyLWMAAveragingWindow = 60;
 	    consensus.eh_epoch_fade_length = 10;
 
         eh_epoch_1 = eh48_5;
         eh_epoch_2 = eh48_5;
-        eh_epoch_3 = zelHash;
+        eh_epoch_3 = eh48_5;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -424,8 +466,8 @@ public:
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
             (0, consensus.hashGenesisBlock)
-            (10, uint256S("0x0a2b47f2b29dbd6f0befc7f0a5a6359b7e2cd9f2f18c7bd19dfdebfc516b661c"))
-            (1249, uint256S("0x00c364ea9772696665c857e3967c7c5d3345a8df8671b4b504565131a9efa5ed")),
+            (320, uint256S("0x0237bf16aba912b0c68933809a7e7fe9553ddff1bc0782d2463fc5d161af1c46")),
+            // (1249, uint256S("0x00c364ea9772696665c857e3967c7c5d3345a8df8671b4b504565131a9efa5ed")),
             1693928849,  // * UNIX timestamp of last checkpoint block
             0,           // * total number of transactions between genesis and last checkpoint
                          //   (the tx=... number in the SetBestChain debug.log lines)
@@ -448,6 +490,8 @@ public:
         nSwapPoolInterval = 100;
         nSwapPoolMaxTimes = 10;
 
+        strDevFundAddress = "t2GoxS2SRmLQDnTyWePHjKD3izvFsKUAjrH";
+
         nBeginCumulusTransition = 420;
         nEndCumulusTransition = 520;
 
@@ -459,6 +503,17 @@ public:
 
         vecP2SHPublicKeys.resize(1);
         vecP2SHPublicKeys[0] = std::make_pair("04276f105ff36a670a56e75c2462cff05a4a7864756e6e1af01022e32752d6fe57b1e13cab4f2dbe3a6a51b4e0de83a5c4627345f5232151867850018c9a3c3a1d", 0);
+
+        // Emergency block creation public keys for testnet (requires 2-of-4 signatures)
+        vecEmergencyPublicKeys.resize(4);
+        vecEmergencyPublicKeys[0] = "029a1c55fa7e69dd99087f7ca799797052ae21327b94159e60b8cc5704eb188583";
+        vecEmergencyPublicKeys[1] = "023c806b01f35a18b42b08f23f5c7e8490801a7da8fd6f6e77708d9f26f22c423e";
+        vecEmergencyPublicKeys[2] = "02615c78e21078c21a63cb21cc4d29eaa148d97c3dcbe7be5d9d4dda4e969bb05a";
+        vecEmergencyPublicKeys[3] = "033d301dc7ef7ab653da36da1285063ea9be1448d601e3c9f99185476b9d4ae1d1";
+
+        // Special collateral hash pattern (all 1's) for emergency blocks
+        emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
+        nEmergencyMinSignatures = 2; // Require 2 signatures minimum
 
     // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
@@ -488,13 +543,21 @@ public:
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 1000;
         consensus.powLimit = uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
+
         consensus.nDigishieldAveragingWindow = 17;
         assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
         consensus.nDigishieldMaxAdjustDown = 0; // Turn off adjustment down
         consensus.nDigishieldMaxAdjustUp = 0; // Turn off adjustment up
-
         consensus.nPowTargetSpacing = 2 * 60;
-	    consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
+        consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
+
+        // Proof of node variables
+        consensus.ponLimit = uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"); // Easy for regtest
+        consensus.ponStartLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // Very easy for regtest
+
+
+        consensus.nPonTargetSpacing = 30; // Proof of node spacing (seconds)
+        consensus.nPonDifficultyWindow = 60; // Proof of node difficulty adjustment window (blocks)
 
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
@@ -537,6 +600,15 @@ public:
                 Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
 
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        
+        // PON subsidy parameters (regtest)
+        consensus.nPONInitialSubsidy = 14;  // 14 FLUX per block initially
+        consensus.nPONSubsidyReductionInterval = 100;  // Quick reduction for testing
+        consensus.nPONMaxReductions = 10;  // Max 10 reductions for testing
+
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
 
@@ -574,6 +646,7 @@ public:
         fTestnetToBeDeprecatedFieldRPC = false;
 
         networkID = CBaseChainParams::Network::REGTEST;
+        nStartFluxnodePaymentsHeight = 100;
         vecBenchmarkingPublicKeys.resize(2);
         vecBenchmarkingPublicKeys[0] = std::make_pair("04cf3c34f01486bbb34c1a7ca11c2ddb1b3d98698c3f37d54452ff91a8cd5e92a6910ce5fc2cc7ad63547454a965df53ff5be740d4ef4ac89848c2bafd1e40e6b7", 0);
         vecBenchmarkingPublicKeys[1] = std::make_pair("045d54130187b4c4bba25004bf615881c2d79b16950a59114df27dc9858d8e531fda4f3a27aa95ceb2bcc87ddd734be40a6808422655e5350fa9417874556b7342", 1617508800); // Sun Apr 04 2021 04:00:00
@@ -618,6 +691,8 @@ public:
         nSwapPoolInterval = 10;
         nSwapPoolMaxTimes = 5;
 
+        strDevFundAddress = "t2GoxS2SRmLQDnTyWePHjKD3izvFsKUAjrH";
+
         nBeginCumulusTransition = 0;
         nEndCumulusTransition = 1000;
 
@@ -630,6 +705,14 @@ public:
         vecP2SHPublicKeys.resize(1);
         vecP2SHPublicKeys[0] = std::make_pair("04276f105ff36a670a56e75c2462cff05a4a7864756e6e1af01022e32752d6fe57b1e13cab4f2dbe3a6a51b4e0de83a5c4627345f5232151867850018c9a3c3a1d", 0);
 
+        // Emergency block parameters (same as testnet)
+        emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
+        nEmergencyMinSignatures = 1;
+        vecEmergencyPublicKeys.resize(4);
+        vecEmergencyPublicKeys[0] = "029a1c55fa7e69dd99087f7ca799797052ae21327b94159e60b8cc5704eb188583";
+        vecEmergencyPublicKeys[1] = "023c806b01f35a18b42b08f23f5c7e8490801a7da8fd6f6e77708d9f26f22c423e";
+        vecEmergencyPublicKeys[2] = "02615c78e21078c21a63cb21cc4d29eaa148d97c3dcbe7be5d9d4dda4e969bb05a";
+        vecEmergencyPublicKeys[3] = "033d301dc7ef7ab653da36da1285063ea9be1448d601e3c9f99185476b9d4ae1d1";
     }
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)

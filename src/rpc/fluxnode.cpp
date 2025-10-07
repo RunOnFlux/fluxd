@@ -15,6 +15,7 @@
 #include "key_io.h"
 #include "fluxnode/benchmarks.h"
 #include "util.h"
+#include "pon/pon-fork.h"
 
 #include <univalue.h>
 #include "rpc/cache.h"
@@ -264,6 +265,40 @@ UniValue createfluxnodekey(const UniValue& params, bool fHelp)
 UniValue createzelnodekey(const UniValue& params, bool fHelp)
 {
     return createfluxnodekey(params, fHelp, __func__);
+}
+
+UniValue createdelegatekeypair(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+                "createdelegatekeypair\n"
+                "\nCreate a new delegate keypair for fluxnode delegation\n"
+                "\nResult:\n"
+                "{\n"
+                "  \"private_key\": \"xxxx\",           (string) Delegate private key\n"
+                "  \"public_key_compressed\": \"xxxx\",  (string) Delegate compressed public key (hex)\n"
+                "  \"public_key_uncompressed\": \"xxxx\" (string) Delegate uncompressed public key (hex)\n"
+                "}\n"
+                "\nExamples:\n" +
+                HelpExampleCli("createdelegatekeypair", "") +
+                HelpExampleRpc("createdelegatekeypair", ""));
+
+    // Create compressed key first
+    CKey secret_compressed;
+    secret_compressed.MakeNewKey(true);  // true = compressed
+    CPubKey pubkey_compressed = secret_compressed.GetPubKey();
+
+    // Create uncompressed version from same private key
+    CKey secret_uncompressed;
+    secret_uncompressed.Set(secret_compressed.begin(), secret_compressed.end(), false);  // false = uncompressed
+    CPubKey pubkey_uncompressed = secret_uncompressed.GetPubKey();
+
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("private_key", EncodeSecret(secret_compressed));
+    result.pushKV("public_key_compressed", HexStr(pubkey_compressed));
+    result.pushKV("public_key_uncompressed", HexStr(pubkey_uncompressed));
+
+    return result;
 }
 
 UniValue createsporkkeys(const UniValue& params, bool fHelp)
@@ -702,6 +737,568 @@ UniValue startdeterministiczelnode(const UniValue& params, bool fHelp)
     return startdeterministicfluxnode(params, fHelp, __func__);
 }
 
+UniValue startfluxnodewithdelegates(const UniValue& params, bool fHelp)
+{
+    if (!IsFluxnodeTransactionsActive()) {
+        throw runtime_error("deterministic fluxnodes transactions is not active yet");
+    }
+
+    if (fHelp || params.size() != 3)
+        throw runtime_error(
+                "startfluxnodewithdelegates \"alias\" \"[delegatepubkey1, delegatepubkey2, ...]\" lockwallet\n"
+                "\nStart a Fluxnode and assign delegate public keys who can also start the node.\n"
+                "\nArguments:\n"
+                "1. alias          (string, required) Alias of the fluxnode from fluxnode.conf.\n"
+                "2. delegates      (array, required) Array of delegate public keys (compressed, up to 4).\n"
+                "3. lockwallet     (boolean, required) Lock wallet after completion.\n"
+                "\nResult:\n"
+                "{\n"
+                "  \"result\": \"xxxx\",     (string) 'success' or 'failed'\n"
+                "  \"txid\": \"xxxx\",       (string) The transaction ID if successful\n"
+                "  \"delegates_count\": n,  (numeric) Number of delegates assigned\n"
+                "  \"error\": \"xxxx\"       (string) Error message, if failed\n"
+                "}\n"
+                "\nExamples:\n" +
+                HelpExampleCli("startfluxnodewithdelegates", "\"mynode\" '[\"02b3e8d5c47d2d968de255e9e81a6e1eaa5a186ae64de6ec5cc2aa24e50e7c2c1a\"]' false") +
+                HelpExampleRpc("startfluxnodewithdelegates", "\"mynode\", [\"02b3e8d5c47d2d968de255e9e81a6e1eaa5a186ae64de6ec5cc2aa24e50e7c2c1a\"], false"));
+
+    std::string alias = params[0].get_str();
+    UniValue delegates = params[1].get_array();
+    bool fLock = params[2].get_bool();
+
+    EnsureWalletIsUnlocked();
+
+    UniValue returnObj(UniValue::VOBJ);
+
+    // Validate delegate count (max 4)
+    if (delegates.size() > CFluxnodeDelegates::MAX_PUBKEYS_LENGTH) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", strprintf("Too many delegates. Maximum is %d", CFluxnodeDelegates::MAX_PUBKEYS_LENGTH));
+        return returnObj;
+    }
+
+    if (delegates.size() == 0) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "At least one delegate key must be provided");
+        return returnObj;
+    }
+
+    // Parse and validate delegate public keys
+    std::vector<CPubKey> delegatePubKeys;
+    for (size_t i = 0; i < delegates.size(); i++) {
+        std::string strPubKey = delegates[i].get_str();
+        CPubKey pubKey(ParseHex(strPubKey));
+
+        if (!pubKey.IsValid()) {
+            returnObj.pushKV("result", "failed");
+            returnObj.pushKV("error", strprintf("Invalid public key at index %d", i));
+            return returnObj;
+        }
+
+        if (!pubKey.IsCompressed()) {
+            returnObj.pushKV("result", "failed");
+            returnObj.pushKV("error", strprintf("Public key at index %d must be compressed", i));
+            return returnObj;
+        }
+
+        // Check for duplicates
+        for (size_t j = 0; j < delegatePubKeys.size(); j++) {
+            if (delegatePubKeys[j] == pubKey) {
+                returnObj.pushKV("result", "failed");
+                returnObj.pushKV("error", strprintf("Duplicate public key at index %d", i));
+                return returnObj;
+            }
+        }
+
+        delegatePubKeys.push_back(pubKey);
+    }
+
+    // Find the fluxnode entry by alias
+    bool found = false;
+    for (FluxnodeConfig::FluxnodeEntry zne : fluxnodeConfig.getEntries()) {
+        if (zne.getAlias() == alias) {
+            found = true;
+            std::string errorMessage;
+
+            int32_t index;
+            zne.castOutputIndex(index);
+            COutPoint outpoint = COutPoint(uint256S(zne.getTxHash()), index);
+
+            // Check if already in mempool or tracker
+            if (mempool.mapFluxnodeTxMempool.count(outpoint)) {
+                returnObj.pushKV("result", "failed");
+                returnObj.pushKV("error", "Mempool already has a fluxnode transaction using this outpoint");
+                return returnObj;
+            } else if (g_fluxnodeCache.InStartTracker(outpoint)) {
+                returnObj.pushKV("result", "failed");
+                returnObj.pushKV("error", "Fluxnode already started, waiting to be confirmed");
+                return returnObj;
+            } else if (g_fluxnodeCache.InDoSTracker(outpoint)) {
+                returnObj.pushKV("result", "failed");
+                returnObj.pushKV("error", "Fluxnode already started then not confirmed, in DoS tracker");
+                return returnObj;
+            } else if (g_fluxnodeCache.InConfirmTracker(outpoint)) {
+                returnObj.pushKV("result", "failed");
+                returnObj.pushKV("error", "Fluxnode already confirmed and in fluxnode list");
+                return returnObj;
+            }
+
+            // Build the start transaction with delegate support
+            CMutableTransaction mutTransaction;
+
+            bool result = activeFluxnode.BuildDeterministicStartTx(zne.getPrivKey(), zne.getTxHash(),
+                                                                  zne.getOutputIndex(), errorMessage, mutTransaction);
+
+            if (!result) {
+                returnObj.pushKV("result", "failed");
+                returnObj.pushKV("error", errorMessage);
+                return returnObj;
+            }
+
+            mutTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
+
+            // Set the FluxTx version with delegate feature bit
+            mutTransaction.nFluxTxVersion = FLUXNODE_TX_TYPE_NORMAL_BIT | FLUXNODE_TX_FEATURE_DELEGATES_BIT;
+
+            // Add delegate data
+            mutTransaction.fUsingDelegates = true;
+            mutTransaction.delegateData.nDelegateVersion = 1;
+            mutTransaction.delegateData.nType = CFluxnodeDelegates::UPDATE;
+            mutTransaction.delegateData.delegateStartingKeys = delegatePubKeys;
+
+            // Sign the transaction
+            if (!activeFluxnode.SignDeterministicStartTx(mutTransaction, errorMessage)) {
+                returnObj.pushKV("result", "failed");
+                returnObj.pushKV("error", "Failed to sign: " + errorMessage);
+                return returnObj;
+            }
+
+            // Commit the transaction
+            CTransaction tx(mutTransaction);
+            CReserveKey reservekey(pwalletMain);
+            CWalletTx walletTx(pwalletMain, tx);
+
+            if (!pwalletMain->CommitTransaction(walletTx, reservekey)) {
+                returnObj.pushKV("result", "failed");
+                returnObj.pushKV("error", "Failed to commit transaction");
+                return returnObj;
+            }
+
+            if (fLock)
+                pwalletMain->Lock();
+
+            returnObj.pushKV("result", "success");
+            returnObj.pushKV("txid", tx.GetHash().GetHex());
+            returnObj.pushKV("delegates_count", (int)delegatePubKeys.size());
+
+            UniValue delegateArray(UniValue::VARR);
+            for (const auto& pubKey : delegatePubKeys) {
+                delegateArray.push_back(HexStr(pubKey));
+            }
+            returnObj.pushKV("delegates", delegateArray);
+
+            return returnObj;
+        }
+    }
+
+    if (!found) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Could not find alias in config. Verify with listfluxnodeconf.");
+    }
+
+    return returnObj;
+}
+
+UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
+{
+    if (!IsFluxnodeTransactionsActive()) {
+        throw runtime_error("deterministic fluxnodes transactions is not active yet");
+    }
+
+    if (fHelp || params.size() != 4)
+        throw runtime_error(
+                "startfluxnodeasdelegate \"txhash\" \"outputindex\" \"delegatekey\" \"vpspubkey\"\n"
+                "\nStart a Fluxnode as an authorized delegate instead of the collateral owner.\n"
+                "\nArguments:\n"
+                "1. txhash         (string, required) The transaction hash of the collateral.\n"
+                "2. outputindex    (string, required) The output index of the collateral.\n"
+                "3. delegatekey    (string, required) The private key of an authorized delegate.\n"
+                "4. vpspubkey      (string, required) The public key for VPS verification.\n"
+                "\nResult:\n"
+                "{\n"
+                "  \"result\": \"xxxx\",     (string) 'success' or 'failed'\n"
+                "  \"txid\": \"xxxx\",       (string) The transaction ID if successful\n"
+                "  \"delegate\": \"xxxx\",    (string) The delegate address used\n"
+                "  \"error\": \"xxxx\"       (string) Error message, if failed\n"
+                "}\n"
+                "\nNote: The delegate must first be authorized by the collateral owner using 'startfluxnodewithdelegates'.\n"
+                "\nExamples:\n" +
+                HelpExampleCli("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\" \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\"") +
+                HelpExampleRpc("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\", \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\""));
+
+    std::string strTxHash = params[0].get_str();
+    std::string strOutputIndex = params[1].get_str();
+    std::string strDelegateKey = params[2].get_str();
+    std::string strVpsPubKey = params[3].get_str();
+
+    UniValue returnObj(UniValue::VOBJ);
+
+    // Validate the transaction hash
+    uint256 txHash = uint256S(strTxHash);
+    if (txHash.IsNull()) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid transaction hash");
+        return returnObj;
+    }
+
+    // Validate the output index
+    int nOutputIndex;
+    try {
+        nOutputIndex = std::stoi(strOutputIndex);
+    } catch (const std::exception& e) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid output index");
+        return returnObj;
+    }
+
+    COutPoint outpoint(txHash, nOutputIndex);
+
+    // Check if already in mempool or tracker
+    if (mempool.mapFluxnodeTxMempool.count(outpoint)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Mempool already has a fluxnode transaction using this outpoint");
+        return returnObj;
+    } else if (g_fluxnodeCache.InStartTracker(outpoint)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Fluxnode already started, waiting to be confirmed");
+        return returnObj;
+    } else if (g_fluxnodeCache.InDoSTracker(outpoint)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Fluxnode already started then not confirmed, in DoS tracker. Must wait until out of DoS tracker to start");
+        return returnObj;
+    } else if (g_fluxnodeCache.InConfirmTracker(outpoint)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Fluxnode already confirmed and in fluxnode list");
+        return returnObj;
+    }
+
+    // Parse and validate delegate private key
+    CKey delegateKey = DecodeSecret(strDelegateKey);
+    if (!delegateKey.IsValid()) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid delegate private key");
+        return returnObj;
+    }
+
+    CPubKey delegatePubKey = delegateKey.GetPubKey();
+
+    // Parse and validate VPS public key
+    CPubKey vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
+    if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid VPS public key");
+        return returnObj;
+    }
+
+    // Check if this delegate is authorized
+    CFluxnodeDelegates storedDelegates;
+    bool isDelegateAuthorized = false;
+    bool hasDelegates = false;
+
+    // Use cache-aware GetDelegates function
+    if (g_fluxnodeCache.GetDelegates(outpoint, storedDelegates)) {
+        hasDelegates = true;
+
+        // Check if the delegate public key is in the authorized list (up to 4 delegates)
+        for (const auto& authorizedKey : storedDelegates.delegateStartingKeys) {
+            if (authorizedKey == delegatePubKey) {
+                isDelegateAuthorized = true;
+                break;
+            }
+        }
+    }
+
+    if (hasDelegates && !isDelegateAuthorized) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "This delegate key is not authorized for this collateral. Use 'updatefluxnodedelegates' first.");
+        return returnObj;
+    }
+
+    if (!hasDelegates) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "No delegates are authorized for this collateral. Use 'updatefluxnodedelegates' first.");
+        return returnObj;
+    }
+
+    // Get the collateral transaction to verify it exists
+    CTransaction collateralTx;
+    uint256 hashBlock;
+    if (!GetTransaction(txHash, collateralTx, Params().GetConsensus(), hashBlock, true)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Collateral transaction not found");
+        return returnObj;
+    }
+
+    if (nOutputIndex >= (int)collateralTx.vout.size()) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid output index for transaction");
+        return returnObj;
+    }
+
+    // Create the transaction
+    CMutableTransaction mutTransaction;
+    mutTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION; // Use upgradeable version for delegate support
+    mutTransaction.nType = FLUXNODE_START_TX_TYPE;
+    mutTransaction.collateralIn = outpoint;
+    mutTransaction.pubKey = vpsPubKey; // Use VPS pubkey for VPS verification
+
+    // Set the FluxTx version with delegate feature bit
+    mutTransaction.nFluxTxVersion = FLUXNODE_TX_TYPE_NORMAL_BIT | FLUXNODE_TX_FEATURE_DELEGATES_BIT;
+
+    // Set up delegate signing flag
+    mutTransaction.fUsingDelegates = true;
+    mutTransaction.delegateData.nDelegateVersion = 1;
+    mutTransaction.delegateData.nType = CFluxnodeDelegates::SIGNING;
+
+    // Sign the transaction with delegate key
+    mutTransaction.sigTime = GetAdjustedTime();
+
+    // Use the same signing message format as in fluxnode.cpp verification
+    std::string strMessage = mutTransaction.GetHash().GetHex();
+    std::string errorMessage;
+
+    if (!obfuScationSigner.SignMessage(strMessage, errorMessage, mutTransaction.sig, delegateKey)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Failed to sign transaction: " + errorMessage);
+        return returnObj;
+    }
+
+    // Verify the signature
+    if (!obfuScationSigner.VerifyMessage(delegatePubKey, mutTransaction.sig, strMessage, errorMessage)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Failed to verify signature: " + errorMessage);
+        return returnObj;
+    }
+
+    // Commit the transaction
+    CTransaction tx(mutTransaction);
+    CReserveKey reservekey(pwalletMain);
+    CWalletTx walletTx(pwalletMain, tx);
+
+    if (!pwalletMain->CommitTransaction(walletTx, reservekey)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Failed to commit transaction");
+        return returnObj;
+    }
+
+    returnObj.pushKV("result", "success");
+    returnObj.pushKV("txid", tx.GetHash().GetHex());
+    returnObj.pushKV("delegate", EncodeDestination(CTxDestination(delegatePubKey.GetID())));
+
+    return returnObj;
+}
+
+UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
+{
+    if (!IsFluxnodeTransactionsActive()) {
+        throw runtime_error("deterministic fluxnodes transactions is not active yet");
+    }
+
+    if (fHelp || params.size() != 5)
+        throw runtime_error(
+                "startp2shasdelegate \"redeemscript\" \"collateraltxid\" \"outputindex\" \"delegatekey\" \"vpspubkey\"\n"
+                "\nStart a P2SH (multisig) Fluxnode as an authorized delegate.\n"
+                "\nArguments:\n"
+                "1. redeemscript    (string, required) The hex-encoded redeem script of the P2SH address.\n"
+                "2. collateraltxid  (string, required) The transaction ID of the collateral.\n"
+                "3. outputindex     (string, required) The output index of the collateral.\n"
+                "4. delegatekey     (string, required) The private key of an authorized delegate.\n"
+                "5. vpspubkey       (string, required) The public key for VPS verification.\n"
+                "\nResult:\n"
+                "{\n"
+                "  \"result\": \"xxxx\",     (string) 'success' or 'failed'\n"
+                "  \"txid\": \"xxxx\",       (string) The transaction ID if successful\n"
+                "  \"delegate\": \"xxxx\",   (string) The delegate address used\n"
+                "  \"error\": \"xxxx\"       (string) Error message, if failed\n"
+                "}\n"
+                "\nNote: The delegate must first be authorized using 'updatefluxnodedelegates'.\n"
+                "\nExamples:\n" +
+                HelpExampleCli("startp2shasdelegate", "\"512103...\" \"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\" \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\"") +
+                HelpExampleRpc("startp2shasdelegate", "\"512103...\", \"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\", \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\""));
+
+    std::string strRedeemScript = params[0].get_str();
+    std::string strTxHash = params[1].get_str();
+    std::string strOutputIndex = params[2].get_str();
+    std::string strDelegateKey = params[3].get_str();
+    std::string strVpsPubKey = params[4].get_str();
+
+    UniValue returnObj(UniValue::VOBJ);
+
+    // Parse the redeem script
+    std::vector<unsigned char> redeemScriptData = ParseHex(strRedeemScript);
+    CScript redeemScript(redeemScriptData.begin(), redeemScriptData.end());
+
+    // Validate the transaction hash
+    uint256 txHash = uint256S(strTxHash);
+    if (txHash.IsNull()) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid transaction hash");
+        return returnObj;
+    }
+
+    // Validate the output index
+    int nOutputIndex;
+    try {
+        nOutputIndex = std::stoi(strOutputIndex);
+    } catch (const std::exception& e) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid output index");
+        return returnObj;
+    }
+
+    COutPoint outpoint(txHash, nOutputIndex);
+
+    // Check if already in mempool or tracker
+    if (mempool.mapFluxnodeTxMempool.count(outpoint)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Mempool already has a fluxnode transaction using this outpoint");
+        return returnObj;
+    } else if (g_fluxnodeCache.InStartTracker(outpoint)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Fluxnode already started, waiting to be confirmed");
+        return returnObj;
+    } else if (g_fluxnodeCache.InDoSTracker(outpoint)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Fluxnode already started then not confirmed, in DoS tracker");
+        return returnObj;
+    } else if (g_fluxnodeCache.InConfirmTracker(outpoint)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Fluxnode already confirmed and in fluxnode list");
+        return returnObj;
+    }
+
+    // Parse and validate delegate private key
+    CKey delegateKey = DecodeSecret(strDelegateKey);
+    if (!delegateKey.IsValid()) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid delegate private key");
+        return returnObj;
+    }
+
+    CPubKey delegatePubKey = delegateKey.GetPubKey();
+
+    // Parse and validate VPS public key
+    CPubKey vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
+    if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid VPS public key");
+        return returnObj;
+    }
+
+    // Check if this delegate is authorized
+    CFluxnodeDelegates storedDelegates;
+    bool hasDelegates = false;
+    bool isDelegateAuthorized = false;
+
+    // Use cache-aware GetDelegates function
+    if (g_fluxnodeCache.GetDelegates(outpoint, storedDelegates)) {
+        hasDelegates = true;
+
+        // Check if the delegate public key is in the authorized list
+        for (const auto& authorizedKey : storedDelegates.delegateStartingKeys) {
+            if (authorizedKey == delegatePubKey) {
+                isDelegateAuthorized = true;
+                break;
+            }
+        }
+    }
+
+    if (hasDelegates && !isDelegateAuthorized) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "This delegate key is not authorized for this collateral");
+        return returnObj;
+    }
+
+    if (!hasDelegates) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "No delegates are authorized for this collateral");
+        return returnObj;
+    }
+
+    // Get the collateral transaction
+    CTransaction collateralTx;
+    uint256 hashBlock;
+    if (!GetTransaction(txHash, collateralTx, Params().GetConsensus(), hashBlock, true)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Collateral transaction not found");
+        return returnObj;
+    }
+
+    if (nOutputIndex >= (int)collateralTx.vout.size()) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Invalid output index for transaction");
+        return returnObj;
+    }
+
+    // Create the P2SH fluxnode start transaction
+    CMutableTransaction mutTransaction;
+    mutTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
+    mutTransaction.nType = FLUXNODE_START_TX_TYPE;
+    mutTransaction.collateralIn = outpoint;
+
+    // For P2SH, we use a dummy public key as placeholder
+    mutTransaction.collateralPubkey = CPubKey();
+    mutTransaction.pubKey = vpsPubKey; // Use VPS pubkey for VPS verification
+
+    // Set the FluxTx version with P2SH and delegate feature bits
+    mutTransaction.nFluxTxVersion = FLUXNODE_TX_TYPE_P2SH_BIT | FLUXNODE_TX_FEATURE_DELEGATES_BIT;
+
+    // Set the redeem script
+    mutTransaction.P2SHRedeemScript = redeemScript;
+
+    // Set up delegate signing flag
+    mutTransaction.fUsingDelegates = true;
+    mutTransaction.delegateData.nDelegateVersion = 1;
+    mutTransaction.delegateData.nType = CFluxnodeDelegates::SIGNING;
+
+    // Sign the transaction with delegate key
+    mutTransaction.sigTime = GetAdjustedTime();
+
+    std::string strMessage = mutTransaction.GetHash().GetHex();
+    std::string errorMessage;
+
+    if (!obfuScationSigner.SignMessage(strMessage, errorMessage, mutTransaction.sig, delegateKey)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Failed to sign transaction: " + errorMessage);
+        return returnObj;
+    }
+
+    // Verify the signature
+    if (!obfuScationSigner.VerifyMessage(delegatePubKey, mutTransaction.sig, strMessage, errorMessage)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Failed to verify signature: " + errorMessage);
+        return returnObj;
+    }
+
+    // Commit the transaction
+    CTransaction tx(mutTransaction);
+    CReserveKey reservekey(pwalletMain);
+    CWalletTx walletTx(pwalletMain, tx);
+
+    if (!pwalletMain->CommitTransaction(walletTx, reservekey)) {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Failed to commit transaction");
+        return returnObj;
+    }
+
+    returnObj.pushKV("result", "success");
+    returnObj.pushKV("txid", tx.GetHash().GetHex());
+    returnObj.pushKV("delegate", EncodeDestination(CTxDestination(delegatePubKey.GetID())));
+    returnObj.pushKV("p2sh", EncodeDestination(CTxDestination(CScriptID(redeemScript))));
+
+    return returnObj;
+}
+
 void GetDeterministicListData(UniValue& listData, const std::string& strFilter, const Tier tier) {
     int count = -1;
     for (const auto& item : g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes) {
@@ -715,7 +1312,7 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
 
 
             CTxDestination payment_destination;
-            if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+            if (IsFluxTxP2SHType(data.nFluxTxVersion, true)) {
                 CScriptID inner(data.P2SHRedeemScript);
                 payment_destination = inner;
             } else if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
@@ -882,7 +1479,7 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
         CTxDestination payment_destination;
 
         // If this is P2SH node, we need to generate the payment destination from the redeemscript
-        if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+        if (IsFluxTxP2SHType(data.nFluxTxVersion, true)) {
             CScriptID innerID(data.P2SHRedeemScript);
             payment_destination = innerID;
         } else if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
@@ -900,6 +1497,9 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
 
         int nCurrentHeight = chainActive.Height();
         int nEligibleIn = FLUXNODE_DOS_REMOVE_AMOUNT - (nCurrentHeight - data.nAddedBlockHeight);
+        if (IsPONActive(nCurrentHeight)) {
+            nEligibleIn = FLUXNODE_DOS_REMOVE_AMOUNT_V2 - (nCurrentHeight - data.nAddedBlockHeight);
+        }
         info.pushKV("eligible_in",  nEligibleIn);
 
         if (data.nCollateral > 0) {
@@ -910,7 +1510,7 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
     }
 
     if (mapOrderedDosList.size()) {
-        for (int i = 0; i < FLUXNODE_DOS_REMOVE_AMOUNT + 1; i++) {
+        for (int i = 0; i < FLUXNODE_DOS_REMOVE_AMOUNT_V2 + 1; i++) {
             if (mapOrderedDosList.count(i)) {
                 for (const auto& item : mapOrderedDosList.at(i)) {
                     wholelist.push_back(item);
@@ -947,13 +1547,14 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
 
     std::map<int, std::vector<UniValue>> mapOrderedStartList;
 
+    int nCurrentHeight = chainActive.Height();
     for (const auto& item : g_fluxnodeCache.mapStartTxTracker) {
 
         // Get the data from the item in the map of dox tracking
         const FluxnodeCacheData data = item.second;
 
         CTxDestination payment_destination;
-        if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+        if (IsFluxTxP2SHType(data.nFluxTxVersion, true)) {
             CScriptID inner(data.P2SHRedeemScript);
             payment_destination = inner;
         } else if (IsAP2SHFluxNodePublicKey(data.collateralPubkey)) {
@@ -968,8 +1569,11 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
         info.pushKV("added_height", data.nAddedBlockHeight);
         info.pushKV("payment_address", EncodeDestination(payment_destination));
 
-        int nCurrentHeight = chainActive.Height();
+
         int nExpiresIn = FLUXNODE_START_TX_EXPIRATION_HEIGHT - (nCurrentHeight - data.nAddedBlockHeight);
+        if (IsPONActive(nCurrentHeight)) {
+            nExpiresIn = FLUXNODE_START_TX_EXPIRATION_HEIGHT_V2 - (nCurrentHeight - data.nAddedBlockHeight);
+        }
 
         info.pushKV("expires_in",  nExpiresIn);
 
@@ -981,7 +1585,11 @@ UniValue getstartlist(const UniValue& params, bool fHelp)
     }
 
     if (mapOrderedStartList.size()) {
-        for (int i = 0; i < FLUXNODE_START_TX_EXPIRATION_HEIGHT + 1; i++) {
+        int nExpirationHeightToCheckAgainst = FLUXNODE_START_TX_EXPIRATION_HEIGHT;
+        if (IsPONActive(nCurrentHeight)) {
+            nExpirationHeightToCheckAgainst = FLUXNODE_START_TX_EXPIRATION_HEIGHT_V2;
+        }
+        for (int i = 0; i < nExpirationHeightToCheckAgainst + 1; i++) {
             if (mapOrderedStartList.count(i)) {
                 for (const auto& item : mapOrderedStartList.at(i)) {
                     wholelist.push_back(item);
@@ -1049,7 +1657,7 @@ UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
         info.pushKV("last_confirmed_height", data.nLastConfirmedBlockHeight);
         info.pushKV("last_paid_height", data.nLastPaidHeight);
         info.pushKV("tier", data.TierToString());
-        if (data.nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+        if (IsFluxTxP2SHType(data.nFluxTxVersion, true)) {
             CScriptID inner;
             inner = CScriptID(data.P2SHRedeemScript);
             info.pushKV("payment_address", EncodeDestination(inner));
@@ -1200,9 +1808,9 @@ UniValue getfluxnodecount (const UniValue& params, bool fHelp, string cmdname)
 
 UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 {
-    if (fHelp || (params.size() != 4))
+    if (fHelp || (params.size() < 4 || params.size() > 5))
         throw runtime_error(
-                "createp2shstarttx \"redeemscript\" \"vpspubkey\" \"txid\" index\n"
+                "createp2shstarttx \"redeemscript\" \"vpspubkey\" \"txid\" index ( [\"delegatepubkey1\", \"delegatepubkey2\", ...] )\n"
                 "\nCreate a transaction spending the given inputs and sending to the given addresses.\n"
                 "Returns hex-encoded raw transaction.\n"
                 "Note that the transaction's inputs are not signed, and\n"
@@ -1210,9 +1818,10 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 
                 "\nArguments:\n"
                 "1. \"redeemscript\"        (string, required) The redeemscript of the multisig address that hold the collateral for the fluxnode\n"
-                "3. \"vpspubkey\"           (string, required) The pubkey the the fluxnode server will use to confirm fluxnode transactions\n"
-                "4. \"txid\"                (string, required) the transaction hash of the collateral input\n"
-                "5. \"index\"               (number, required) the index of the transaction collateral input\n"
+                "2. \"vpspubkey\"           (string, required) The pubkey the the fluxnode server will use to confirm fluxnode transactions\n"
+                "3. \"txid\"                (string, required) the transaction hash of the collateral input\n"
+                "4. \"index\"               (number, required) the index of the transaction collateral input\n"
+                "5. \"delegates\"           (array, optional) Array of delegate public keys (compressed, up to 4) who can start the node\n"
 
                 "\nResult:\n"
                 "\"transaction\"            (string) hex string of the transaction\n"
@@ -1221,12 +1830,21 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
                 + HelpExampleCli("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
                                                       " \"02d8ada61e8847722e91cc652082174e8b6b2844661d518e0eb78e65790f3b451c\""
                                                       " \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\" 0")
-                + HelpExampleRpc("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
+                + HelpExampleCli("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
                                                       " \"02d8ada61e8847722e91cc652082174e8b6b2844661d518e0eb78e65790f3b451c\""
-                                                      " \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\" 0"));
+                                                      " \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\" 0"
+                                                      " '[\"02b3e8d5c47d2d968de255e9e81a6e1eaa5a186ae64de6ec5cc2aa24e50e7c2c1a\"]'")
+                + HelpExampleRpc("createp2shstarttx", "\"52210359abaeb6e0b4b3602b497e5adf74d816db9f5ea2f112b7402da447f711ba05f9210346341768cd2e0ec0e40df68234713cdf9a3d4b54bd53cc82d9e0ffca05f6676a52ae\""
+                                                      ", \"02d8ada61e8847722e91cc652082174e8b6b2844661d518e0eb78e65790f3b451c\""
+                                                      ", \"9503edca5193bb7a61e5c7173cb51d453984a2779ab32db32de8f9f65b8f11a0\", 0"
+                                                      ", [\"02b3e8d5c47d2d968de255e9e81a6e1eaa5a186ae64de6ec5cc2aa24e50e7c2c1a\"]"));
 
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR)(UniValue::VSTR)(UniValue::VNUM), false);
+    if (params.size() == 4) {
+        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR)(UniValue::VSTR)(UniValue::VNUM), false);
+    } else {
+        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR)(UniValue::VSTR)(UniValue::VNUM)(UniValue::VARR), false);
+    }
 
 
     // Get data from the parameters
@@ -1247,16 +1865,74 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 
     COutPoint collateralIn(uint256S(strCollateralTransactionHash), nCollateralIndex);
 
+    // Process delegate keys if provided
+    std::vector<CPubKey> delegatePubKeys;
+    bool useDelegates = false;
+
+    if (params.size() > 4) {
+        UniValue delegates = params[4].get_array();
+
+        if (delegates.size() > 0) {
+            useDelegates = true;
+
+            // Validate delegate count (max 4)
+            if (delegates.size() > CFluxnodeDelegates::MAX_PUBKEYS_LENGTH) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Too many delegates. Maximum is %d", CFluxnodeDelegates::MAX_PUBKEYS_LENGTH));
+            }
+
+            // Parse and validate delegate public keys
+            for (size_t i = 0; i < delegates.size(); i++) {
+                std::string strPubKey = delegates[i].get_str();
+                CPubKey pubKey(ParseHex(strPubKey));
+
+                if (!pubKey.IsValid()) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid delegate public key at index %d", i));
+                }
+
+                if (!pubKey.IsCompressed()) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Delegate public key at index %d must be compressed", i));
+                }
+
+                // Check for duplicates
+                for (size_t j = 0; j < delegatePubKeys.size(); j++) {
+                    if (delegatePubKeys[j] == pubKey) {
+                        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Duplicate delegate public key at index %d", i));
+                    }
+                }
+
+                delegatePubKeys.push_back(pubKey);
+            }
+        }
+    }
+
     // Create the transaction
     CMutableTransaction mutableTransaction;
 
     // Set the data for the P2SH Node Transaction
     mutableTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION;
-    mutableTransaction.nFluxTxVersion = FLUXNODE_INTERNAL_P2SH_TX_VERSION;
+    // Use bit-based version after PON fork, legacy version before
+    if (IsPONActive(chainActive.Height() + 1)) {
+        if (useDelegates) {
+            // Include delegate feature bit if delegates are being used
+            mutableTransaction.nFluxTxVersion = FLUXNODE_TX_TYPE_P2SH_BIT | FLUXNODE_TX_FEATURE_DELEGATES_BIT;
+        } else {
+            mutableTransaction.nFluxTxVersion = FLUXNODE_TX_TYPE_P2SH_BIT;  // Can OR with other feature bits as needed
+        }
+    } else {
+        mutableTransaction.nFluxTxVersion = FLUXNODE_INTERNAL_P2SH_TX_VERSION;
+    }
     mutableTransaction.nType = FLUXNODE_START_TX_TYPE;
     mutableTransaction.collateralIn = collateralIn;
     mutableTransaction.P2SHRedeemScript = redeemScript;
     mutableTransaction.pubKey = vpsPubKey;
+
+    // Add delegate data if delegates were provided
+    if (useDelegates) {
+        mutableTransaction.fUsingDelegates = true;
+        mutableTransaction.delegateData.nDelegateVersion = 1;
+        mutableTransaction.delegateData.nType = CFluxnodeDelegates::UPDATE;
+        mutableTransaction.delegateData.delegateStartingKeys = delegatePubKeys;
+    }
 
     // Variables needed for List PubKeys Call
     txnouttype type;
@@ -1307,7 +1983,7 @@ UniValue signp2shstarttx(const UniValue& params, bool fHelp)
                 "\"SignedTx\"     (string) The raw hex of the signed transaction\n"
 
                 "\nExamples:\n" +
-                HelpExampleCli("signp2shstarttx", "\"rawtransactionhex\" \"privatekey\"") + HelpExampleRpc("signp2shstarttx", ""));
+                HelpExampleCli("signp2shstarttx", "\"rawtransactionhex\" \"privatekey\"") + HelpExampleRpc("signp2shstarttx", "\"rawtransactionhex\" \"privatekey\""));
 
 #ifdef ENABLE_WALLET
     LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
@@ -1750,6 +2426,7 @@ static const CRPCCommand commands[] =
                 { "fluxnode",   "viewdeterministiczelnodelist", &viewdeterministiczelnodelist, false },
 
                 { "fluxnode",   "createfluxnodekey",      &createfluxnodekey,      false  },
+                { "fluxnode",   "createdelegatekeypair",  &createdelegatekeypair,  false  },
                 { "fluxnode",   "getfluxnodeoutputs",     &getfluxnodeoutputs,     false  },
                 { "fluxnode",   "startfluxnode",          &startfluxnode,          false  },
                 { "fluxnode",   "listfluxnodes",          &listfluxnodes,          false  },
@@ -1763,6 +2440,9 @@ static const CRPCCommand commands[] =
                 { "fluxnode",   "sendp2shstarttx",      &sendp2shstarttx,      false  },
 
                 { "fluxnode",   "startdeterministicfluxnode", &startdeterministicfluxnode, false },
+                { "fluxnode",   "startfluxnodewithdelegates", &startfluxnodewithdelegates, false },
+                { "fluxnode",   "startfluxnodeasdelegate", &startfluxnodeasdelegate, false },
+                { "fluxnode",   "startp2shasdelegate", &startp2shasdelegate, false },
                 { "fluxnode",   "viewdeterministicfluxnodelist", &viewdeterministicfluxnodelist, false },
 
                 { "benchmarks", "getbenchmarks",         &getbenchmarks,           false  },

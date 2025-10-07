@@ -79,6 +79,9 @@ void CheckForSnapshot(CCoinsViewCache* coinsview)
             }
         } else {
             // We are looking at timestamps only
+            if (!chainActive.Tip() || chainActive.Height() < 1) {
+                return;
+            }
             int64_t tipTime = chainActive.Tip()->nTime;
             int64_t nPrevTime = chainActive[chainActive.Height() - 1]->nTime;
 

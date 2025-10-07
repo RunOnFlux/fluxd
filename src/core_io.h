@@ -20,6 +20,7 @@ extern CScript ParseScript(const std::string& s);
 extern std::string ScriptToAsmStr(const CScript& script, const bool fAttemptSighashDecode = false);
 extern bool DecodeHexTx(CTransaction& tx, const std::string& strHexTx);
 extern bool DecodeHexBlk(CBlock&, const std::string& strHexBlk);
+extern std::string EncodeHexBlock(const CBlock& block);
 extern uint256 ParseHashUV(const UniValue& v, const std::string& strName);
 extern uint256 ParseHashStr(const std::string&, const std::string& strName);
 extern std::vector<unsigned char> ParseHexUV(const UniValue& v, const std::string& strName);

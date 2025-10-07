@@ -15,6 +15,9 @@
 #include "util.h"
 #include "key_io.h"
 #include "fluxnode/activefluxnode.h"
+#include "fluxnode/fluxnodecachedb.h"
+#include "primitives/transaction.h"
+#include "pon/pon-fork.h"
 
 FluxnodeCache g_fluxnodeCache;
 
@@ -48,6 +51,35 @@ bool CheckFluxnodeTxSignatures(const CTransaction&  transaction)
 
         std::string errorMessage;
         std::string strMessage = transaction.GetHash().GetHex();
+
+        bool fAllowDelegatesToSign = false;
+        if (transaction.IsSigningAsDelegate()) {
+            fAllowDelegatesToSign = true;
+        }
+
+        // Double check permissions on update delegates. Signature will fail, causing tx to fail.
+        if (transaction.IsUpdatingDelegate()) {
+            fAllowDelegatesToSign = false;
+        }
+
+        if (fAllowDelegatesToSign) {
+            // Checking if delegates signed this start transaction
+            CFluxnodeDelegates storedDelegates;
+
+            // Using existing delegates - check if signer is authorized (cache-aware)
+            if (g_fluxnodeCache.GetDelegates(transaction.collateralIn, storedDelegates)) {
+                for (const auto& delegateKey : storedDelegates.delegateStartingKeys) {
+                    if (obfuScationSigner.VerifyMessage(delegateKey, transaction.sig, strMessage, errorMessage)) {
+                        return true;
+                    }
+                }
+            }
+            // If fIsVerifying we are verifying from the database, meaning we might not have the delegate data
+            // Assume if we saved a transaction to the database this was already verified
+            if (!fIsVerifying) {
+                return error("fluxnode-tx-signing-as-delegate-failed-to-verify");
+            }
+        }
 
         /**
          * P2SH NODES CORE CHECK 3
@@ -113,6 +145,12 @@ bool CheckFluxnodeTxSignatures(const CTransaction&  transaction)
 
 bool CheckBenchmarkSignature(const CTransaction& transaction)
 {
+    // TESTNET ONLY
+    if (IsTestnetBenchmarkBypassActive()) {
+        LogPrintf("Testnet - Bypass Benchmark Signature requirment\n");
+        return true;
+    }
+
     std::string public_key = GetFluxnodeBenchmarkPublicKey(transaction);
     CPubKey pubkey(ParseHex(public_key));
     std::string errorMessage = "";
@@ -127,11 +165,25 @@ bool CheckBenchmarkSignature(const CTransaction& transaction)
 void GetUndoDataForExpiredFluxnodeDosScores(CFluxnodeTxBlockUndo& p_fluxnodeTxUndoData, const int& p_nHeight)
 {
     LOCK(g_fluxnodeCache.cs);
+
+    bool fPONActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_PON);
     int nUndoHeight = p_nHeight - FLUXNODE_DOS_REMOVE_AMOUNT;
 
+    if (fPONActive) {
+        nUndoHeight = p_nHeight - FLUXNODE_DOS_REMOVE_AMOUNT_V2;
+    }
+
     for (const auto& item: g_fluxnodeCache.mapStartTxDOSTracker) {
-        if (item.second.nAddedBlockHeight == nUndoHeight) {
-            p_fluxnodeTxUndoData.vecExpiredDosData.emplace_back(item.second);
+        if (fPONActive) {
+            // If there are nodes in DOSTracker with heights less than our new nUndoHeight
+            // Include these by using less than or equal.
+            if (item.second.nAddedBlockHeight <= nUndoHeight) {
+                p_fluxnodeTxUndoData.vecExpiredDosData.emplace_back(item.second);
+            }
+        } else {
+            if (item.second.nAddedBlockHeight == nUndoHeight) {
+                p_fluxnodeTxUndoData.vecExpiredDosData.emplace_back(item.second);
+            }
         }
     }
 }
@@ -306,6 +358,17 @@ bool FluxnodeCache::CheckIfConfirmed(const COutPoint& out)
     return false;
 }
 
+bool FluxnodeCache::GetPubkeyIfConfirmed(const COutPoint& out, CPubKey& pubKey)
+{
+    LOCK(cs);
+    if (mapConfirmedFluxnodeData.count(out)) {
+        pubKey = mapConfirmedFluxnodeData.at(out).pubKey;
+        return true;
+    }
+
+    return false;
+}
+
 bool FluxnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight)
 {
     int nCurrentHeight;
@@ -358,6 +421,10 @@ void FluxnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
     LOCK2(cs, g_fluxnodeCache.cs);
     int removalHeight = p_nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT;
 
+    if (IsPONActive(p_nHeight)) {
+        removalHeight = p_nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT_V2;
+    }
+
     std::vector<COutPoint> vecOutPoints;
     std::set<COutPoint> setNewDosHeights;
     for (const auto& object: g_fluxnodeCache.mapStartTxTracker) {
@@ -381,6 +448,10 @@ void FluxnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
 {
     LOCK2(cs, g_fluxnodeCache.cs);
     int removalHeight = p_nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT;
+
+    if (IsPONActive(p_nHeight)) {
+        removalHeight = p_nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT_V2;
+    }
 
     for (const auto& item : g_fluxnodeCache.mapStartTxDOSTracker) {
         if (item.second.nAddedBlockHeight == removalHeight) {
@@ -418,21 +489,20 @@ bool FluxnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COu
     }
 
     bool fHalvingActive = NetworkUpgradeActive(nCurrentHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
-    if (fHalvingActive) {
-        if (nCurrentHeight - data.nLastConfirmedBlockHeight <= FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2) {
-            error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
-                  __LINE__,
-                  out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
-            return false;
-        }
-    } else {
-        if (nCurrentHeight - data.nLastConfirmedBlockHeight <= FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1) {
-            // TODO - Remove this error message after release + 1 month and we don't see any problems
-            error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
-                  __LINE__,
-                  out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
-            return false;
-        }
+    bool fPONActive = NetworkUpgradeActive(nCurrentHeight, Params().GetConsensus(), Consensus::UPGRADE_PON);
+
+    int nDistanceToCheck = FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1; // Default - Legacy
+    if (fPONActive) {
+        nDistanceToCheck = FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V3;
+    } else if (fHalvingActive) {
+        nDistanceToCheck = FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2;
+    }
+
+    if (nCurrentHeight - data.nLastConfirmedBlockHeight <= nDistanceToCheck) {
+        error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
+              __LINE__,
+              out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
+        return false;
     }
 
     return true;
@@ -461,9 +531,13 @@ bool FluxnodeCache::CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_n
     LOCK(cs);
 
     bool fHalvingActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
+    bool fPONActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_PON);
 
     if (mapConfirmedFluxnodeData.count(out)) {
-        if (fHalvingActive) {
+        if (fPONActive) {
+            return p_nHeight - mapConfirmedFluxnodeData.at(out).nLastConfirmedBlockHeight > FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V3;
+        }
+        else if (fHalvingActive) {
             return p_nHeight - mapConfirmedFluxnodeData.at(out).nLastConfirmedBlockHeight > FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2;
         } else {
             return p_nHeight - mapConfirmedFluxnodeData.at(out).nLastConfirmedBlockHeight > FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1;
@@ -513,7 +587,7 @@ bool FluxnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPo
 
 
                         // We can get the destination from the Hash of the RedeemScript.
-                        if (mapConfirmedFluxnodeData.at(p_fluxnodeOut).nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+                        if (IsFluxTxP2SHType(mapConfirmedFluxnodeData.at(p_fluxnodeOut).nFluxTxVersion, true)) {
                            CScriptID inner(mapConfirmedFluxnodeData.at(p_fluxnodeOut).P2SHRedeemScript);
                            dest = inner;
                            return true;
@@ -579,6 +653,7 @@ bool FluxnodeCache::CheckFluxnodePayout(const CTransaction& coinbase, const int 
 {
     LOCK(cs);
     CAmount blockValue = GetBlockSubsidy(p_Height, Params().GetConsensus());
+    CAmount nRemainerLeft = blockValue;
     std::map<Tier, FluxnodePayoutInfo> mapFluxnodePayouts;
 
     // Gather all correct payout data
@@ -588,24 +663,50 @@ bool FluxnodeCache::CheckFluxnodePayout(const CTransaction& coinbase, const int 
             info.script = GetScriptForDestination(info.dest);
             info.amount = GetFluxnodeSubsidy(p_Height, blockValue, currentTier);
             mapFluxnodePayouts[(Tier)currentTier] = info;
+            nRemainerLeft -= info.amount; // Deduce remainer
         }
     }
 
+    // Dev fund checking, we we are already going through the coinbase vouts
+    bool fDevFundPaid = false;
+    bool fCheckDevFundPayment = IsPONActive(p_Height);
+    CScript devFundScript = GetScriptForDestination(DecodeDestination(Params().GetDevFundAddress()));
+
+    // Track which outputs have been used for fluxnode payments to prevent double-counting
+    std::set<size_t> setUsedOutputs;
+
     // Compare it to what is in the block
     // Loop through Tx to make sure they all got paid
-    for (const auto& out : coinbase.vout) {
+    for (size_t i = 0; i < coinbase.vout.size(); i++) {
+        const auto& out = coinbase.vout[i];
         for (auto& payout : mapFluxnodePayouts) {
             if (!payout.second.approvedpayout) {
                 if (out.scriptPubKey == payout.second.script) {
                     if (out.nValue == payout.second.amount) {
                         payout.second.approvedpayout = true;
+                        setUsedOutputs.insert(i); // Mark this output as used for fluxnode payment
+                        break;
                     }
                 }
             }
         }
+
+        // Check Dev Fund Payment (Strict) - but only if this output hasn't been used for fluxnode payment
+        if (fCheckDevFundPayment && !fDevFundPaid && !setUsedOutputs.count(i)) {
+            if (out.scriptPubKey == devFundScript) {
+                if (out.nValue >= nRemainerLeft) {
+                    fDevFundPaid = true;
+                }
+            }
+        }
+    }
+ 
+    // Check for failed payouts and add the paid nodes if approved
+    if (fCheckDevFundPayment && !fDevFundPaid) {
+        error("Invalid block dev fund payment. Should be paying : %s -> %u", Params().GetDevFundAddress(), nRemainerLeft);
+        return false;
     }
 
-    // Check for failed payouts and add the paid nodes if approved
     bool fFail = false;
     for (const auto payout : mapFluxnodePayouts) {
         if (!payout.second.approvedpayout) {
@@ -1066,6 +1167,24 @@ bool FluxnodeCache::Flush()
             }
     }
 
+    /**
+     * Handle delegate cache operations
+     * Move delegate changes from local cache to global cache
+     */
+    for (const auto& item : mapDelegateToWrite) {
+        // Add/update delegate to dirty writes map
+        g_fluxnodeCache.mapDirtyDelegateWrites[item.first] = item.second;
+        // Remove from erase set if it was there
+        g_fluxnodeCache.setDirtyDelegateErases.erase(item.first);
+    }
+
+    for (const auto& outpoint : setDelegateToErase) {
+        // Add to dirty erase set
+        g_fluxnodeCache.setDirtyDelegateErases.insert(outpoint);
+        // Remove from writes map if it was there
+        g_fluxnodeCache.mapDirtyDelegateWrites.erase(outpoint);
+    }
+
     //! DO ALL REMOVAL FROM THE ITEMS IN THE LIST HERE (using iterators so we can remove items while going over the list a single time
     // Currently only have to do this when moving from CONFIRM->START (undo blocks only)
     if (setRemoveFromList.size()) {
@@ -1091,6 +1210,8 @@ bool FluxnodeCache::Flush()
                 g_fluxnodeCache.SortList(currentTier);
         }
     }
+
+    
 
     return true;
 }
@@ -1190,6 +1311,29 @@ void FluxnodeCache::EraseFromList(const std::set<COutPoint>& setToRemove, const 
     }
 }
 
+bool FluxnodeCache::GetDelegates(const COutPoint& outpoint, CFluxnodeDelegates& delegates)
+{
+    LOCK(cs);
+
+    // First check if it's marked for erasure
+    if (setDirtyDelegateErases.count(outpoint)) {
+        return false; // Delegates have been erased
+    }
+
+    // Check if we have a pending write for this outpoint
+    if (mapDirtyDelegateWrites.count(outpoint)) {
+        delegates = mapDirtyDelegateWrites.at(outpoint);
+        return true;
+    }
+
+    // Not in cache, read from database
+    if (pFluxnodeDB) {
+        return pFluxnodeDB->ReadFluxnodeDelegates(outpoint, delegates);
+    }
+
+    return false;
+}
+
 void FluxnodeCache::DumpFluxnodeCache()
 {
     LOCK(cs);
@@ -1210,6 +1354,15 @@ void FluxnodeCache::DumpFluxnodeCache()
         if (!found) {
             pFluxnodeDB->EraseFluxnodeCacheData(item);
         }
+    }
+
+    // Write dirty delegates to database
+    for (const auto& item : mapDirtyDelegateWrites) {
+        pFluxnodeDB->WriteFluxnodeDelegates(item.first, item.second);
+    }
+
+    for (const auto& outpoint : setDirtyDelegateErases) {
+        pFluxnodeDB->EraseFluxnodeDelegate(outpoint);
     }
 }
 
@@ -1277,8 +1430,11 @@ int GetFluxnodeExpirationCount(const int& p_nHeight)
     // Get the status on if Fluxnode params1 is activated
     bool fFluxActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
     bool fHalvingActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_HALVING);
+    bool fPONActive = NetworkUpgradeActive(p_nHeight, Params().GetConsensus(), Consensus::UPGRADE_PON);
 
-    if (fHalvingActive) {
+    if (fPONActive) {
+        return FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V4;
+    } else if (fHalvingActive) {
         return FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V3;
     } else if (fFluxActive) {
         return FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V2;
@@ -1394,3 +1550,9 @@ void FluxnodeCache::LogDebugData(const int& nHeight, const uint256& blockhash, b
 
 }
 /** Fluxnode Tier code end **/
+
+bool IsTestnetBenchmarkBypassActive() {
+    bool fTestNet = GetBoolArg("-testnet", false);
+    bool fBenchCheckBypass = GetBoolArg("-testnetbenchbypass", false);
+    return fTestNet && fBenchCheckBypass;
+}

@@ -17,6 +17,9 @@
 #include "main.h"
 #include "metrics.h"
 #include "miner.h"
+#include "pon/pon.h"
+#include "pon/pon-fork.h"
+#include "pon/pon-minter.h"
 #include "net.h"
 #include "pow.h"
 #include "rpc/server.h"
@@ -207,53 +210,95 @@ UniValue generate(const UniValue& params, bool fHelp)
             unsigned int k = ehparams[0].k;
     while (nHeight < nHeightEnd)
     {
-        std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(Params(), coinbaseScript->reserveScript));
+        // Check if PON is active for regtest
+        bool isPONActive = IsPONActive(nHeight + 1);
+        COutPoint collateral;
+        int64_t enforceTime = 0;
+        
+        if (isPONActive) {
+            // Use test bypass collateral for PON blocks on regtest
+            collateral.hash = uint256S("0x544553544e4f4400000000000000000000000000000000000000000000000000");
+            collateral.n = 0;
+            
+            // Calculate the slot time for deterministic block generation
+            int64_t genesisTime = chainparams.GenesisBlock().nTime;
+            
+            // For regtest, ensure slot time is after previous block time
+            LOCK(cs_main);
+            // PON blocks need timestamp strictly greater than previous block
+            int64_t minTime = chainActive.Tip()->GetBlockTime() + 1;
+
+            // Use the minimum valid time for PON blocks
+            enforceTime = std::max(GetTime(), minTime);
+
+            // Try to get the dev fund address
+            CTxDestination dest = DecodeDestination(Params().GetDevFundAddress());
+            if (!IsValidDestination(dest)) {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to create block template: Invalid dev payout address");
+            }
+
+            coinbaseScript->reserveScript = GetScriptForDestination(dest);
+        }
+        
+        std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(Params(), coinbaseScript->reserveScript, false, collateral, enforceTime));
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         CBlock *pblock = &pblocktemplate->block;
-        {
+        
+        if (!isPONActive) {
+            // Only increment extra nonce for POW blocks
             LOCK(cs_main);
             IncrementExtraNonce(pblock, chainActive.Tip(), nExtraNonce);
         }
 
-        // Hash state
-        crypto_generichash_blake2b_state eh_state;
-        EhInitialiseState(n, k, eh_state);
+        if (isPONActive) {
+            // This is normally called in IncrementExtraNonce, but because we aren't doing that anymore.
+            // We need to make sure we build the merkleroot.
+            pblock->hashMerkleRoot = pblock->BuildMerkleTree();
 
-        // I = the block header minus nonce and solution.
-        CEquihashInput I{*pblock};
-        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-        ss << I;
+            // For PON blocks, no equihash solving needed
+            // Just need to sign the block (using dummy signature for regtest)
+            pblock->vchBlockSig = std::vector<unsigned char>(64, 0);  // Dummy signature for regtest
+        } else {
+            // POW block - solve equihash
+            // Hash state
+            crypto_generichash_blake2b_state eh_state;
+            EhInitialiseState(n, k, eh_state);
 
-        // H(I||...
-        crypto_generichash_blake2b_update(&eh_state, (unsigned char*)&ss[0], ss.size());
+            // I = the block header minus nonce and solution.
+            CEquihashInput I{*pblock};
+            CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+            ss << I;
 
-        while (true) {
-            // Yes, there is a chance every nonce could fail to satisfy the -regtest
-            // target -- 1 in 2^(2^256). That ain't gonna happen
-            pblock->nNonce = ArithToUint256(UintToArith256(pblock->nNonce) + 1);
+            // H(I||...
+            crypto_generichash_blake2b_update(&eh_state, (unsigned char*)&ss[0], ss.size());
 
-            // H(I||V||...
-            crypto_generichash_blake2b_state curr_state;
-            curr_state = eh_state;
-            crypto_generichash_blake2b_update(&curr_state,
-                                              pblock->nNonce.begin(),
-                                              pblock->nNonce.size());
+            while (true) {
+                // Yes, there is a chance every nonce could fail to satisfy the -regtest
+                // target -- 1 in 2^(2^256). That ain't gonna happen
+                pblock->nNonce = ArithToUint256(UintToArith256(pblock->nNonce) + 1);
 
-            // (x_1, x_2, ...) = A(I, V, n, k)
-            std::function<bool(std::vector<unsigned char>)> validBlock =
-                    [&pblock](std::vector<unsigned char> soln) {
-                pblock->nSolution = soln;
-                solutionTargetChecks.increment();
-                return CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus());
-            };
-            bool found = EhBasicSolveUncancellable(n, k, curr_state, validBlock);
-            ehSolverRuns.increment();
-            if (found) {
-                goto endloop;
+                // H(I||V||...
+                crypto_generichash_blake2b_state curr_state;
+                curr_state = eh_state;
+                crypto_generichash_blake2b_update(&curr_state,
+                                                  pblock->nNonce.begin(),
+                                                  pblock->nNonce.size());
+
+                // (x_1, x_2, ...) = A(I, V, n, k)
+                std::function<bool(std::vector<unsigned char>)> validBlock =
+                        [&pblock](std::vector<unsigned char> soln) {
+                    pblock->nSolution = soln;
+                    solutionTargetChecks.increment();
+                    return CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus());
+                };
+                bool found = EhBasicSolveUncancellable(n, k, curr_state, validBlock);
+                ehSolverRuns.increment();
+                if (found) {
+                    break;
+                }
             }
         }
-endloop:
         CValidationState state;
         if (!ProcessNewBlock(state, Params(), NULL, pblock, true, NULL))
             throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
@@ -331,6 +376,7 @@ UniValue getmininginfo(const UniValue& params, bool fHelp)
             "  \"pooledtx\": n              (numeric) The size of the mem pool\n"
             "  \"testnet\": true|false      (boolean) If using testnet or not\n"
             "  \"chain\": \"xxxx\",         (string) current network name as defined in BIP70 (main, test, regtest)\n"
+            "  \"ponminter\": true|false    (boolean) If the PON minter is running\n"
             "}\n"
             "\nExamples:\n"
             + HelpExampleCli("getmininginfo", "")
@@ -356,6 +402,7 @@ UniValue getmininginfo(const UniValue& params, bool fHelp)
 #ifdef ENABLE_MINING
     obj.pushKV("generate",         getgenerate(params, false));
 #endif
+    obj.pushKV("ponminter",        IsPONMinterRunning());
     return obj;
 }
 

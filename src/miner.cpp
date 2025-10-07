@@ -32,6 +32,8 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
+#include "pon/pon-fork.h"
+#include "pon/pon.h"
 
 #include "sodium.h"
 
@@ -105,11 +107,16 @@ void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, 
 
     // Updating time can change work required on testnet:
     if (consensusParams.nPowAllowMinDifficultyBlocksAfterHeight != boost::none) {
-        pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, consensusParams);
+        pblock->nBits = GetNextWorkRequiredByFork(pindexPrev, pblock, consensusParams);
     }
 }
-
 CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, std::map<int, std::pair<CScript, CAmount>>* fluxnodePayouts)
+{
+    return CreateNewBlock(chainparams, scriptPubKeyIn, false, COutPoint(), 0, fluxnodePayouts);
+}
+
+
+CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn, const bool fForEmergency, const COutPoint& ponNodeCollateral, const uint32_t& enforceTime, std::map<int, std::pair<CScript, CAmount>>* fluxnodePayouts)
 {
     // Create new block
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
@@ -532,15 +539,35 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         pblock->nNonce = ArithToUint256(nonce);
 
         // Fill in header
+        if (IsPONActive(pindexPrev->nHeight + 1)) {
+            pblock->nVersion = CBlockHeader::PON_VERSION;
+            pblock->nodesCollateral = ponNodeCollateral;
+            
+            // For PON blocks, use enforced time if provided
+            if (enforceTime > 0) {
+                pblock->nTime = enforceTime;
+            }
+        }
+
         pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
         pblock->hashFinalSaplingRoot   = sapling_tree.root();
-        UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
-        pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
+        pblock->hashMerkleRoot = pblock->BuildMerkleTree();
+
+        // Only update time for POW blocks (PON time is already set to slot)
+        if (!IsPONActive(pindexPrev->nHeight + 1)) {
+            UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
+        }
+        
+        pblock->nBits = GetNextWorkRequiredByFork(pindexPrev, pblock, chainparams.GetConsensus());
         pblock->nSolution.clear();
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
 
+        if (fForEmergency) {
+            return pblocktemplate.release();
+        }
+
         CValidationState state;
-        if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false)) {
+        if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false, false)) {
             if (state.IsInvalidTx()) {
                 LogPrintf("Removing transaction from mempool that is causing block to fail validity check. %s\n", state.GetInvalidTx().GetHash().GetHex());
                 std::list<CTransaction> removed;
@@ -680,7 +707,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
             // Create new block
             //
             unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
-            
+
             // Get the height of current tip
             int nHeight = chainActive.Height();
             if (nHeight == -1) {

@@ -8,6 +8,7 @@
 #include "chainparams.h"
 #include "pow.h"
 #include "random.h"
+#include "pon/pon-fork.h"
 
 TEST(PoW, DifficultyAveraging) {
     SelectParams(CBaseChainParams::MAIN);
@@ -32,13 +33,13 @@ TEST(PoW, DifficultyAveraging) {
                                         blocks[lastBlk].GetMedianTimePast(),
                                         blocks[firstBlk].GetMedianTimePast(),
                                         params),
-              GetNextWorkRequired(&blocks[lastBlk], nullptr, params));
+            GetNextWorkRequiredByFork(&blocks[lastBlk], nullptr, params));
     // Result should be unchanged, modulo integer division precision loss
     arith_uint256 bnRes;
     bnRes.SetCompact(0x1e7fffff);
     bnRes /= params.DigishieldAveragingWindowTimespan();
     bnRes *= params.DigishieldAveragingWindowTimespan();
-    EXPECT_EQ(bnRes.GetCompact(), GetNextWorkRequired(&blocks[lastBlk], nullptr, params));
+    EXPECT_EQ(bnRes.GetCompact(), GetNextWorkRequiredByFork(&blocks[lastBlk], nullptr, params));
 
     // Randomise the final block time (plus 1 to ensure it is always different)
     blocks[lastBlk].nTime += GetRand(params.nPowTargetSpacing/2) + 1;
@@ -49,9 +50,9 @@ TEST(PoW, DifficultyAveraging) {
                                         blocks[lastBlk].GetMedianTimePast(),
                                         blocks[firstBlk].GetMedianTimePast(),
                                         params),
-              GetNextWorkRequired(&blocks[lastBlk], nullptr, params));
+            GetNextWorkRequiredByFork(&blocks[lastBlk], nullptr, params));
     // Result should not be unchanged
-    EXPECT_NE(0x1e7fffff, GetNextWorkRequired(&blocks[lastBlk], nullptr, params));
+    EXPECT_NE(0x1e7fffff, GetNextWorkRequiredByFork(&blocks[lastBlk], nullptr, params));
 
     // Change the final block difficulty
     blocks[lastBlk].nBits = 0x1e0fffff;
@@ -62,7 +63,7 @@ TEST(PoW, DifficultyAveraging) {
                                         blocks[lastBlk].GetMedianTimePast(),
                                         blocks[firstBlk].GetMedianTimePast(),
                                         params),
-              GetNextWorkRequired(&blocks[lastBlk], nullptr, params));
+            GetNextWorkRequiredByFork(&blocks[lastBlk], nullptr, params));
 
     // Result should be the same as if the average difficulty was used
     arith_uint256 average = UintToArith256(uint256S("0000796968696969696969696969696969696969696969696969696969696969"));
@@ -70,5 +71,5 @@ TEST(PoW, DifficultyAveraging) {
                                         blocks[lastBlk].GetMedianTimePast(),
                                         blocks[firstBlk].GetMedianTimePast(),
                                         params),
-              GetNextWorkRequired(&blocks[lastBlk], nullptr, params));
+            GetNextWorkRequiredByFork(&blocks[lastBlk], nullptr, params));
 }

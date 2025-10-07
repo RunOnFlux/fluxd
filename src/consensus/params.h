@@ -34,6 +34,7 @@ enum UpgradeIndex {
     UPGRADE_FLUX,
     UPGRADE_HALVING,
     UPGRADE_P2SHNODES,
+    UPGRADE_PON,  // Proof of Node activation
     // NOTE: Also add new upgrades to NetworkUpgradeInfo in upgrades.cpp
     MAX_NETWORK_UPGRADES
 };
@@ -115,12 +116,19 @@ struct Params {
     NetworkUpgrade vUpgrades[MAX_NETWORK_UPGRADES];
     /** Proof of work parameters */
     uint256 powLimit;
+    uint256 ponLimit;  // Separate limit for Proof of Node (minimum difficulty)
+    uint256 ponStartLimit;  // Initial easier limit for PON fork transition
 
     boost::optional<uint32_t> nPowAllowMinDifficultyBlocksAfterHeight;	
     int64_t nDigishieldAveragingWindow;
     int64_t nDigishieldMaxAdjustDown;
     int64_t nDigishieldMaxAdjustUp;
     int64_t nPowTargetSpacing;
+    int64_t nPonTargetSpacing;
+    int64_t nPonDifficultyWindow;
+    int nPONSubsidyReductionInterval;  // Blocks per year for 10% reduction
+    int nPONMaxReductions;  // Maximum number of reductions to apply
+    int nPONInitialSubsidy;
     int64_t DigishieldAveragingWindowTimespan() const { return nDigishieldAveragingWindow * nPowTargetSpacing; }
     int64_t DigishieldMinActualTimespan() const { return (DigishieldAveragingWindowTimespan() * (100 - nDigishieldMaxAdjustUp  )) / 100; }
     int64_t DigishieldMaxActualTimespan() const { return (DigishieldAveragingWindowTimespan() * (100 + nDigishieldMaxAdjustDown)) / 100; }

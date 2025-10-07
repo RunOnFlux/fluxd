@@ -10,7 +10,7 @@
  * network protocol versioning
  */
 
-static const int PROTOCOL_VERSION = 170019;
+static const int PROTOCOL_VERSION = 170020;
 
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
@@ -44,5 +44,7 @@ static const int MIN_PEER_PROTO_VERSION_FLUXNODE = 170009;
 static const int DETERMINISTIC_FLUXNODES = 170016;
 
 static const int P2SH_NODES = 170019;
+
+static const int PROOF_OF_NODE = 170020;
 
 #endif // BITCOIN_VERSION_H

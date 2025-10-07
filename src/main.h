@@ -114,7 +114,7 @@ static const unsigned int DATABASE_WRITE_INTERVAL = 60 * 60;
 static const unsigned int DATABASE_FLUSH_INTERVAL = 24 * 60 * 60;
 /** Maximum length of reject messages. */
 static const unsigned int MAX_REJECT_MESSAGE_LENGTH = 111;
-static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
+static const int64_t DEFAULT_MAX_TIP_AGE = 4 * 60 * 60;
 
 /** The maximum rate of address records we're willing to process on average.
  * Is bypassed for whitelisted connections. */
@@ -271,6 +271,7 @@ bool GetTransaction(const uint256 &hash, CTransaction &tx, const Consensus::Para
 bool ActivateBestChain(CValidationState& state, const CChainParams& chainparams, const CBlock* pblock = NULL);
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams);
 CAmount GetFluxnodeSubsidy(int nHeight, const CAmount& blockValue, int nNodeTier);
+CAmount GetMinDevFundAmount(const int& nHeight, const Consensus::Params& consensusParams);
 CAmount GetExchangeFundAmount(int nHeight, const Consensus::Params& consensusParams);
 CAmount GetFoundationFundAmount(int nHeight, const Consensus::Params& consensusParams);
 bool IsSwapPoolInterval(const int64_t nHeight);
@@ -499,7 +500,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
 bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state,
                                 const CChainParams& chainparams, CBlockIndex *pindexPrev);
 bool ContextualCheckBlock(const CBlock& block, CValidationState& state,
-                          const CChainParams& chainparams, CBlockIndex *pindexPrev, bool fComeFromAccept);
+                          const CChainParams& chainparams, CBlockIndex *pindexPrev, bool fComeFromAccept, bool fCheckPONSignature = true);
 
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins.
  *  Validity checks that depend on the UTXO set are also done; ConnectBlock()
@@ -508,7 +509,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                   const CChainParams& chainparams, bool fJustCheck = false, FluxnodeCache* p_fluxnodeCache = nullptr);
 
 /** Check a block is completely valid from start to finish (only works on top of our current best block, with cs_main held) */
-bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams, const CBlock& block, CBlockIndex* pindexPrev, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
+bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams, const CBlock& block, CBlockIndex* pindexPrev, bool fCheckPOW = true, bool fCheckMerkleRoot = true, bool fCheckPONSignature = true);
 
 
 /**

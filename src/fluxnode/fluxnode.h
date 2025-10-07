@@ -21,18 +21,22 @@
 
 // If the fluxnode isn't confirmed within this amount of blocks, the fluxnode is moved to a DoS list
 #define FLUXNODE_START_TX_EXPIRATION_HEIGHT 60
+#define FLUXNODE_START_TX_EXPIRATION_HEIGHT_V2 240
 
 // How long the fluxnode will stay in the DoS list. Is the calculated from that height the start transaction was added to the chain
 #define FLUXNODE_DOS_REMOVE_AMOUNT 180
+#define FLUXNODE_DOS_REMOVE_AMOUNT_V2 720
 
 // How often a new confirmation transaction needs to be seen on chain to keep a node up and running
 #define FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V1 60
 #define FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V2 80
 #define FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V3 160
+#define FLUXNODE_CONFIRM_UPDATE_EXPIRATION_HEIGHT_V4 640 // PON activation - targeting 30 second blocks
 
 // Nodes are allowed to send a update confirm notification only after this many blocks past there last confirm
 #define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V1 40
 #define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2 120
+#define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V3 500 // PON activation - targeting 30 second blocks
 #define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 5
 
 // Maximum ip address size in fluxnode confirm transaction
@@ -72,6 +76,7 @@
 class FluxnodeCache;
 class CFluxnodeTxBlockUndo;
 class ActiveFluxnode;
+class CFluxnodeDelegates;
 
 extern FluxnodeCache g_fluxnodeCache;
 extern ActiveFluxnode activeFluxnode;
@@ -242,7 +247,7 @@ public:
             READWRITE(nTier);
             READWRITE(nStatus);
             READWRITE(nCollateral);
-            if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+            if (IsFluxTxP2SHType(nFluxTxVersion, true)) {
                 READWRITE(*(CScriptBase*)(&P2SHRedeemScript));
             }
         } else {
@@ -370,7 +375,18 @@ public:
     std::map<int, std::pair<int, COutPoint>> mapPaidNodes;
     std::map<COutPoint, int> mapUndoPaidNodes;
 
+    //! DELEGATE CACHE ITEMS (LOCAL)
+    // Map of delegates to write when flushing
+    std::map<COutPoint, CFluxnodeDelegates> mapDelegateToWrite;
+    // Set of delegates to erase when flushing
+    std::set<COutPoint> setDelegateToErase;
+
     //! GLOBAL CACHE ITEMS ONLY
+    // Map of delegates that need to be written to database (dirty delegates)
+    std::map<COutPoint, CFluxnodeDelegates> mapDirtyDelegateWrites;
+    // Set of delegates that need to be erased from database
+    std::set<COutPoint> setDirtyDelegateErases;
+
     // Global tracking of Started Fluxnodes
     std::map<COutPoint, FluxnodeCacheData> mapStartTxTracker;
 
@@ -410,6 +426,10 @@ public:
         mapFluxnodeList.clear();
 
         mapPaidNodes.clear();
+        mapDelegateToWrite.clear();
+        setDelegateToErase.clear();
+        mapDirtyDelegateWrites.clear();
+        setDirtyDelegateErases.clear();
     }
 
     void AddNewStart(const CTransaction& p_transaction, const int p_nHeight, int nTier = 0, const CAmount nCollateral = 0);
@@ -441,6 +461,7 @@ public:
     void CheckForUndoExpiredStartTx(const int& p_nHeight);
     bool CheckIfStarted(const COutPoint& out);
     bool CheckIfConfirmed(const COutPoint& out);
+    bool GetPubkeyIfConfirmed(const COutPoint& out, CPubKey& pubKey);
     bool CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight = 0);
 
     bool CheckFluxnodePayout(const CTransaction& coinbase, const int p_Height, FluxnodeCache* p_fluxnodeCache = nullptr);
@@ -463,6 +484,9 @@ public:
 
     void DumpFluxnodeCache();
 
+    // Delegate helper - checks cache first, then database
+    bool GetDelegates(const COutPoint& outpoint, CFluxnodeDelegates& delegates);
+
     void CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<int>& vNodeCount);
     void CountMigration(int& nOldTotal, int& nNewTotal, std::vector<int>& vOldNodeCount, std::vector<int>& vNewNodeCount);
 
@@ -476,5 +500,7 @@ std::string GetP2SHFluxNodePublicKey(const CTransaction& tx);
 bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet);
 
 bool IsFluxnodeTransactionsActive();
+
+bool IsTestnetBenchmarkBypassActive();
 
 #endif //ZELCASHNODES_FLUXNODE_H

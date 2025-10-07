@@ -202,6 +202,9 @@ TEST_F(ContextualCheckBlockTest, BlockSaplingRulesAcceptSaplingTx) {
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, 1);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, 1);
 
+    // PON block versions not required.
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_PON, 100);
+
     CMutableTransaction mtx = GetFirstBlockCoinbaseTx();
 
     // Make it a Sapling transaction
@@ -251,6 +254,9 @@ TEST_F(ContextualCheckBlockTest, BlockSaplingRulesRejectOtherTx) {
     SelectParams(CBaseChainParams::REGTEST);
 
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, 0);
+
+    // PON block versions not required.
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_PON, 100);
 
     CMutableTransaction mtx = GetFirstBlockCoinbaseTx();
 

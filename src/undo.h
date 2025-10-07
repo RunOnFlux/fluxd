@@ -80,20 +80,21 @@ public:
     }
 };
 
-template <typename Stream, typename Operation>
-void ReadWriteExtraFluxnodeUndoBlockData(Stream &s, Operation ser_action, std::map<COutPoint, std::string> &mapLastIpAddress)
+template <typename Stream, typename Operation, typename T>
+void ReadWriteExtraFluxnodeUndoBlockData(Stream &s, Operation ser_action, T &data)
 {
     if (ser_action.ForRead())
     {
         if (!s.empty()) {
-            READWRITE(mapLastIpAddress);
+            READWRITE(data);
         }
     }
     else
     {
-        READWRITE(mapLastIpAddress);
+        READWRITE(data);
     }
-};
+}
+
 
 class CFluxnodeTxBlockUndo
 {
@@ -103,6 +104,7 @@ public:
     std::map<COutPoint, int> mapUpdateLastConfirmHeight;
     std::map<COutPoint, int> mapLastPaidHeights;
     std::map<COutPoint, std::string> mapLastIpAddress;
+    std::map<COutPoint, CFluxnodeDelegates> mapOldDelegates;
 
     void SetNull() {
         vecExpiredDosData.clear();
@@ -110,6 +112,7 @@ public:
         mapUpdateLastConfirmHeight.clear();
         mapLastPaidHeights.clear();
         mapLastIpAddress.clear();
+        mapOldDelegates.clear();
     }
 
     CFluxnodeTxBlockUndo(){
@@ -125,6 +128,7 @@ public:
         READWRITE(mapUpdateLastConfirmHeight);
         READWRITE(mapLastPaidHeights);
         ReadWriteExtraFluxnodeUndoBlockData(s, ser_action, mapLastIpAddress);
+        ReadWriteExtraFluxnodeUndoBlockData(s, ser_action, mapOldDelegates);
     }
 };
 

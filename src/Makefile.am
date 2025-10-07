@@ -138,6 +138,7 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   deprecation.h \
+  emergencyblock.h \
   hash.h \
   httprpc.h \
   httpserver.h \
@@ -157,6 +158,9 @@ BITCOIN_CORE_H = \
   netbase.h \
   noui.h \
   policy/fees.h \
+  pon/pon.h \
+  pon/pon-fork.h \
+  pon/pon-minter.h \
   pow.h \
   prevector.h \
   primitives/block.h \
@@ -252,6 +256,7 @@ libbitcoin_server_a_SOURCES = \
   chain.cpp \
   checkpoints.cpp \
   deprecation.cpp \
+  emergencyblock.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
@@ -263,10 +268,14 @@ libbitcoin_server_a_SOURCES = \
   net.cpp \
   noui.cpp \
   policy/fees.cpp \
+  pon/pon.cpp \
+  pon/pon-fork.cpp \
+  pon/pon-minter.cpp \
   pow.cpp \
   rest.cpp \
   rpc/blockchain.cpp \
   rpc/cache.cpp \
+  rpc/emergencyblock.cpp \
   rpc/mining.cpp \
   rpc/misc.cpp \
   rpc/net.cpp \

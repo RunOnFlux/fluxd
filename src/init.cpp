@@ -27,6 +27,7 @@
 #include "mempool_limit.h"
 #include "metrics.h"
 #include "miner.h"
+#include "pon/pon-minter.h"
 #include "net.h"
 #include "rpc/server.h"
 #include "rpc/register.h"
@@ -215,6 +216,7 @@ void Shutdown()
 #ifdef ENABLE_MINING
     GenerateBitcoins(false, 0, Params());
 #endif
+    StopPONMinter();
     StopNode();
     StopTorControl();
 
@@ -516,6 +518,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageGroup(_("Mining options:"));
     strUsage += HelpMessageOpt("-gen", strprintf(_("Generate coins (default: %u)"), 0));
     strUsage += HelpMessageOpt("-genproclimit=<n>", strprintf(_("Set the number of threads for coin generation if enabled (-1 = all cores, default: %d)"), 1));
+    strUsage += HelpMessageOpt("-ponminter", _("Enable PON minting for testing (testnet only, allows minting without being a fluxnode, default: false)"));
     strUsage += HelpMessageOpt("-equihashsolver=<name>", _("Specify the Equihash solver to be used if enabled (default: \"default\")"));
     strUsage += HelpMessageOpt("-mineraddress=<addr>", _("Send mined coins to a specific single address"));
     strUsage += HelpMessageOpt("-minetolocalwallet", strprintf(
@@ -1954,33 +1957,38 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     if (fFluxnode) {
-        
         strPath = GetSelfPath();
         LogPrintf("Path: %s\n",strPath);
-       
-         if (FindBenchmarkPath("fluxbenchd",strPath)) {
+    
+        if (FindBenchmarkPath("fluxbenchd",strPath)) {
 
             LogPrintf("Found fluxbenchd in %s\n",strPath);
 
             if (FindBenchmarkPath("fluxbench-cli",strPath)) {
-                 LogPrintf("Found fluxbench-cli in %s\n",strPath);
+                LogPrintf("Found fluxbench-cli in %s\n",strPath);
             } else {
-                 return InitError("Failed to find benchmark cli application");
+                if (!IsTestnetBenchmarkBypassActive()) {
+                    return InitError("Failed to find benchmark cli application");
+                }
             }
 
         } else {
 
-             if (FindBenchmarkPath("zelbenchd", strPath)) {
-                  LogPrintf("Found zelbenchd in %s\n",strPath);
-             } else {
-                 return InitError("Failed to find benchmark application");
-             }
+            if (FindBenchmarkPath("zelbenchd", strPath)) {
+                LogPrintf("Found zelbenchd in %s\n",strPath);
+            } else {
+                if (!IsTestnetBenchmarkBypassActive()) {
+                    return InitError("Failed to find benchmark application");
+                }
+            }
 
-             if (FindBenchmarkPath("zelbench-cli", strPath)) {
-                  LogPrintf("Found zelbench-cli in %s\n",strPath);
-             } else {
-                 return InitError("Failed to find benchmark cli application");
-             }
+            if (FindBenchmarkPath("zelbench-cli", strPath)) {
+                LogPrintf("Found zelbench-cli in %s\n",strPath);
+            } else {
+                if (!IsTestnetBenchmarkBypassActive()) {
+                    return InitError("Failed to find benchmark cli application");
+                }
+            }
         }
         
     }
@@ -1993,7 +2001,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
         // Make sure that fluxbenchd is running and stop flux if it isn't
         if (!IsFluxBenchdRunning()) {
-            return InitError("Failed to start benchmark application");
+            if (!IsTestnetBenchmarkBypassActive()) {
+                return InitError("Failed to start benchmark application");
+            }
         }
     }
 
@@ -2033,6 +2043,23 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Generate coins in the background
     GenerateBitcoins(GetBoolArg("-gen", false), GetArg("-genproclimit", 1), chainparams);
 #endif
+
+    // Start PON minter if this is an active fluxnode or if explicitly enabled for testing
+    bool fPONMinter = GetBoolArg("-ponminter", false);
+    bool isMainnet = (chainparams.NetworkIDString() == "main");
+    bool isRegtest = (chainparams.NetworkIDString() == "regtest");
+    
+    // Only allow -ponminter flag on testnet, not mainnet or regtest
+    if (fPONMinter && isMainnet) {
+        return InitError(_("Error: -ponminter flag is only allowed on testnet"));
+    }
+    if (fPONMinter && isRegtest) {
+        return InitError(_("Error: -ponminter flag is not allowed on regtest. Use 'generate' RPC command instead"));
+    }
+    
+    if (fFluxnode || fPONMinter) {
+        StartPONMinter(chainparams);
+    }
 
     // ********************************************************* Step 12: finished
 

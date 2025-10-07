@@ -183,6 +183,22 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry) 
                 if (tx.IsFluxnodeUpgradedP2SHTx()) {
                     entry.pushKV("redeemscript", tx.P2SHRedeemScript.ToString());
                 }
+                // Add delegate data if present
+                if (HasFluxTxDelegatesFeature(tx.nFluxTxVersion) && tx.fUsingDelegates) {
+                    entry.pushKV("using_delegates", true);
+
+                    UniValue delegateObj(UniValue::VOBJ);
+                    delegateObj.pushKV("version", (int)tx.delegateData.nDelegateVersion);
+                    delegateObj.pushKV("type", (int)tx.delegateData.nType);
+
+                    UniValue delegateArray(UniValue::VARR);
+                    for (const auto& key : tx.delegateData.delegateStartingKeys) {
+                        delegateArray.push_back(EncodeBase64(key.begin(), key.size()));
+                    }
+                    delegateObj.pushKV("keys", delegateArray);
+
+                    entry.pushKV("delegate_data", delegateObj);
+                }
             } else {
                 // Needed only if not upgraded and not p2sh
                 entry.pushKV("collateral_pubkey",

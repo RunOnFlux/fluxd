@@ -281,10 +281,19 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params&
 
 arith_uint256 GetBlockProof(const CBlockIndex& block)
 {
+    // PON blocks use a fixed amount of work since they're based on time slots
+    // and node selection, not computational difficulty
+    if (block.nVersion >= 100) { // PON_VERSION
+        // Use a reasonable fixed value - equivalent to a moderate difficulty POW block
+        // This ensures chain work accumulates properly without overflow
+        return arith_uint256(1) << 40; // 2^40, a reasonable work amount
+    }
+    
     arith_uint256 bnTarget;
     bool fNegative;
     bool fOverflow;
     bnTarget.SetCompact(block.nBits, &fNegative, &fOverflow);
+    
     if (fNegative || fOverflow || bnTarget == 0)
         return 0;
     // We need to compute 2**256 / (bnTarget+1), but we can't represent 2**256

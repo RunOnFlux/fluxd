@@ -47,8 +47,107 @@ static_assert(SAPLING_TX_VERSION <= SAPLING_MAX_TX_VERSION,
 static const int32_t FLUXNODE_TX_VERSION = 5;
 static const int32_t FLUXNODE_TX_UPGRADEABLE_VERSION = 6;
 
+// Legacy version constants for backward compatibility
 static const int32_t FLUXNODE_INTERNAL_NORMAL_TX_VERSION = 1;
 static const int32_t FLUXNODE_INTERNAL_P2SH_TX_VERSION = 2;
+
+// Bit-based version system (for use after PON fork)
+// Bits 0-7: Transaction type
+static const int32_t FLUXNODE_TX_TYPE_MASK = 0xFF;
+static const int32_t FLUXNODE_TX_TYPE_NORMAL_BIT = 0x01;  // Bit 0
+static const int32_t FLUXNODE_TX_TYPE_P2SH_BIT = 0x02;    // Bit 1
+
+// Bits 8-15: Feature flags
+static const int32_t FLUXNODE_TX_FEATURE_MASK = 0xFF00;
+static const int32_t FLUXNODE_TX_FEATURE_DELEGATES_BIT = 0x0100;  // Bit 8
+static const int32_t FLUXNODE_TX_FEATURE_RESERVED1_BIT = 0x0200;  // Bit 9
+static const int32_t FLUXNODE_TX_FEATURE_RESERVED2_BIT = 0x0400;  // Bit 10
+
+inline bool HasConflictingBits(const int32_t& version) {
+    return (version & FLUXNODE_TX_TYPE_NORMAL_BIT) != 0 && (version & FLUXNODE_TX_TYPE_P2SH_BIT) != 0;
+}
+// Helper functions for version checking
+inline bool IsFluxTxNormalType(const int32_t& version, bool includeBitCheck = false) {
+    if (includeBitCheck) {
+        if (HasConflictingBits(version))
+            return false;
+        return (version & FLUXNODE_TX_TYPE_NORMAL_BIT) != 0 || version == FLUXNODE_INTERNAL_NORMAL_TX_VERSION;
+    }
+    return version == FLUXNODE_INTERNAL_NORMAL_TX_VERSION;
+}
+
+inline bool IsFluxTxP2SHType(const int32_t& version, bool includeBitCheck = false) {
+    if (includeBitCheck) {
+        if (HasConflictingBits(version))
+            return false;
+        return (version & FLUXNODE_TX_TYPE_P2SH_BIT) != 0 || version == FLUXNODE_INTERNAL_P2SH_TX_VERSION;
+    }
+    return version == FLUXNODE_INTERNAL_P2SH_TX_VERSION;
+}
+
+inline bool HasFluxTxDelegatesFeature(int32_t version) {
+    return (version & FLUXNODE_TX_FEATURE_DELEGATES_BIT) != 0;
+}
+
+class CFluxnodeDelegates
+{
+public:
+    static const int MAX_PUBKEYS_LENGTH = 4;
+    static const int8_t INITIAL_VERSION = 1;
+    static const int8_t NONE = 0;
+    static const int8_t UPDATE = 1;
+    static const int8_t SIGNING = 2;
+
+    int8_t nDelegateVersion;
+    int8_t nType;
+    std::vector<CPubKey> delegateStartingKeys;
+
+    void SetNull() {
+        nDelegateVersion = 1;
+        nType = NONE;
+        delegateStartingKeys.clear();
+    }
+
+    CFluxnodeDelegates() {
+        SetNull();
+    }
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(nDelegateVersion);
+        READWRITE(nType);
+        if(nDelegateVersion == INITIAL_VERSION) {
+            if (nType == UPDATE) {
+                READWRITE(delegateStartingKeys);
+            }
+        }
+    }
+
+    bool IsSigning() const {
+        return nType == SIGNING;
+    }
+
+    bool IsUpdating() const {
+        return nType == UPDATE;
+    }
+
+    bool IsValid() const {
+        if (nType != UPDATE && nType != SIGNING)
+            return false;
+
+        if (delegateStartingKeys.size() > MAX_PUBKEYS_LENGTH)
+            return false;
+
+        for (const auto& pubkey : delegateStartingKeys) {
+            if (!pubkey.IsValid() || !pubkey.IsCompressed()) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
 
 /**
  * A shielded input to a transaction. It contains data that describes a Spend transfer.
@@ -605,7 +704,10 @@ public:
     // Fluxnode Tx Version 6 (Includes P2SH nodes ability)
     const int32_t nFluxTxVersion; // Adding this field for further upgradability to fluxnode txes in the future
     const CScript P2SHRedeemScript;
-
+    
+    // Delegate support (when FLUXNODE_TX_FEATURE_DELEGATES_BIT is set)
+    const bool fUsingDelegates;
+    const CFluxnodeDelegates delegateData;
 
     /** Construct a CTransaction that qualifies as IsNull() */
     CTransaction();
@@ -676,20 +778,35 @@ public:
 
             if (nType == FLUXNODE_START_TX_TYPE) {
                 READWRITE(*const_cast<int32_t *>(&nFluxTxVersion)); // Normal or P2SH
-                if (nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION) {
+                
+                // Check for backward compatibility (exact match) or bit-based check
+                bool isNormalTx = (nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION) || 
+                                  ((nFluxTxVersion & FLUXNODE_TX_TYPE_NORMAL_BIT) != 0);
+                bool isP2SHTx = (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) || 
+                                ((nFluxTxVersion & FLUXNODE_TX_TYPE_P2SH_BIT) != 0);
+                
+                if (isNormalTx && !(nFluxTxVersion & FLUXNODE_TX_TYPE_P2SH_BIT)) {
                     READWRITE(*const_cast<COutPoint *>(&collateralIn));
                     READWRITE(*const_cast<CPubKey *>(&collateralPubkey));
                     READWRITE(*const_cast<CPubKey *>(&pubKey));
                     READWRITE(*const_cast<uint32_t *>(&sigTime));
                     if (!(s.GetType() & SER_GETHASH))
                         READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
-                } else if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+                } else if (isP2SHTx) {
                     READWRITE(*const_cast<COutPoint *>(&collateralIn));
                     READWRITE(*const_cast<CPubKey *>(&pubKey));
                     READWRITE(*const_cast<CScriptBase *>((CScriptBase *) (&P2SHRedeemScript))); // New Addition to Tx
                     READWRITE(*const_cast<uint32_t *>(&sigTime));
                     if (!(s.GetType() & SER_GETHASH))
                         READWRITE(*const_cast<std::vector<unsigned char> *>(&sig));
+                }
+                
+                // Handle delegate data if the feature bit is set
+                if (HasFluxTxDelegatesFeature(nFluxTxVersion)) {
+                    READWRITE(*const_cast<bool *>(&fUsingDelegates));
+                    if (fUsingDelegates) {
+                        READWRITE(*const_cast<CFluxnodeDelegates *>(&delegateData));
+                    }
                 }
             } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
                 READWRITE(*const_cast<COutPoint *>(&collateralIn));
@@ -747,11 +864,23 @@ public:
     }
 
     bool IsFluxnodeUpgradedNormalTx() const {
-        return IsFluxnodeUpgradeTx() && nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION;
+        return IsFluxnodeUpgradeTx() && IsFluxTxNormalType(nFluxTxVersion, true);
     }
 
     bool IsFluxnodeUpgradedP2SHTx() const {
-        return IsFluxnodeUpgradeTx() && nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION;
+        return IsFluxnodeUpgradeTx() && IsFluxTxP2SHType(nFluxTxVersion, true);
+    }
+    
+    bool HasDelegates() const {
+        return IsFluxnodeUpgradeTx() && HasFluxTxDelegatesFeature(nFluxTxVersion);
+    }
+
+    bool IsSigningAsDelegate() const {
+        return HasDelegates() && delegateData.IsValid() && delegateData.IsSigning();
+    }
+
+    bool IsUpdatingDelegate() const {
+        return HasDelegates() && delegateData.IsValid() && delegateData.IsUpdating();
     }
 
     bool IsNull() const {
@@ -860,7 +989,10 @@ struct CMutableTransaction
     // Fluxnode Tx Version 6 (Includes P2SH nodes ability)
     int32_t nFluxTxVersion; // Adding this field for further upgradability to fluxnode txes in the future
     CScript P2SHRedeemScript;
-
+    
+    // Delegate support (when FLUXNODE_TX_FEATURE_DELEGATES_BIT is set)
+    bool fUsingDelegates;
+    CFluxnodeDelegates delegateData;
 
     CMutableTransaction();
     CMutableTransaction(const CTransaction& tx);
@@ -926,22 +1058,38 @@ struct CMutableTransaction
             return;
         } else if (nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION) {
             READWRITE(nType);
-            if (nType == FLUXNODE_START_TX_TYPE) {
+            if ((nType & FLUXNODE_START_TX_TYPE) == FLUXNODE_START_TX_TYPE) {
                 READWRITE(nFluxTxVersion);
-                if (nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION) {
+                
+                // Check for backward compatibility (exact match) or bit-based check
+                bool isNormalTx = (nFluxTxVersion == FLUXNODE_INTERNAL_NORMAL_TX_VERSION) || 
+                                  ((nFluxTxVersion & FLUXNODE_TX_TYPE_NORMAL_BIT) != 0);
+                bool isP2SHTx = (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) || 
+                                ((nFluxTxVersion & FLUXNODE_TX_TYPE_P2SH_BIT) != 0);
+                
+                if (isNormalTx && !(nFluxTxVersion & FLUXNODE_TX_TYPE_P2SH_BIT)) {
                     READWRITE(collateralIn);
                     READWRITE(collateralPubkey);
                     READWRITE(pubKey);
                     READWRITE(sigTime);
+
                     if (!(s.GetType() & SER_GETHASH))
                         READWRITE(sig);
-                } else if (nFluxTxVersion == FLUXNODE_INTERNAL_P2SH_TX_VERSION) {
+                } else if (isP2SHTx) {
                     READWRITE(collateralIn);
                     READWRITE(pubKey);
                     READWRITE(*(CScriptBase*)(&P2SHRedeemScript));
                     READWRITE(sigTime);
                     if (!(s.GetType() & SER_GETHASH))
                         READWRITE(sig);
+                }
+                
+                // Handle delegate data if the feature bit is set
+                if (HasFluxTxDelegatesFeature(nFluxTxVersion)) {
+                    READWRITE(fUsingDelegates);
+                    if (fUsingDelegates) {
+                        READWRITE(delegateData);
+                    }
                 }
             } else if (nType == FLUXNODE_CONFIRM_TX_TYPE) {
                 READWRITE(collateralIn);

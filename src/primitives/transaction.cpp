@@ -11,6 +11,13 @@
 #include "utilstrencodings.h"
 #include "librustzcash.h"
 
+// Define static members of CFluxnodeDelegates
+const int CFluxnodeDelegates::MAX_PUBKEYS_LENGTH;
+const int8_t CFluxnodeDelegates::INITIAL_VERSION;
+const int8_t CFluxnodeDelegates::NONE;
+const int8_t CFluxnodeDelegates::UPDATE;
+const int8_t CFluxnodeDelegates::SIGNING;
+
 JSDescription::JSDescription(
     ZCJoinSplit& params,
     const uint256& joinSplitPubKey,
@@ -210,7 +217,7 @@ CMutableTransaction::CMutableTransaction(const CTransaction& tx) : nVersion(tx.n
                                                                    bindingSig(tx.bindingSig), nType(tx.nType), collateralIn(tx.collateralIn), collateralPubkey(tx.collateralPubkey),
                                                                    pubKey(tx.pubKey), sigTime(tx.sigTime), ip(tx.ip), sig(tx.sig), benchmarkTier(tx.benchmarkTier),
                                                                    benchmarkSig(tx.benchmarkSig), benchmarkSigTime(tx.benchmarkSigTime), nUpdateType(tx.nUpdateType),
-                                                                   nFluxTxVersion(tx.nFluxTxVersion), P2SHRedeemScript(tx.P2SHRedeemScript)
+                                                                   nFluxTxVersion(tx.nFluxTxVersion), P2SHRedeemScript(tx.P2SHRedeemScript), fUsingDelegates(tx.fUsingDelegates), delegateData(tx.delegateData)
 {
     
 }
@@ -244,7 +251,7 @@ void CTransaction::UpdateHash() const
 CTransaction::CTransaction() : nVersion(CTransaction::SPROUT_MIN_CURRENT_VERSION), fOverwintered(false), nVersionGroupId(0), nExpiryHeight(0), vin(), vout(), nLockTime(0),
                                valueBalance(0), vShieldedSpend(), vShieldedOutput(), vJoinSplit(), joinSplitPubKey(), joinSplitSig(), bindingSig(), nType(FLUXNODE_NO_TYPE),
                                collateralIn(), collateralPubkey(), pubKey(), sigTime(0), ip(), sig(), benchmarkTier(0), benchmarkSig(), benchmarkSigTime(0), nUpdateType(0),
-                               nFluxTxVersion(0), P2SHRedeemScript()  { }
+                               nFluxTxVersion(0), P2SHRedeemScript(), fUsingDelegates(false), delegateData()  { }
 
 CTransaction::CTransaction(const CMutableTransaction &tx) : nVersion(tx.nVersion), fOverwintered(tx.fOverwintered), nVersionGroupId(tx.nVersionGroupId), nExpiryHeight(tx.nExpiryHeight),
                                                             vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime),
@@ -253,7 +260,7 @@ CTransaction::CTransaction(const CMutableTransaction &tx) : nVersion(tx.nVersion
                                                             bindingSig(tx.bindingSig), nType(tx.nType), collateralIn(tx.collateralIn), collateralPubkey(tx.collateralPubkey),
                                                             pubKey(tx.pubKey), sigTime(tx.sigTime), ip(tx.ip), sig(tx.sig), benchmarkTier(tx.benchmarkTier),
                                                             benchmarkSig(tx.benchmarkSig), benchmarkSigTime(tx.benchmarkSigTime), nUpdateType(tx.nUpdateType),
-                                                            nFluxTxVersion(tx.nFluxTxVersion), P2SHRedeemScript(tx.P2SHRedeemScript)
+                                                            nFluxTxVersion(tx.nFluxTxVersion), P2SHRedeemScript(tx.P2SHRedeemScript), fUsingDelegates(tx.fUsingDelegates), delegateData(tx.delegateData)
 {
     UpdateHash();
 }
@@ -271,7 +278,7 @@ CTransaction::CTransaction(
                               ip(tx.ip), sig(tx.sig), benchmarkTier(tx.benchmarkTier),
                               benchmarkSig(tx.benchmarkSig), benchmarkSigTime(tx.benchmarkSigTime),
                               nUpdateType(tx.nUpdateType), nFluxTxVersion(tx.nFluxTxVersion),
-                              P2SHRedeemScript(tx.P2SHRedeemScript)
+                              P2SHRedeemScript(tx.P2SHRedeemScript), fUsingDelegates(tx.fUsingDelegates), delegateData(tx.delegateData)
 {
     assert(evilDeveloperFlag);
 }
@@ -286,7 +293,7 @@ CTransaction::CTransaction(CMutableTransaction &&tx) : nVersion(tx.nVersion), fO
                                                        pubKey(tx.pubKey), sigTime(tx.sigTime), ip(tx.ip),
                                                        sig(tx.sig), benchmarkTier(tx.benchmarkTier), benchmarkSig(tx.benchmarkSig),
                                                        benchmarkSigTime(tx.benchmarkSigTime), nUpdateType(tx.nUpdateType), nFluxTxVersion(tx.nFluxTxVersion),
-                                                       P2SHRedeemScript(tx.P2SHRedeemScript)
+                                                       P2SHRedeemScript(tx.P2SHRedeemScript), fUsingDelegates(tx.fUsingDelegates), delegateData(tx.delegateData)
 {
     UpdateHash();
 }
@@ -325,6 +332,8 @@ CTransaction& CTransaction::operator=(const CTransaction &tx) {
     *const_cast<int32_t*>(&nFluxTxVersion) = tx.nFluxTxVersion;
     *const_cast<CScript*>(&P2SHRedeemScript) = tx.P2SHRedeemScript;
 
+    *const_cast<bool*>(&fUsingDelegates) = tx.fUsingDelegates;
+    *const_cast<CFluxnodeDelegates*>(&delegateData) = tx.delegateData;
 
     return *this;
 }

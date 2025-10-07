@@ -14,6 +14,7 @@
 
 static const char DB_FLUXNODE_CACHE_DATA = 'd';
 static const char BLOCK_FLUXNODE_UNDO_DATA = 'u';
+static const char FLUXNODE_DELEGATE_DATA = 'f';
 
 // EST 720 blocks * 7 Days
 static const int ONE_WEEK_OF_BLOCK_COUNT = 5040;
@@ -76,6 +77,33 @@ bool CDeterministicFluxnodeDB::LoadFluxnodeCacheData()
     LogPrint("dfluxnode", "%s : Size of mapConfirmedFluxnodeData: %s\n", __func__, g_fluxnodeCache.mapConfirmedFluxnodeData.size());
 
     return true;
+}
+
+bool CDeterministicFluxnodeDB::WriteFluxnodeDelegates(const COutPoint& outpoint, const CFluxnodeDelegates& delegates)
+{
+    LogPrintf("Writing Delgate data for : %s n", outpoint.ToFullString());
+    return Write(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint), delegates);
+}
+
+bool CDeterministicFluxnodeDB::ReadFluxnodeDelegates(const COutPoint& outpoint, CFluxnodeDelegates& delegates)
+{
+    // If it exists, return the read value.
+    if (Exists(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint)))
+        return Read(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint), delegates);
+
+    // If it doesn't exist, we just return true because we don't want to fail just because it didn't exist in the db
+    return true;
+}
+
+bool CDeterministicFluxnodeDB::EraseFluxnodeDelegate(const COutPoint& outpoint)
+{
+    LogPrintf("Erasing Delgate data for : %s n", outpoint.ToFullString());
+    return Erase(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint));
+}
+
+bool CDeterministicFluxnodeDB::FluxnodeDelegateExists(const COutPoint& outpoint)
+{
+    return Exists(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint));
 }
 
 bool CDeterministicFluxnodeDB::WriteBlockUndoFluxnodeData(const uint256& p_blockHash, CFluxnodeTxBlockUndo& p_undoData)
