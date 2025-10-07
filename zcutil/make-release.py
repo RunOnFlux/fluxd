@@ -291,8 +291,8 @@ def gen_release_notes(release, releasefrom):
 
 @phase('Updating debian changelog.')
 def update_debian_changelog(release):
-    os.environ['DEBEMAIL'] = 'info@zel.cash'
-    os.environ['DEBFULLNAME'] = 'Zel Foundation'
+    os.environ['DEBEMAIL'] = 'info@runonflux.io'
+    os.environ['DEBFULLNAME'] = 'Flux Foundation'
     sh_log(
         'debchange',
         '--newversion', release.debversion,
