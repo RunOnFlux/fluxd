@@ -8,15 +8,15 @@
 #define ZELCASH_DEPRECATION_H
 
 // Deprecation policy:
-// * Shut down 52 weeks' worth of blocks after the estimated release block height.
-// * A warning is shown during the 2 weeks' worth of blocks prior to shut down.
+// * Shut down 104 weeks' worth of blocks after the estimated release block height.
+// * A warning is shown during the 4 weeks' worth of blocks prior to shut down.
 
 static const int APPROX_RELEASE_HEIGHT = 2007000;
-static const int WEEKS_UNTIL_DEPRECATION = 52;
-static const int DEPRECATION_HEIGHT = APPROX_RELEASE_HEIGHT + (WEEKS_UNTIL_DEPRECATION * 7 * 24 * 30);
+static const int WEEKS_UNTIL_DEPRECATION = 104;
+static const int DEPRECATION_HEIGHT = APPROX_RELEASE_HEIGHT + (WEEKS_UNTIL_DEPRECATION * 7 * 24 * 120);
 
 // Number of blocks before deprecation to warn users
-static const int DEPRECATION_WARN_LIMIT = 14 * 24 * 30; // 2 weeks
+static const int DEPRECATION_WARN_LIMIT = 28 * 24 * 120; // 4 weeks
 
 /**
  * Checks whether the node is deprecated based on the current block height, and
