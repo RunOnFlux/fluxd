@@ -232,7 +232,6 @@ public:
 
         // New nType Version Checker
         if ((nType&FLUXNODE_TX_TYPE_UPGRADED) == FLUXNODE_TX_TYPE_UPGRADED) {
-            LogPrintf("FLUXNODE_TX_TYPE_UPGRADED Found %d - %s    - nType = %d - TX-Type (%d), result = %d\n", __LINE__, __func__, nType, FLUXNODE_TX_TYPE_UPGRADED, nType ^ FLUXNODE_TX_TYPE_UPGRADED);
             READWRITE(nFluxTxVersion);
             READWRITE(nTransactionType);
             // Normal and P2SH data share most fields so for now we can just check at the end for P2SH
