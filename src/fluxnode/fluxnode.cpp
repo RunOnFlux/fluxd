@@ -618,59 +618,56 @@ bool FluxnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPo
 
     LOCK(cs);
     if (mapFluxnodeList.count((Tier)nTier)) {
-        int setSize = mapFluxnodeList.at((Tier) nTier).setConfirmedTxInList.size();
-        if (setSize) {
-            for (int i = 0; i < setSize; i++) {
-                if (mapFluxnodeList.at((Tier) nTier).listConfirmedFluxnodes.size()) {
-                    p_fluxnodeOut = mapFluxnodeList.at((Tier) nTier).listConfirmedFluxnodes.front().out;
-                    if (mapConfirmedFluxnodeData.count(p_fluxnodeOut)) {
+        auto& tierList = mapFluxnodeList.at((Tier) nTier);
+        // Use while loop instead of for loop to properly handle iterator after pop_front()
+        // This prevents skipping entries when removing stale nodes
+        while (!tierList.listConfirmedFluxnodes.empty()) {
+            p_fluxnodeOut = tierList.listConfirmedFluxnodes.front().out;
+            if (mapConfirmedFluxnodeData.count(p_fluxnodeOut)) {
 
 
-                        // We can get the destination from the Hash of the RedeemScript.
-                        if (IsFluxTxP2SHType(mapConfirmedFluxnodeData.at(p_fluxnodeOut).nFluxTxVersion, true)) {
-                           CScriptID inner(mapConfirmedFluxnodeData.at(p_fluxnodeOut).P2SHRedeemScript);
-                           dest = inner;
-                           return true;
-                        }
+                // We can get the destination from the Hash of the RedeemScript.
+                if (IsFluxTxP2SHType(mapConfirmedFluxnodeData.at(p_fluxnodeOut).nFluxTxVersion, true)) {
+                   CScriptID inner(mapConfirmedFluxnodeData.at(p_fluxnodeOut).P2SHRedeemScript);
+                   dest = inner;
+                   return true;
+                }
 
-                        if (IsAP2SHFluxNodePublicKey(mapConfirmedFluxnodeData.at(p_fluxnodeOut).collateralPubkey)) {
-                            CTxDestination payment_destination;
-                            if (GetFluxNodeP2SHDestination(pcoinsTip, p_fluxnodeOut, payment_destination)) {
-                                dest = payment_destination;
-                                return true;
-                            } else {
-                                // Only in a very specific scenario should this happen. while rebuildfluxnodedb rpc is running
-                                // Because we are only rebuilding the fluxnode db, we are still on the tip of the chian where a utxo could be marked as spent.
-                                // Becase we aren't using the destination address while rebuilding the database this check can be bypassed.
-                                if(fFluxnodeDBRebuild) {
-                                    LogPrintf("%s: Rebuilding Fluxnode Database: P2SH node outpoint %s was spent. So we can't get the address\n", __func__, p_fluxnodeOut.ToString());
-                                    return true;
-                                }
-                                /**
-                                 * This shouldn't ever happen. As the only scenario this fails at is if the coin is spent.
-                                 * If the coin is spent in the block previous to the block where this fluxnode is next
-                                 * on the list to get a payment. It will be removed from the confirmed list just as
-                                 * any other node would be. See -> func (GetUndoDataForExpiredConfirmFluxnodes)
-                                 * If this coin is spent in the same block that it would receive a payout
-                                 * the coin would be found in the pcoinsTip Cache and the correct destination would be found
-                                 * Only after the block is connected would the pcoinTip cache be updated spending the coin"
-                                 * Making it so we could no longer find the coins scriptPubKey in func ( GetFluxNodeP2SHDestination )
-                              */
-                                error("Failed to get p2sh destination %s", p_fluxnodeOut.ToFullString());
-                                return false;
-                            }
-                        } else {
-                            dest = mapConfirmedFluxnodeData.at(p_fluxnodeOut).collateralPubkey.GetID();
+                if (IsAP2SHFluxNodePublicKey(mapConfirmedFluxnodeData.at(p_fluxnodeOut).collateralPubkey)) {
+                    CTxDestination payment_destination;
+                    if (GetFluxNodeP2SHDestination(pcoinsTip, p_fluxnodeOut, payment_destination)) {
+                        dest = payment_destination;
+                        return true;
+                    } else {
+                        // Only in a very specific scenario should this happen. while rebuildfluxnodedb rpc is running
+                        // Because we are only rebuilding the fluxnode db, we are still on the tip of the chian where a utxo could be marked as spent.
+                        // Becase we aren't using the destination address while rebuilding the database this check can be bypassed.
+                        if(fFluxnodeDBRebuild) {
+                            LogPrintf("%s: Rebuilding Fluxnode Database: P2SH node outpoint %s was spent. So we can't get the address\n", __func__, p_fluxnodeOut.ToString());
                             return true;
                         }
-                    } else {
-                        // The front of the list, wasn't in the confirmed fluxnode data. These means it expired
-                        mapFluxnodeList.at((Tier) nTier).listConfirmedFluxnodes.pop_front();
-                        mapFluxnodeList.at((Tier) nTier).setConfirmedTxInList.erase(p_fluxnodeOut);
+                        /**
+                         * This shouldn't ever happen. As the only scenario this fails at is if the coin is spent.
+                         * If the coin is spent in the block previous to the block where this fluxnode is next
+                         * on the list to get a payment. It will be removed from the confirmed list just as
+                         * any other node would be. See -> func (GetUndoDataForExpiredConfirmFluxnodes)
+                         * If this coin is spent in the same block that it would receive a payout
+                         * the coin would be found in the pcoinsTip Cache and the correct destination would be found
+                         * Only after the block is connected would the pcoinTip cache be updated spending the coin"
+                         * Making it so we could no longer find the coins scriptPubKey in func ( GetFluxNodeP2SHDestination )
+                      */
+                        error("Failed to get p2sh destination %s", p_fluxnodeOut.ToFullString());
+                        return false;
                     }
                 } else {
-                    return false;
+                    dest = mapConfirmedFluxnodeData.at(p_fluxnodeOut).collateralPubkey.GetID();
+                    return true;
                 }
+            } else {
+                // The front of the list, wasn't in the confirmed fluxnode data. These means it expired
+                // Remove and continue checking (while loop will check new front element)
+                tierList.listConfirmedFluxnodes.pop_front();
+                tierList.setConfirmedTxInList.erase(p_fluxnodeOut);
             }
         }
     } else {
