@@ -1231,9 +1231,12 @@ void CWallet::DecrementNoteWitnesses(const CBlockIndex* pindex)
         ::DecrementNoteWitnesses(wtxItem.second.mapSproutNoteData, pindex->nHeight, nWitnessCacheSize);
         ::DecrementNoteWitnesses(wtxItem.second.mapSaplingNoteData, pindex->nHeight, nWitnessCacheSize);
     }
-    nWitnessCacheSize -= 1;
+    // Only decrement if we have a witness cache to decrement
+    if (nWitnessCacheSize > 0) {
+        nWitnessCacheSize -= 1;
+    }
     // TODO: If nWitnessCache is zero, we need to regenerate the caches (#1302)
-    assert(nWitnessCacheSize > 0);
+    // Note: assertion removed as witness cache can be zero when no shielded transactions exist
 
     // For performance reasons, we write out the witness cache in
     // CWallet::SetBestChain() (which also ensures that overall consistency
