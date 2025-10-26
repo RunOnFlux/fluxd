@@ -8048,8 +8048,8 @@ we need to compare similar types or i < j will not function correctly
 You must compare (int < int) because (int < unsigned int) can give incorrectly results
 */
 int64_t GetMaxReorgDepth(const int64_t nHeight) {
-    if (nHeight >= 2020000 && nHeight <= 2022500) {
-        return 2500;  // Temporary deep reorg limit during PON stabilization period
+    if (nHeight >= 2020000 && nHeight <= 2025000) {
+        return 5000;  // Temporary deep reorg limit during PON stabilization period
     }
 
     return MAX_REORG_LENGTH;  // Normal limit: 40 blocks
