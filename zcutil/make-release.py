@@ -266,6 +266,7 @@ def build():
 @phase('Generating manpages.')
 def gen_manpages():
     sh_log('./contrib/devtools/gen-manpages.sh')
+    copy_manpages_to_deb()
 
 
 @phase('Generating release notes.')
@@ -293,6 +294,8 @@ def gen_release_notes(release, releasefrom):
 def update_debian_changelog(release):
     os.environ['DEBEMAIL'] = 'info@runonflux.io'
     os.environ['DEBFULLNAME'] = 'Flux Foundation'
+
+    # Update main debian changelog
     sh_log(
         'debchange',
         '--newversion', release.debversion,
@@ -300,6 +303,20 @@ def update_debian_changelog(release):
         '--changelog', './contrib/debian/changelog',
         '{} release.'.format(release.novtext),
     )
+
+    # Update deb_file changelogs for each architecture
+    for arch in ['amd64', 'arm64', 'i386']:
+        changelog_path = './deb_file/flux_{}/DEBIAN/changelog'.format(arch)
+        sh_log(
+            'debchange',
+            '--newversion', release.debversion,
+            '--distribution', 'stable',
+            '--changelog', changelog_path,
+            '{} release.'.format(release.novtext),
+        )
+
+    # Update deb_file control files for each architecture
+    patch_deb_control_files(release)
 
 
 # Helper code:
@@ -356,6 +373,44 @@ def patch_gitian_linux_yml(release, releaseprev):
 
         outf.write('name: "flux-{}"\n'.format(release.novtext))
         outf.write(inf.read())
+
+
+def patch_deb_control_files(release):
+    """Update version in deb_file control files for each architecture."""
+    for arch in ['amd64', 'arm64', 'i386']:
+        path = './deb_file/flux_{}/DEBIAN/control'.format(arch)
+        rgx = re.compile(r'^(Version: )(.+)$')
+        with PathPatcher(path) as (inf, outf):
+            for line in inf:
+                m = rgx.match(line)
+                if m is None:
+                    outf.write(line)
+                else:
+                    prefix = m.group(1)
+                    outf.write('{}{}\n'.format(prefix, release.novtext))
+
+
+def copy_manpages_to_deb():
+    """Copy generated manpages from doc/man to deb_file directories for each architecture."""
+    import shutil
+
+    manpages = {
+        'flux-cli.1': 'flux-cli.1',
+        'fluxd.1': 'fluxd.1',
+        'flux-tx.1': 'flux-tx.1',
+        'zcash-fetch-params.1': 'flux-fetch-params.1',  # Note: renamed for deb
+    }
+
+    for arch in ['amd64', 'arm64', 'i386']:
+        dest_dir = './deb_file/flux_{}/usr/share/doc/flux/manpages'.format(arch)
+        for src_name, dest_name in manpages.items():
+            src_path = './doc/man/{}'.format(src_name)
+            dest_path = '{}/{}'.format(dest_dir, dest_name)
+            if os.path.exists(src_path):
+                logging.debug('Copying %s to %s', src_path, dest_path)
+                shutil.copy2(src_path, dest_path)
+            else:
+                logging.warning('Manpage not found: %s', src_path)
 
 
 def _patch_build_defs(release, path, pattern):

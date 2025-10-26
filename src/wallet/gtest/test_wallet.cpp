@@ -1190,9 +1190,15 @@ TEST(WalletTests, CachedWitnessesEmptyChain) {
     EXPECT_TRUE((bool) sproutWitnesses[1]);
     EXPECT_TRUE((bool) saplingWitnesses[0]);
 
-    // Until #1302 is implemented, this should triggger an assertion
-    EXPECT_DEATH(wallet.DecrementNoteWitnesses(&index),
-                 ".*nWitnessCacheSize > 0.*");
+    // Verify that DecrementNoteWitnesses handles empty cache properly
+    // After one increment and one decrement, cache size should be 0
+    EXPECT_EQ(1, wallet.nWitnessCacheSize);
+    wallet.DecrementNoteWitnesses(&index);
+    EXPECT_EQ(0, wallet.nWitnessCacheSize);
+
+    // Verify that calling DecrementNoteWitnesses again with empty cache doesn't crash
+    wallet.DecrementNoteWitnesses(&index);
+    EXPECT_EQ(0, wallet.nWitnessCacheSize);
 }
 
 TEST(WalletTests, CachedWitnessesChainTip) {

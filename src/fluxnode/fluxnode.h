@@ -232,7 +232,7 @@ public:
 
         // New nType Version Checker
         if ((nType&FLUXNODE_TX_TYPE_UPGRADED) == FLUXNODE_TX_TYPE_UPGRADED) {
-            LogPrintf("FLUXNODE_TX_TYPE_UPGRADED Found %d - %s    - nType = %d - TX-Type (%d), result = %d\n", __LINE__, __func__, nType, FLUXNODE_TX_TYPE_UPGRADED, nType ^ FLUXNODE_TX_TYPE_UPGRADED);
+            // LogPrintf("FLUXNODE_TX_TYPE_UPGRADED Found %d - %s    - nType = %d - TX-Type (%d), result = %d\n", __LINE__, __func__, nType, FLUXNODE_TX_TYPE_UPGRADED, nType ^ FLUXNODE_TX_TYPE_UPGRADED);
             READWRITE(nFluxTxVersion);
             READWRITE(nTransactionType);
             // Normal and P2SH data share most fields so for now we can just check at the end for P2SH
@@ -456,13 +456,13 @@ public:
     bool GetNextPayment(CTxDestination& dest, int nTier, COutPoint& p_fluxnodeOut, bool fFluxnodeDBRebuild = false);
 
     //! Confirmation Tx Methods
-    bool CheckNewStartTx(const COutPoint& out);
+    bool CheckNewStartTx(const COutPoint& out, int nHeight = 0, bool fFromMempool = false);
     void CheckForExpiredStartTx(const int& p_nHeight);
     void CheckForUndoExpiredStartTx(const int& p_nHeight);
     bool CheckIfStarted(const COutPoint& out);
     bool CheckIfConfirmed(const COutPoint& out);
     bool GetPubkeyIfConfirmed(const COutPoint& out, CPubKey& pubKey);
-    bool CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight = 0);
+    bool CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight = 0, bool fFromMempool = false);
 
     bool CheckFluxnodePayout(const CTransaction& coinbase, const int p_Height, FluxnodeCache* p_fluxnodeCache = nullptr);
 
@@ -490,7 +490,7 @@ public:
     void CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<int>& vNodeCount);
     void CountMigration(int& nOldTotal, int& nNewTotal, std::vector<int>& vOldNodeCount, std::vector<int>& vNewNodeCount);
 
-    bool CheckConfirmationHeights(const int nHeight, const COutPoint& out, const std::string& ip);
+    bool CheckConfirmationHeights(const int nHeight, const COutPoint& out, const std::string& ip, bool fFromMempool = false);
 };
 
 int GetFluxnodeExpirationCount(const int& p_nHeight);

@@ -369,7 +369,7 @@ bool FluxnodeCache::GetPubkeyIfConfirmed(const COutPoint& out, CPubKey& pubKey)
     return false;
 }
 
-bool FluxnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight)
+bool FluxnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const int p_nHeight, bool fFromMempool)
 {
     int nCurrentHeight;
     if (p_nHeight)
@@ -393,17 +393,35 @@ bool FluxnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const i
         return false;
     }
 
-    if (!CheckConfirmationHeights(nCurrentHeight, out, p_transaction.ip)) {
+    if (!CheckConfirmationHeights(nCurrentHeight, out, p_transaction.ip, fFromMempool)) {
         return false;
     }
 
     return true;
 }
 
-bool FluxnodeCache::CheckNewStartTx(const COutPoint& out)
+bool FluxnodeCache::CheckNewStartTx(const COutPoint& out, int nHeight, bool fFromMempool)
 {
     LOCK(cs);
     if (mapStartTxTracker.count(out)) {
+        // For mempool validation, always reject duplicates
+        if (fFromMempool) {
+            LogPrint("mempool", "MEMPOOL REJECTION: START_FLUX already in tracker - %s\n", out.ToString());
+            return false;
+        }
+
+        // For block validation, check if it's at the same height (competing blocks)
+        int nAddedHeight = mapStartTxTracker.at(out).nAddedBlockHeight;
+
+        // CONSENSUS FIX: Allow START_FLUX at exact same height to enable competing blocks
+        // This allows blocks with better difficulty to compete even if they contain
+        // START_FLUX transactions for nodes already added by a competing block
+        if (nHeight > 0 && nAddedHeight == nHeight) {
+            LogPrintf("EXACT HEIGHT: Allowing START_FLUX at same height - %s: blockHeight=%d, addedHeight=%d\n",
+                      out.ToString(), nHeight, nAddedHeight);
+            return true;
+        }
+
         LogPrint("dfluxnode", "%s :  Failed because it is in the mapStartTxTracker: %s\n", __func__, out.ToString());
         return false;
     }
@@ -468,7 +486,7 @@ void FluxnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
 }
 
 
-bool FluxnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COutPoint& out, const std::string& ip) {
+bool FluxnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COutPoint& out, const std::string& ip, bool fFromMempool) {
     if (!mapConfirmedFluxnodeData.count(out)) {
         return false;
     }
@@ -498,7 +516,29 @@ bool FluxnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COu
         nDistanceToCheck = FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V2;
     }
 
-    if (nCurrentHeight - data.nLastConfirmedBlockHeight <= nDistanceToCheck) {
+    int nConfirmationDistance = nCurrentHeight - data.nLastConfirmedBlockHeight;
+
+    if (nConfirmationDistance <= nDistanceToCheck) {
+
+        if (fFromMempool) {
+            LogPrint("mempool", "VALIDATION: Mempool rejection - %s: currentHeight=%d, lastConfirmed=%d, distance=%d\n",
+                     out.ToString(), nCurrentHeight, data.nLastConfirmedBlockHeight, nConfirmationDistance);
+            return false;
+        }
+
+        // CONSENSUS FIX: Allow UPDATE_CONFIRM at exact same height to enable competing blocks
+        // This fixes two issues:
+        // 1. Allows blocks with better work to compete at same height (PON consensus)
+        // 2. Handles reorg edge case where lastConfirmed wasn't rolled back
+        // Without this, first block at a height locks out all competitors regardless of difficulty
+        if (nConfirmationDistance == 0) {
+            LogPrintf("EXACT HEIGHT: Allowing UPDATE_CONFIRM at same height - %s: currentHeight=%d, lastConfirmed=%d\n",
+                      out.ToString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
+            return true;
+        }
+
+        LogPrintf("VALIDATION FAILURE: Block rejection - %s: currentHeight=%d, lastConfirmed=%d, distance=%d, threshold=%d\n",
+                  out.ToString(), nCurrentHeight, data.nLastConfirmedBlockHeight, nConfirmationDistance, nDistanceToCheck);
         error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
               __LINE__,
               out.ToFullString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
@@ -578,59 +618,56 @@ bool FluxnodeCache::GetNextPayment(CTxDestination& dest, const int nTier, COutPo
 
     LOCK(cs);
     if (mapFluxnodeList.count((Tier)nTier)) {
-        int setSize = mapFluxnodeList.at((Tier) nTier).setConfirmedTxInList.size();
-        if (setSize) {
-            for (int i = 0; i < setSize; i++) {
-                if (mapFluxnodeList.at((Tier) nTier).listConfirmedFluxnodes.size()) {
-                    p_fluxnodeOut = mapFluxnodeList.at((Tier) nTier).listConfirmedFluxnodes.front().out;
-                    if (mapConfirmedFluxnodeData.count(p_fluxnodeOut)) {
+        auto& tierList = mapFluxnodeList.at((Tier) nTier);
+        // Use while loop instead of for loop to properly handle iterator after pop_front()
+        // This prevents skipping entries when removing stale nodes
+        while (!tierList.listConfirmedFluxnodes.empty()) {
+            p_fluxnodeOut = tierList.listConfirmedFluxnodes.front().out;
+            if (mapConfirmedFluxnodeData.count(p_fluxnodeOut)) {
 
 
-                        // We can get the destination from the Hash of the RedeemScript.
-                        if (IsFluxTxP2SHType(mapConfirmedFluxnodeData.at(p_fluxnodeOut).nFluxTxVersion, true)) {
-                           CScriptID inner(mapConfirmedFluxnodeData.at(p_fluxnodeOut).P2SHRedeemScript);
-                           dest = inner;
-                           return true;
-                        }
+                // We can get the destination from the Hash of the RedeemScript.
+                if (IsFluxTxP2SHType(mapConfirmedFluxnodeData.at(p_fluxnodeOut).nFluxTxVersion, true)) {
+                   CScriptID inner(mapConfirmedFluxnodeData.at(p_fluxnodeOut).P2SHRedeemScript);
+                   dest = inner;
+                   return true;
+                }
 
-                        if (IsAP2SHFluxNodePublicKey(mapConfirmedFluxnodeData.at(p_fluxnodeOut).collateralPubkey)) {
-                            CTxDestination payment_destination;
-                            if (GetFluxNodeP2SHDestination(pcoinsTip, p_fluxnodeOut, payment_destination)) {
-                                dest = payment_destination;
-                                return true;
-                            } else {
-                                // Only in a very specific scenario should this happen. while rebuildfluxnodedb rpc is running
-                                // Because we are only rebuilding the fluxnode db, we are still on the tip of the chian where a utxo could be marked as spent.
-                                // Becase we aren't using the destination address while rebuilding the database this check can be bypassed.
-                                if(fFluxnodeDBRebuild) {
-                                    LogPrintf("%s: Rebuilding Fluxnode Database: P2SH node outpoint %s was spent. So we can't get the address\n", __func__, p_fluxnodeOut.ToString());
-                                    return true;
-                                }
-                                /**
-                                 * This shouldn't ever happen. As the only scenario this fails at is if the coin is spent.
-                                 * If the coin is spent in the block previous to the block where this fluxnode is next
-                                 * on the list to get a payment. It will be removed from the confirmed list just as
-                                 * any other node would be. See -> func (GetUndoDataForExpiredConfirmFluxnodes)
-                                 * If this coin is spent in the same block that it would receive a payout
-                                 * the coin would be found in the pcoinsTip Cache and the correct destination would be found
-                                 * Only after the block is connected would the pcoinTip cache be updated spending the coin"
-                                 * Making it so we could no longer find the coins scriptPubKey in func ( GetFluxNodeP2SHDestination )
-                              */
-                                error("Failed to get p2sh destination %s", p_fluxnodeOut.ToFullString());
-                                return false;
-                            }
-                        } else {
-                            dest = mapConfirmedFluxnodeData.at(p_fluxnodeOut).collateralPubkey.GetID();
+                if (IsAP2SHFluxNodePublicKey(mapConfirmedFluxnodeData.at(p_fluxnodeOut).collateralPubkey)) {
+                    CTxDestination payment_destination;
+                    if (GetFluxNodeP2SHDestination(pcoinsTip, p_fluxnodeOut, payment_destination)) {
+                        dest = payment_destination;
+                        return true;
+                    } else {
+                        // Only in a very specific scenario should this happen. while rebuildfluxnodedb rpc is running
+                        // Because we are only rebuilding the fluxnode db, we are still on the tip of the chian where a utxo could be marked as spent.
+                        // Becase we aren't using the destination address while rebuilding the database this check can be bypassed.
+                        if(fFluxnodeDBRebuild) {
+                            LogPrintf("%s: Rebuilding Fluxnode Database: P2SH node outpoint %s was spent. So we can't get the address\n", __func__, p_fluxnodeOut.ToString());
                             return true;
                         }
-                    } else {
-                        // The front of the list, wasn't in the confirmed fluxnode data. These means it expired
-                        mapFluxnodeList.at((Tier) nTier).listConfirmedFluxnodes.pop_front();
-                        mapFluxnodeList.at((Tier) nTier).setConfirmedTxInList.erase(p_fluxnodeOut);
+                        /**
+                         * This shouldn't ever happen. As the only scenario this fails at is if the coin is spent.
+                         * If the coin is spent in the block previous to the block where this fluxnode is next
+                         * on the list to get a payment. It will be removed from the confirmed list just as
+                         * any other node would be. See -> func (GetUndoDataForExpiredConfirmFluxnodes)
+                         * If this coin is spent in the same block that it would receive a payout
+                         * the coin would be found in the pcoinsTip Cache and the correct destination would be found
+                         * Only after the block is connected would the pcoinTip cache be updated spending the coin"
+                         * Making it so we could no longer find the coins scriptPubKey in func ( GetFluxNodeP2SHDestination )
+                      */
+                        error("Failed to get p2sh destination %s", p_fluxnodeOut.ToFullString());
+                        return false;
                     }
                 } else {
-                    return false;
+                    dest = mapConfirmedFluxnodeData.at(p_fluxnodeOut).collateralPubkey.GetID();
+                    return true;
                 }
+            } else {
+                // The front of the list, wasn't in the confirmed fluxnode data. These means it expired
+                // Remove and continue checking (while loop will check new front element)
+                tierList.listConfirmedFluxnodes.pop_front();
+                tierList.setConfirmedTxInList.erase(p_fluxnodeOut);
             }
         }
     } else {
@@ -652,6 +689,36 @@ struct FluxnodePayoutInfo {
 bool FluxnodeCache::CheckFluxnodePayout(const CTransaction& coinbase, const int p_Height, FluxnodeCache* p_fluxnodeCache)
 {
     LOCK(cs);
+
+    // REORG BUGFIX: Proactively clean up stale entries from payment lists before determining payouts
+    // This prevents list corruption during reorgs where nodes may have been moved back to START
+    // state or expired but remain in the list due to lazy cleanup. Without this, payment validation
+    // can fail because the expected payee is not at the front of the list.
+    // This is fork-safe because it implements the same cleanup logic that GetNextPayment() already
+    // does (line 634-635), just more thoroughly and earlier.
+    for (int currentTier = CUMULUS; currentTier != LAST; currentTier++) {
+        if (mapFluxnodeList.count((Tier)currentTier)) {
+            auto& tierList = mapFluxnodeList.at((Tier)currentTier);
+
+            // Remove stale entries from front of list
+            while (!tierList.listConfirmedFluxnodes.empty()) {
+                COutPoint frontOutpoint = tierList.listConfirmedFluxnodes.front().out;
+
+                // Check if this node is still in the confirmed map
+                if (!mapConfirmedFluxnodeData.count(frontOutpoint)) {
+                    // Entry is stale, remove it from both list and set
+                    LogPrint("fluxnode", "%s: Removing stale entry from %s payment list: %s\n",
+                             __func__, TierToString((Tier)currentTier), frontOutpoint.ToString());
+                    tierList.listConfirmedFluxnodes.pop_front();
+                    tierList.setConfirmedTxInList.erase(frontOutpoint);
+                } else {
+                    // Front entry is valid, stop cleaning
+                    break;
+                }
+            }
+        }
+    }
+
     CAmount blockValue = GetBlockSubsidy(p_Height, Params().GetConsensus());
     CAmount nRemainerLeft = blockValue;
     std::map<Tier, FluxnodePayoutInfo> mapFluxnodePayouts;
@@ -811,8 +878,11 @@ void FluxnodeCache::AddBackUndoData(const CFluxnodeTxBlockUndo& p_undoData)
     for (const auto& item : p_undoData.mapUpdateLastConfirmHeight) {
         LOCK(g_fluxnodeCache.cs);
         if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.first)) {
+            int oldValueInGlobal = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first).nLastConfirmedBlockHeight;
             mapConfirmedFluxnodeData[item.first] = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first);
             mapConfirmedFluxnodeData[item.first].nLastConfirmedBlockHeight = item.second;
+            LogPrintf("UNDO PREPARE: Copying to local cache for %s: globalValue=%d, willRestoreTo=%d\n",
+                      item.first.ToString(), oldValueInGlobal, item.second);
         } else {
             if (!fIsVerifying)
                 error("%s : This should never happen. When undo an update confirm nLastConfirmedBlockHeight . FluxnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
@@ -911,9 +981,15 @@ bool FluxnodeCache::Flush()
      * 3. Mark the collateral as dirty so it can be databased when the daemon shutdowns
      */
     for (const auto& item : mapConfirmedFluxnodeData) {
+        int currentValueInGlobal = g_fluxnodeCache.mapConfirmedFluxnodeData[item.first].nLastConfirmedBlockHeight;
+        int restoredValue = item.second.nLastConfirmedBlockHeight;
+
         g_fluxnodeCache.mapConfirmedFluxnodeData[item.first].nLastConfirmedBlockHeight = item.second.nLastConfirmedBlockHeight;
         g_fluxnodeCache.mapConfirmedFluxnodeData[item.first].ip = item.second.ip;
         g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
+
+        LogPrintf("FLUSH BACKWARD: Applying UNDO for %s: currentInGlobal=%d -> restoredValue=%d\n",
+                  item.first.ToString(), currentValueInGlobal, restoredValue);
     }
 
     set<Tier> removedTiers;
@@ -1052,8 +1128,13 @@ bool FluxnodeCache::Flush()
         // Take the fluxnodedata from the mapStartTxTracker and move it to the mapConfirm
         if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.first)) {
 
+            int oldValue = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first).nLastConfirmedBlockHeight;
+
             // Update the nLastConfirmedBlockHeight
             g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first).nLastConfirmedBlockHeight = setAddToUpdateConfirmHeight;
+
+            LogPrintf("FLUSH FORWARD: Applying UPDATE_CONFIRM for %s: oldLastConfirmed=%d -> newLastConfirmed=%d\n",
+                      item.first.ToString(), oldValue, setAddToUpdateConfirmHeight);
 
             // Update IP address
             g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first).ip = item.second;
@@ -1141,22 +1222,27 @@ bool FluxnodeCache::Flush()
             }
             if (g_fluxnodeCache.mapFluxnodeList.at(tier).setConfirmedTxInList.count(item.first)) {
 
+                // BUGFIX: Search from end backwards, but INCLUDE the first element
+                // Original code stopped at begin() without checking it, causing failures
+                // when the paid node ended up at the front of the list
                 auto it = g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes.end();
-                    while (--it != g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes.begin()) {
+                auto begin_it = g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes.begin();
 
-                        if (it->out == item.first) {
-                            // The node that we are undoing the paid height on, should always be near the last node in the list. So, we need
-                            // to get the data. Remove the entry from near the back of the list, and put it at the front.
-                            // This allows us to not have to sort() the list afterwards. If this was the only change
-                            FluxnodeListData old_data = *it;
-                            g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes.erase(it);
-                            old_data.nLastPaidHeight = item.second;
-                            g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes.emplace_front(old_data);
-                            fFoundIt = true;
-                            break;
-                        }
+                while (it != begin_it) {
+                    --it;
+                    if (it->out == item.first) {
+                        // The node that we are undoing the paid height on, should always be near the last node in the list. So, we need
+                        // to get the data. Remove the entry from near the back of the list, and put it at the front.
+                        // This allows us to not have to sort() the list afterwards. If this was the only change
+                        FluxnodeListData old_data = *it;
+                        g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes.erase(it);
+                        old_data.nLastPaidHeight = item.second;
+                        g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes.emplace_front(old_data);
+                        fFoundIt = true;
+                        break;
                     }
                 }
+            }
 
                 if (!fFoundIt)
                     error("%s : This should never happen. When undoing a paid node. The back most item in the list isn't the correct outpoint. Report this to the dev team to figure out what is happening: %s\n",

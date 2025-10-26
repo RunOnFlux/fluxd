@@ -1211,7 +1211,7 @@ bool ContextualCheckTransaction(
 
             bool fFailure = false;
             std::string strFailMessage;
-            if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralIn)) {
+            if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralIn, nHeight, fFromMempool)) {
                 fFailure = true;
                 strFailMessage = "fluxnode-tx-already-in-chain-or-waiting-for-dos-unban";
             }
@@ -1355,7 +1355,7 @@ bool ContextualCheckTransaction(
 
                 // Check the update height, but make sure we only pass in the height if this check is coming from an AcceptBlock call
                 // If it is coming from an AcceptBlock call pass in the height of the block otherwise use the default 0
-                if (!fFailure && !g_fluxnodeCache.CheckUpdateHeight(tx, nHeight)) {
+                if (!fFailure && !g_fluxnodeCache.CheckUpdateHeight(tx, nHeight, fFromMempool)) {
                     fFailure = true;
                     strFailMessage = "fluxnode-tx-invalid-update-confirm-outpoint-not-confirmed-or-too-soon";
                 }
@@ -1467,9 +1467,6 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
     }
 
     if (tx.IsFluxnodeTx()) {
-        if (tx.nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION) {
-            LogPrintf("Found a upgraded TX --------------------------------\n");
-        }
         // Check type of fluxnode tx
         if (tx.nType != FLUXNODE_START_TX_TYPE && tx.nType != FLUXNODE_CONFIRM_TX_TYPE)
             return state.DoS(10, error("CheckTransaction(): Is Fluxnode Tx, bad type"),
@@ -1787,7 +1784,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE && tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
             {
                 LOCK(g_fluxnodeCache.cs);
-                if (!g_fluxnodeCache.CheckConfirmationHeights(nextBlockHeight, tx.collateralIn, tx.ip)) {
+                if (!g_fluxnodeCache.CheckConfirmationHeights(nextBlockHeight, tx.collateralIn, tx.ip, true)) {
                     LogPrint("mempool", "Dropping confirmation fluxnode txid %s : failed CheckConfirmationHeights check\n", tx.GetHash().ToString());
                     return false;
                 }
@@ -3170,6 +3167,8 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
         return DISCONNECT_FAILED;
     }
 
+    LogPrintf("DISCONNECT BLOCK %d: Read undo data - %d UPDATE_CONFIRM undos, %d paid node undos\n",
+              pindex->nHeight, fluxnodeBlockUndo.mapUpdateLastConfirmHeight.size(), fluxnodeBlockUndo.mapLastPaidHeights.size());
 
     if (!p_fluxnodeCache) {
         error("DisconnectBlock(): p_fluxnodeCache is null");
@@ -3644,7 +3643,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
                 if (tx.nType == FLUXNODE_START_TX_TYPE) {
                     if (p_fluxnodeCache) {
-                        if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralIn)) {
+                        if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralIn, pindex->nHeight, false)) {
                             return state.DoSTx(100, error("ConnectBlock(): fluxnode tx, failed CheckNewStartTx call"),
                                              REJECT_INVALID, "bad-txns-fluxnode-tx-check-new-start", false, tx);
                         }
@@ -3682,6 +3681,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                             // Add the lastConfirmed and lastIpAddress into the undoblock data
                             fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight[tx.collateralIn] =  global_data.nLastConfirmedBlockHeight;
                             fluxnodeTxBlockUndo.mapLastIpAddress[tx.collateralIn] = global_data.ip;
+                            LogPrintf("UNDO SAVE: Block %d connecting, saving undo for %s: oldLastConfirmed=%d, will set to newHeight=%d\n",
+                                      pindex->nHeight, tx.collateralIn.ToString(), global_data.nLastConfirmedBlockHeight, pindex->nHeight);
                         }
                     }
                 }
@@ -5224,7 +5225,7 @@ static bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state
         pindex = miSelf->second;
         if (ppindex)
             *ppindex = pindex;
-        if (pindex->nStatus & BLOCK_FAILED_MASK)
+        if (pindex->nStatus & BLOCK_FAILED_MASK) 
             return state.Invalid(error("%s: block is marked invalid", __func__), 0, "duplicate");
         return true;
     }
