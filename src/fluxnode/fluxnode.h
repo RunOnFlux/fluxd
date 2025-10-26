@@ -456,7 +456,7 @@ public:
     bool GetNextPayment(CTxDestination& dest, int nTier, COutPoint& p_fluxnodeOut, bool fFluxnodeDBRebuild = false);
 
     //! Confirmation Tx Methods
-    bool CheckNewStartTx(const COutPoint& out);
+    bool CheckNewStartTx(const COutPoint& out, int nHeight = 0, bool fFromMempool = false);
     void CheckForExpiredStartTx(const int& p_nHeight);
     void CheckForUndoExpiredStartTx(const int& p_nHeight);
     bool CheckIfStarted(const COutPoint& out);

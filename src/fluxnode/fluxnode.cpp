@@ -400,10 +400,28 @@ bool FluxnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const i
     return true;
 }
 
-bool FluxnodeCache::CheckNewStartTx(const COutPoint& out)
+bool FluxnodeCache::CheckNewStartTx(const COutPoint& out, int nHeight, bool fFromMempool)
 {
     LOCK(cs);
     if (mapStartTxTracker.count(out)) {
+        // For mempool validation, always reject duplicates
+        if (fFromMempool) {
+            LogPrint("mempool", "MEMPOOL REJECTION: START_FLUX already in tracker - %s\n", out.ToString());
+            return false;
+        }
+
+        // For block validation, check if it's at the same height (competing blocks)
+        int nAddedHeight = mapStartTxTracker.at(out).nAddedBlockHeight;
+
+        // CONSENSUS FIX: Allow START_FLUX at exact same height to enable competing blocks
+        // This allows blocks with better difficulty to compete even if they contain
+        // START_FLUX transactions for nodes already added by a competing block
+        if (nHeight > 0 && nAddedHeight == nHeight) {
+            LogPrintf("EXACT HEIGHT: Allowing START_FLUX at same height - %s: blockHeight=%d, addedHeight=%d\n",
+                      out.ToString(), nHeight, nAddedHeight);
+            return true;
+        }
+
         LogPrint("dfluxnode", "%s :  Failed because it is in the mapStartTxTracker: %s\n", __func__, out.ToString());
         return false;
     }

@@ -1211,7 +1211,7 @@ bool ContextualCheckTransaction(
 
             bool fFailure = false;
             std::string strFailMessage;
-            if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralIn)) {
+            if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralIn, nHeight, fFromMempool)) {
                 fFailure = true;
                 strFailMessage = "fluxnode-tx-already-in-chain-or-waiting-for-dos-unban";
             }
@@ -3636,7 +3636,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
                 if (tx.nType == FLUXNODE_START_TX_TYPE) {
                     if (p_fluxnodeCache) {
-                        if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralIn)) {
+                        if (!g_fluxnodeCache.CheckNewStartTx(tx.collateralIn, pindex->nHeight, false)) {
                             return state.DoSTx(100, error("ConnectBlock(): fluxnode tx, failed CheckNewStartTx call"),
                                              REJECT_INVALID, "bad-txns-fluxnode-tx-check-new-start", false, tx);
                         }
