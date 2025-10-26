@@ -773,7 +773,6 @@ public:
                 UpdateHash();
             return;
         } else if (nVersion == FLUXNODE_TX_UPGRADEABLE_VERSION) { // Support P2SH and Normal Fluxnode Tx
-            LogPrintf("FLUXNODE_TX_UPGRADEABLE_VERSION Found------------------------- %d\n", nVersion);
             READWRITE(*const_cast<int8_t*>(&nType)); // Start, Confirm
 
             if (nType == FLUXNODE_START_TX_TYPE) {
