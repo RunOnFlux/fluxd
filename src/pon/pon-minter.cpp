@@ -135,8 +135,10 @@ void PONMinter(const CChainParams& chainparams)
                 continue;
             }
 
-            // Calculate current slot
-            int64_t now = GetAdjustedTime();
+            // Calculate current slot using system time
+            // Using GetTime() instead of GetAdjustedTime() helps nodes agree on slot number
+            // GetAdjustedTime can vary between nodes based on different peer time offsets
+            int64_t now = GetTime();
             uint32_t currentSlot = GetSlotNumber(now, genesisTime, consensusParams);
 
             // Skip if we already tried this slot
@@ -166,6 +168,14 @@ void PONMinter(const CChainParams& chainparams)
                 pindexPrev = chainActive.Tip();
             }
 
+            // Don't mint if last block is very recent (< 10 seconds old)
+            // This helps reduce burst blocks when multiple nodes try to mint immediately
+            int64_t timeSinceLastBlock = now - pindexPrev->nTime;
+            if (timeSinceLastBlock < 10) {
+                MilliSleep(3000);
+                continue;
+            }
+
             uint256 ponHash = GetPONHash(collateral, pindexPrev->GetBlockHash(), currentSlot);
             unsigned int nBits = GetNextPONWorkRequired(pindexPrev);
             if (!CheckProofOfNode(ponHash, nBits, Params().GetConsensus(), pindexPrev->nHeight + 1)) {
@@ -178,6 +188,37 @@ void PONMinter(const CChainParams& chainparams)
             }
 
             LogPrintf("PON: Eligible for slot %d, creating block...\n", currentSlot);
+
+            // Priority-based delay to help reduce collisions
+            // Nodes wait proportionally to their PON hash value (lower hash = shorter wait)
+            arith_uint256 targetValue;
+            targetValue.SetCompact(nBits);
+            arith_uint256 ponHashValue = UintToArith256(ponHash);
+
+            // Calculate priority as a percentage of target
+            // Lower hash value results in shorter delay
+            double priority = ponHashValue.getdouble() / targetValue.getdouble();
+            int priorityDelayMs = (int)(priority * 10000); // 0-10000ms delay based on priority
+
+            // Add randomization to help avoid exact collisions
+            priorityDelayMs += getrand(0, 1000); // Add 0-1000ms random jitter
+
+            LogPrint("pon", "PON: Eligible with priority %.4f, waiting %dms before minting\n",
+                     priority, priorityDelayMs);
+            MilliSleep(priorityDelayMs);
+
+            // After priority delay, check if someone else already mined
+            {
+                LOCK(cs_main);
+                CBlockIndex* pNewTip = chainActive.Tip();
+                if (pNewTip->GetBlockHash() != pindexPrev->GetBlockHash()) {
+                    LogPrintf("PON: Slot %d already filled by another node during priority wait, skipping\n", currentSlot);
+                    lastAttemptedSlot = currentSlot;
+                    continue;
+                }
+                // Update pindexPrev to latest tip
+                pindexPrev = pNewTip;
+            }
 
             CScript scriptPubKey;
             {
