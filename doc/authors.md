@@ -2,7 +2,7 @@ Flux Contributors
 ==================
 
 Jeremy "Blondfrogs" Anderson (229)
-Tadeas Kmenta (73)
+Tadeas Kmenta (77)
 Tom Moulton (39)
 Miles Manley (18)
 Cabecinha84 (7)
