@@ -3412,7 +3412,14 @@ void PartitionCheck(bool (*initialDownloadCheck)(const CChainParams&),
 
     const int SPAN_HOURS=4;
     const int SPAN_SECONDS=SPAN_HOURS*60*60;
-    int BLOCKS_EXPECTED = SPAN_SECONDS / nPowTargetSpacing;
+
+    // PARTITION_FIX: Use PON target spacing if PON is active
+    int64_t targetSpacing = nPowTargetSpacing;
+    if (bestHeader && NetworkUpgradeActive(bestHeader->nHeight, Params().GetConsensus(), Consensus::UPGRADE_PON)) {
+        targetSpacing = Params().GetConsensus().nPonTargetSpacing;
+    }
+
+    int BLOCKS_EXPECTED = SPAN_SECONDS / targetSpacing;
 
     boost::math::poisson_distribution<double> poisson(BLOCKS_EXPECTED);
 
