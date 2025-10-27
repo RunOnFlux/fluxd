@@ -44,5 +44,26 @@ bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPre
 bool ContextualCheckPONBlockHeader(const CBlockHeader& pblock, const CBlockIndex* pindexPrev,
                      const Consensus::Params& params, bool fCheckSignature = true);
 
+// Log PON eligibility for all confirmed fluxnodes at a given slot offset
+// This is called automatically after each block connection for monitoring
+void LogPONEligibility(const CBlockIndex* pindexPrev, int slotOffset = 1);
+
+// Structure to hold eligible node info
+struct EligibleNodeInfo {
+    COutPoint collateral;
+    uint256 ponHash;
+
+    // Sort by PON hash (ascending - lowest hash has best priority)
+    bool operator<(const EligibleNodeInfo& other) const {
+        return ponHash < other.ponHash;
+    }
+};
+
+// Get all eligible nodes for a given slot, sorted by PON hash (best hash first)
+std::vector<EligibleNodeInfo> GetEligibleNodes(const CBlockIndex* pindexPrev, uint32_t slot, unsigned int nBits);
+
+// Get the rank of a specific node in the eligible nodes list (1-indexed, 1 = best)
+// Returns -1 if node is not in the eligible list
+int GetNodeRank(const std::vector<EligibleNodeInfo>& eligibleNodes, const COutPoint& myCollateral);
 
 #endif // BITCOIN_PON_H

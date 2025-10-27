@@ -74,17 +74,44 @@ bool ProcessPONBlock(CBlock* pblock, const CChainParams& chainparams)
     return true;
 }
 
+/**
+ * PON Minter Main Loop
+ *
+ * This function continuously monitors for block production opportunities using a rank-based
+ * coordination system to minimize orphans and optimize difficulty adjustment.
+ *
+ * Timing Strategy:
+ * - Slots are 30 seconds long (nPonTargetSpacing)
+ * - Poll every 1 second to detect new slots quickly
+ * - 5-second burst guard prevents stampedes after recent blocks
+ * - Rank-based delays (4s intervals): Rank 1=4s, Rank 2=8s, Rank 3=12s, ..., Rank 7=28s
+ * - Fresh timestamps calculated after delays for natural distribution
+ *
+ * Orphan Prevention:
+ * - 4-second rank spacing exceeds typical propagation time (2-5s)
+ * - Lower-ranked nodes see higher-ranked blocks before attempting
+ * - Slot expiration check prevents late block creation
+ * - Tip change detection skips if another node mined during wait
+ *
+ * Example Timeline (Slot starts at T=0):
+ * - T+0-1s:   Nodes detect new slot
+ * - T+1-5s:   5-second guard (if previous block was recent)
+ * - T+4-6s:   Rank 1 creates block
+ * - T+6-8s:   Block propagates
+ * - T+8s:     Rank 2 checks tip, sees Rank 1's block, skips
+ * - Result:   Only Rank 1 produces block, zero orphans
+ */
 void PONMinter(const CChainParams& chainparams)
 {
     LogPrintf("PON Minter started\n");
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
     RenameThread("pon-minter");
 
-    // Cache some values
+    // Cache genesis time and consensus parameters for slot calculations
     const int64_t genesisTime = chainparams.GenesisBlock().nTime;
     const Consensus::Params& consensusParams = chainparams.GetConsensus();
 
-    // Track last slot we tried to avoid retrying same slot
+    // Track last slot we attempted to avoid retrying the same slot
     uint32_t lastAttemptedSlot = 0;
 
     try {
@@ -143,7 +170,7 @@ void PONMinter(const CChainParams& chainparams)
 
             // Skip if we already tried this slot
             if (currentSlot <= lastAttemptedSlot) {
-                MilliSleep(3000); // Check every 3 seconds
+                MilliSleep(1000); // Check every 1 second for better coordination
                 continue;
             }
 
@@ -168,51 +195,87 @@ void PONMinter(const CChainParams& chainparams)
                 pindexPrev = chainActive.Tip();
             }
 
-            // Don't mint if last block is very recent (< 10 seconds old)
-            // This helps reduce burst blocks when multiple nodes try to mint immediately
+            // Don't mint if last block is very recent (< 5 seconds old)
+            // This covers block propagation time without artificially slowing difficulty adjustments
+            // The rank-based system provides the main coordination
             int64_t timeSinceLastBlock = now - pindexPrev->nTime;
-            if (timeSinceLastBlock < 10) {
-                MilliSleep(3000);
+            if (timeSinceLastBlock < 5) {
+                MilliSleep(1000);
                 continue;
             }
 
-            uint256 ponHash = GetPONHash(collateral, pindexPrev->GetBlockHash(), currentSlot);
+            // Get current difficulty target for this block height
             unsigned int nBits = GetNextPONWorkRequired(pindexPrev);
-            if (!CheckProofOfNode(ponHash, nBits, Params().GetConsensus(), pindexPrev->nHeight + 1)) {
+
+            // Calculate eligibility and rank for all nodes in this slot
+            // Each node computes: Hash(collateral, prevBlockHash, slotNumber)
+            // If hash < difficulty target, the node is eligible
+            // All eligible nodes are then ranked by hash value (lowest = best = Rank 1)
+            //
+            // IMPORTANT: This ranking is for COORDINATION only, NOT consensus!
+            // - Consensus accepts the first valid block received (based on chain work)
+            // - Ranking simply helps nodes agree on who should try first
+            // - Lower-ranked nodes wait longer, see higher-ranked blocks, and skip
+            // - This dramatically reduces orphan blocks and network waste
+            std::vector<EligibleNodeInfo> eligibleNodes = GetEligibleNodes(pindexPrev, currentSlot, nBits);
+
+            // Find our rank in the eligible list
+            int myRank = GetNodeRank(eligibleNodes, collateral);
+
+            if (myRank == -1) {
+                // Not eligible for this slot
                 arith_uint256 target;
                 target.SetCompact(nBits);
+                uint256 ponHash = GetPONHash(collateral, pindexPrev->GetBlockHash(), currentSlot);
                 LogPrint("pon", "PON: Not eligible for slot %d - hash=%s target=%s (nBits=%08x)\n",
                          currentSlot, ponHash.GetHex(), target.GetHex(), nBits);
                 lastAttemptedSlot = currentSlot;
                 continue;
             }
 
-            LogPrintf("PON: Eligible for slot %d, creating block...\n", currentSlot);
+            // Log eligibility with rank information
+            int totalEligible = eligibleNodes.size();
+            uint256 myHash = eligibleNodes[myRank - 1].ponHash;
+            LogPrintf("PON: Eligible for slot %d - Rank %d of %d eligible nodes (hash: %s)\n",
+                     currentSlot, myRank, totalEligible, myHash.GetHex());
 
-            // Priority-based delay to help reduce collisions
-            // Nodes wait proportionally to their PON hash value (lower hash = shorter wait)
-            arith_uint256 targetValue;
-            targetValue.SetCompact(nBits);
-            arith_uint256 ponHashValue = UintToArith256(ponHash);
+            // Rank-based delay to coordinate block production across 30-second slot window
+            // Account for block propagation time (typically 2-5 seconds)
+            // Rank 1 waits 4s to allow any late blocks from previous slot to propagate
+            // Each subsequent rank waits 4 more seconds, giving time for higher-ranked blocks to propagate
+            // Example: Rank 1 = 4s, Rank 2 = 8s, Rank 3 = 12s, Rank 4 = 16s, Rank 5 = 20s, Rank 6 = 24s, Rank 7 = 28s
+            // With 4s intervals, we fit 7 ranks in a 30s slot window
+            int rankDelayMs = myRank * 4000; // 4 second intervals
 
-            // Calculate priority as a percentage of target
-            // Lower hash value results in shorter delay
-            double priority = ponHashValue.getdouble() / targetValue.getdouble();
-            int priorityDelayMs = (int)(priority * 10000); // 0-10000ms delay based on priority
+            LogPrintf("PON: Rank %d of %d eligible - waiting %dms (%.1fs) before minting\n",
+                     myRank, totalEligible, rankDelayMs, rankDelayMs / 1000.0);
+            MilliSleep(rankDelayMs);
 
-            // Add randomization to help avoid exact collisions
-            priorityDelayMs += getrand(0, 1000); // Add 0-1000ms random jitter
+            // Get fresh timestamp after rank delay completes
+            // This ensures block timestamps reflect when they were actually created,
+            // not when the slot started, giving natural distribution across the slot window
+            int64_t nowAfterWait = GetTime();
 
-            LogPrint("pon", "PON: Eligible with priority %.4f, waiting %dms before minting\n",
-                     priority, priorityDelayMs);
-            MilliSleep(priorityDelayMs);
-
-            // After priority delay, check if someone else already mined
+            // Perform safety checks before block creation:
+            // 1. Verify we haven't moved to the next slot during our wait
+            // 2. Check if another node already produced a block while we waited
             {
                 LOCK(cs_main);
+
+                // Check if we're still in the same slot
+                uint32_t slotAfterWait = GetSlotNumber(nowAfterWait, genesisTime, consensusParams);
+
+                if (slotAfterWait != currentSlot) {
+                    LogPrintf("PON: Slot %d expired during wait (now in slot %d), skipping\n",
+                             currentSlot, slotAfterWait);
+                    lastAttemptedSlot = currentSlot;
+                    continue;
+                }
+
                 CBlockIndex* pNewTip = chainActive.Tip();
                 if (pNewTip->GetBlockHash() != pindexPrev->GetBlockHash()) {
-                    LogPrintf("PON: Slot %d already filled by another node during priority wait, skipping\n", currentSlot);
+                    LogPrintf("PON: Slot %d already filled by another node during wait (likely rank %d or better), skipping\n",
+                             currentSlot, myRank - 1);
                     lastAttemptedSlot = currentSlot;
                     continue;
                 }
@@ -220,10 +283,10 @@ void PONMinter(const CChainParams& chainparams)
                 pindexPrev = pNewTip;
             }
 
+            // Setup block reward payout script
             CScript scriptPubKey;
             {
-
-                // Try to get the dev fund address
+                // Get the dev fund address for block rewards
                 CTxDestination dest = DecodeDestination(Params().GetDevFundAddress());
                 if (!IsValidDestination(dest)) {
                     LogPrintf("PON: Invalid Dev Fund Address\n");
@@ -240,9 +303,12 @@ void PONMinter(const CChainParams& chainparams)
                 }
             }
 
-            // Create the block with enforced slot time
+            // Create the block template
+            // Uses fresh timestamp (nowAfterWait) calculated after rank delay, giving each
+            // rank a naturally distributed timestamp within the slot window
+            // (Rank 1 ~T+4s, Rank 2 ~T+8s, Rank 3 ~T+12s, etc.)
             std::unique_ptr<CBlockTemplate> pblocktemplate(
-                CreateNewBlock(chainparams, scriptPubKey, false, collateral, now)
+                CreateNewBlock(chainparams, scriptPubKey, false, collateral, nowAfterWait)
             );
 
             if (!pblocktemplate) {
@@ -253,19 +319,22 @@ void PONMinter(const CChainParams& chainparams)
 
             CBlock* pblock = &pblocktemplate->block;
 
-            // Sign the block
+            // Sign the block with our fluxnode private key
+            // Block signature proves we control the collateral used for PON eligibility
             if (!SignPONBlock(*pblock, collateral)) {
                 LogPrintf("PON: Failed to sign block\n");
                 lastAttemptedSlot = currentSlot;
                 continue;
             }
-            
-            // Process the block
+
+            // Submit the block to the network
+            // This validates and adds the block to our chain, then broadcasts to peers
             if (ProcessPONBlock(pblock, chainparams)) {
-                LogPrintf("PON: Successfully created block at height %d for slot %d\n", 
+                LogPrintf("PON: Successfully created block at height %d for slot %d\n",
                          nHeight, currentSlot);
             }
-            
+
+            // Mark this slot as attempted (success or failure) to avoid retrying
             lastAttemptedSlot = currentSlot;
         }
     }
