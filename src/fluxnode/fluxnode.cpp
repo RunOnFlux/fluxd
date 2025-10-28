@@ -1450,6 +1450,12 @@ void FluxnodeCache::DumpFluxnodeCache()
     for (const auto& outpoint : setDirtyDelegateErases) {
         pFluxnodeDB->EraseFluxnodeDelegate(outpoint);
     }
+
+    // Clear dirty tracking structures after successful database write
+    // Failure to clear these causes memory leak as they accumulate indefinitely
+    setDirtyOutPoint.clear();
+    mapDirtyDelegateWrites.clear();
+    setDirtyDelegateErases.clear();
 }
 
 bool IsFluxnodeTransactionsActive()
