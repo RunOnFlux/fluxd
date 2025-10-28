@@ -487,6 +487,8 @@ void FluxnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
 
 
 bool FluxnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COutPoint& out, const std::string& ip, bool fFromMempool) {
+    LOCK(cs); // Protect access to mapConfirmedFluxnodeData from concurrent modification
+
     if (!mapConfirmedFluxnodeData.count(out)) {
         return false;
     }
@@ -879,7 +881,15 @@ void FluxnodeCache::AddBackUndoData(const CFluxnodeTxBlockUndo& p_undoData)
         LOCK(g_fluxnodeCache.cs);
         if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.first)) {
             int oldValueInGlobal = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first).nLastConfirmedBlockHeight;
-            mapConfirmedFluxnodeData[item.first] = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first);
+
+            // FIX: Only copy from global if this outpoint is NOT already in the local cache
+            // If it's already in local cache, it means we've already prepared undo for it in this batch
+            // and we should preserve those changes rather than overwriting with current global state
+            if (!mapConfirmedFluxnodeData.count(item.first)) {
+                mapConfirmedFluxnodeData[item.first] = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first);
+            }
+
+            // Now set the confirmation height to the undo value
             mapConfirmedFluxnodeData[item.first].nLastConfirmedBlockHeight = item.second;
             LogPrintf("UNDO PREPARE: Copying to local cache for %s: globalValue=%d, willRestoreTo=%d\n",
                       item.first.ToString(), oldValueInGlobal, item.second);
