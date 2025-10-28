@@ -487,6 +487,8 @@ void FluxnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
 
 
 bool FluxnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COutPoint& out, const std::string& ip, bool fFromMempool) {
+    LOCK(cs); // Protect access to mapConfirmedFluxnodeData from concurrent modification
+
     if (!mapConfirmedFluxnodeData.count(out)) {
         return false;
     }
