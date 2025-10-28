@@ -1406,12 +1406,14 @@ UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp, strin
     std::string strFilter = "";
     if (params.size() == 1) strFilter = params[0].get_str();
 
-    if (strFilter == CRPCFluxnodeCache::filter && CRPCFluxnodeCache::nHeight == chainActive.Height()) {
+    // Try to get cached data using thread-safe method
+    UniValue cachedList = CRPCFluxnodeCache::GetFluxnodeListCache(strFilter, chainActive.Height());
+    if (!cachedList.isNull()) {
         LogPrintf("%s: Sending cached data\n", __func__);
-        return CRPCFluxnodeCache::list;
+        return cachedList;
     }
 
-    // Create empty list
+    // Cache miss - build new list
     UniValue deterministicList(UniValue::VARR);
 
     // Fill list

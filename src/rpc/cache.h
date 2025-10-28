@@ -6,6 +6,7 @@
 #define FLUX_CACHE_H
 
 #include <string>
+#include "sync.h"
 
 class UniValue;
 
@@ -15,9 +16,11 @@ public:
     static int64_t nHeight;
     static UniValue list;
     static std::string filter;
+    static CCriticalSection cs_cache; // Mutex to protect cache access
 
     static void ClearFluxnodeListCache();
     static void SetFluxnodeListCache(int64_t nHeight, UniValue& list, std::string& filter);
+    static UniValue GetFluxnodeListCache(const std::string& strFilter, int64_t nCurrentHeight);
 
 };
 
