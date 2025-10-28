@@ -16,6 +16,7 @@
 #include "fluxnode/benchmarks.h"
 #include "util.h"
 #include "pon/pon-fork.h"
+#include "pon/pon.h"
 
 #include <univalue.h>
 #include "rpc/cache.h"

@@ -155,6 +155,34 @@ namespace {
             if (pa->nChainWork > pb->nChainWork) return false;
             if (pa->nChainWork < pb->nChainWork) return true;
 
+            // For PON blocks at same height (same chain work), use PON hash as deterministic tie-breaker
+            // This prevents network splits when multiple eligible nodes create competing blocks
+            // Lower PON hash wins (same ordering as our rank-based coordination)
+            bool isPONBlockA = (pa->nVersion >= 100);
+            bool isPONBlockB = (pb->nVersion >= 100);
+
+            if (isPONBlockA && isPONBlockB && pa->nHeight == pb->nHeight) {
+                // Both are PON blocks at same height - use PON hash as tie-breaker
+                uint256 ponHashA = GetPONHash(pa->GetBlockHeader());
+                uint256 ponHashB = GetPONHash(pb->GetBlockHeader());
+
+                if (ponHashA < ponHashB) {
+                    LogPrint("pon", "PON tie-breaker: Block %s (PON hash %s) wins over %s (PON hash %s) at height %d\n",
+                             pa->GetBlockHash().ToString().substr(0,12).c_str(), ponHashA.ToString().substr(0,12).c_str(),
+                             pb->GetBlockHash().ToString().substr(0,12).c_str(), ponHashB.ToString().substr(0,12).c_str(),
+                             pa->nHeight);
+                    return false; // A has better (lower) hash, A wins
+                }
+                if (ponHashA > ponHashB) {
+                    LogPrint("pon", "PON tie-breaker: Block %s (PON hash %s) wins over %s (PON hash %s) at height %d\n",
+                             pb->GetBlockHash().ToString().substr(0,12).c_str(), ponHashB.ToString().substr(0,12).c_str(),
+                             pa->GetBlockHash().ToString().substr(0,12).c_str(), ponHashA.ToString().substr(0,12).c_str(),
+                             pb->nHeight);
+                    return true;  // B has better (lower) hash, B wins
+                }
+                // If hashes are equal, fall through to sequence ID
+            }
+
             // ... then by earliest time received, ...
             if (pa->nSequenceId < pb->nSequenceId) return false;
             if (pa->nSequenceId > pb->nSequenceId) return true;
@@ -4290,6 +4318,19 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
     // Update chainActive & related variables.
     UpdateTip(pindexNew, chainparams);
+
+    // Periodically check and shrink debug.log if needed (every 20000 blocks about 1 week in 30 second intervals)
+    // This checks actual file size against configurable threshold
+    if (pindexNew && GetBoolArg("-shrinkdebugfile", !fDebug) && pindexNew->nHeight % 20000 == 0) {
+        ShrinkDebugFile();
+    }
+
+    // Check PON eligibility for next slot after each block
+    // Only run when synced (within 5 minutes of current time) to avoid overhead during sync
+    if (pindexNew && GetTime() - pindexNew->nTime < 300) { // 300 seconds = 5 minutes
+        LogPONEligibility(pindexNew, 1);
+    }
+
     // Tell wallet about transactions that went from mempool
     // to conflicted:
     BOOST_FOREACH(const CTransaction &tx, txConflicted) {

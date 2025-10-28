@@ -305,3 +305,119 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex*
     LogPrint("pon", "ContextualCheckPONBlockHeader: Full validation passed for block %s\n", block.GetHash().GetHex());
     return true;
 }
+
+void LogPONEligibility(const CBlockIndex* pindexPrev, int slotOffset)
+{
+    // Check if PON is active
+    int ponActivationHeight = GetPONActivationHeight();
+    if (!pindexPrev || pindexPrev->nHeight < ponActivationHeight) {
+        return; // PON not active yet
+    }
+
+    // Start timing
+    int64_t nTimeStart = GetTimeMicros();
+
+    const Consensus::Params& consensusParams = Params().GetConsensus();
+    int64_t genesisTime = Params().GenesisBlock().nTime;
+
+    // Calculate current slot
+    int64_t currentTime = GetAdjustedTime();
+    uint32_t currentSlot = GetSlotNumber(currentTime, genesisTime, consensusParams);
+
+    // Get the difficulty for the next block
+    unsigned int nBits = GetNextPONWorkRequired(pindexPrev);
+
+    // Get the previous block hash (which will be used for PON hash calculation)
+    uint256 prevBlockHash = pindexPrev->GetBlockHash();
+
+    LOCK(g_fluxnodeCache.cs);
+    int totalNodes = g_fluxnodeCache.mapConfirmedFluxnodeData.size();
+
+    // Keep checking slots until we find one with eligible nodes (max 100 slots ahead)
+    int maxSlotsToCheck = 100;
+    for (int offset = slotOffset; offset <= maxSlotsToCheck; offset++) {
+        uint32_t checkedSlot = currentSlot + offset;
+        int eligibleNodes = 0;
+
+        // Iterate through all confirmed fluxnodes
+        for (const auto& pair : g_fluxnodeCache.mapConfirmedFluxnodeData) {
+            const COutPoint& collateral = pair.first;
+
+            // Calculate PON hash for this node at the checked slot
+            uint256 ponHash = GetPONHash(collateral, prevBlockHash, checkedSlot);
+
+            // Check if this hash meets the difficulty requirement
+            if (CheckProofOfNode(ponHash, nBits, consensusParams, pindexPrev->nHeight + 1)) {
+                eligibleNodes++;
+
+                // Log each eligible node (use full collateral: txhash:index)
+                LogPrint("pon", "PON Eligibility: Node %s:%d eligible for slot %d (hash: %s)\n",
+                         collateral.hash.ToString().c_str(), collateral.n, checkedSlot, ponHash.ToString().c_str());
+            }
+        }
+
+        // Calculate timing
+        int64_t nTimeEnd = GetTimeMicros();
+        double nTimeElapsed = (nTimeEnd - nTimeStart) * 0.001; // Convert to milliseconds
+
+        // Calculate eligibility rate
+        double eligibilityRate = (totalNodes > 0) ? (100.0 * eligibleNodes / totalNodes) : 0.0;
+
+        // Log summary with timing (only when -debug=pon is enabled)
+        LogPrint("pon", "PON Eligibility Check: Block %d, Slot %d - %d of %d nodes eligible (%.2f%%), difficulty=%08x, time=%.2fms\n",
+                 pindexPrev->nHeight + 1, checkedSlot, eligibleNodes, totalNodes, eligibilityRate, nBits, nTimeElapsed);
+
+        // If we found eligible nodes, stop checking
+        if (eligibleNodes > 0) {
+            break;
+        }
+
+        // If no nodes eligible, continue to next slot
+        LogPrint("pon", "PON Eligibility: No eligible nodes for slot %d, checking next slot...\n", checkedSlot);
+    }
+}
+
+std::vector<EligibleNodeInfo> GetEligibleNodes(const CBlockIndex* pindexPrev, uint32_t slot, unsigned int nBits)
+{
+    std::vector<EligibleNodeInfo> eligibleNodes;
+
+    if (!pindexPrev) {
+        return eligibleNodes;
+    }
+
+    const Consensus::Params& consensusParams = Params().GetConsensus();
+    uint256 prevBlockHash = pindexPrev->GetBlockHash();
+
+    LOCK(g_fluxnodeCache.cs);
+
+    // Check all confirmed fluxnodes
+    for (const auto& pair : g_fluxnodeCache.mapConfirmedFluxnodeData) {
+        const COutPoint& collateral = pair.first;
+
+        // Calculate PON hash for this node at the slot
+        uint256 ponHash = GetPONHash(collateral, prevBlockHash, slot);
+
+        // Check if this hash meets the difficulty requirement
+        if (CheckProofOfNode(ponHash, nBits, consensusParams, pindexPrev->nHeight + 1)) {
+            EligibleNodeInfo info;
+            info.collateral = collateral;
+            info.ponHash = ponHash;
+            eligibleNodes.push_back(info);
+        }
+    }
+
+    // Sort by PON hash (lowest hash first = best priority)
+    std::sort(eligibleNodes.begin(), eligibleNodes.end());
+
+    return eligibleNodes;
+}
+
+int GetNodeRank(const std::vector<EligibleNodeInfo>& eligibleNodes, const COutPoint& myCollateral)
+{
+    for (size_t i = 0; i < eligibleNodes.size(); i++) {
+        if (eligibleNodes[i].collateral == myCollateral) {
+            return i + 1; // Rank is 1-indexed (1 = best)
+        }
+    }
+    return -1; // Not found in eligible list
+}

@@ -895,10 +895,20 @@ void ShrinkDebugFile()
     // Scroll debug.log if it's getting too big
     boost::filesystem::path pathLog = GetDataDir() / "debug.log";
     FILE* file = fopen(pathLog.string().c_str(), "r");
-    if (file && boost::filesystem::file_size(pathLog) > 10 * 1000000)
+
+    // Get configurable size threshold (default 500MB, min 10MB, max 10GB)
+    int64_t nMaxLogSizeMB = GetArg("-maxdebugfilesize", 500); // Default 500MB
+    if (nMaxLogSizeMB < 10) nMaxLogSizeMB = 10;       // Minimum 10MB
+    if (nMaxLogSizeMB > 2048) nMaxLogSizeMB = 2048; // Maximum 2GB
+    int64_t nMaxLogSize = nMaxLogSizeMB * 1000000;
+
+    if (file && boost::filesystem::file_size(pathLog) > nMaxLogSize)
     {
-        // Restart the file with some of the end
-        std::vector <char> vch(200000,0);
+        LogPrintf("ShrinkDebugFile: debug.log size is %.1f MB, shrinking to last 50 MB...\n",
+                  boost::filesystem::file_size(pathLog) / 1000000.0);
+
+        // Keep last 50MB when shrinking (reasonable amount for debugging)
+        std::vector <char> vch(50000000,0);
         fseek(file, -((long)vch.size()), SEEK_END);
         int nBytes = fread(begin_ptr(vch), 1, vch.size(), file);
         fclose(file);
@@ -908,6 +918,7 @@ void ShrinkDebugFile()
         {
             fwrite(begin_ptr(vch), 1, nBytes, file);
             fclose(file);
+            LogPrintf("ShrinkDebugFile: Shrinking complete, kept %.1f MB\n", nBytes / 1000000.0);
         }
     }
     else if (file != NULL)
