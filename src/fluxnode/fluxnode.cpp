@@ -374,8 +374,10 @@ bool FluxnodeCache::CheckUpdateHeight(const CTransaction& p_transaction, const i
     int nCurrentHeight;
     if (p_nHeight)
         nCurrentHeight = p_nHeight;
-    else
+    else {
+        LOCK(cs_main);
         nCurrentHeight = chainActive.Height();
+    }
 
     COutPoint out = p_transaction.collateralIn;
     if (!p_transaction.IsFluxnodeTx()) {
