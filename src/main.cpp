@@ -7943,21 +7943,8 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             // Stalling only triggers when the block download window cannot move. During normal steady state,
             // the download window should be much larger than the to-be-downloaded set of blocks, so disconnection
             // should only happen during initial block download.
-
-            // Check peer count before disconnecting to avoid disconnecting all peers during heavy block processing
-            size_t nPeerCount = 0;
-            {
-                LOCK(cs_vNodes);
-                nPeerCount = vNodes.size();
-            }
-
-            // Only disconnect if we have enough peers (keep minimum of 4 to maintain network connectivity)
-            if (nPeerCount > 4) {
-                LogPrintf("Peer=%d is stalling block download, disconnecting (peers: %d)\n", pto->id, nPeerCount);
-                pto->fDisconnect = true;
-            } else {
-                LogPrint("net", "Not disconnecting peer=%d despite stalling (only %d peers remaining)\n", pto->id, nPeerCount);
-            }
+            LogPrintf("Peer=%d is stalling block download, disconnecting\n", pto->id);
+            pto->fDisconnect = true;
         }
         // In case there is a block that has been in flight from this peer for (2 + 0.5 * N) times the block interval
         // (with N the number of validated blocks that were in flight at the time it was requested), disconnect due to
