@@ -263,29 +263,43 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex*
 
     // 1. Verify the signature matches the collateral owner
     if (fCheckSignature) {
+        int currentHeight = pindexPrev ? pindexPrev->nHeight + 1 : 0;
+        int chainTipHeight = chainActive.Height();
+
+        // CRITICAL: Check if we're validating against wrong chain state FIRST
+        // During out-of-order or competing chain validation, the global cache reflects
+        // a different chain state. Any validation using cache data would be incorrect.
+        // Allow validation for:
+        // - Blocks at tip height (competing blocks)
+        // - Blocks at tip+1 (normal next block, cache is correct after previous block connected)
+        // Defer for:
+        // - Blocks more than 1 ahead (out-of-order, parent blocks not processed yet)
+        // - Blocks behind tip (competing chain)
+        if (currentHeight != chainTipHeight && currentHeight != chainTipHeight + 1) {
+            // Defer ALL signature validation - will be checked when block is actually connected
+            LogPrint("pon", "FluxNode signature check deferred for block at height %d (tip=%d), different chain state\n",
+                    currentHeight, chainTipHeight);
+            return true;
+        }
+
+        // Past this point: block height matches chain tip or tip+1, cache state should be correct
         FluxnodeCacheData data = g_fluxnodeCache.GetFluxnodeData(block.nodesCollateral);
 
         if (data.IsNull()) {
-            // Try to refresh cache if we're validating a recent block
-            int currentHeight = pindexPrev ? pindexPrev->nHeight + 1 : 0;
-            bool isRecentBlock = (chainActive.Height() - currentHeight) < 10;
-
-            if (isRecentBlock) {
-                LogPrint("pon", "FluxNode not found in cache, attempting refresh for %s (height=%d)\n",
-                        block.nodesCollateral.ToString(), currentHeight);
-
-                // Small delay to allow cache sync
-                MilliSleep(100);
-
-                // Retry cache lookup
-                data = g_fluxnodeCache.GetFluxnodeData(block.nodesCollateral);
+            // Fluxnode not found in cache
+            // Special case: For competing blocks at same height, the fluxnode might have expired in
+            // the current tip block, but this competing block might be using it before expiration.
+            // Defer validation to ConnectBlock where we'll have the correct state.
+            if (currentHeight == chainTipHeight) {
+                LogPrint("pon", "FluxNode %s not found at competing height %d (tip=%d), deferring signature validation\n",
+                        block.nodesCollateral.ToString(), currentHeight, chainTipHeight);
+                return true;
             }
 
-            if (data.IsNull()) {
-                return error("ContextualCheckPONBlockHeader: FluxNode %s not found in cache for block %s (height=%d, recent=%s)",
-                            block.nodesCollateral.ToString(), block.GetHash().GetHex(),
-                            currentHeight, isRecentBlock ? "yes" : "no");
-            }
+            // For tip+1 blocks, fluxnode should exist. If it doesn't, block is invalid.
+            return error("ContextualCheckPONBlockHeader: FluxNode %s not found in cache for block %s (height=%d)",
+                        block.nodesCollateral.ToString(), block.GetHash().GetHex(),
+                        currentHeight);
         }
 
         // Create the message that was signed (block hash)
