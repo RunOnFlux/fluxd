@@ -98,6 +98,10 @@ static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
 static const int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 16;
 /** Timeout in seconds during which a peer must stall block download progress before being disconnected. */
 static const unsigned int BLOCK_STALLING_TIMEOUT = 2;
+/** Maximum number of headers to announce when relaying blocks with headers message.
+ *  With 30-second block times, this allows announcing up to 12 minutes of blocks (24 * 30s).
+ *  Increased from Bitcoin's 8 to account for faster block times. */
+static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 24;
 /** Number of headers sent in one getheaders result. We rely on the assumption that if a peer sends
  *  less than this number, we reached its tip. Changing this value is a protocol upgrade. */
 static const unsigned int MAX_HEADERS_RESULTS = 160;

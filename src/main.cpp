@@ -329,6 +329,8 @@ struct CNodeState {
     int nBlocksInFlightValidHeaders;
     //! Whether we consider this a preferred download peer.
     bool fPreferredDownload;
+    //! Whether this peer wants us to announce new blocks via "headers" message (BIP 130).
+    bool fPreferHeaders;
 
     CNodeState() {
         fCurrentlyConnected = false;
@@ -342,6 +344,7 @@ struct CNodeState {
         nBlocksInFlight = 0;
         nBlocksInFlightValidHeaders = 0;
         fPreferredDownload = false;
+        fPreferHeaders = false;
     }
 };
 
@@ -4575,9 +4578,23 @@ bool ActivateBestChain(CValidationState& state, const CChainParams& chainparams,
                 nBlockEstimate = Checkpoints::GetTotalBlocksEstimate(chainparams.Checkpoints());
             {
                 LOCK(cs_vNodes);
-                BOOST_FOREACH(CNode* pnode, vNodes)
-                    if (chainActive.Height() > (pnode->nStartingHeight != -1 ? pnode->nStartingHeight - 2000 : nBlockEstimate))
-                        pnode->PushInventory(CInv(MSG_BLOCK, hashNewTip));
+                BOOST_FOREACH(CNode* pnode, vNodes) {
+                    if (chainActive.Height() > (pnode->nStartingHeight != -1 ? pnode->nStartingHeight - 2000 : nBlockEstimate)) {
+                        // BIP 130: If peer prefers headers, announce via headers instead of inv
+                        CNodeState *state = State(pnode->GetId());
+                        if (state && state->fPreferHeaders) {
+                            // Send the new block header
+                            LogPrint("net", "Announcing block %s via headers to peer=%d\n",
+                                     hashNewTip.ToString(), pnode->id);
+                            std::vector<CBlockHeader> vHeaders;
+                            vHeaders.push_back(pindexNewTip->GetBlockHeader());
+                            pnode->PushMessage("headers", vHeaders);
+                        } else {
+                            // Send traditional inv message
+                            pnode->PushInventory(CInv(MSG_BLOCK, hashNewTip));
+                        }
+                    }
+                }
             }
             // Notify external listeners about the new tip.
             GetMainSignals().UpdatedBlockTip(pindexNewTip);
@@ -6833,6 +6850,19 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             LOCK(cs_main);
             State(pfrom->GetId())->fCurrentlyConnected = true;
         }
+
+        // BIP 130: After verack, tell peer we prefer to receive headers rather than inv's
+        if (pfrom->nVersion >= SENDHEADERS_VERSION) {
+            pfrom->PushMessage("sendheaders");
+        }
+    }
+
+
+    else if (strCommand == "sendheaders")
+    {
+        // BIP 130: Peer prefers to receive new block announcements as headers
+        LOCK(cs_main);
+        State(pfrom->GetId())->fPreferHeaders = true;
     }
 
 

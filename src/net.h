@@ -346,6 +346,13 @@ public:
     // Whether a ping is requested.
     bool fPingQueued;
 
+    // BIP 130: If true this node prefers to receive new block announcements via
+    // "headers" message rather than "inv" message
+    bool fPreferHeaders;
+    // BIP 152: If true, this node can receive and send compact blocks
+    // This is reserved for future compact blocks implementation
+    bool fPreferHeaderAndIDs;
+
     CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
     ~CNode();
 
