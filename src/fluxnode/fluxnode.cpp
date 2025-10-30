@@ -491,14 +491,74 @@ void FluxnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
 bool FluxnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COutPoint& out, const std::string& ip, bool fFromMempool) {
     LOCK(cs); // Protect access to mapConfirmedFluxnodeData from concurrent modification
 
+    // Get chain tip height for state validation checks
+    int chainTipHeight;
+    {
+        LOCK(cs_main);
+        chainTipHeight = chainActive.Height();
+    }
+
+    // Check if fluxnode exists in confirmed map
     if (!mapConfirmedFluxnodeData.count(out)) {
+        // Fluxnode not in confirmed map
+        // For competing blocks at same height, this might mean the fluxnode expired in
+        // the current tip block, but this competing block might have UPDATE_CONFIRM that
+        // would prevent expiration. Defer validation to ConnectBlock.
+        if (!fFromMempool && nCurrentHeight == chainTipHeight) {
+            LogPrint("fluxnode", "DEFERRED VALIDATION: Fluxnode %s not in confirmed map at competing height %d, deferring\n",
+                     out.ToString(), nCurrentHeight);
+            return true;
+        }
         return false;
     }
 
     auto data = g_fluxnodeCache.GetFluxnodeData(out);
     if (data.IsNull()) {
+        // Same reasoning as above - defer for competing blocks
+        if (!fFromMempool && nCurrentHeight == chainTipHeight) {
+            LogPrint("fluxnode", "DEFERRED VALIDATION: Fluxnode %s data is null at competing height %d, deferring\n",
+                     out.ToString(), nCurrentHeight);
+            return true;
+        }
         return false;
     }
+
+    // CRITICAL: Check if we're validating against the wrong chain state FIRST
+    // This must happen before any validation that depends on chain state (IP checks, confirmation heights, etc.)
+    // During out-of-order block validation or reorgs, the global cache reflects a different chain
+    // state than the block being validated. All validation using cache data would be incorrect.
+    // We defer validation until the block is actually connected with correct chain state.
+    if (!fFromMempool) {
+        // chainTipHeight already fetched at line 495-499
+
+        // Special case: Allow competing blocks at exact same height
+        // This enables PON consensus where multiple blocks can be valid at same height
+        if (nCurrentHeight == chainTipHeight) {
+            int nConfirmationDistance = nCurrentHeight - data.nLastConfirmedBlockHeight;
+            if (nConfirmationDistance == 0) {
+                LogPrintf("EXACT HEIGHT: Allowing UPDATE_CONFIRM at same height - %s: currentHeight=%d, lastConfirmed=%d\n",
+                          out.ToString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
+                return true;
+            }
+            // If distance != 0 at same height, fall through to normal validation
+            // (this means we're at tip validating a new block, cache is correct)
+        } else if (nCurrentHeight == chainTipHeight + 1) {
+            // Normal next block: tip was just updated, this is the expected next block
+            // Cache is correct after previous block connected and flushed
+            // Fall through to normal validation
+        } else {
+            // Block height is not tip, not tip+1 - we're validating out-of-order or competing chain
+            // - More than 1 ahead: out-of-order (parent blocks not processed)
+            // - Behind tip: competing chain block
+            // Cache state is from different chain branch, defer all validation
+            LogPrint("fluxnode", "DEFERRED VALIDATION: All checks deferred - %s: blockHeight=%d, chainTip=%d\n",
+                     out.ToString(), nCurrentHeight, chainTipHeight);
+            return true;
+        }
+    }
+
+    // Past this point, we know: fFromMempool=true OR (block height == chain tip AND distance != 0)
+    // In both cases, the global cache state is correct for validation
 
     bool fFluxActive = NetworkUpgradeActive(nCurrentHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX);
     // Allow ip address changes at a different interval
@@ -523,24 +583,14 @@ bool FluxnodeCache::CheckConfirmationHeights(const int nCurrentHeight, const COu
     int nConfirmationDistance = nCurrentHeight - data.nLastConfirmedBlockHeight;
 
     if (nConfirmationDistance <= nDistanceToCheck) {
-
         if (fFromMempool) {
             LogPrint("mempool", "VALIDATION: Mempool rejection - %s: currentHeight=%d, lastConfirmed=%d, distance=%d\n",
                      out.ToString(), nCurrentHeight, data.nLastConfirmedBlockHeight, nConfirmationDistance);
             return false;
         }
 
-        // CONSENSUS FIX: Allow UPDATE_CONFIRM at exact same height to enable competing blocks
-        // This fixes two issues:
-        // 1. Allows blocks with better work to compete at same height (PON consensus)
-        // 2. Handles reorg edge case where lastConfirmed wasn't rolled back
-        // Without this, first block at a height locks out all competitors regardless of difficulty
-        if (nConfirmationDistance == 0) {
-            LogPrintf("EXACT HEIGHT: Allowing UPDATE_CONFIRM at same height - %s: currentHeight=%d, lastConfirmed=%d\n",
-                      out.ToString(), nCurrentHeight, data.nLastConfirmedBlockHeight);
-            return true;
-        }
-
+        // If we reach here during block validation, something is wrong
+        // The early check should have caught height mismatches
         LogPrintf("VALIDATION FAILURE: Block rejection - %s: currentHeight=%d, lastConfirmed=%d, distance=%d, threshold=%d\n",
                   out.ToString(), nCurrentHeight, data.nLastConfirmedBlockHeight, nConfirmationDistance, nDistanceToCheck);
         error("%s - %d - Confirmation to soon - %s -> Current Height: %d, lastConfirmed: %d\n", __func__,
