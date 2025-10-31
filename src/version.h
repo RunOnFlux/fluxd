@@ -50,4 +50,10 @@ static const int PROOF_OF_NODE = 170020;
 //! "sendheaders" command and announcing blocks with headers starts with this version
 static const int SENDHEADERS_VERSION = 170021;
 
+//! "sendcmpct" command for BIP 152 compact block relay (same version as sendheaders)
+static const int SENDCMPCT_VERSION = 170021;
+
+//! "cmpheaders" message for efficient header sync of checkpointed blocks
+static const int CMPHEADERS_VERSION = 170021;
+
 #endif // BITCOIN_VERSION_H

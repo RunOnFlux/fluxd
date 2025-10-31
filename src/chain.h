@@ -251,7 +251,7 @@ public:
         pprev = NULL;
         pskip = NULL;
         nHeight = 0;
-        nFile = 0;
+        nFile = -1;
         nDataPos = 0;
         nUndoPos = 0;
         nChainWork = arith_uint256();
@@ -403,13 +403,16 @@ class CDiskBlockIndex : public CBlockIndex
 {
 public:
     uint256 hashPrev;
+    uint256 hashBlock;  // Store the actual block hash to avoid recomputing from incomplete headers
 
     CDiskBlockIndex() {
         hashPrev = uint256();
+        hashBlock = uint256();
     }
 
     explicit CDiskBlockIndex(const CBlockIndex* pindex) : CBlockIndex(*pindex) {
         hashPrev = (pprev ? pprev->GetBlockHash() : uint256());
+        hashBlock = pindex->GetBlockHash();  // Store the actual hash
     }
 
     ADD_SERIALIZE_METHODS;
@@ -452,7 +455,7 @@ public:
         READWRITE(nBits);
         READWRITE(nNonce);
         READWRITE(nSolution);
-        
+
         // Only read/write PON fields if this is a PON block
         if (this->nVersion >= CBlockHeader::PON_VERSION) {
             READWRITE(nodesCollateral);
@@ -471,12 +474,28 @@ public:
             READWRITE(nSaplingValue);
         }
 
+        // For POW blocks without full data (compact headers), we need to store the hash
+        // because we can't compute it without nSolution.
+        // PON blocks don't need this since they don't have nSolution at all.
+        // We check: disk serialization + POW block + no full data = compact header
+        if ((s.GetType() & SER_DISK) &&
+            (this->nVersion < CBlockHeader::PON_VERSION) &&
+            !(nStatus & BLOCK_HAVE_DATA)) {
+            READWRITE(hashBlock);
+        }
+
         // If you have just added new serialized fields above, remember to add
         // them to CBlockTreeDB::LoadBlockIndexGuts() in txdb.cpp :)
     }
 
     uint256 GetBlockHash() const
     {
+        // If hashBlock is stored (compact headers), use it
+        // because we don't have nSolution to compute it correctly
+        if (!hashBlock.IsNull())
+            return hashBlock;
+
+        // Otherwise compute hash from header fields (normal case and backwards compatible)
         CBlockHeader block;
         block.nVersion        = nVersion;
         block.hashPrevBlock   = hashPrev;
