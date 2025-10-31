@@ -198,6 +198,57 @@ public:
     }
 };
 
+/**
+ * Compact block header for efficient header sync of checkpointed blocks.
+ * For POW blocks (version < 100): omits nSolution (saves ~1344 bytes)
+ * For PON blocks (version >= 100): includes all data (already compact)
+ * Used for headers below the latest checkpoint where Equihash verification
+ * is not needed since the checkpoint validates the chain.
+ *
+ * IMPORTANT: For POW blocks, we include the block hash since we cannot
+ * compute it without the nSolution. The checkpoint validates correctness.
+ */
+class CCompactBlockHeader : public CBlockHeader
+{
+public:
+    uint256 hashBlock;  // The actual block hash (needed for POW blocks without nSolution)
+
+    CCompactBlockHeader() { hashBlock.SetNull(); }
+
+    CCompactBlockHeader(const CBlockHeader &header)
+    {
+        CBlockHeader::SetNull();
+        *((CBlockHeader*)this) = header;
+        hashBlock = header.GetHash();
+    }
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(this->nVersion);
+        READWRITE(hashPrevBlock);
+        READWRITE(hashMerkleRoot);
+        READWRITE(hashFinalSaplingRoot);
+        READWRITE(nTime);
+        READWRITE(nBits);
+
+        // Serialize based on version
+        if (nVersion >= PON_VERSION) {
+            // PON block - include all data (already compact)
+            READWRITE(nodesCollateral);
+            READWRITE(vchBlockSig);
+        } else {
+            // POW block - include nNonce but OMIT nSolution
+            // The large Equihash solution is not needed for checkpointed blocks
+            READWRITE(nNonce);
+            // nSolution deliberately omitted to save bandwidth
+            // But we DO include the hash since we can't compute it without nSolution
+            READWRITE(hashBlock);
+        }
+    }
+};
+
 
 /** Describes a place in the block chain to another node such that if the
  * other node doesn't have the same branch, it can find a recent common trunk.

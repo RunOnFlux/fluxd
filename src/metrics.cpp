@@ -215,18 +215,37 @@ int printStats(bool mining)
     int64_t tipmediantime;
     size_t connections;
     int64_t netsolps;
+    int maxSyncHeight = 0;
+    int maxCommonHeight = 0;
     {
         LOCK2(cs_main, cs_vNodes);
         height = chainActive.Height();
         tipmediantime = chainActive.Tip()->GetMedianTimePast();
         connections = vNodes.size();
         netsolps = GetNetworkHashPS(120, -1);
+
+        // Find the best header sync progress across all peers
+        for (CNode* pnode : vNodes) {
+            CNodeStateStats stats;
+            if (GetNodeStateStats(pnode->GetId(), stats)) {
+                maxSyncHeight = std::max(maxSyncHeight, stats.nSyncHeight);
+                maxCommonHeight = std::max(maxCommonHeight, stats.nCommonHeight);
+            }
+        }
     }
     auto localsolps = GetLocalSolPS();
 
     if (IsInitialBlockDownload(Params())) {
         int netheight = EstimateNetHeight(height, tipmediantime, Params());
         int downloadPercent = netheight == 0 ? 0 : height * 100 / netheight;
+
+        // Show header download progress if we're syncing headers ahead of blocks
+        if (maxSyncHeight > height + 100) {
+            int headerPercent = netheight == 0 ? 0 : maxSyncHeight * 100 / netheight;
+            std::cout << "    " << _("Downloading headers") << " | " << maxSyncHeight << " / ~" << netheight << " (" << headerPercent << "%)" << std::endl;
+            lines++;
+        }
+
         std::cout << "     " << _("Downloading blocks") << " | " << height << " / ~" << netheight << " (" << downloadPercent << "%)" << std::endl;
     } else {
         std::cout << "           " << _("Block height") << " | " << height << std::endl;
