@@ -10,7 +10,7 @@
  * network protocol versioning
  */
 
-static const int PROTOCOL_VERSION = 170020;
+static const int PROTOCOL_VERSION = 170021;
 
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
@@ -46,5 +46,14 @@ static const int DETERMINISTIC_FLUXNODES = 170016;
 static const int P2SH_NODES = 170019;
 
 static const int PROOF_OF_NODE = 170020;
+
+//! "sendheaders" command and announcing blocks with headers starts with this version
+static const int SENDHEADERS_VERSION = 170021;
+
+//! "sendcmpct" command for BIP 152 compact block relay (same version as sendheaders)
+static const int SENDCMPCT_VERSION = 170021;
+
+//! "cmpheaders" message for efficient header sync of checkpointed blocks
+static const int CMPHEADERS_VERSION = 170021;
 
 #endif // BITCOIN_VERSION_H
