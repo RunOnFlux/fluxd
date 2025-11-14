@@ -7,6 +7,7 @@
 #include "txdb.h"
 
 #include "chainparams.h"
+#include "checkpoints.h"
 #include "hash.h"
 #include "main.h"
 #include "pow.h"
@@ -511,6 +512,9 @@ bool CBlockTreeDB::LoadBlockIndexGuts(boost::function<CBlockIndex*(const uint256
             if (pcursor->GetValue(diskindex)) {
                 // Construct block index object
                 CBlockIndex* pindexNew = insertBlockIndex(diskindex.GetBlockHash());
+
+                // ALWAYS update with database data, even if entry already exists
+                // (it might have been created empty when we processed a child block before its parent)
                 pindexNew->pprev          = insertBlockIndex(diskindex.hashPrev);
                 pindexNew->nHeight        = diskindex.nHeight;
                 pindexNew->nFile          = diskindex.nFile;
@@ -534,13 +538,24 @@ bool CBlockTreeDB::LoadBlockIndexGuts(boost::function<CBlockIndex*(const uint256
 
                 // Consistency checks
                 auto header = pindexNew->GetBlockHeader();
-                if (header.GetHash() != pindexNew->GetBlockHash())
-                    return error("LoadBlockIndex(): block header inconsistency detected: on-disk = %s, in-memory = %s",
-                       diskindex.ToString(),  pindexNew->ToString());
+
+                // For POW blocks below checkpoint: header may be from compact headers (no nSolution),
+                // so header.GetHash() won't match. Skip hash check for checkpointed blocks.
+                int latestCheckpoint = Checkpoints::GetTotalBlocksEstimate(Params().Checkpoints());
+                bool isCheckpointed = pindexNew->nHeight < latestCheckpoint;
+
+                if (!isCheckpointed || header.IsPON()) {
+                    // Only verify hash consistency for non-checkpointed blocks or PON blocks
+                    if (header.GetHash() != pindexNew->GetBlockHash())
+                        return error("LoadBlockIndex(): block header inconsistency detected: on-disk = %s, in-memory = %s",
+                           diskindex.ToString(),  pindexNew->ToString());
+                }
+
                 if (header.IsPON()) {
                     if (!CheckProofOfNode(GetPONHash(header), pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight) && !IsEmergencyBlock(header))
                         return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
-                } else {
+                } else if (!isCheckpointed) {
+                    // Only verify PoW for non-checkpointed POW blocks
                     if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, Params().GetConsensus()))
                         return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
                 }
