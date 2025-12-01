@@ -1,5 +1,5 @@
 ---
-name: "flux-9.0.5"
+name: "flux-9.0.6"
 enable_cache: true
 distro: "debian"
 suites:
