@@ -3890,34 +3890,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             pindex->nStatus |= BLOCK_HAVE_UNDO;
         }
 
-        if (fluxnodeTxBlockUndo.vecExpiredDosData.size() ||
-            fluxnodeTxBlockUndo.vecExpiredConfirmedData.size() ||
-            fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight.size() ||
-            fluxnodeTxBlockUndo.mapLastPaidHeights.size())
-        {
-            if (!pFluxnodeDB->WriteBlockUndoFluxnodeData(block.GetHash(), fluxnodeTxBlockUndo))
-                return AbortNode(state, "Failed to write fluxnodetx undo data");
-        }
-
-        // Add delegate updates to the cache instead of writing directly to database
-        for (const auto& item : mapNewDelegates) {
-            if (item.second.delegateStartingKeys.empty()) {
-                // If no keys, mark for erasure
-                if (p_fluxnodeCache) {
-                    p_fluxnodeCache->setDelegateToErase.insert(item.first);
-                    // Remove from write map if it was there
-                    p_fluxnodeCache->mapDelegateToWrite.erase(item.first);
-                }
-            } else {
-                // Add to write map
-                if (p_fluxnodeCache) {
-                    p_fluxnodeCache->mapDelegateToWrite[item.first] = item.second;
-                    // Remove from erase set if it was there
-                    p_fluxnodeCache->setDelegateToErase.erase(item.first);
-                }
-            }
-        }
-
         // Now that all consensus rules have been validated, set nCachedBranchId.
         // Move this if BLOCK_VALID_CONSENSUS is ever altered.
         static_assert(BLOCK_VALID_CONSENSUS == BLOCK_VALID_SCRIPTS,
@@ -3931,6 +3903,39 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
         pindex->RaiseValidity(BLOCK_VALID_SCRIPTS);
         setDirtyBlockIndex.insert(pindex);
+    }
+
+    // Always write fluxnode undo data, even for reconnected blocks.
+    // The undo data depends on the current chain state at connection time, which may differ
+    // from when the block was first connected (due to PON competing blocks and reorgs).
+    // Since this is keyed by block hash in LevelDB, overwriting is safe.
+    if (fluxnodeTxBlockUndo.vecExpiredDosData.size() ||
+        fluxnodeTxBlockUndo.vecExpiredConfirmedData.size() ||
+        fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight.size() ||
+        fluxnodeTxBlockUndo.mapLastPaidHeights.size())
+    {
+        if (!pFluxnodeDB->WriteBlockUndoFluxnodeData(block.GetHash(), fluxnodeTxBlockUndo))
+            return AbortNode(state, "Failed to write fluxnodetx undo data");
+    }
+
+    // Always process delegate updates, even for reconnected blocks.
+    // Like fluxnode undo data, delegate state depends on current chain state.
+    for (const auto& item : mapNewDelegates) {
+        if (item.second.delegateStartingKeys.empty()) {
+            // If no keys, mark for erasure
+            if (p_fluxnodeCache) {
+                p_fluxnodeCache->setDelegateToErase.insert(item.first);
+                // Remove from write map if it was there
+                p_fluxnodeCache->mapDelegateToWrite.erase(item.first);
+            }
+        } else {
+            // Add to write map
+            if (p_fluxnodeCache) {
+                p_fluxnodeCache->mapDelegateToWrite[item.first] = item.second;
+                // Remove from erase set if it was there
+                p_fluxnodeCache->setDelegateToErase.erase(item.first);
+            }
+        }
     }
 
     if (fTxIndex)
@@ -4319,8 +4324,8 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     // Update chainActive & related variables.
     UpdateTip(pindexNew, chainparams);
 
-    // Periodically check and shrink debug.log if needed (every 20000 blocks about 1 week in 30 second intervals)
-    // This checks actual file size against configurable threshold
+    // Periodically check and shrink debug.log if needed (every 20000 blocks, ~1 week at 30s intervals)
+    // Uses -maxdebugfilesize (threshold) and -debuglogretainsize (keep size) parameters
     if (pindexNew && GetBoolArg("-shrinkdebugfile", !fDebug) && pindexNew->nHeight % 20000 == 0) {
         ShrinkDebugFile();
     }
