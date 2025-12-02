@@ -1,4 +1,4 @@
-# Flux 9.0.5
+# Flux 9.0.6
 
 ## What is Flux?
 
