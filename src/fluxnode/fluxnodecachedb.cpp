@@ -15,6 +15,7 @@
 static const char DB_FLUXNODE_CACHE_DATA = 'd';
 static const char BLOCK_FLUXNODE_UNDO_DATA = 'u';
 static const char FLUXNODE_DELEGATE_DATA = 'f';
+static const char DB_FLUXNODE_SYNC_STATE = 's';
 
 // EST 720 blocks * 7 Days
 static const int ONE_WEEK_OF_BLOCK_COUNT = 5040;
@@ -160,4 +161,39 @@ bool CDeterministicFluxnodeDB::CleanupOldFluxnodeData()
     }
 
     return true;
+}
+
+bool CDeterministicFluxnodeDB::WriteSyncState(const FluxnodeSyncState& syncState)
+{
+    return Write(DB_FLUXNODE_SYNC_STATE, syncState);
+}
+
+bool CDeterministicFluxnodeDB::ReadSyncState(FluxnodeSyncState& syncState)
+{
+    return Read(DB_FLUXNODE_SYNC_STATE, syncState);
+}
+
+void CDeterministicFluxnodeDB::WriteBatchFluxnodeData(CDBBatch& batch, const FluxnodeCacheData& data)
+{
+    batch.Write(std::make_pair(DB_FLUXNODE_CACHE_DATA, data.collateralIn), data);
+}
+
+void CDeterministicFluxnodeDB::EraseBatchFluxnodeData(CDBBatch& batch, const COutPoint& outpoint)
+{
+    batch.Erase(std::make_pair(DB_FLUXNODE_CACHE_DATA, outpoint));
+}
+
+void CDeterministicFluxnodeDB::WriteBatchDelegates(CDBBatch& batch, const COutPoint& outpoint, const CFluxnodeDelegates& delegates)
+{
+    batch.Write(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint), delegates);
+}
+
+void CDeterministicFluxnodeDB::EraseBatchDelegates(CDBBatch& batch, const COutPoint& outpoint)
+{
+    batch.Erase(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint));
+}
+
+void CDeterministicFluxnodeDB::WriteBatchSyncState(CDBBatch& batch, const FluxnodeSyncState& syncState)
+{
+    batch.Write(DB_FLUXNODE_SYNC_STATE, syncState);
 }

@@ -483,6 +483,7 @@ public:
     void EraseFromList(const std::set<COutPoint>& setToRemove, const Tier nTier);
 
     void DumpFluxnodeCache();
+    void DumpFluxnodeCache(const uint256& bestBlockHash, int nBestBlockHeight);
 
     // Delegate helper - checks cache first, then database
     bool GetDelegates(const COutPoint& outpoint, CFluxnodeDelegates& delegates);

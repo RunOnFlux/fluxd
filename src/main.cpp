@@ -167,17 +167,9 @@ namespace {
                 uint256 ponHashB = GetPONHash(pb->GetBlockHeader());
 
                 if (ponHashA < ponHashB) {
-                    LogPrint("pon", "PON tie-breaker: Block %s (PON hash %s) wins over %s (PON hash %s) at height %d\n",
-                             pa->GetBlockHash().ToString().substr(0,12).c_str(), ponHashA.ToString().substr(0,12).c_str(),
-                             pb->GetBlockHash().ToString().substr(0,12).c_str(), ponHashB.ToString().substr(0,12).c_str(),
-                             pa->nHeight);
                     return false; // A has better (lower) hash, A wins
                 }
                 if (ponHashA > ponHashB) {
-                    LogPrint("pon", "PON tie-breaker: Block %s (PON hash %s) wins over %s (PON hash %s) at height %d\n",
-                             pb->GetBlockHash().ToString().substr(0,12).c_str(), ponHashB.ToString().substr(0,12).c_str(),
-                             pa->GetBlockHash().ToString().substr(0,12).c_str(), ponHashA.ToString().substr(0,12).c_str(),
-                             pb->nHeight);
                     return true;  // B has better (lower) hash, B wins
                 }
                 // If hashes are equal, fall through to sequence ID
@@ -4094,8 +4086,14 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
         if (!pcoinsTip->Flush())
             return AbortNode(state, "Failed to write to coin database");
 
-        // Dump Fluxnode cache to database
-        g_fluxnodeCache.DumpFluxnodeCache();
+        // Dump Fluxnode cache to database with sync state marker
+        // This uses atomic batch writes to ensure consistency between
+        // fluxnode data and the sync state marker
+        if (chainActive.Tip()) {
+            g_fluxnodeCache.DumpFluxnodeCache(chainActive.Tip()->GetBlockHash(), chainActive.Height());
+        } else {
+            g_fluxnodeCache.DumpFluxnodeCache();
+        }
         nLastFlush = nNow;
     }
     if ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) && nNow > nLastSetChain + (int64_t)DATABASE_WRITE_INTERVAL * 1000000) {
