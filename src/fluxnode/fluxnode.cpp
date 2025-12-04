@@ -1520,6 +1520,61 @@ void FluxnodeCache::DumpFluxnodeCache()
     setDirtyDelegateErases.clear();
 }
 
+void FluxnodeCache::DumpFluxnodeCache(const uint256& bestBlockHash, int nBestBlockHeight)
+{
+    LOCK(cs);
+
+    // Use a batch for atomic writes - this ensures all fluxnode data and the sync state
+    // are written together. If crash occurs, either all writes succeed or none do.
+    CDBBatch batch(*pFluxnodeDB);
+
+    bool found = false;
+    for (const auto& item : setDirtyOutPoint) {
+        found = false;
+        if (mapStartTxTracker.count(item)) {
+            found = true;
+            pFluxnodeDB->WriteBatchFluxnodeData(batch, mapStartTxTracker.at(item));
+        } else if (mapStartTxDOSTracker.count(item)) {
+            found = true;
+            pFluxnodeDB->WriteBatchFluxnodeData(batch, mapStartTxDOSTracker.at(item));
+        } else if (mapConfirmedFluxnodeData.count(item)) {
+            found = true;
+            pFluxnodeDB->WriteBatchFluxnodeData(batch, mapConfirmedFluxnodeData.at(item));
+        }
+
+        if (!found) {
+            pFluxnodeDB->EraseBatchFluxnodeData(batch, item);
+        }
+    }
+
+    // Write dirty delegates to batch
+    for (const auto& item : mapDirtyDelegateWrites) {
+        pFluxnodeDB->WriteBatchDelegates(batch, item.first, item.second);
+    }
+
+    for (const auto& outpoint : setDirtyDelegateErases) {
+        pFluxnodeDB->EraseBatchDelegates(batch, outpoint);
+    }
+
+    // Write the sync state marker - this records what block height the fluxnode
+    // cache is synced to. Used for crash recovery detection at startup.
+    FluxnodeSyncState syncState(bestBlockHash, nBestBlockHeight);
+    pFluxnodeDB->WriteBatchSyncState(batch, syncState);
+
+    // Commit the batch atomically with sync for durability
+    if (pFluxnodeDB->WriteBatch(batch, true)) {
+        // Only clear dirty tracking structures after successful database write
+        setDirtyOutPoint.clear();
+        mapDirtyDelegateWrites.clear();
+        setDirtyDelegateErases.clear();
+
+        LogPrint("dfluxnode", "DumpFluxnodeCache: Synced to block %s at height %d\n",
+                 bestBlockHash.ToString(), nBestBlockHeight);
+    } else {
+        LogPrintf("ERROR: DumpFluxnodeCache: Failed to write batch to database\n");
+    }
+}
+
 bool IsFluxnodeTransactionsActive()
 {
     return chainActive.Height() >= Params().GetConsensus().vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight;
