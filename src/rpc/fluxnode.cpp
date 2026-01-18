@@ -1300,6 +1300,91 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
     return returnObj;
 }
 
+UniValue listfluxnodedelegates(const UniValue& params, bool fHelp)
+{
+    if (!IsFluxnodeTransactionsActive()) {
+        throw runtime_error("deterministic fluxnodes transactions is not active yet");
+    }
+
+    if (fHelp || params.size() != 2)
+        throw runtime_error(
+                "listfluxnodedelegates \"txhash\" \"outputindex\"\n"
+                "\nList delegate keys authorized for a specific fluxnode collateral.\n"
+                "\nArguments:\n"
+                "1. txhash         (string, required) The transaction hash of the collateral.\n"
+                "2. outputindex    (string, required) The output index of the collateral.\n"
+                "\nResult:\n"
+                "{\n"
+                "  \"collateral\": \"xxxx:n\",           (string) Collateral outpoint\n"
+                "  \"has_delegates\": true|false,        (boolean) Whether delegates are registered\n"
+                "  \"delegate_version\": n,              (numeric) Delegate data version\n"
+                "  \"delegate_type\": n,                 (numeric) Delegate type (1=UPDATE/ALL, 2=SIGNING)\n"
+                "  \"delegate_type_string\": \"xxxx\",   (string) Delegate type as string\n"
+                "  \"delegate_keys\": [                  (array) Array of authorized delegate public keys\n"
+                "    \"key\",                            (string) Compressed public key (hex)\n"
+                "    ...\n"
+                "  ]\n"
+                "}\n"
+                "\nExamples:\n" +
+                HelpExampleCli("listfluxnodedelegates", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\"") +
+                HelpExampleRpc("listfluxnodedelegates", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\""));
+
+    std::string strTxHash = params[0].get_str();
+    std::string strOutputIndex = params[1].get_str();
+
+    UniValue returnObj(UniValue::VOBJ);
+
+    // Validate the transaction hash
+    uint256 txHash = uint256S(strTxHash);
+    if (txHash.IsNull()) {
+        returnObj.pushKV("error", "Invalid transaction hash");
+        return returnObj;
+    }
+
+    // Validate the output index
+    int nOutputIndex;
+    try {
+        nOutputIndex = std::stoi(strOutputIndex);
+    } catch (const std::exception& e) {
+        returnObj.pushKV("error", "Invalid output index");
+        return returnObj;
+    }
+
+    COutPoint outpoint(txHash, nOutputIndex);
+
+    returnObj.pushKV("collateral", outpoint.ToFullString());
+
+    // Try to get delegates for this outpoint
+    CFluxnodeDelegates delegates;
+    bool hasDelegates = g_fluxnodeCache.GetDelegates(outpoint, delegates);
+
+    returnObj.pushKV("has_delegates", hasDelegates);
+
+    if (hasDelegates && delegates.IsValid()) {
+        returnObj.pushKV("delegate_version", delegates.nDelegateVersion);
+        returnObj.pushKV("delegate_type", delegates.nType);
+
+        std::string typeString;
+        if (delegates.nType == CFluxnodeDelegates::UPDATE) {
+            typeString = "UPDATE";
+        } else if (delegates.nType == CFluxnodeDelegates::SIGNING) {
+            typeString = "SIGNING";
+        } else {
+            typeString = "UNKNOWN";
+        }
+        returnObj.pushKV("delegate_type_string", typeString);
+
+        // Add delegate keys array
+        UniValue keysArray(UniValue::VARR);
+        for (const auto& pubkey : delegates.delegateStartingKeys) {
+            keysArray.push_back(HexStr(pubkey));
+        }
+        returnObj.pushKV("delegate_keys", keysArray);
+    }
+
+    return returnObj;
+}
+
 void GetDeterministicListData(UniValue& listData, const std::string& strFilter, const Tier tier) {
     int count = -1;
     for (const auto& item : g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes) {
@@ -2446,6 +2531,7 @@ static const CRPCCommand commands[] =
                 { "fluxnode",   "startfluxnodewithdelegates", &startfluxnodewithdelegates, false },
                 { "fluxnode",   "startfluxnodeasdelegate", &startfluxnodeasdelegate, false },
                 { "fluxnode",   "startp2shasdelegate", &startp2shasdelegate, false },
+                { "fluxnode",   "listfluxnodedelegates", &listfluxnodedelegates, false },
                 { "fluxnode",   "viewdeterministicfluxnodelist", &viewdeterministicfluxnodelist, false },
 
                 { "benchmarks", "getbenchmarks",         &getbenchmarks,           false  },
