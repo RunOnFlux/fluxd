@@ -1329,12 +1329,15 @@ UniValue listfluxnodedelegates(const UniValue& params, bool fHelp)
                 HelpExampleCli("listfluxnodedelegates", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\"") +
                 HelpExampleRpc("listfluxnodedelegates", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\""));
 
-    std::string strTxHash = params[0].get_str();
-    std::string strOutputIndex = params[1].get_str();
-
     UniValue returnObj(UniValue::VOBJ);
 
     // Validate the transaction hash
+    std::string strTxHash = params[0].get_str();
+    if (!IsHex(strTxHash) || strTxHash.length() != 64) {
+        returnObj.pushKV("error", "Invalid transaction hash (must be 64 hex characters)");
+        return returnObj;
+    }
+
     uint256 txHash = uint256S(strTxHash);
     if (txHash.IsNull()) {
         returnObj.pushKV("error", "Invalid transaction hash");
@@ -1342,9 +1345,16 @@ UniValue listfluxnodedelegates(const UniValue& params, bool fHelp)
     }
 
     // Validate the output index
-    int nOutputIndex;
+    std::string strOutputIndex = params[1].get_str();
+    uint32_t nOutputIndex;
+
     try {
-        nOutputIndex = std::stoi(strOutputIndex);
+        unsigned long idx = std::stoul(strOutputIndex);
+        if (idx > 0xFFFFFFFF) {
+            returnObj.pushKV("error", "Output index exceeds maximum (4294967295)");
+            return returnObj;
+        }
+        nOutputIndex = static_cast<uint32_t>(idx);
     } catch (const std::exception& e) {
         returnObj.pushKV("error", "Invalid output index");
         return returnObj;
