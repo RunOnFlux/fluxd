@@ -916,15 +916,16 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
         throw runtime_error("deterministic fluxnodes transactions is not active yet");
     }
 
-    if (fHelp || params.size() != 4)
+    if (fHelp || params.size() < 3 || params.size() > 5)
         throw runtime_error(
-                "startfluxnodeasdelegate \"txhash\" \"outputindex\" \"delegatekey\" \"vpspubkey\"\n"
+                "startfluxnodeasdelegate \"txhash\" \"outputindex\" \"delegatekey\" (\"vpspubkey\") (\"collateralpubkey\")\n"
                 "\nStart a Fluxnode as an authorized delegate instead of the collateral owner.\n"
                 "\nArguments:\n"
-                "1. txhash         (string, required) The transaction hash of the collateral.\n"
-                "2. outputindex    (string, required) The output index of the collateral.\n"
-                "3. delegatekey    (string, required) The private key of an authorized delegate.\n"
-                "4. vpspubkey      (string, required) The public key for VPS verification.\n"
+                "1. txhash            (string, required) The transaction hash of the collateral.\n"
+                "2. outputindex       (string, required) The output index of the collateral.\n"
+                "3. delegatekey       (string, required) The private key of an authorized delegate.\n"
+                "4. vpspubkey         (string, optional) The public key for VPS verification. If not provided or empty, will be looked up from previous start transaction.\n"
+                "5. collateralpubkey  (string, optional) The public key of the collateral owner. If not provided or empty, will be looked up from previous start transaction.\n"
                 "\nResult:\n"
                 "{\n"
                 "  \"result\": \"xxxx\",     (string) 'success' or 'failed'\n"
@@ -934,13 +935,14 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
                 "}\n"
                 "\nNote: The delegate must first be authorized by the collateral owner using 'startfluxnodewithdelegates'.\n"
                 "\nExamples:\n" +
-                HelpExampleCli("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\" \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\"") +
-                HelpExampleRpc("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\", \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\""));
+                HelpExampleCli("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\"") +
+                HelpExampleRpc("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\""));
 
     std::string strTxHash = params[0].get_str();
     std::string strOutputIndex = params[1].get_str();
     std::string strDelegateKey = params[2].get_str();
-    std::string strVpsPubKey = params[3].get_str();
+    std::string strVpsPubKey = params.size() > 3 ? params[3].get_str() : "";
+    std::string strCollateralPubKey = params.size() > 4 ? params[4].get_str() : "";
 
     UniValue returnObj(UniValue::VOBJ);
 
@@ -993,14 +995,6 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
 
     CPubKey delegatePubKey = delegateKey.GetPubKey();
 
-    // Parse and validate VPS public key
-    CPubKey vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
-    if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
-        returnObj.pushKV("result", "failed");
-        returnObj.pushKV("error", "Invalid VPS public key");
-        return returnObj;
-    }
-
     // Check if this delegate is authorized
     CFluxnodeDelegates storedDelegates;
     bool isDelegateAuthorized = false;
@@ -1046,11 +1040,57 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
         return returnObj;
     }
 
+    // Get cached fluxnode data for lookups
+    FluxnodeCacheData cachedData = g_fluxnodeCache.GetFluxnodeData(outpoint);
+
+    // Get VPS public key - either from parameter or lookup from cache
+    CPubKey vpsPubKey;
+    if (!strVpsPubKey.empty()) {
+        // Use provided VPS public key
+        vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
+        if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
+            returnObj.pushKV("result", "failed");
+            returnObj.pushKV("error", "Invalid VPS public key");
+            return returnObj;
+        }
+    } else {
+        // Try to look up from cache (previous start transaction)
+        if (!cachedData.IsNull() && cachedData.pubKey.IsValid()) {
+            vpsPubKey = cachedData.pubKey;
+        } else {
+            returnObj.pushKV("result", "failed");
+            returnObj.pushKV("error", "Could not find VPS public key. Please provide it as a parameter.");
+            return returnObj;
+        }
+    }
+
+    // Get collateral public key - either from parameter or lookup from cache
+    CPubKey collateralPubKey;
+    if (!strCollateralPubKey.empty()) {
+        // Use provided collateral public key
+        collateralPubKey = CPubKey(ParseHex(strCollateralPubKey));
+        if (!collateralPubKey.IsValid() || !collateralPubKey.IsFullyValid()) {
+            returnObj.pushKV("result", "failed");
+            returnObj.pushKV("error", "Invalid collateral public key");
+            return returnObj;
+        }
+    } else {
+        // Try to look up from cache (previous start transaction)
+        if (!cachedData.IsNull() && cachedData.collateralPubkey.IsValid()) {
+            collateralPubKey = cachedData.collateralPubkey;
+        } else {
+            returnObj.pushKV("result", "failed");
+            returnObj.pushKV("error", "Could not find collateral public key. Please provide it as a parameter.");
+            return returnObj;
+        }
+    }
+
     // Create the transaction
     CMutableTransaction mutTransaction;
     mutTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION; // Use upgradeable version for delegate support
     mutTransaction.nType = FLUXNODE_START_TX_TYPE;
     mutTransaction.collateralIn = outpoint;
+    mutTransaction.collateralPubkey = collateralPubKey;
     mutTransaction.pubKey = vpsPubKey; // Use VPS pubkey for VPS verification
 
     // Set the FluxTx version with delegate feature bit
@@ -1105,16 +1145,16 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
         throw runtime_error("deterministic fluxnodes transactions is not active yet");
     }
 
-    if (fHelp || params.size() != 5)
+    if (fHelp || params.size() < 3 || params.size() > 5)
         throw runtime_error(
-                "startp2shasdelegate \"redeemscript\" \"collateraltxid\" \"outputindex\" \"delegatekey\" \"vpspubkey\"\n"
+                "startp2shasdelegate \"txhash\" \"outputindex\" \"delegatekey\" (\"vpspubkey\") (\"redeemscript\")\n"
                 "\nStart a P2SH (multisig) Fluxnode as an authorized delegate.\n"
                 "\nArguments:\n"
-                "1. redeemscript    (string, required) The hex-encoded redeem script of the P2SH address.\n"
-                "2. collateraltxid  (string, required) The transaction ID of the collateral.\n"
-                "3. outputindex     (string, required) The output index of the collateral.\n"
-                "4. delegatekey     (string, required) The private key of an authorized delegate.\n"
-                "5. vpspubkey       (string, required) The public key for VPS verification.\n"
+                "1. txhash          (string, required) The transaction ID of the collateral.\n"
+                "2. outputindex     (string, required) The output index of the collateral.\n"
+                "3. delegatekey     (string, required) The private key of an authorized delegate.\n"
+                "4. vpspubkey       (string, optional) The public key for VPS verification. If not provided or empty, will be looked up from previous start transaction.\n"
+                "5. redeemscript    (string, optional) The hex-encoded redeem script of the P2SH address. If not provided or empty, will be looked up from previous start transaction.\n"
                 "\nResult:\n"
                 "{\n"
                 "  \"result\": \"xxxx\",     (string) 'success' or 'failed'\n"
@@ -1124,20 +1164,16 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
                 "}\n"
                 "\nNote: The delegate must first be authorized using 'updatefluxnodedelegates'.\n"
                 "\nExamples:\n" +
-                HelpExampleCli("startp2shasdelegate", "\"512103...\" \"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\" \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\"") +
-                HelpExampleRpc("startp2shasdelegate", "\"512103...\", \"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\", \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\""));
+                HelpExampleCli("startp2shasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\"") +
+                HelpExampleRpc("startp2shasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\""));
 
-    std::string strRedeemScript = params[0].get_str();
-    std::string strTxHash = params[1].get_str();
-    std::string strOutputIndex = params[2].get_str();
-    std::string strDelegateKey = params[3].get_str();
-    std::string strVpsPubKey = params[4].get_str();
+    std::string strTxHash = params[0].get_str();
+    std::string strOutputIndex = params[1].get_str();
+    std::string strDelegateKey = params[2].get_str();
+    std::string strVpsPubKey = params.size() > 3 ? params[3].get_str() : "";
+    std::string strRedeemScript = params.size() > 4 ? params[4].get_str() : "";
 
     UniValue returnObj(UniValue::VOBJ);
-
-    // Parse the redeem script
-    std::vector<unsigned char> redeemScriptData = ParseHex(strRedeemScript);
-    CScript redeemScript(redeemScriptData.begin(), redeemScriptData.end());
 
     // Validate the transaction hash
     uint256 txHash = uint256S(strTxHash);
@@ -1188,14 +1224,6 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
 
     CPubKey delegatePubKey = delegateKey.GetPubKey();
 
-    // Parse and validate VPS public key
-    CPubKey vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
-    if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
-        returnObj.pushKV("result", "failed");
-        returnObj.pushKV("error", "Invalid VPS public key");
-        return returnObj;
-    }
-
     // Check if this delegate is authorized
     CFluxnodeDelegates storedDelegates;
     bool hasDelegates = false;
@@ -1239,6 +1267,47 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
         returnObj.pushKV("result", "failed");
         returnObj.pushKV("error", "Invalid output index for transaction");
         return returnObj;
+    }
+
+    // Get cached fluxnode data for lookups
+    FluxnodeCacheData cachedData = g_fluxnodeCache.GetFluxnodeData(outpoint);
+
+    // Get VPS public key - either from parameter or lookup from cache
+    CPubKey vpsPubKey;
+    if (!strVpsPubKey.empty()) {
+        // Use provided VPS public key
+        vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
+        if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
+            returnObj.pushKV("result", "failed");
+            returnObj.pushKV("error", "Invalid VPS public key");
+            return returnObj;
+        }
+    } else {
+        // Try to look up from cache (previous start transaction)
+        if (!cachedData.IsNull() && cachedData.pubKey.IsValid()) {
+            vpsPubKey = cachedData.pubKey;
+        } else {
+            returnObj.pushKV("result", "failed");
+            returnObj.pushKV("error", "Could not find VPS public key. Please provide it as a parameter.");
+            return returnObj;
+        }
+    }
+
+    // Get redeem script - either from parameter or lookup from cache
+    CScript redeemScript;
+    if (!strRedeemScript.empty()) {
+        // Use provided redeem script
+        std::vector<unsigned char> redeemScriptData = ParseHex(strRedeemScript);
+        redeemScript = CScript(redeemScriptData.begin(), redeemScriptData.end());
+    } else {
+        // Try to look up from cache (previous start transaction)
+        if (!cachedData.IsNull() && cachedData.P2SHRedeemScript.size() > 0) {
+            redeemScript = cachedData.P2SHRedeemScript;
+        } else {
+            returnObj.pushKV("result", "failed");
+            returnObj.pushKV("error", "Could not find redeem script. Please provide it as a parameter.");
+            return returnObj;
+        }
     }
 
     // Create the P2SH fluxnode start transaction
