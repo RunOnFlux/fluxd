@@ -24,6 +24,7 @@
 #include <boost/tokenizer.hpp>
 #include <fstream>
 #include <consensus/validation.h>
+#include <consensus/params.h>
 #include <undo.h>
 #include "core_io.h"
 #include "boost/assign/list_of.hpp"
@@ -34,6 +35,47 @@
 std::string CRPCFluxnodeCache::filter = "";
 int64_t CRPCFluxnodeCache::nHeight = -1;
 UniValue CRPCFluxnodeCache::list = NullUniValue;
+
+// Scan blockchain to find a fluxnode transaction for a given collateral outpoint
+// that contains the keys we need (collateralPubkey, pubKey, P2SHRedeemScript)
+// Returns true if found and fills in the foundTx parameter
+// Scans from tip back to KAMATA activation (when deterministic fluxnodes went live)
+static bool FindFluxnodeTxForCollateral(const COutPoint& collateralOutpoint, CTransaction& foundTx)
+{
+    LOCK(cs_main);
+
+    if (!chainActive.Tip())
+        return false;
+
+    // Only scan back to KAMATA activation - no fluxnode transactions exist before that
+    int nMinHeight = Params().GetConsensus().vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight;
+
+    // Scan from most recent to oldest - usually finds match within first few hundred blocks
+    // if the node was recently active (CONFIRM transactions every ~640 blocks)
+    for (int height = chainActive.Height(); height >= nMinHeight; height--) {
+        CBlockIndex* pindex = chainActive[height];
+        if (!pindex)
+            continue;
+
+        CBlock block;
+        if (!ReadBlockFromDisk(block, pindex, Params().GetConsensus()))
+            continue;
+
+        for (const CTransaction& tx : block.vtx) {
+            // Check if this is a fluxnode START or CONFIRM transaction with matching collateralIn
+            if ((tx.nType == FLUXNODE_START_TX_TYPE || tx.nType == FLUXNODE_CONFIRM_TX_TYPE) &&
+                tx.collateralIn == collateralOutpoint) {
+                // Check if it has valid keys we need
+                if (tx.pubKey.IsValid() && (tx.collateralPubkey.IsValid() || tx.P2SHRedeemScript.size() > 0)) {
+                    foundTx = tx;
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
 
 UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
     if (fHelp || params.size() > 0)
@@ -1040,49 +1082,43 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
         return returnObj;
     }
 
-    // Get cached fluxnode data for lookups
-    FluxnodeCacheData cachedData = g_fluxnodeCache.GetFluxnodeData(outpoint);
+    // Scan blockchain for a previous fluxnode transaction to get the keys
+    // (cache won't have data since we already verified node is not active)
+    CTransaction blockchainTx;
+    bool hasBlockchainTx = FindFluxnodeTxForCollateral(outpoint, blockchainTx);
 
-    // Get VPS public key - either from parameter or lookup from cache
+    // Get VPS public key - either from parameter or blockchain
     CPubKey vpsPubKey;
     if (!strVpsPubKey.empty()) {
-        // Use provided VPS public key
         vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
         if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
             returnObj.pushKV("result", "failed");
             returnObj.pushKV("error", "Invalid VPS public key");
             return returnObj;
         }
+    } else if (hasBlockchainTx && blockchainTx.pubKey.IsValid()) {
+        vpsPubKey = blockchainTx.pubKey;
     } else {
-        // Try to look up from cache (previous start transaction)
-        if (!cachedData.IsNull() && cachedData.pubKey.IsValid()) {
-            vpsPubKey = cachedData.pubKey;
-        } else {
-            returnObj.pushKV("result", "failed");
-            returnObj.pushKV("error", "Could not find VPS public key. Please provide it as a parameter.");
-            return returnObj;
-        }
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Could not find VPS public key in blockchain. Please provide it as a parameter.");
+        return returnObj;
     }
 
-    // Get collateral public key - either from parameter or lookup from cache
+    // Get collateral public key - either from parameter or blockchain
     CPubKey collateralPubKey;
     if (!strCollateralPubKey.empty()) {
-        // Use provided collateral public key
         collateralPubKey = CPubKey(ParseHex(strCollateralPubKey));
         if (!collateralPubKey.IsValid() || !collateralPubKey.IsFullyValid()) {
             returnObj.pushKV("result", "failed");
             returnObj.pushKV("error", "Invalid collateral public key");
             return returnObj;
         }
+    } else if (hasBlockchainTx && blockchainTx.collateralPubkey.IsValid()) {
+        collateralPubKey = blockchainTx.collateralPubkey;
     } else {
-        // Try to look up from cache (previous start transaction)
-        if (!cachedData.IsNull() && cachedData.collateralPubkey.IsValid()) {
-            collateralPubKey = cachedData.collateralPubkey;
-        } else {
-            returnObj.pushKV("result", "failed");
-            returnObj.pushKV("error", "Could not find collateral public key. Please provide it as a parameter.");
-            return returnObj;
-        }
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Could not find collateral public key in blockchain. Please provide it as a parameter.");
+        return returnObj;
     }
 
     // Create the transaction
@@ -1269,45 +1305,39 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
         return returnObj;
     }
 
-    // Get cached fluxnode data for lookups
-    FluxnodeCacheData cachedData = g_fluxnodeCache.GetFluxnodeData(outpoint);
+    // Scan blockchain for a previous fluxnode transaction to get the keys
+    // (cache won't have data since we already verified node is not active)
+    CTransaction blockchainTx;
+    bool hasBlockchainTx = FindFluxnodeTxForCollateral(outpoint, blockchainTx);
 
-    // Get VPS public key - either from parameter or lookup from cache
+    // Get VPS public key - either from parameter or blockchain
     CPubKey vpsPubKey;
     if (!strVpsPubKey.empty()) {
-        // Use provided VPS public key
         vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
         if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
             returnObj.pushKV("result", "failed");
             returnObj.pushKV("error", "Invalid VPS public key");
             return returnObj;
         }
+    } else if (hasBlockchainTx && blockchainTx.pubKey.IsValid()) {
+        vpsPubKey = blockchainTx.pubKey;
     } else {
-        // Try to look up from cache (previous start transaction)
-        if (!cachedData.IsNull() && cachedData.pubKey.IsValid()) {
-            vpsPubKey = cachedData.pubKey;
-        } else {
-            returnObj.pushKV("result", "failed");
-            returnObj.pushKV("error", "Could not find VPS public key. Please provide it as a parameter.");
-            return returnObj;
-        }
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Could not find VPS public key in blockchain. Please provide it as a parameter.");
+        return returnObj;
     }
 
-    // Get redeem script - either from parameter or lookup from cache
+    // Get redeem script - either from parameter or blockchain
     CScript redeemScript;
     if (!strRedeemScript.empty()) {
-        // Use provided redeem script
         std::vector<unsigned char> redeemScriptData = ParseHex(strRedeemScript);
         redeemScript = CScript(redeemScriptData.begin(), redeemScriptData.end());
+    } else if (hasBlockchainTx && blockchainTx.P2SHRedeemScript.size() > 0) {
+        redeemScript = blockchainTx.P2SHRedeemScript;
     } else {
-        // Try to look up from cache (previous start transaction)
-        if (!cachedData.IsNull() && cachedData.P2SHRedeemScript.size() > 0) {
-            redeemScript = cachedData.P2SHRedeemScript;
-        } else {
-            returnObj.pushKV("result", "failed");
-            returnObj.pushKV("error", "Could not find redeem script. Please provide it as a parameter.");
-            return returnObj;
-        }
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Could not find redeem script in blockchain. Please provide it as a parameter.");
+        return returnObj;
     }
 
     // Create the P2SH fluxnode start transaction
