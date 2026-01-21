@@ -19,7 +19,6 @@
 #endif
 
 #include <filesystem>
-#include <boost/version.hpp>
 
 using namespace std;
 

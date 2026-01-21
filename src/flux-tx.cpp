@@ -20,8 +20,6 @@
 
 #include <stdio.h>
 
-#include <boost/algorithm/string.hpp>
-
 static bool fCreateBlank;
 static std::map<std::string,UniValue> registers;
 static const int CONTINUE_EXECUTION=-1;

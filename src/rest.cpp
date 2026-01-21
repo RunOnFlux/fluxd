@@ -16,9 +16,6 @@
 #include "utilstrencodings.h"
 #include "version.h"
 
-#include <boost/algorithm/string.hpp>
-#include <boost/dynamic_bitset.hpp>
-
 #include <univalue.h>
 
 using namespace std;
@@ -493,7 +490,7 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
     vector<unsigned char> bitmap;
     vector<CCoin> outs;
     std::string bitmapStringRepresentation;
-    boost::dynamic_bitset<unsigned char> hits(vOutPoints.size());
+    std::vector<bool> hits(vOutPoints.size(), false);
     {
         LOCK2(cs_main, mempool.cs);
 
@@ -527,7 +524,17 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
             bitmapStringRepresentation.append(hits[i] ? "1" : "0"); // form a binary string representation (human-readable for json output)
         }
     }
-    boost::to_block_range(hits, std::back_inserter(bitmap));
+
+    // Convert vector<bool> to bitmap bytes
+    for (size_t i = 0; i < hits.size(); i += 8) {
+        unsigned char byte = 0;
+        for (size_t j = 0; j < 8 && (i + j) < hits.size(); ++j) {
+            if (hits[i + j]) {
+                byte |= (1 << j);
+            }
+        }
+        bitmap.push_back(byte);
+    }
 
     switch (rf) {
     case RF_BINARY: {

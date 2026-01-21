@@ -21,7 +21,6 @@
 #include <univalue.h>
 #include "rpc/cache.h"
 
-#include <boost/tokenizer.hpp>
 #include <fstream>
 #include <consensus/validation.h>
 #include <consensus/params.h>

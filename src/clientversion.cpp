@@ -9,12 +9,6 @@
 
 #include <string>
 
-#include <boost/preprocessor/arithmetic/add.hpp>
-#include <boost/preprocessor/arithmetic/sub.hpp>
-#include <boost/preprocessor/comparison/equal.hpp>
-#include <boost/preprocessor/comparison/less.hpp>
-#include <boost/preprocessor/control/if.hpp>
-
 /**
  * Name of client reported in the 'version' message. Report the same name
  * for both bitcoind and bitcoin-core, to make it harder for attackers to
@@ -56,38 +50,33 @@ const std::string CLIENT_NAME("MagicBean");
 #define GIT_COMMIT_DATE "Wed, 21 Feb 2018 19:30:48 -0700"
 #endif
 
-#define RENDER_BETA_STRING(num) "-beta" DO_STRINGIZE(num)
-#define RENDER_RC_STRING(num) "-rc" DO_STRINGIZE(num)
-#define RENDER_DEV_STRING(num) "-" DO_STRINGIZE(num)
+// Render build number as beta/rc/dev/release string at compile-time
+#if CLIENT_VERSION_BUILD < 25
+#define BUILD_SUFFIX_STR "-beta" DO_STRINGIZE(CLIENT_VERSION_BUILD + 1)
+#elif CLIENT_VERSION_BUILD < 50
+#define BUILD_SUFFIX_STR "-rc" DO_STRINGIZE(CLIENT_VERSION_BUILD - 24)
+#elif CLIENT_VERSION_BUILD == 50
+#define BUILD_SUFFIX_STR ""
+#else
+#define BUILD_SUFFIX_STR "-" DO_STRINGIZE(CLIENT_VERSION_BUILD - 50)
+#endif
 
-#define RENDER_BUILD(build) \
-    BOOST_PP_IF( \
-        BOOST_PP_LESS(build, 25), \
-        RENDER_BETA_STRING(BOOST_PP_ADD(build, 1)), \
-        BOOST_PP_IF( \
-            BOOST_PP_LESS(build, 50), \
-            RENDER_RC_STRING(BOOST_PP_SUB(build, 24)), \
-            BOOST_PP_IF( \
-                BOOST_PP_EQUAL(build, 50), \
-                "", \
-                RENDER_DEV_STRING(BOOST_PP_SUB(build, 50)))))
+#define BUILD_DESC_WITH_SUFFIX(maj, min, rev, suffix) \
+    "v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev) BUILD_SUFFIX_STR "-" DO_STRINGIZE(suffix)
 
-#define BUILD_DESC_WITH_SUFFIX(maj, min, rev, build, suffix) \
-    "v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev) RENDER_BUILD(build) "-" DO_STRINGIZE(suffix)
+#define BUILD_DESC_FROM_COMMIT(maj, min, rev, commit) \
+    "v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev) BUILD_SUFFIX_STR "-g" commit
 
-#define BUILD_DESC_FROM_COMMIT(maj, min, rev, build, commit) \
-    "v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev) RENDER_BUILD(build) "-g" commit
-
-#define BUILD_DESC_FROM_UNKNOWN(maj, min, rev, build) \
-    "v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev) RENDER_BUILD(build) "-unk"
+#define BUILD_DESC_FROM_UNKNOWN(maj, min, rev) \
+    "v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev) BUILD_SUFFIX_STR "-unk"
 
 #ifndef BUILD_DESC
 #ifdef BUILD_SUFFIX
-#define BUILD_DESC BUILD_DESC_WITH_SUFFIX(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_REVISION, CLIENT_VERSION_BUILD, BUILD_SUFFIX)
+#define BUILD_DESC BUILD_DESC_WITH_SUFFIX(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_REVISION, BUILD_SUFFIX)
 #elif defined(GIT_COMMIT_ID)
-#define BUILD_DESC BUILD_DESC_FROM_COMMIT(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_REVISION, CLIENT_VERSION_BUILD, GIT_COMMIT_ID)
+#define BUILD_DESC BUILD_DESC_FROM_COMMIT(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_REVISION, GIT_COMMIT_ID)
 #else
-#define BUILD_DESC BUILD_DESC_FROM_UNKNOWN(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_REVISION, CLIENT_VERSION_BUILD)
+#define BUILD_DESC BUILD_DESC_FROM_UNKNOWN(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_REVISION)
 #endif
 #endif
 

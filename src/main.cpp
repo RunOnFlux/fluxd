@@ -44,11 +44,9 @@
 #include "fluxnode/activefluxnode.h"
 
 #include <sstream>
-
-#include <boost/algorithm/string/replace.hpp>
 #include <filesystem>
 #include <fstream>
-#include <boost/math/distributions/poisson.hpp>
+#include <cmath>
 
 #include "emergencyblock.h"
 
@@ -3427,6 +3425,18 @@ void StopScriptCheckQueue() {
     scriptcheckqueue.Quit();
 }
 
+// Calculate Poisson probability density function
+// P(k; lambda) = (lambda^k * e^(-lambda)) / k!
+static double PoissonPDF(int k, double lambda)
+{
+    if (k < 0) return 0.0;
+
+    // Use logarithms to avoid overflow for large values
+    // log(P) = k*log(lambda) - lambda - log(k!)
+    double logP = k * std::log(lambda) - lambda - std::lgamma(k + 1);
+    return std::exp(logP);
+}
+
 //
 // Called periodically asynchronously; alerts if it smells like
 // we're being fed a bad chain (blocks being generated much
@@ -3450,8 +3460,6 @@ void PartitionCheck(bool (*initialDownloadCheck)(const CChainParams&),
 
     int BLOCKS_EXPECTED = SPAN_SECONDS / targetSpacing;
 
-    boost::math::poisson_distribution<double> poisson(BLOCKS_EXPECTED);
-
     std::string strWarning;
     int64_t startTime = GetAdjustedTime()-SPAN_SECONDS;
 
@@ -3465,7 +3473,7 @@ void PartitionCheck(bool (*initialDownloadCheck)(const CChainParams&),
     }
 
     // How likely is it to find that many by chance?
-    double p = boost::math::pdf(poisson, nBlocks);
+    double p = PoissonPDF(nBlocks, BLOCKS_EXPECTED);
 
     LogPrint("partitioncheck", "%s : Found %d blocks in the last %d hours\n", __func__, nBlocks, SPAN_HOURS);
     LogPrint("partitioncheck", "%s : likelihood: %g\n", __func__, p);

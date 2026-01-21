@@ -37,7 +37,6 @@
 #endif
 #endif
 
-#include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <memory>
 
 /** HTTP request work item */
