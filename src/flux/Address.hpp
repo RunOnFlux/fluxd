@@ -10,7 +10,7 @@
 #include "serialize.h"
 #include "Zelcash.h"
 
-#include <boost/variant.hpp>
+#include <variant>
 
 namespace libflux {
 class InvalidEncoding {
@@ -139,7 +139,7 @@ public:
     SaplingIncomingViewingKey(uint256 ivk) : uint256(ivk) { }
     
     // Can pass in diversifier for Sapling addr
-    boost::optional<SaplingPaymentAddress> address(diversifier_t d) const;
+    std::optional<SaplingPaymentAddress> address(diversifier_t d) const;
 };
 
 class SaplingFullViewingKey {
@@ -221,8 +221,8 @@ public:
     SaplingPaymentAddress default_address() const;
 };
 
-typedef boost::variant<InvalidEncoding, SproutPaymentAddress, SaplingPaymentAddress> PaymentAddress;
-typedef boost::variant<InvalidEncoding, SproutViewingKey> ViewingKey;
+typedef std::variant<InvalidEncoding, SproutPaymentAddress, SaplingPaymentAddress> PaymentAddress;
+typedef std::variant<InvalidEncoding, SproutViewingKey> ViewingKey;
 
 }
 

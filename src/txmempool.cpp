@@ -564,7 +564,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
             i++;
         }
 
-        boost::unordered_map<uint256, SproutMerkleTree, CCoinsKeyHasher> intermediates;
+        std::unordered_map<uint256, SproutMerkleTree, CCoinsKeyHasher> intermediates;
 
         BOOST_FOREACH(const JSDescription &joinsplit, tx.vJoinSplit) {
             BOOST_FOREACH(const uint256 &nf, joinsplit.nullifiers) {
@@ -876,9 +876,9 @@ void CTxMemPool::AddRecentlySeenInBlock(const uint256& txId) {
 
 void CTxMemPool::EnsureSizeLimit() {
     AssertLockHeld(cs);
-    boost::optional<uint256> maybeDropTxId;
-    while ((maybeDropTxId = weightedTxTree->maybeDropRandom()).is_initialized()) {
-        uint256 txId = maybeDropTxId.get();
+    std::optional<uint256> maybeDropTxId;
+    while ((maybeDropTxId = weightedTxTree->maybeDropRandom()).has_value()) {
+        uint256 txId = maybeDropTxId.value();
         recentlyEvicted->add(txId);
         std::list<CTransaction> removed;
         remove(mapTx.find(txId)->GetTx(), removed, true);

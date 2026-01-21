@@ -17,6 +17,7 @@
 #include <fstream>
 
 using ::testing::StrictMock;
+using namespace boost::placeholders;
 
 static const std::string CLIENT_VERSION_STR = FormatVersion(CLIENT_VERSION);
 extern std::atomic<bool> fRequestShutdown;

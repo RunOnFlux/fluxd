@@ -49,7 +49,7 @@ bool CDeterministicFluxnodeDB::FluxnodeCacheDataExists(const COutPoint& outpoint
 
 bool CDeterministicFluxnodeDB::LoadFluxnodeCacheData()
 {
-    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
 
     pcursor->Seek(std::make_pair(DB_FLUXNODE_CACHE_DATA, COutPoint()));
 

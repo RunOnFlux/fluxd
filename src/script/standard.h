@@ -10,7 +10,7 @@
 #include "script/interpreter.h"
 #include "uint256.h"
 
-#include <boost/variant.hpp>
+#include <variant>
 
 #include <stdint.h>
 
@@ -71,6 +71,7 @@ enum txnouttype
 class CNoDestination {
 public:
     friend bool operator==(const CNoDestination &a, const CNoDestination &b) { return true; }
+    friend bool operator!=(const CNoDestination &a, const CNoDestination &b) { return false; }
     friend bool operator<(const CNoDestination &a, const CNoDestination &b) { return true; }
 };
 
@@ -81,7 +82,7 @@ public:
  *  * CScriptID: TX_SCRIPTHASH destination
  *  A CTxDestination is the internal data type encoded in a bitcoin address
  */
-typedef boost::variant<CNoDestination, CKeyID, CScriptID> CTxDestination;
+typedef std::variant<CNoDestination, CKeyID, CScriptID> CTxDestination;
 
 /** Check whether a CTxDestination is a CNoDestination. */
 bool IsValidDestination(const CTxDestination& dest);

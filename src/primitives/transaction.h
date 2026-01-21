@@ -17,7 +17,7 @@
 
 #include <array>
 
-#include <boost/variant.hpp>
+#include <variant>
 #include <netbase.h>
 #include <pubkey.h>
 
@@ -242,7 +242,7 @@ public:
 };
 
 template <typename Stream>
-class SproutProofSerializer : public boost::static_visitor<>
+class SproutProofSerializer
 {
     Stream& s;
     bool useGroth;
@@ -271,7 +271,7 @@ template<typename Stream, typename T>
 inline void SerReadWriteSproutProof(Stream& s, const T& proof, bool useGroth, CSerActionSerialize ser_action)
 {
     auto ps = SproutProofSerializer<Stream>(s, useGroth);
-    boost::apply_visitor(ps, proof);
+    std::visit(ps, proof);
 }
 
 template<typename Stream, typename T>

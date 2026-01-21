@@ -78,7 +78,7 @@ bool CDBWrapper::WriteBatch(CDBBatch& batch, bool fSync)
 
 bool CDBWrapper::IsEmpty()
 {
-    boost::scoped_ptr<CDBIterator> it(NewIterator());
+    std::unique_ptr<CDBIterator> it(NewIterator());
     it->SeekToFirst();
     return !(it->Valid());
 }

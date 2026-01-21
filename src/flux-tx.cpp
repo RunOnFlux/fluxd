@@ -516,7 +516,7 @@ public:
 static void MutateTx(CMutableTransaction& tx, const std::string& command,
                      const std::string& commandVal)
 {
-    boost::scoped_ptr<Secp256k1Init> ecc;
+    std::unique_ptr<Secp256k1Init> ecc;
 
     if (command == "nversion")
         MutateTxVersion(tx, commandVal);

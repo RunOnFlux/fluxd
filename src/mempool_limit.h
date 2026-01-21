@@ -123,7 +123,7 @@ public:
 
     // If the total cost limit is exceeded, pick a random number based on the total cost
     // of the collection and remove the associated transaction.
-    boost::optional<uint256> maybeDropRandom();
+    std::optional<uint256> maybeDropRandom();
 };
 
 

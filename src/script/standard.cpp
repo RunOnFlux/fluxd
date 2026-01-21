@@ -329,7 +329,7 @@ bool ListPubKeysFromMultiSigScript(const CScript& scriptPubKey, txnouttype& type
 
 namespace
 {
-class CScriptVisitor : public boost::static_visitor<bool>
+class CScriptVisitor 
 {
 private:
     CScript *script;
@@ -359,7 +359,7 @@ CScript GetScriptForDestination(const CTxDestination& dest)
 {
     CScript script;
 
-    boost::apply_visitor(CScriptVisitor(&script), dest);
+    std::visit(CScriptVisitor(&script), dest);
     return script;
 }
 
@@ -375,7 +375,7 @@ CScript GetScriptForMultisig(int nRequired, const std::vector<CPubKey>& keys)
 }
 
 bool IsValidDestination(const CTxDestination& dest) {
-    return dest.which() != 0;
+    return dest.index() != 0;
 }
 
 // insightexplorer

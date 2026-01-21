@@ -82,7 +82,7 @@ JSDescription JSDescription::Randomized(
     );
 }
 
-class SproutProofVerifier : public boost::static_visitor<bool>
+class SproutProofVerifier 
 {
     ZCJoinSplit& params;
     libflux::ProofVerifier& verifier;
@@ -130,7 +130,7 @@ bool JSDescription::Verify(
     const uint256& joinSplitPubKey
 ) const {
     auto pv = SproutProofVerifier(params, verifier, joinSplitPubKey, *this);
-    return boost::apply_visitor(pv, proof);
+    return std::visit(pv, proof);
 }
 
 uint256 JSDescription::h_sig(ZCJoinSplit& params, const uint256& joinSplitPubKey) const

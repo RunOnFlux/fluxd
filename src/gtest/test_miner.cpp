@@ -4,6 +4,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <memory>
 
 #include "chainparams.h"
 #include "key.h"
@@ -16,14 +17,14 @@ TEST(Miner, GetScriptForMinerAddress) {
 
     // No miner address set
     {
-        boost::shared_ptr<CReserveScript> coinbaseScript;
+        std::shared_ptr<CReserveScript> coinbaseScript;
         GetScriptForMinerAddress(coinbaseScript);
         EXPECT_FALSE((bool) coinbaseScript);
     }
 
     mapArgs["-mineraddress"] = "notAnAddress";
     {
-        boost::shared_ptr<CReserveScript> coinbaseScript;
+        std::shared_ptr<CReserveScript> coinbaseScript;
         GetScriptForMinerAddress(coinbaseScript);
         EXPECT_FALSE((bool) coinbaseScript);
     }
@@ -31,7 +32,7 @@ TEST(Miner, GetScriptForMinerAddress) {
     // Partial address
     mapArgs["-mineraddress"] = "t1T8yaLVhNqxA5KJcmiqq";
     {
-        boost::shared_ptr<CReserveScript> coinbaseScript;
+        std::shared_ptr<CReserveScript> coinbaseScript;
         GetScriptForMinerAddress(coinbaseScript);
         EXPECT_FALSE((bool) coinbaseScript);
     }
@@ -39,7 +40,7 @@ TEST(Miner, GetScriptForMinerAddress) {
     // Typo in address
     mapArgs["-mineraddress"] = "t1TByaLVhNqxA5KJcmiqqFN88e8DNp2PBfF";
     {
-        boost::shared_ptr<CReserveScript> coinbaseScript;
+        std::shared_ptr<CReserveScript> coinbaseScript;
         GetScriptForMinerAddress(coinbaseScript);
         EXPECT_FALSE((bool) coinbaseScript);
     }
@@ -52,7 +53,7 @@ TEST(Miner, GetScriptForMinerAddress) {
     // Valid address
     mapArgs["-mineraddress"] = "t1T8yaLVhNqxA5KJcmiqqFN88e8DNp2PBfF";
     {
-        boost::shared_ptr<CReserveScript> coinbaseScript;
+        std::shared_ptr<CReserveScript> coinbaseScript;
         GetScriptForMinerAddress(coinbaseScript);
         EXPECT_TRUE((bool) coinbaseScript);
         EXPECT_EQ(expectedCoinbaseScript, coinbaseScript->reserveScript);
@@ -61,7 +62,7 @@ TEST(Miner, GetScriptForMinerAddress) {
     // Valid address with leading whitespace
     mapArgs["-mineraddress"] = "  t1T8yaLVhNqxA5KJcmiqqFN88e8DNp2PBfF";
     {
-        boost::shared_ptr<CReserveScript> coinbaseScript;
+        std::shared_ptr<CReserveScript> coinbaseScript;
         GetScriptForMinerAddress(coinbaseScript);
         EXPECT_TRUE((bool) coinbaseScript);
         EXPECT_EQ(expectedCoinbaseScript, coinbaseScript->reserveScript);
@@ -70,7 +71,7 @@ TEST(Miner, GetScriptForMinerAddress) {
     // Valid address with trailing whitespace
     mapArgs["-mineraddress"] = "t1T8yaLVhNqxA5KJcmiqqFN88e8DNp2PBfF  ";
     {
-        boost::shared_ptr<CReserveScript> coinbaseScript;
+        std::shared_ptr<CReserveScript> coinbaseScript;
         GetScriptForMinerAddress(coinbaseScript);
         EXPECT_TRUE((bool) coinbaseScript);
         EXPECT_EQ(expectedCoinbaseScript, coinbaseScript->reserveScript);
