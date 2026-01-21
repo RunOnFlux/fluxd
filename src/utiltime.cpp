@@ -11,6 +11,7 @@
 #include "utiltime.h"
 
 #include <chrono>
+#include <thread>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread.hpp>
 
@@ -50,7 +51,7 @@ int64_t GetTimeMicros()
 
 void MilliSleep(int64_t n)
 {
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(n));
+    std::this_thread::sleep_for(std::chrono::milliseconds(n));
 }
 
 std::string DateTimeStrFormat(const char* pszFormat, int64_t nTime)

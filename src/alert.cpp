@@ -1,4 +1,5 @@
 // Copyright (c) 2010 Satoshi Nakamoto
+#include <thread>
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
@@ -261,7 +262,7 @@ CAlert::Notify(const std::string& strMessage, bool fThread)
     boost::replace_all(strCmd, "%s", safeStatus);
 
     if (fThread)
-        boost::thread t(runCommand, strCmd); // thread runs free
+        std::thread t(runCommand, strCmd); // thread runs free
     else
         runCommand(strCmd);
 }

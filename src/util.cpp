@@ -15,6 +15,8 @@
 #include "sync.h"
 #include "utilstrencodings.h"
 #include "utiltime.h"
+
+#include <thread>
 #include "clientversion.h"
 
 #include <stdarg.h>
@@ -244,7 +246,7 @@ bool LogAcceptCategory(const char* category)
         // This helps prevent issues debugging global destructors,
         // where mapMultiArgs might be deleted before another
         // global destructor calls LogPrint()
-        static boost::thread_specific_ptr<set<string> > ptrCategory;
+        thread_local std::unique_ptr<set<string>> ptrCategory;
         if (ptrCategory.get() == NULL)
         {
             const vector<string>& categories = mapMultiArgs["-debug"];
@@ -1072,6 +1074,6 @@ std::string LicenseInfo()
 
 int GetNumCores()
 {
-    return boost::thread::physical_concurrency();
+    return std::thread::hardware_concurrency();
 }
 

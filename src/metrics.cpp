@@ -552,7 +552,6 @@ void ThreadShowMetricsScreen()
 
         *nNextRefresh = GetTime() + nRefresh;
         while (GetTime() < *nNextRefresh) {
-            boost::this_thread::interruption_point();
             MilliSleep(200);
         }
 

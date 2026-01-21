@@ -1,4 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
+#include <vector>
+#include <thread>
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
@@ -25,9 +27,9 @@ extern ZCJoinSplit* pfluxParams;
 void StartShutdown();
 bool ShutdownRequested();
 /** Interrupt threads */
-void Interrupt(boost::thread_group& threadGroup);
+void Interrupt(std::vector<std::thread>& threadGroup);
 void Shutdown();
-bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler);
+bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler);
 
 /** The help message mode determines what help message to show */
 enum HelpMessageMode {

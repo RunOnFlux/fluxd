@@ -1,4 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
+#include <vector>
+#include <thread>
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
@@ -48,7 +50,6 @@
 #include "snapshot/snapshotdb.h"
 
 #ifdef ENABLE_WALLET
-#include "key_io.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
@@ -181,14 +182,13 @@ static CCoinsViewDB *pcoinsdbview = NULL;
 static CCoinsViewErrorCatcher *pcoinscatcher = NULL;
 static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
-void Interrupt(boost::thread_group& threadGroup)
+void Interrupt(std::vector<std::thread>& threadGroup)
 {
     InterruptHTTPServer();
     InterruptHTTPRPC();
     InterruptRPC();
     InterruptREST();
     InterruptTorControl();
-    threadGroup.interrupt_all();
 }
 
 void Shutdown()
@@ -573,7 +573,7 @@ static void BlockNotifyCallback(const uint256& hashNewTip)
     std::string strCmd = GetArg("-blocknotify", "");
 
     boost::replace_all(strCmd, "%s", hashNewTip.GetHex());
-    boost::thread t(runCommand, strCmd); // thread runs free
+    std::thread t(runCommand, strCmd); // thread runs free
 }
 
 struct CImportingNow
@@ -701,7 +701,6 @@ void ThreadNotifyRecentlyAdded()
         std::this_thread::sleep_until(
             std::chrono::time_point<std::chrono::steady_clock>(nextFire));
 
-        boost::this_thread::interruption_point();
 
         mempool.NotifyRecentlyAdded();
     }
@@ -781,7 +780,7 @@ static void ZC_LoadParams(
     LogPrintf("Loaded Sapling parameters in %fs seconds.\n", elapsed);
 }
 
-bool AppInitServers(boost::thread_group& threadGroup)
+bool AppInitServers(std::vector<std::thread>& threadGroup)
 {
     RPCServer::OnStopped(&OnRPCStopped);
     RPCServer::OnPreCommand(&OnRPCPreCommand);
@@ -801,7 +800,7 @@ bool AppInitServers(boost::thread_group& threadGroup)
 /** Initialize bitcoin.
  *  @pre Parameters should be parsed and config file should be read.
  */
-bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
+bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 {
     // ********************************************************* Step 1: setup
 #ifdef _MSC_VER
@@ -1249,12 +1248,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     LogPrintf("Using %u threads for script verification\n", nScriptCheckThreads);
     if (nScriptCheckThreads) {
         for (int i=0; i<nScriptCheckThreads-1; i++)
-            threadGroup.create_thread(&ThreadScriptCheck);
+            threadGroup.emplace_back(ThreadScriptCheck);
     }
 
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
-    threadGroup.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
+    threadGroup.emplace_back(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
 
     // Count uptime
     MarkStartTime();
@@ -1264,7 +1263,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             !fPrintToConsole && !GetBoolArg("-daemon", false)) {
         // Start the persistent metrics interface
         ConnectMetricsScreen();
-        threadGroup.create_thread(&ThreadShowMetricsScreen);
+        threadGroup.emplace_back(ThreadShowMetricsScreen);
     }
 
     // Initialize Flux circuit parameters ("ZC" in function name refers to Zelcash)
@@ -1913,7 +1912,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         for (const std::string& strFile : mapMultiArgs["-loadblock"])
             vImportFiles.push_back(strFile);
     }
-    threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
+    threadGroup.emplace_back(boost::bind(&ThreadImport, vImportFiles));
     if (chainActive.Tip() == NULL) {
         LogPrintf("Waiting for genesis block to be imported...\n");
         while (!fRequestShutdown && chainActive.Tip() == NULL)
@@ -2059,7 +2058,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Start the thread that notifies listeners of transactions that have been
     // recently added to the mempool.
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "txnotify", &ThreadNotifyRecentlyAdded));
+    threadGroup.emplace_back(boost::bind(&TraceThread<void (*)()>, "txnotify", &ThreadNotifyRecentlyAdded));
 
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
         StartTorControl(threadGroup, scheduler);
@@ -2109,12 +2108,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         pwalletMain->ReacceptWalletTransactions();
 
         // Run a thread to flush wallet periodically
-        threadGroup.create_thread(boost::bind(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile)));
+        threadGroup.emplace_back(boost::bind(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile)));
     }
 #endif
 
     // SENDALERT
-    threadGroup.create_thread(boost::bind(ThreadSendAlert));
+    threadGroup.emplace_back(boost::bind(ThreadSendAlert));
 
     return !fRequestShutdown;
 }

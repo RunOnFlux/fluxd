@@ -929,9 +929,6 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
         }
         pcursor->close();
     }
-    catch (const boost::thread_interrupted&) {
-        throw;
-    }
     catch (...) {
         result = DB_CORRUPT;
     }
@@ -1034,9 +1031,6 @@ DBErrors CWalletDB::FindWalletTxToZap(CWallet* pwallet, vector<uint256>& vTxHash
         }
         pcursor->close();
     }
-    catch (const boost::thread_interrupted&) {
-        throw;
-    }
     catch (...) {
         result = DB_CORRUPT;
     }
@@ -1105,7 +1099,6 @@ void ThreadFlushWalletDB(const string& strFile)
 
                 if (nRefCount == 0)
                 {
-                    boost::this_thread::interruption_point();
                     map<string, int>::iterator mi = bitdb.mapFileUseCount.find(strFile);
                     if (mi != bitdb.mapFileUseCount.end())
                     {

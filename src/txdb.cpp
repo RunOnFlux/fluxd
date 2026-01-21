@@ -107,7 +107,6 @@ bool CCoinsViewDB::GetAllBalances(std::map<std::string, CAmount>& mapBalances) c
     pcursor->Seek(std::make_pair(DB_COINS, uint256()));
     // Load mapBlockIndex
     while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
         std::pair<char, uint256> key;
         if (pcursor->GetKey(key) && key.first == DB_COINS) {
             CCoins coins;
@@ -275,7 +274,6 @@ bool CCoinsViewDB::GetStats(CCoinsStats &stats) const {
     ss << stats.hashBlock;
     CAmount nTotalAmount = 0;
     while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
         std::pair<char, uint256> key;
         CCoins coins;
         if (pcursor->GetKey(key) && key.first == DB_COINS) {
@@ -362,7 +360,6 @@ bool CBlockTreeDB::ReadAddressUnspentIndex(uint160 addressHash, int type, std::v
     pcursor->Seek(make_pair(DB_ADDRESSUNSPENTINDEX, CAddressIndexIteratorKey(type, addressHash)));
 
     while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
         std::pair<char,CAddressUnspentKey> key;
         if (!(pcursor->GetKey(key) && key.first == DB_ADDRESSUNSPENTINDEX && key.second.hashBytes == addressHash))
             break;
@@ -403,7 +400,6 @@ bool CBlockTreeDB::ReadAddressIndex(
     }
 
     while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
         std::pair<char,CAddressIndexKey> key;
         if (!(pcursor->GetKey(key) && key.first == DB_ADDRESSINDEX && key.second.hashBytes == addressHash))
             break;
@@ -448,7 +444,6 @@ bool CBlockTreeDB::ReadTimestampIndex(unsigned int high, unsigned int low,
     pcursor->Seek(make_pair(DB_TIMESTAMPINDEX, CTimestampIndexIteratorKey(low)));
 
     while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
         std::pair<char, CTimestampIndexKey> key;
         if (!(pcursor->GetKey(key) && key.first == DB_TIMESTAMPINDEX && key.second.timestamp < high)) {
             break;
@@ -505,7 +500,6 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
 
     // Load mapBlockIndex
     while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
         std::pair<char, uint256> key;
         if (pcursor->GetKey(key) && key.first == DB_BLOCK_INDEX) {
             CDiskBlockIndex diskindex;

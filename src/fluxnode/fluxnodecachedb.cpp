@@ -56,7 +56,6 @@ bool CDeterministicFluxnodeDB::LoadFluxnodeCacheData()
     LOCK(g_fluxnodeCache.cs);
     // Load mapBlockIndex
     while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
         std::pair<char, uint256> key;
         if (pcursor->GetKey(key) && key.first == DB_FLUXNODE_CACHE_DATA) {
             FluxnodeCacheData data;

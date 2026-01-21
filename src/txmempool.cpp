@@ -791,8 +791,6 @@ void CTxMemPool::NotifyRecentlyAdded()
     for (auto tx : txs) {
         try {
             SyncWithWallets(tx, NULL);
-        } catch (const boost::thread_interrupted&) {
-            throw;
         } catch (const std::exception& e) {
             PrintExceptionContinue(&e, "CTxMemPool::NotifyRecentlyAdded()");
         } catch (...) {

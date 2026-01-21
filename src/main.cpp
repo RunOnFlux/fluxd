@@ -4877,7 +4877,6 @@ bool ActivateBestChain(CValidationState& state, const CChainParams& chainparams,
     CBlockIndex *pindexNewTip = NULL;
     CBlockIndex *pindexMostWork = NULL;
     do {
-        boost::this_thread::interruption_point();
 
         bool fInitialDownload;
         {
@@ -6013,7 +6012,6 @@ bool static LoadBlockIndexDB()
     if (!pblocktree->LoadBlockIndexGuts(InsertBlockIndex))
         return false;
 
-    boost::this_thread::interruption_point();
 
     // Calculate nChainWork
     vector<pair<int, CBlockIndex*> > vSortedByHeight;
@@ -6215,7 +6213,6 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
     auto verifier = libflux::ProofVerifier::Disabled();
     for (CBlockIndex* pindex = chainActive.Tip(); pindex && pindex->pprev; pindex = pindex->pprev)
     {
-        boost::this_thread::interruption_point();
         uiInterface.ShowProgress(_("Verifying blocks..."), std::max(1, std::min(99, (int)(((double)(chainActive.Height() - pindex->nHeight)) / (double)nCheckDepth * (nCheckLevel >= 4 ? 50 : 100)))));
         if (pindex->nHeight < chainActive.Height()-nCheckDepth)
             break;
@@ -6260,7 +6257,6 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
     if (nCheckLevel >= 4) {
         CBlockIndex *pindex = pindexState;
         while (pindex != chainActive.Tip()) {
-            boost::this_thread::interruption_point();
             uiInterface.ShowProgress(_("Verifying blocks..."), std::max(1, std::min(99, 100 - (int)(((double)(chainActive.Height() - pindex->nHeight)) / (double)nCheckDepth * 50))));
             pindex = chainActive.Next(pindex);
             CBlock block;
@@ -6531,7 +6527,6 @@ bool LoadExternalBlockFile(const CChainParams& chainparams, FILE* fileIn, CDiskB
         CBufferedFile blkdat(fileIn, 2*MAX_BLOCK_SIZE, MAX_BLOCK_SIZE+8, SER_DISK, CLIENT_VERSION);
         uint64_t nRewind = blkdat.GetPos();
         while (!blkdat.eof()) {
-            boost::this_thread::interruption_point();
 
             blkdat.SetPos(nRewind);
             nRewind++; // start one byte further next time, in case of failure
@@ -6925,7 +6920,6 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
 
         const CInv &inv = *it;
         {
-            boost::this_thread::interruption_point();
             it++;
 
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
@@ -7358,7 +7352,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         for (CAddress& addr : vAddr)
         {
-            boost::this_thread::interruption_point();
 
             // apply rate limiting
             if (!pfrom->fWhitelisted) {
@@ -7441,7 +7434,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         {
             const CInv &inv = vInv[nInv];
 
-            boost::this_thread::interruption_point();
             pfrom->AddInventoryKnown(inv);
 
             bool fAlreadyHave = AlreadyHave(inv);
@@ -8549,7 +8541,6 @@ bool ProcessMessages(CNode* pfrom)
         try
         {
             fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
-            boost::this_thread::interruption_point();
         }
         catch (const std::ios_base::failure& e)
         {
@@ -8577,9 +8568,6 @@ bool ProcessMessages(CNode* pfrom)
                 }
                 PrintExceptionContinue(&e, "ProcessMessages()");
             }
-        }
-        catch (const boost::thread_interrupted&) {
-            throw;
         }
         catch (const std::exception& e) {
             PrintExceptionContinue(&e, "ProcessMessages()");

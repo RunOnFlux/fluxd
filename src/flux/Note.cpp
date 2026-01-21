@@ -187,9 +187,7 @@ std::optional<SaplingOutgoingPlaintext> SaplingOutgoingPlaintext::decrypt(
         assert(ss.size() == 0);
 
         return ret;
-    } catch (const boost::thread_interrupted&) {
-        throw;
-    } catch (...) {
+    } catch (const std::exception& e) {
         return std::nullopt;
     }
 }
@@ -213,9 +211,7 @@ std::optional<SaplingNotePlaintext> SaplingNotePlaintext::decrypt(
         ss << pt.value();
         ss >> ret;
         assert(ss.size() == 0);
-    } catch (const boost::thread_interrupted&) {
-        throw;
-    } catch (...) {
+    } catch (const std::exception& e) {
         return std::nullopt;
     }
 
@@ -263,9 +259,7 @@ std::optional<SaplingNotePlaintext> SaplingNotePlaintext::decrypt(
         ss << pt.value();
         ss >> ret;
         assert(ss.size() == 0);
-    } catch (const boost::thread_interrupted&) {
-        throw;
-    } catch (...) {
+    } catch (const std::exception& e) {
         return std::nullopt;
     }
 

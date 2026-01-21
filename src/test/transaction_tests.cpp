@@ -716,12 +716,12 @@ BOOST_AUTO_TEST_CASE(test_big_overwinter_transaction) {
 
     // check all inputs concurrently, with the cache
     PrecomputedTransactionData txdata(tx);
-    boost::thread_group threadGroup;
+    std::vector<std::thread> threadGroup;
     CCheckQueue<CScriptCheck> scriptcheckqueue(128);
     CCheckQueueControl<CScriptCheck> control(&scriptcheckqueue);
 
     for (int i=0; i<20; i++)
-        threadGroup.create_thread(boost::bind(&CCheckQueue<CScriptCheck>::Thread, boost::ref(scriptcheckqueue)));
+        threadGroup.emplace_back(boost::bind(&CCheckQueue<CScriptCheck>::Thread, boost::ref(scriptcheckqueue)));
 
     CCoins coins;
     coins.nVersion = 1;
@@ -744,8 +744,7 @@ BOOST_AUTO_TEST_CASE(test_big_overwinter_transaction) {
     bool controlCheck = control.Wait();
     assert(controlCheck);
 
-    threadGroup.interrupt_all();
-    threadGroup.join_all();
+    for (auto& t : threadGroup) { if (t.joinable()) t.join(); };
 }
 
 BOOST_AUTO_TEST_CASE(test_IsStandard)

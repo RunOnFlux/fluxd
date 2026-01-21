@@ -1,4 +1,5 @@
 // Copyright (c) 2015 The Bitcoin Core developers
+#include <thread>
 // Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
@@ -439,17 +440,17 @@ bool InitHTTPServer()
     return true;
 }
 
-boost::thread threadHTTP;
+std::thread threadHTTP;
 
 bool StartHTTPServer()
 {
     LogPrint("http", "Starting HTTP server\n");
     int rpcThreads = std::max((long)GetArg("-rpcthreads", DEFAULT_HTTP_THREADS), 1L);
     LogPrintf("HTTP: starting %d worker threads\n", rpcThreads);
-    threadHTTP = boost::thread(boost::bind(&ThreadHTTP, eventBase, eventHTTP));
+    threadHTTP = std::thread(boost::bind(&ThreadHTTP, eventBase, eventHTTP));
 
     for (int i = 0; i < rpcThreads; i++) {
-        boost::thread rpc_worker(HTTPWorkQueueRun, workQueue);
+        std::thread rpc_worker(HTTPWorkQueueRun, workQueue);
         rpc_worker.detach();
     }
     return true;
@@ -488,9 +489,9 @@ void StopHTTPServer()
         // master that appears to be solved, so in the future that solution
         // could be used again (if desirable).
         // (see discussion in https://github.com/bitcoin/bitcoin/pull/6990)
-        if (!threadHTTP.try_join_for(boost::chrono::milliseconds(2000))) {
-            LogPrintf("HTTP event loop did not exit within allotted time, sending loopbreak\n");
-            event_base_loopbreak(eventBase);
+        // std::thread doesn't have try_join_for, so we break the event loop and join
+        event_base_loopbreak(eventBase);
+        if (threadHTTP.joinable()) {
             threadHTTP.join();
         }
     }
