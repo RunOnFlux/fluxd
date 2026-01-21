@@ -15,7 +15,6 @@
 #include "key_io.h"
 #include "activefluxnode.h"
 
-#include <boost/algorithm/string/replace.hpp>
 #include <filesystem>
 #include <fstream>
 
@@ -23,7 +22,6 @@
 #include <openssl/rand.h>
 
 using namespace std;
-using namespace boost;
 
 // A helper object for signing messages from Fluxnodes
 CObfuScationSigner obfuScationSigner;

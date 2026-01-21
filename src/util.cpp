@@ -91,22 +91,11 @@
 #include <mutex>
 #endif
 
-#include <boost/algorithm/string/case_conv.hpp> // for to_lower()
-#include <mutex>
-#include <boost/algorithm/string/join.hpp>
-#include <mutex>
-#include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
-#include <mutex>
 #include <filesystem>
 #include <mutex>
 #include <fstream>
-#include <mutex>
-#include <boost/program_options/detail/config_file.hpp>
-#include <mutex>
-#include <boost/program_options/parsers.hpp>
-#include <mutex>
+#include <sstream>
 #include <openssl/crypto.h>
-#include <mutex>
 #include <openssl/conf.h>
 #include <mutex>
 
@@ -752,20 +741,48 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
     if (!streamConfig.good())
         throw missing_zelcash_conf();
 
-    set<string> setOptions;
-    setOptions.insert("*");
-
-    for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; it != end; ++it)
+    std::string line;
+    int linenr = 0;
+    while (std::getline(streamConfig, line))
     {
+        linenr++;
+        // Strip leading/trailing whitespace
+        size_t start = line.find_first_not_of(" \t\r\n");
+        size_t end = line.find_last_not_of(" \t\r\n");
+        if (start == std::string::npos) continue; // Empty line
+        line = line.substr(start, end - start + 1);
+
+        // Skip comments
+        if (line.empty() || line[0] == '#') continue;
+
+        // Find the '=' separator
+        size_t eq_pos = line.find('=');
+        if (eq_pos == std::string::npos) continue; // Skip lines without '='
+
+        // Extract key and value
+        std::string key = line.substr(0, eq_pos);
+        std::string value = (eq_pos + 1 < line.length()) ? line.substr(eq_pos + 1) : "";
+
+        // Trim whitespace from key and value
+        size_t key_end = key.find_last_not_of(" \t");
+        if (key_end != std::string::npos)
+            key = key.substr(0, key_end + 1);
+
+        size_t val_start = value.find_first_not_of(" \t");
+        if (val_start != std::string::npos)
+            value = value.substr(val_start);
+
+        if (key.empty()) continue;
+
         // Don't overwrite existing settings so command line settings override flux.conf
-        string strKey = string("-") + it->string_key;
+        string strKey = string("-") + key;
         if (mapSettingsRet.count(strKey) == 0)
         {
-            mapSettingsRet[strKey] = it->value[0];
+            mapSettingsRet[strKey] = value;
             // interpret nofoo=1 as foo=0 (and nofoo=0 as foo=1) as long as foo not set)
             InterpretNegativeSetting(strKey, mapSettingsRet);
         }
-        mapMultiSettingsRet[strKey].push_back(it->value[0]);
+        mapMultiSettingsRet[strKey].push_back(value);
     }
     // If datadir is changed in .conf file:
     ClearDatadirCache();

@@ -20,13 +20,9 @@
 
 #include <univalue.h>
 
-#include <boost/bind.hpp>
 #include <filesystem>
-#include <boost/iostreams/concepts.hpp>
-#include <boost/iostreams/stream.hpp>
 #include <memory>
 #include <boost/signals2/signal.hpp>
-#include <boost/algorithm/string/case_conv.hpp> // for to_upper()
 
 using namespace RPCServer;
 using namespace std;
@@ -61,12 +57,12 @@ void RPCServer::OnStopped(std::function<void ()> slot)
 
 void RPCServer::OnPreCommand(std::function<void (const CRPCCommand&)> slot)
 {
-    g_rpcSignals.PreCommand.connect(boost::bind(slot, _1));
+    g_rpcSignals.PreCommand.connect(slot);
 }
 
 void RPCServer::OnPostCommand(std::function<void (const CRPCCommand&)> slot)
 {
-    g_rpcSignals.PostCommand.connect(boost::bind(slot, _1));
+    g_rpcSignals.PostCommand.connect(slot);
 }
 
 void RPCTypeCheck(const UniValue& params,

@@ -17,7 +17,6 @@
 #include "httprpc.h"
 #include "fluxnode/fluxnodeconfig.h"
 
-#include <boost/algorithm/string/predicate.hpp>
 #include <filesystem>
 
 #include <stdio.h>

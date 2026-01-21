@@ -18,8 +18,7 @@
 #include <algorithm>
 #include <map>
 
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/replace.hpp>
+// boost::algorithm removed - using custom string utilities
 
 using namespace std;
 

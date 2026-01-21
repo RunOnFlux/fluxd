@@ -10,7 +10,6 @@
 
 #include <memory>
 
-#include <boost/format.hpp>
 #include <fstream>
 #include "tinyformat.h"
 #include "sync.h"
