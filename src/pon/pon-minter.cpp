@@ -22,7 +22,7 @@
 
 #include <boost/thread.hpp>
 
-static boost::thread* ponMinterThread = nullptr;
+static std::thread* ponMinterThread = nullptr;
 static bool fPONMinter = false;
 
 bool SignPONBlock(CBlock& block, const COutPoint& collateral)
@@ -116,7 +116,6 @@ void PONMinter(const CChainParams& chainparams)
 
     try {
         while (fPONMinter) {
-            boost::this_thread::interruption_point();
 
             if (chainparams.MiningRequiresPeers()) {
                 // Busy-wait for the network to come online so we don't waste time mining
@@ -338,10 +337,6 @@ void PONMinter(const CChainParams& chainparams)
             lastAttemptedSlot = currentSlot;
         }
     }
-    catch (const boost::thread_interrupted&) {
-        LogPrintf("PON Minter terminated\n");
-        throw;
-    }
     catch (const std::runtime_error &e) {
         LogPrintf("PON Minter runtime error: %s\n", e.what());
         return;
@@ -355,7 +350,7 @@ void StartPONMinter(const CChainParams& chainparams)
     }
     
     fPONMinter = true;
-    ponMinterThread = new boost::thread(boost::bind(&PONMinter, boost::cref(chainparams)));
+    ponMinterThread = new std::thread(boost::bind(&PONMinter, boost::cref(chainparams)));
     LogPrintf("PON Minter thread started\n");
 }
 
@@ -368,7 +363,7 @@ void StopPONMinter()
     LogPrintf("Stopping PON Minter...\n");
     fPONMinter = false;
     
-    ponMinterThread->interrupt();
+    // std::thread does not support interrupt();
     ponMinterThread->join();
     delete ponMinterThread;
     ponMinterThread = nullptr;

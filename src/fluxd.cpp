@@ -1,4 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
+#include <vector>
+#include <thread>
 // Copyright (c) 2009-2013 The Bitcoin Core developers
 // Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
@@ -39,7 +41,7 @@
 
 static bool fDaemon;
 
-void WaitForShutdown(boost::thread_group* threadGroup)
+void WaitForShutdown(std::vector<std::thread>* threadGroup)
 {
     bool fShutdown = ShutdownRequested();
     // Tell the main threads to shutdown.
@@ -51,7 +53,11 @@ void WaitForShutdown(boost::thread_group* threadGroup)
     if (threadGroup)
     {
         Interrupt(*threadGroup);
-        threadGroup->join_all();
+        for (auto& thread : *threadGroup) {
+            if (thread.joinable()) {
+                thread.join();
+            }
+        }
     }
 }
 
@@ -61,7 +67,7 @@ void WaitForShutdown(boost::thread_group* threadGroup)
 //
 bool AppInit(int argc, char* argv[])
 {
-    boost::thread_group threadGroup;
+    std::vector<std::thread> threadGroup;
     CScheduler scheduler;
 
     bool fRet = false;
@@ -190,7 +196,7 @@ bool AppInit(int argc, char* argv[])
     if (!fRet)
     {
         Interrupt(threadGroup);
-        // threadGroup.join_all(); was left out intentionally here, because we didn't re-test all of
+        // for (auto& t : threadGroup) { if (t.joinable()) t.join(); }; was left out intentionally here, because we didn't re-test all of
         // the startup-failure cases to make sure they don't result in a hang due to some
         // thread-blocking-waiting-for-another-thread-during-startup case
     } else {

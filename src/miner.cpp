@@ -1,4 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
+#include <vector>
+#include <thread>
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
@@ -748,7 +750,6 @@ void static BitcoinMiner(const CChainParams& chainparams)
             arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
 
             while (true) {
-                boost::this_thread::interruption_point();
                 // Hash state
                 crypto_generichash_blake2b_state state;
                 EhInitialiseState(n, k, state);
@@ -775,7 +776,6 @@ void static BitcoinMiner(const CChainParams& chainparams)
                 std::function<bool(std::vector<unsigned char>)> validBlock =
                         [&pblock, &hashTarget, &chainparams, &m_cs, &cancelSolver, &coinbaseScript]
                         (std::vector<unsigned char> soln) {
-                    boost::this_thread::interruption_point();
                     // Write the solution to the hash and compute the result.
                     LogPrint("pow", "- Checking solution against target\n");
                     pblock->nSolution = soln;
@@ -801,7 +801,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
                     if (chainparams.MineBlocksOnDemand()) {
                         // Increment here because throwing skips the call below
                         ehSolverRuns.increment();
-                        throw boost::thread_interrupted();
+                        return true;
                     }
 
                     return true;
@@ -831,7 +831,6 @@ void static BitcoinMiner(const CChainParams& chainparams)
 
                     // Convert solution indices to byte array (decompress) and pass it to validBlock method.
                     for (size_t s = 0; s < eq.nsols; s++) {
-                        boost::this_thread::interruption_point();
                         LogPrint("pow", "Checking solution %d\n", s+1);
                         std::vector<eh_index> index_vector(PROOFSIZE);
                         for (size_t i = 0; i < PROOFSIZE; i++) {
@@ -861,7 +860,6 @@ void static BitcoinMiner(const CChainParams& chainparams)
                 }
 
                 // Check for stop or if block needs to be rebuilt
-                boost::this_thread::interruption_point();
                 // Regtest mode doesn't require peers
                 if (vNodes.empty() && chainparams.MiningRequiresPeers())
                     break;
@@ -883,13 +881,6 @@ void static BitcoinMiner(const CChainParams& chainparams)
             }
         }
     }
-    catch (const boost::thread_interrupted&)
-    {
-        miningTimer.stop();
-        c.disconnect();
-        LogPrintf("FluxMiner terminated\n");
-        throw;
-    }
     catch (const std::runtime_error &e)
     {
         miningTimer.stop();
@@ -903,15 +894,19 @@ void static BitcoinMiner(const CChainParams& chainparams)
 
 void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams& chainparams)
 {
-    static boost::thread_group* minerThreads = NULL;
+    static std::vector<std::thread>* minerThreads = NULL;
 
     if (nThreads < 0)
         nThreads = GetNumCores();
 
     if (minerThreads != NULL)
     {
-        minerThreads->interrupt_all();
-        minerThreads->join_all();
+        // std::thread doesn't support interrupt, just join all threads
+        for (auto& thread : *minerThreads) {
+            if (thread.joinable()) {
+                thread.join();
+            }
+        }
         delete minerThreads;
         minerThreads = NULL;
     }
@@ -919,9 +914,9 @@ void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams& chainpar
     if (nThreads == 0 || !fGenerate)
         return;
 
-    minerThreads = new boost::thread_group();
+    minerThreads = new std::vector<std::thread>();
     for (int i = 0; i < nThreads; i++) {
-        minerThreads->create_thread(boost::bind(&BitcoinMiner, boost::cref(chainparams)));
+        minerThreads->emplace_back(boost::bind(&BitcoinMiner, boost::cref(chainparams)));
     }
 }
 

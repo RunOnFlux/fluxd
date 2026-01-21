@@ -11,6 +11,7 @@
 
 #include <filesystem>
 #include <boost/thread.hpp>
+#include <thread>
 
 /** Basic testing setup.
  * This just configures logging and chain parameters.
@@ -36,7 +37,7 @@ struct TestingSetup: public JoinSplitTestingSetup {
     CCoinsViewDB *pcoinsdbview;
     std::filesystem::path orig_current_path;
     std::filesystem::path pathTemp;
-    boost::thread_group threadGroup;
+    std::vector<std::thread> threadGroup;
 
     TestingSetup();
     ~TestingSetup();

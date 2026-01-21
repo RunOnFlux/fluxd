@@ -265,11 +265,6 @@ template <typename Callable> void TraceThread(const char* name,  Callable func)
         func();
         LogPrintf("%s thread exit\n", name);
     }
-    catch (const boost::thread_interrupted&)
-    {
-        LogPrintf("%s thread interrupt\n", name);
-        throw;
-    }
     catch (const std::exception& e) {
         PrintExceptionContinue(&e, name);
         throw;

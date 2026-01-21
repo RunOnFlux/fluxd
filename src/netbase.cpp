@@ -147,7 +147,6 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
         // 2 seconds looks fine in our situation.
         struct timespec ts = { 2, 0 };
         gai_suspend(&query, 1, &ts);
-        boost::this_thread::interruption_point();
 
         nErr = gai_error(query);
         if (0 == nErr)
@@ -285,7 +284,6 @@ bool static InterruptibleRecv(uint8_t* data, size_t len, int timeout, SOCKET& hS
                 return false;
             }
         }
-        boost::this_thread::interruption_point();
         curTime = GetTimeMillis();
     }
     return len == 0;
