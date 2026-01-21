@@ -11,7 +11,6 @@
 #include <memory>
 
 #include <boost/format.hpp>
-#include <boost/optional.hpp>
 #include <fstream>
 #include "tinyformat.h"
 #include "sync.h"

@@ -9,7 +9,6 @@
 
 #include "primitives/block.h"
 
-#include <boost/optional.hpp>
 #include <stdint.h>
 
 class CBlockIndex;

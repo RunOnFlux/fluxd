@@ -67,14 +67,14 @@ bool RPCIsInWarmup(std::string *statusOut);
 /**
  * Type-check arguments; throws JSONRPCError if wrong type given. Does not check that
  * the right number of arguments are passed, just that any passed are the correct type.
- * Use like:  RPCTypeCheck(params, boost::assign::list_of(str_type)(int_type)(obj_type));
+ * Use like:  RPCTypeCheck(params, {str_type, int_type, obj_type});
  */
 void RPCTypeCheck(const UniValue& params,
                   const std::list<UniValue::VType>& typesExpected, bool fAllowNull=false);
 
 /*
   Check for expected keys/value types in an Object.
-  Use like: RPCTypeCheckObj(object, boost::assign::map_list_of("name", str_type)("value", int_type));
+  Use like: RPCTypeCheckObj(object, {{"name", str_type}, {"value", int_type}});
 */
 void RPCTypeCheckObj(const UniValue& o,
                   const std::map<std::string, UniValue::VType>& typesExpected, bool fAllowNull=false);

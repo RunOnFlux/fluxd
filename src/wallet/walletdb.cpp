@@ -22,6 +22,9 @@
 
 using namespace std;
 
+// Shutdown check from init.cpp
+extern bool ShutdownRequested();
+
 static uint64_t nAccountingEntryNumber = 0;
 
 //
@@ -1072,7 +1075,7 @@ void ThreadFlushWalletDB(const string& strFile)
     unsigned int nLastSeen = nWalletDBUpdated;
     unsigned int nLastFlushed = nWalletDBUpdated;
     int64_t nLastWalletUpdate = GetTime();
-    while (true)
+    while (!ShutdownRequested())
     {
         MilliSleep(500);
 

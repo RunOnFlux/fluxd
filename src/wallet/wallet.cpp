@@ -1618,6 +1618,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFromLoadWallet, CWalletD
         {
             boost::replace_all(strCmd, "%s", wtxIn.GetHash().GetHex());
             std::thread t(runCommand, strCmd); // thread runs free
+            t.detach();
         }
 
     }

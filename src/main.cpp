@@ -49,7 +49,6 @@
 #include <filesystem>
 #include <fstream>
 #include <boost/math/distributions/poisson.hpp>
-#include <boost/static_assert.hpp>
 
 #include "emergencyblock.h"
 
@@ -1128,7 +1127,7 @@ bool ContextualCheckTransaction(
         // Rules that apply before Sapling:
         if (!saplingActive) {
             // Size limits
-            BOOST_STATIC_ASSERT(MAX_BLOCK_SIZE > MAX_TX_SIZE_BEFORE_SAPLING); // sanity
+            static_assert(MAX_BLOCK_SIZE > MAX_TX_SIZE_BEFORE_SAPLING); // sanity
             if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_TX_SIZE_BEFORE_SAPLING)
                 return state.DoS(100, error("ContextualCheckTransaction(): size limits failed"),
                                  REJECT_INVALID, "bad-txns-oversize");
@@ -1166,7 +1165,7 @@ bool ContextualCheckTransaction(
 
     if (!tx.vJoinSplit.empty())
     {
-        BOOST_STATIC_ASSERT(crypto_sign_PUBLICKEYBYTES == 32);
+        static_assert(crypto_sign_PUBLICKEYBYTES == 32);
 
         // We rely on libsodium to check that the signature is canonical.
         // https://github.com/jedisct1/libsodium/commit/62911edb7ff2275cccd74bf1c8aefcc4d76924e0
@@ -1558,8 +1557,8 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
     }
 
     // Size limits
-    BOOST_STATIC_ASSERT(MAX_BLOCK_SIZE >= MAX_TX_SIZE_AFTER_SAPLING); // sanity
-    BOOST_STATIC_ASSERT(MAX_TX_SIZE_AFTER_SAPLING > MAX_TX_SIZE_BEFORE_SAPLING); // sanity
+    static_assert(MAX_BLOCK_SIZE >= MAX_TX_SIZE_AFTER_SAPLING); // sanity
+    static_assert(MAX_TX_SIZE_AFTER_SAPLING > MAX_TX_SIZE_BEFORE_SAPLING); // sanity
     if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_TX_SIZE_AFTER_SAPLING)
         return state.DoS(100, error("CheckTransaction(): size limits failed"),
                          REJECT_INVALID, "bad-txns-oversize");
@@ -3422,6 +3421,10 @@ static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
 void ThreadScriptCheck() {
     RenameThread("flux-scriptch");
     scriptcheckqueue.Thread();
+}
+
+void StopScriptCheckQueue() {
+    scriptcheckqueue.Quit();
 }
 
 //

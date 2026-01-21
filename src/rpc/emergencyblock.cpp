@@ -22,7 +22,6 @@
 #include "timedata.h"
 
 #include <stdint.h>
-#include <boost/assign/list_of.hpp>
 #include <univalue.h>
 
 using namespace std;
