@@ -32,7 +32,6 @@
 
 #include <boost/algorithm/string/replace.hpp>
 #include <filesystem>
-#include <boost/thread.hpp>
 #include <fluxnode/fluxnode.h>
 
 using namespace std;

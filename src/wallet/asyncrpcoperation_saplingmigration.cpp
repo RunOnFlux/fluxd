@@ -4,6 +4,7 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "assert.h"
+#include <cmath>
 #include "boost/variant/static_visitor.hpp"
 #include "asyncrpcoperation_saplingmigration.h"
 #include "init.h"

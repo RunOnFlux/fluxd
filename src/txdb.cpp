@@ -15,7 +15,6 @@
 
 #include <stdint.h>
 
-#include <boost/thread.hpp>
 
 #include "emergencyblock.h"
 #include "pon/pon.h"

@@ -67,7 +67,6 @@
 #include <filesystem>
 #include <boost/function.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
-#include <boost/thread.hpp>
 #include <openssl/crypto.h>
 #include <stdlib.h>
 

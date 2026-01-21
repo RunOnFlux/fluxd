@@ -9,6 +9,8 @@
 #include "config/bitcoin-config.h"
 #endif
 
+#include <cassert>
+
 #ifdef WIN32
 #ifdef _WIN32_WINNT
 #undef _WIN32_WINNT
@@ -30,7 +32,7 @@
 #endif
 
 LockedPageManager* LockedPageManager::_instance = NULL;
-boost::once_flag LockedPageManager::init_flag = BOOST_ONCE_INIT;
+std::once_flag LockedPageManager::init_flag;
 
 /** Determine system page size in bytes */
 static inline size_t GetSystemPageSize()

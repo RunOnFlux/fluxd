@@ -39,7 +39,6 @@
 
 #include "sodium.h"
 
-#include <boost/thread.hpp>
 #include <tuple>
 #ifdef ENABLE_MINING
 #include <functional>

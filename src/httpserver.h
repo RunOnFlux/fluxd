@@ -8,7 +8,6 @@
 
 #include <string>
 #include <stdint.h>
-#include <boost/thread.hpp>
 #include <memory>
 #include <functional>
 

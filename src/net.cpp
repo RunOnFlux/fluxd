@@ -1,6 +1,13 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 #include <vector>
+#include <condition_variable>
+#include <mutex>
+#include <condition_variable>
 #include <thread>
+#include <condition_variable>
+#include <chrono>
+#include <mutex>
+#include <condition_variable>
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
@@ -23,12 +30,20 @@
 
 #ifdef WIN32
 #include <string.h>
+#include <condition_variable>
+#include <mutex>
+#include <condition_variable>
 #else
 #include <fcntl.h>
+#include <condition_variable>
+#include <mutex>
+#include <condition_variable>
 #endif
 
 #include <filesystem>
-#include <boost/thread.hpp>
+#include <condition_variable>
+#include <mutex>
+#include <condition_variable>
 
 // Dump addresses to peers.dat every 15 minutes (900s)
 #define DUMP_ADDRESSES_INTERVAL 900
@@ -98,7 +113,7 @@ NodeId nLastNodeId = 0;
 CCriticalSection cs_nLastNodeId;
 
 static CSemaphore *semOutbound = NULL;
-static boost::condition_variable messageHandlerCondition;
+static std::condition_variable messageHandlerCondition;
 
 // Signals for message handling
 static CNodeSignals g_signals;
@@ -1526,8 +1541,8 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
 
 void ThreadMessageHandler()
 {
-    boost::mutex condition_mutex;
-    boost::unique_lock<boost::mutex> lock(condition_mutex);
+    std::mutex condition_mutex;
+    std::unique_lock<std::mutex> lock(condition_mutex);
 
     SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
     while (true)
@@ -1586,7 +1601,7 @@ void ThreadMessageHandler()
         }
 
         if (fSleep)
-            messageHandlerCondition.timed_wait(lock, boost::posix_time::microsec_clock::universal_time() + boost::posix_time::milliseconds(100));
+            messageHandlerCondition.wait_for(lock, std::chrono::milliseconds(100));
     }
 }
 
