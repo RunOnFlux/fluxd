@@ -19,7 +19,6 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <filesystem>
-#include <boost/thread.hpp>
 
 #include <stdio.h>
 

@@ -50,7 +50,6 @@
 #include <filesystem>
 #include <fstream>
 #include <boost/math/distributions/poisson.hpp>
-#include <boost/thread.hpp>
 #include <boost/static_assert.hpp>
 
 #include "emergencyblock.h"

@@ -9,8 +9,8 @@
 #include "utilstrencodings.h"
 
 #include <stdio.h>
+#include <mutex>
 
-#include <boost/thread.hpp>
 
 #ifdef DEBUG_LOCKCONTENTION
 void PrintLockContention(const char* pszName, const char* pszFile, int nLine)
@@ -57,7 +57,7 @@ private:
 
 typedef std::vector<std::pair<void*, CLockLocation> > LockStack;
 
-static boost::mutex dd_mutex;
+static std::mutex dd_mutex;
 static std::map<std::pair<void*, void*>, LockStack> lockorders;
 thread_local std::unique_ptr<LockStack> lockstack;
 

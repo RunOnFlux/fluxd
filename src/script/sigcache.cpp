@@ -12,8 +12,9 @@
 #include "uint256.h"
 #include "util.h"
 
-#include <boost/thread.hpp>
 #include <unordered_set>
+#include <shared_mutex>
+#include <mutex>
 
 namespace {
 
@@ -41,7 +42,7 @@ private:
     uint256 nonce;
     typedef std::unordered_set<uint256, CSignatureCacheHasher> map_type;
     map_type setValid;
-    boost::shared_mutex cs_sigcache;
+    std::shared_mutex cs_sigcache;
 
 
 public:
@@ -59,13 +60,13 @@ public:
     bool
     Get(const uint256& entry)
     {
-        boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
+        std::shared_lock<std::shared_mutex> lock(cs_sigcache);
         return setValid.count(entry);
     }
 
     void Erase(const uint256& entry)
     {
-        boost::unique_lock<boost::shared_mutex> lock(cs_sigcache);
+        std::unique_lock<std::shared_mutex> lock(cs_sigcache);
         setValid.erase(entry);
     }
 
@@ -74,7 +75,7 @@ public:
         size_t nMaxCacheSize = GetArg("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE) * ((size_t) 1 << 20);
         if (nMaxCacheSize <= 0) return;
 
-        boost::unique_lock<boost::shared_mutex> lock(cs_sigcache);
+        std::unique_lock<std::shared_mutex> lock(cs_sigcache);
         while (memusage::DynamicUsage(setValid) > nMaxCacheSize)
         {
             map_type::size_type s = GetRand(setValid.bucket_count());

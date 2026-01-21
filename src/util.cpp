@@ -17,14 +17,19 @@
 #include "utiltime.h"
 
 #include <thread>
+#include <mutex>
 #include "clientversion.h"
 
 #include <stdarg.h>
+#include <mutex>
 #include <stdio.h>
+#include <mutex>
 
 #if (defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
 #include <pthread.h>
+#include <mutex>
 #include <pthread_np.h>
+#include <mutex>
 #endif
 
 #ifndef WIN32
@@ -40,9 +45,13 @@
 #endif // __linux__
 
 #include <algorithm>
+#include <mutex>
 #include <fcntl.h>
+#include <mutex>
 #include <sys/resource.h>
+#include <mutex>
 #include <sys/stat.h>
+#include <mutex>
 
 #else
 
@@ -69,23 +78,34 @@
 #endif
 
 #include <io.h> /* for _commit */
+#include <mutex>
 #include <shlobj.h>
+#include <mutex>
 #endif
 
 #ifdef HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
+#include <mutex>
 #endif
 
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
+#include <mutex>
 #include <boost/algorithm/string/join.hpp>
+#include <mutex>
 #include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
+#include <mutex>
 #include <filesystem>
+#include <mutex>
 #include <fstream>
+#include <mutex>
 #include <boost/program_options/detail/config_file.hpp>
+#include <mutex>
 #include <boost/program_options/parsers.hpp>
-#include <boost/thread.hpp>
+#include <mutex>
 #include <openssl/crypto.h>
+#include <mutex>
 #include <openssl/conf.h>
+#include <mutex>
 
 // Work around clang compilation problem in Boost 1.46:
 // /usr/include/boost/program_options/detail/config_file.hpp:163:17: error: call to function 'to_internal' that is neither visible in the template definition nor found by argument-dependent lookup
@@ -173,10 +193,10 @@ instance_of_cinit;
  * the mutex).
  */
 
-static boost::once_flag debugPrintInitFlag = BOOST_ONCE_INIT;
+static std::once_flag debugPrintInitFlag;
 
 /**
- * We use boost::call_once() to make sure mutexDebugLog and
+ * We use std::call_once() to make sure mutexDebugLog and
  * vMsgsBeforeOpenLog are initialized in a thread-safe manner.
  *
  * NOTE: fileout, mutexDebugLog and sometimes vMsgsBeforeOpenLog
@@ -185,7 +205,7 @@ static boost::once_flag debugPrintInitFlag = BOOST_ONCE_INIT;
  * tested, explicit destruction of these objects can be implemented.
  */
 static FILE* fileout = NULL;
-static boost::mutex* mutexDebugLog = NULL;
+static std::mutex* mutexDebugLog = NULL;
 static list<string> *vMsgsBeforeOpenLog;
 
 [[noreturn]] void new_handler_terminate()
@@ -210,14 +230,14 @@ static int FileWriteStr(const std::string &str, FILE *fp)
 static void DebugPrintInit()
 {
     assert(mutexDebugLog == NULL);
-    mutexDebugLog = new boost::mutex();
+    mutexDebugLog = new std::mutex();
     vMsgsBeforeOpenLog = new list<string>;
 }
 
 void OpenDebugLog()
 {
-    boost::call_once(&DebugPrintInit, debugPrintInitFlag);
-    boost::mutex::scoped_lock scoped_lock(*mutexDebugLog);
+    std::call_once(debugPrintInitFlag, &DebugPrintInit);
+    std::lock_guard<std::mutex> scoped_lock(*mutexDebugLog);
 
     assert(fileout == NULL);
     assert(vMsgsBeforeOpenLog);
@@ -301,8 +321,8 @@ int LogPrintStr(const std::string &str)
     }
     else if (fPrintToDebugLog)
     {
-        boost::call_once(&DebugPrintInit, debugPrintInitFlag);
-        boost::mutex::scoped_lock scoped_lock(*mutexDebugLog);
+        std::call_once(debugPrintInitFlag, &DebugPrintInit);
+        std::lock_guard<std::mutex> scoped_lock(*mutexDebugLog);
 
         string strTimestamped = LogTimestampStr(str, &fStartedNewLine);
 

@@ -10,7 +10,6 @@
 #include "fluxnode.h"
 #include "undo.h"
 #include <filesystem>
-#include <boost/thread.hpp>
 
 static const char DB_FLUXNODE_CACHE_DATA = 'd';
 static const char BLOCK_FLUXNODE_UNDO_DATA = 'u';

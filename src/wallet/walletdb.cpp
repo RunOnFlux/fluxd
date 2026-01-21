@@ -19,7 +19,6 @@
 
 #include <filesystem>
 #include <memory>
-#include <boost/thread.hpp>
 
 using namespace std;
 

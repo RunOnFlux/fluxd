@@ -20,7 +20,6 @@
 #include "../consensus/validation.h"
 #include "../key_io.h"
 
-#include <boost/thread.hpp>
 
 static std::thread* ponMinterThread = nullptr;
 static bool fPONMinter = false;
