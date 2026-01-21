@@ -12,7 +12,6 @@
 #include <set>
 #include <vector>
 
-#include <boost/foreach.hpp>
 #include <unordered_set>
 #include <unordered_map>
 
