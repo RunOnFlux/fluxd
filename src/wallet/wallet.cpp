@@ -31,7 +31,7 @@
 #include <assert.h>
 
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/thread.hpp>
 #include <fluxnode/fluxnode.h>
 
@@ -829,12 +829,12 @@ bool CWallet::Verify(const string& walletFile, string& warningString, string& er
     if (!bitdb.Open(GetDataDir()))
     {
         // try moving the database env out of the way
-        boost::filesystem::path pathDatabase = GetDataDir() / "database";
-        boost::filesystem::path pathDatabaseBak = GetDataDir() / strprintf("database.%d.bak", GetTime());
+        std::filesystem::path pathDatabase = GetDataDir() / "database";
+        std::filesystem::path pathDatabaseBak = GetDataDir() / strprintf("database.%d.bak", GetTime());
         try {
-            boost::filesystem::rename(pathDatabase, pathDatabaseBak);
+            std::filesystem::rename(pathDatabase, pathDatabaseBak);
             LogPrintf("Moved old %s to %s. Retrying.\n", pathDatabase.string(), pathDatabaseBak.string());
-        } catch (const boost::filesystem::filesystem_error&) {
+        } catch (const std::filesystem::filesystem_error&) {
             // failure is ok (well, not really, but it's not worse than what we started with)
         }
 
@@ -854,7 +854,7 @@ bool CWallet::Verify(const string& walletFile, string& warningString, string& er
             return false;
     }
 
-    if (boost::filesystem::exists(GetDataDir() / walletFile))
+    if (std::filesystem::exists(GetDataDir() / walletFile))
     {
         CDBEnv::VerifyResult r = bitdb.Verify(walletFile, CWalletDB::Recover);
         if (r == CDBEnv::RECOVER_OK)

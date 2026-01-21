@@ -19,7 +19,8 @@
 #include "flux/Note.hpp"
 #include "flux/NoteEncryption.hpp"
 
-#include <boost/filesystem.hpp>
+#include <chrono>
+#include <filesystem>
 
 using ::testing::Return;
 
@@ -155,8 +156,9 @@ std::pair<uint256, uint256> GetWitnessesAndAnchors(TestWallet& wallet,
 
 TEST(WalletTests, SetupDatadirLocationRunAsFirstTest) {
     // Get temporary and unique path for file.
-    boost::filesystem::path pathTemp = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-    boost::filesystem::create_directories(pathTemp);
+    std::filesystem::path pathTemp = std::filesystem::temp_directory_path() /
+        ("test_wallet_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(pathTemp);
     mapArgs["-datadir"] = pathTemp.string();
 }
 

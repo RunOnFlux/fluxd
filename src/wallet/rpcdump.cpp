@@ -508,15 +508,15 @@ UniValue dumpwallet_impl(const UniValue& params, bool fHelp, bool fDumpZKeys)
 
     EnsureWalletIsUnlocked();
 
-    boost::filesystem::path exportdir;
+    std::filesystem::path exportdir;
     try {
         exportdir = GetExportDir();
     } catch (const std::runtime_error& e) {
         throw JSONRPCError(RPC_INTERNAL_ERROR, e.what());
     }
-    boost::filesystem::path exportfilepath = exportdir / params[0].get_str();
+    std::filesystem::path exportfilepath = exportdir / params[0].get_str();
 
-    if (boost::filesystem::exists(exportfilepath)) {
+    if (std::filesystem::exists(exportfilepath)) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot overwrite existing file " + exportfilepath.string());
     }
 

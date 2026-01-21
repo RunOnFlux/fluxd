@@ -23,7 +23,7 @@
 #include "wallet/wallet.h"
 #endif
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/test/unit_test.hpp>
 #include <boost/thread.hpp>
 
@@ -40,12 +40,12 @@ JoinSplitTestingSetup::JoinSplitTestingSetup()
 {
     pfluxParams = ZCJoinSplit::Prepared();
 
-    boost::filesystem::path sapling_spend = ZC_GetParamsDir() / "sapling-spend.params";
-    boost::filesystem::path sapling_output = ZC_GetParamsDir() / "sapling-output.params";
-    boost::filesystem::path sprout_groth16 = ZC_GetParamsDir() / "sprout-groth16.params";
+    std::filesystem::path sapling_spend = ZC_GetParamsDir() / "sapling-spend.params";
+    std::filesystem::path sapling_output = ZC_GetParamsDir() / "sapling-output.params";
+    std::filesystem::path sprout_groth16 = ZC_GetParamsDir() / "sprout-groth16.params";
 
     static_assert(
-        sizeof(boost::filesystem::path::value_type) == sizeof(codeunit),
+        sizeof(std::filesystem::path::value_type) == sizeof(codeunit),
         "librustzcash not configured correctly");
     auto sapling_spend_str = sapling_spend.native();
     auto sapling_output_str = sapling_output.native();
@@ -96,11 +96,11 @@ TestingSetup::TestingSetup()
 #endif
 
         // Save current path, in case a test changes it
-        orig_current_path = boost::filesystem::current_path();
+        orig_current_path = std::filesystem::current_path();
 
         ClearDatadirCache();
         pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i", (unsigned long)GetTime(), (int)(GetRand(100000)));
-        boost::filesystem::create_directories(pathTemp);
+        std::filesystem::create_directories(pathTemp);
         mapArgs["-datadir"] = pathTemp.string();
         pblocktree = new CBlockTreeDB(1 << 20, true);
         pcoinsdbview = new CCoinsViewDB(1 << 23, true);
@@ -138,9 +138,9 @@ TestingSetup::~TestingSetup()
 #endif
 
         // Restore the previous current path so temporary directory can be deleted
-        boost::filesystem::current_path(orig_current_path);
+        std::filesystem::current_path(orig_current_path);
 
-        boost::filesystem::remove_all(pathTemp);
+        std::filesystem::remove_all(pathTemp);
 }
 
 

@@ -10,7 +10,7 @@
 #define ZELCASH_FLUXNODECACHEDB_H
 
 #include "dbwrapper.h"
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 
 class FluxnodeCacheData;
 class COutPoint;
