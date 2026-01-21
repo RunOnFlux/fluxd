@@ -27,7 +27,7 @@
 #include <arpa/inet.h>
 #endif
 
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 #include <boost/foreach.hpp>
 #include <boost/signals2/signal.hpp>
 
@@ -695,7 +695,7 @@ void RelayInv(const CInv& inv);
 class CAddrDB
 {
 private:
-    boost::filesystem::path pathAddr;
+    std::filesystem::path pathAddr;
 public:
     CAddrDB();
     bool Write(const CAddrMan& addr);

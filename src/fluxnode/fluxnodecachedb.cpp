@@ -9,7 +9,7 @@
 #include "fluxnode/fluxnodecachedb.h"
 #include "fluxnode.h"
 #include "undo.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/thread.hpp>
 
 static const char DB_FLUXNODE_CACHE_DATA = 'd';

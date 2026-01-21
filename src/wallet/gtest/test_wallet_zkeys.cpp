@@ -9,7 +9,8 @@
 #include "wallet/walletdb.h"
 #include "util.h"
 
-#include <boost/filesystem.hpp>
+#include <chrono>
+#include <filesystem>
 
 /**
  * This test covers Sapling methods on CWallet
@@ -221,8 +222,9 @@ TEST(wallet_zkeys_tests, write_zkey_direct_to_db) {
 
     // Get temporary and unique path for file.
     // Note: / operator to append paths
-    boost::filesystem::path pathTemp = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-    boost::filesystem::create_directories(pathTemp);
+    std::filesystem::path pathTemp = std::filesystem::temp_directory_path() /
+        ("test_zkeys_db_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(pathTemp);
     mapArgs["-datadir"] = pathTemp.string();
 
     bool fFirstRun;
@@ -293,8 +295,9 @@ TEST(wallet_zkeys_tests, WriteViewingKeyDirectToDB) {
 
     // Get temporary and unique path for file.
     // Note: / operator to append paths
-    boost::filesystem::path pathTemp = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-    boost::filesystem::create_directories(pathTemp);
+    std::filesystem::path pathTemp = std::filesystem::temp_directory_path() /
+        ("test_viewing_key_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(pathTemp);
     mapArgs["-datadir"] = pathTemp.string();
 
     bool fFirstRun;
@@ -338,8 +341,9 @@ TEST(wallet_zkeys_tests, write_cryptedzkey_direct_to_db) {
 
     // Get temporary and unique path for file.
     // Note: / operator to append paths
-    boost::filesystem::path pathTemp = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-    boost::filesystem::create_directories(pathTemp);
+    std::filesystem::path pathTemp = std::filesystem::temp_directory_path() /
+        ("test_crypted_zkey_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(pathTemp);
     mapArgs["-datadir"] = pathTemp.string();
 
     bool fFirstRun;
@@ -412,8 +416,9 @@ TEST(wallet_zkeys_tests, WriteCryptedSaplingZkeyDirectToDb) {
 
     // Get temporary and unique path for file.
     // Note: / operator to append paths
-    boost::filesystem::path pathTemp = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-    boost::filesystem::create_directories(pathTemp);
+    std::filesystem::path pathTemp = std::filesystem::temp_directory_path() /
+        ("test_sapling_crypted_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(pathTemp);
     mapArgs["-datadir"] = pathTemp.string();
 
     bool fFirstRun;

@@ -9,7 +9,7 @@
 #include "pubkey.h"
 #include "txdb.h"
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/thread.hpp>
 
 /** Basic testing setup.
@@ -34,8 +34,8 @@ struct JoinSplitTestingSetup: public BasicTestingSetup {
  */
 struct TestingSetup: public JoinSplitTestingSetup {
     CCoinsViewDB *pcoinsdbview;
-    boost::filesystem::path orig_current_path;
-    boost::filesystem::path pathTemp;
+    std::filesystem::path orig_current_path;
+    std::filesystem::path pathTemp;
     boost::thread_group threadGroup;
 
     TestingSetup();

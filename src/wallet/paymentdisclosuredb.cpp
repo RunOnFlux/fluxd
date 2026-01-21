@@ -8,11 +8,11 @@
 #include "util.h"
 #include "dbwrapper.h"
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 using namespace std;
 
-static boost::filesystem::path emptyPath;
+static std::filesystem::path emptyPath;
 
 /**
  * Static method to return the shared/default payment disclosure database.
@@ -27,8 +27,8 @@ shared_ptr<PaymentDisclosureDB> PaymentDisclosureDB::sharedInstance() {
 PaymentDisclosureDB::PaymentDisclosureDB() : PaymentDisclosureDB(emptyPath) {
 }
 
-PaymentDisclosureDB::PaymentDisclosureDB(const boost::filesystem::path& dbPath) {
-    boost::filesystem::path path(dbPath);
+PaymentDisclosureDB::PaymentDisclosureDB(const std::filesystem::path& dbPath) {
+    std::filesystem::path path(dbPath);
     if (path.empty()) {
         path = GetDataDir() / "paymentdisclosure";
         LogPrintf("PaymentDisclosure: using default path for database: %s\n", path.string());

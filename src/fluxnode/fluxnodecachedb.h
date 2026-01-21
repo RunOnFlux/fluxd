@@ -12,7 +12,7 @@
 #include "dbwrapper.h"
 #include "serialize.h"
 #include "uint256.h"
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 
 class FluxnodeCacheData;
 class COutPoint;

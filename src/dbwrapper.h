@@ -12,7 +12,7 @@
 #include "util.h"
 #include "version.h"
 
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 
 #include <leveldb/db.h>
 #include <leveldb/write_batch.h>
@@ -174,7 +174,7 @@ public:
      * @param[in] fMemory     If true, use leveldb's memory environment.
      * @param[in] fWipe       If true, remove all existing data.
      */
-    CDBWrapper(const boost::filesystem::path& path, size_t nCacheSize, bool fMemory = false, bool fWipe = false);
+    CDBWrapper(const std::filesystem::path& path, size_t nCacheSize, bool fMemory = false, bool fWipe = false);
     ~CDBWrapper();
 
     template <typename K, typename V>

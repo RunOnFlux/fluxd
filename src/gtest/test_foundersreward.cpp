@@ -11,11 +11,12 @@
 #include "flux/Address.hpp"
 #include "wallet/wallet.h"
 #include "amount.h"
+#include <chrono>
 #include <memory>
 #include <string>
 #include <set>
 #include <vector>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include "util.h"
 
 // To run tests:
@@ -29,8 +30,9 @@
 #if 0
 TEST(founders_reward_test, create_testnet_2of3multisig) {
     SelectParams(CBaseChainParams::TESTNET);
-    boost::filesystem::path pathTemp = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-    boost::filesystem::create_directories(pathTemp);
+    std::filesystem::path pathTemp = std::filesystem::temp_directory_path() /
+        ("test_founders_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(pathTemp);
     mapArgs["-datadir"] = pathTemp.string();
     bool fFirstRun;
     auto pWallet = std::make_shared<CWallet>("wallet.dat");

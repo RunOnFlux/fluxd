@@ -16,7 +16,7 @@
 #include "fluxnode/fluxnodeconfig.h"
 
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/thread.hpp>
 
 #include <stdio.h>
@@ -99,7 +99,7 @@ bool AppInit(int argc, char* argv[])
             RenameDirectoriesFromZelcashToFlux();
         }
 
-        if (!boost::filesystem::is_directory(GetDataDir(false)))
+        if (!std::filesystem::is_directory(GetDataDir(false)))
         {
             fprintf(stderr, "Error: Specified data directory \"%s\" does not exist.\n", mapArgs["-datadir"].c_str());
             return false;

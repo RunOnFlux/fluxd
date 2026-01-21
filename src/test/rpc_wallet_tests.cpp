@@ -34,7 +34,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/test/unit_test.hpp>
 #include <boost/format.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 #include <univalue.h>
 
@@ -423,9 +423,10 @@ BOOST_AUTO_TEST_CASE(rpc_wallet_z_exportwallet)
     BOOST_CHECK(addrs.size()==1);
 
     // Set up paths
-    boost::filesystem::path tmppath = boost::filesystem::temp_directory_path();
-    boost::filesystem::path tmpfilename = boost::filesystem::unique_path("%%%%%%%%");
-    boost::filesystem::path exportfilepath = tmppath / tmpfilename;
+    std::filesystem::path tmppath = std::filesystem::temp_directory_path();
+    std::filesystem::path tmpfilename = "export_wallet_" +
+        std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    std::filesystem::path exportfilepath = tmppath / tmpfilename;
 
     // export will fail since exportdir is not set
     BOOST_CHECK_THROW(CallRPC(string("z_exportwallet ") + tmpfilename.string()), runtime_error);
@@ -508,8 +509,8 @@ BOOST_AUTO_TEST_CASE(rpc_wallet_z_importwallet)
     std::string testWalletDump = (formatobject % testKey % testAddr).str();
 
     // write test data to file
-    boost::filesystem::path temp = boost::filesystem::temp_directory_path() /
-            boost::filesystem::unique_path();
+    std::filesystem::path temp = std::filesystem::temp_directory_path() /
+            ("import_wallet_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     const std::string path = temp.string();
     std::ofstream file(path);
     file << testWalletDump;
@@ -1374,7 +1375,7 @@ BOOST_AUTO_TEST_CASE(rpc_wallet_encrypted_wallet_zkeys)
     strWalletPass.reserve(100);
     strWalletPass = "hello";
 
-    boost::filesystem::current_path(GetArg("-datadir","/tmp/thisshouldnothappen"));
+    std::filesystem::current_path(GetArg("-datadir","/tmp/thisshouldnothappen"));
     BOOST_CHECK(pwalletMain->EncryptWallet(strWalletPass));
 
     // Verify we can still list the keys imported
@@ -1435,7 +1436,7 @@ BOOST_AUTO_TEST_CASE(rpc_wallet_encrypted_wallet_sapzkeys)
     strWalletPass.reserve(100);
     strWalletPass = "hello";
 
-    boost::filesystem::current_path(GetArg("-datadir","/tmp/thisshouldnothappen"));
+    std::filesystem::current_path(GetArg("-datadir","/tmp/thisshouldnothappen"));
     BOOST_CHECK(pwalletMain->EncryptWallet(strWalletPass));
 
     // Verify we can still list the keys imported

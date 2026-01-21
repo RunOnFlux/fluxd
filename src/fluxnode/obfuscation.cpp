@@ -16,8 +16,8 @@
 #include "activefluxnode.h"
 
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
+#include <filesystem>
+#include <fstream>
 
 #include <algorithm>
 #include <boost/assign/list_of.hpp>

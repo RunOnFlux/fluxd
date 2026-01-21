@@ -77,8 +77,8 @@
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
+#include <filesystem>
+#include <fstream>
 #include <boost/foreach.hpp>
 #include <boost/program_options/detail/config_file.hpp>
 #include <boost/program_options/parsers.hpp>
@@ -220,7 +220,7 @@ void OpenDebugLog()
 
     assert(fileout == NULL);
     assert(vMsgsBeforeOpenLog);
-    boost::filesystem::path pathDebug = GetDataDir() / "debug.log";
+    std::filesystem::path pathDebug = GetDataDir() / "debug.log";
     fileout = fopen(pathDebug.string().c_str(), "a");
     if (fileout) setbuf(fileout, NULL); // unbuffered
 
@@ -316,7 +316,7 @@ int LogPrintStr(const std::string &str)
             // reopen the log file, if requested
             if (fReopenDebugLog) {
                 fReopenDebugLog = false;
-                boost::filesystem::path pathDebug = GetDataDir() / "debug.log";
+                std::filesystem::path pathDebug = GetDataDir() / "debug.log";
                 if (freopen(pathDebug.string().c_str(),"a",fileout) != NULL)
                     setbuf(fileout, NULL); // unbuffered
             }
@@ -475,9 +475,9 @@ void PrintExceptionContinue(const std::exception* pex, const char* pszThread)
     strMiscWarning = message;
 }
 
-boost::filesystem::path GetDefaultDataDirForCoinName(const std::string &coinName)
+std::filesystem::path GetDefaultDataDirForCoinName(const std::string &coinName)
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
     // Windows < Vista: C:\Documents and Settings\Username\Application Data\Flux
     // Windows >= Vista: C:\Users\Username\AppData\Roaming\Flux
     // Mac: ~/Library/Application Support/Flux
@@ -509,9 +509,9 @@ boost::filesystem::path GetDefaultDataDirForCoinName(const std::string &coinName
 }
 
 
-boost::filesystem::path GetDefaultDataDir()
+std::filesystem::path GetDefaultDataDir()
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
 
     fs::path fluxDefaultDir = GetDefaultDataDirForCoinName("Flux");
     if (!fs::is_directory(fluxDefaultDir)) {
@@ -524,16 +524,16 @@ boost::filesystem::path GetDefaultDataDir()
     return fluxDefaultDir;
 }
 
-static boost::filesystem::path pathCached;
-static boost::filesystem::path pathCachedNetSpecific;
-static boost::filesystem::path zc_paramsPathCached;
+static std::filesystem::path pathCached;
+static std::filesystem::path pathCachedNetSpecific;
+static std::filesystem::path zc_paramsPathCached;
 static CCriticalSection csPathCached;
 
-static boost::filesystem::path ZC_GetBaseParamsDir()
+static std::filesystem::path ZC_GetBaseParamsDir()
 {
     // Copied from GetDefaultDataDir and adapter for zcash params.
 
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
     // Windows < Vista: C:\Documents and Settings\Username\Application Data\ZcashParams
     // Windows >= Vista: C:\Users\Username\AppData\Roaming\ZcashParams
     // Mac: ~/Library/Application Support/ZcashParams
@@ -560,9 +560,9 @@ static boost::filesystem::path ZC_GetBaseParamsDir()
 #endif
 }
 
-const boost::filesystem::path &ZC_GetParamsDir()
+const std::filesystem::path &ZC_GetParamsDir()
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
 
     LOCK(csPathCached); // Reuse the same lock as upstream.
 
@@ -581,12 +581,12 @@ const boost::filesystem::path &ZC_GetParamsDir()
 // Return the user specified export directory.  Create directory if it doesn't exist.
 // If user did not set option, return an empty path.
 // If there is a filesystem problem, throw an exception.
-const boost::filesystem::path GetExportDir()
+const std::filesystem::path GetExportDir()
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
     fs::path path;
     if (mapArgs.count("-exportdir")) {
-        path = fs::system_complete(mapArgs["-exportdir"]);
+        path = fs::absolute(mapArgs["-exportdir"]);
         if (fs::exists(path) && !fs::is_directory(path)) {
             throw std::runtime_error(strprintf("The -exportdir '%s' already exists and is not a directory", path.string()));
         }
@@ -598,9 +598,9 @@ const boost::filesystem::path GetExportDir()
 }
 
 
-const boost::filesystem::path &GetDataDir(bool fNetSpecific)
+const std::filesystem::path &GetDataDir(bool fNetSpecific)
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
 
     LOCK(csPathCached);
 
@@ -612,7 +612,7 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
         return path;
 
     if (mapArgs.count("-datadir")) {
-        path = fs::system_complete(mapArgs["-datadir"]);
+        path = fs::absolute(mapArgs["-datadir"]);
         if (!fs::is_directory(path)) {
             path = "";
             return path;
@@ -630,7 +630,7 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
 
 bool RenameDirectoriesFromZelcashToFlux()
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
 
     fs::path zelcashPath = GetDefaultDataDirForCoinName("Zelcash");
     fs::path fluxPath = GetDefaultDataDirForCoinName("Flux");
@@ -667,38 +667,38 @@ bool RenameDirectoriesFromZelcashToFlux()
 
 void ClearDatadirCache()
 {
-    pathCached = boost::filesystem::path();
-    pathCachedNetSpecific = boost::filesystem::path();
+    pathCached = std::filesystem::path();
+    pathCachedNetSpecific = std::filesystem::path();
 }
 
-boost::filesystem::path GetConfigFile()
+std::filesystem::path GetConfigFile()
 {
-    boost::filesystem::path pathFluxConfigFile(GetArg("-conf", "flux.conf"));
-    boost::filesystem::path dataDir = GetDataDir(false);
-    if (!pathFluxConfigFile.is_complete()) {
+    std::filesystem::path pathFluxConfigFile(GetArg("-conf", "flux.conf"));
+    std::filesystem::path dataDir = GetDataDir(false);
+    if (!pathFluxConfigFile.is_absolute()) {
         pathFluxConfigFile = dataDir / pathFluxConfigFile;
     }
 
-    boost::filesystem::ifstream streamConfig(pathFluxConfigFile);
+    std::ifstream streamConfig(pathFluxConfigFile);
     if (streamConfig.good()) {
         return pathFluxConfigFile;
     }
 
-    boost::filesystem::path pathZelcashConfigFile(GetArg("-conf", "zelcash.conf"));
-    if (!pathZelcashConfigFile.is_complete()) {
+    std::filesystem::path pathZelcashConfigFile(GetArg("-conf", "zelcash.conf"));
+    if (!pathZelcashConfigFile.is_absolute()) {
         pathZelcashConfigFile = dataDir / pathZelcashConfigFile;
     }
 
     return pathZelcashConfigFile;
 }
 
-boost::filesystem::path GetFluxnodeConfigFile()
+std::filesystem::path GetFluxnodeConfigFile()
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
 
     // If zelnode.conf exists use this file instead of fluxnode.conf
-    boost::filesystem::path pathZelnodeConfigFile(GetArg("-znconf", "zelnode.conf"));
-    if (!pathZelnodeConfigFile.is_complete()) {
+    std::filesystem::path pathZelnodeConfigFile(GetArg("-znconf", "zelnode.conf"));
+    if (!pathZelnodeConfigFile.is_absolute()) {
         pathZelnodeConfigFile = GetDataDir() / pathZelnodeConfigFile;
         if (fs::exists(pathZelnodeConfigFile)) {
             LogPrintf("Using zelnode.conf Config File\n");
@@ -707,8 +707,8 @@ boost::filesystem::path GetFluxnodeConfigFile()
     }
 
     // Use fluxnode.conf as the next option
-    boost::filesystem::path pathFluxnodeConfigFile(GetArg("-znconf", "fluxnode.conf"));
-    if (!pathFluxnodeConfigFile.is_complete()) {
+    std::filesystem::path pathFluxnodeConfigFile(GetArg("-znconf", "fluxnode.conf"));
+    if (!pathFluxnodeConfigFile.is_absolute()) {
         pathFluxnodeConfigFile = GetDataDir() / pathFluxnodeConfigFile;
         if (fs::exists(pathFluxnodeConfigFile)) {
             LogPrintf("Using fluxnode.conf Config File\n");
@@ -724,7 +724,7 @@ boost::filesystem::path GetFluxnodeConfigFile()
 void ReadConfigFile(map<string, string>& mapSettingsRet,
                     map<string, vector<string> >& mapMultiSettingsRet)
 {
-    boost::filesystem::ifstream streamConfig(GetConfigFile());
+    std::ifstream streamConfig(GetConfigFile());
     if (!streamConfig.good())
         throw missing_zelcash_conf();
 
@@ -748,14 +748,14 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
 }
 
 #ifndef WIN32
-boost::filesystem::path GetPidFile()
+std::filesystem::path GetPidFile()
 {
-    boost::filesystem::path pathPidFile(GetArg("-pid", "zelcashd.pid"));
-    if (!pathPidFile.is_complete()) pathPidFile = GetDataDir() / pathPidFile;
+    std::filesystem::path pathPidFile(GetArg("-pid", "zelcashd.pid"));
+    if (!pathPidFile.is_absolute()) pathPidFile = GetDataDir() / pathPidFile;
     return pathPidFile;
 }
 
-void CreatePidFile(const boost::filesystem::path &path, pid_t pid)
+void CreatePidFile(const std::filesystem::path &path, pid_t pid)
 {
     FILE* file = fopen(path.string().c_str(), "w");
     if (file)
@@ -766,7 +766,7 @@ void CreatePidFile(const boost::filesystem::path &path, pid_t pid)
 }
 #endif
 
-bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest)
+bool RenameOver(std::filesystem::path src, std::filesystem::path dest)
 {
 #ifdef WIN32
     return MoveFileExA(src.string().c_str(), dest.string().c_str(),
@@ -782,13 +782,13 @@ bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest)
  * Specifically handles case where path p exists, but it wasn't possible for the user to
  * write to the parent directory.
  */
-bool TryCreateDirectory(const boost::filesystem::path& p)
+bool TryCreateDirectory(const std::filesystem::path& p)
 {
     try
     {
-        return boost::filesystem::create_directory(p);
-    } catch (const boost::filesystem::filesystem_error&) {
-        if (!boost::filesystem::exists(p) || !boost::filesystem::is_directory(p))
+        return std::filesystem::create_directory(p);
+    } catch (const std::filesystem::filesystem_error&) {
+        if (!std::filesystem::exists(p) || !std::filesystem::is_directory(p))
             throw;
     }
 
@@ -897,7 +897,7 @@ void ShrinkDebugFile()
     // file, and atomically renames over debug.log. Any concurrent LogPrintStr
     // writes land on the unlinked inode; LogPrintStr reopens on next call
     // when fReopenDebugLog is set.
-    boost::filesystem::path pathLog = GetDataDir() / "debug.log";
+    std::filesystem::path pathLog = GetDataDir() / "debug.log";
 
     // Get configurable size threshold. Default 500 MB, min 10 MB. Upper cap
     // depends on whether debug logging is active: 10 GiB with -debug on so a
@@ -908,8 +908,8 @@ void ShrinkDebugFile()
     if (nMaxLogSizeMB > nUpperCapMB) nMaxLogSizeMB = nUpperCapMB;
     int64_t nMaxLogSize = nMaxLogSizeMB * 1000000;
 
-    boost::system::error_code ec;
-    uintmax_t curSize = boost::filesystem::file_size(pathLog, ec);
+    std::error_code ec;
+    uintmax_t curSize = std::filesystem::file_size(pathLog, ec);
     if (ec || (int64_t)curSize <= nMaxLogSize)
         return;
 
@@ -924,16 +924,16 @@ void ShrinkDebugFile()
     size_t nBytes = fread(begin_ptr(vch), 1, vch.size(), src);
     fclose(src);
 
-    boost::filesystem::path pathTmp = pathLog;
+    std::filesystem::path pathTmp = pathLog;
     pathTmp += ".tmp";
     FILE* dst = fopen(pathTmp.string().c_str(), "wb");
     if (!dst) return;
     fwrite(begin_ptr(vch), 1, nBytes, dst);
     fclose(dst);
 
-    boost::filesystem::rename(pathTmp, pathLog, ec);
+    std::filesystem::rename(pathTmp, pathLog, ec);
     if (ec) {
-        boost::filesystem::remove(pathTmp, ec);
+        std::filesystem::remove(pathTmp, ec);
         return;
     }
 
@@ -943,9 +943,9 @@ void ShrinkDebugFile()
 }
 
 #ifdef WIN32
-boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate)
+std::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate)
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
 
     char pszPath[MAX_PATH] = "";
 
@@ -959,23 +959,23 @@ boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate)
 }
 #endif
 
-boost::filesystem::path GetTempPath() {
+std::filesystem::path GetTempPath() {
 #if BOOST_FILESYSTEM_VERSION == 3
-    return boost::filesystem::temp_directory_path();
+    return std::filesystem::temp_directory_path();
 #else
     // TODO: remove when we don't support filesystem v2 anymore
-    boost::filesystem::path path;
+    std::filesystem::path path;
 #ifdef WIN32
     char pszPath[MAX_PATH] = "";
 
     if (GetTempPathA(MAX_PATH, pszPath))
-        path = boost::filesystem::path(pszPath);
+        path = std::filesystem::path(pszPath);
 #else
-    path = boost::filesystem::path("/tmp");
+    path = std::filesystem::path("/tmp");
 #endif
-    if (path.empty() || !boost::filesystem::is_directory(path)) {
+    if (path.empty() || !std::filesystem::is_directory(path)) {
         LogPrintf("GetTempPath(): failed to find temp path\n");
-        return boost::filesystem::path("");
+        return std::filesystem::path("");
     }
     return path;
 #endif
@@ -1015,12 +1015,8 @@ void SetupEnvironment()
         setenv("LC_ALL", "C", 1);
     }
 #endif
-    // The path locale is lazy initialized and to avoid deinitialization errors
-    // in multithreading environments, it is set explicitly by the main thread.
-    // A dummy locale is used to extract the internal default locale, used by
-    // boost::filesystem::path, which is then used to explicitly imbue the path.
-    std::locale loc = boost::filesystem::path::imbue(std::locale::classic());
-    boost::filesystem::path::imbue(loc);
+    // Note: std::filesystem (unlike boost::filesystem) does not require explicit
+    // locale initialization as it handles locales internally in a thread-safe manner.
 }
 
 bool SetupNetworking()
