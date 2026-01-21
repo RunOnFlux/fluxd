@@ -256,7 +256,7 @@ namespace {
      *
      * Memory used: 1.7MB
      */
-    boost::scoped_ptr<CRollingBloomFilter> recentRejects;
+    std::unique_ptr<CRollingBloomFilter> recentRejects;
     uint256 hashRecentRejectsChainTip;
 
     /** Blocks that are in flight, and that are in the queue to be downloaded. Protected by cs_main. */
@@ -3562,7 +3562,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         // Sapling
         //
         // If we've reached ConnectBlock, we have all transactions of
-        // parents and can expect nChainSaplingValue not to be boost::none.
+        // parents and can expect nChainSaplingValue not to be std::nullopt.
         // However, the miner and mining RPCs may not have populated this
         // value and will call `TestBlockValidity`. So, we act
         // conditionally.
@@ -4736,7 +4736,7 @@ void FallbackSproutValuePoolBalance(
                 assert(*pindex->nChainSproutValue == chainparams.SproutValuePoolCheckpointBalance());
                 // And we should expect non-none for the delta stored in the block index here,
                 // or the checkpoint is too early.
-                assert(pindex->nSproutValue != boost::none);
+                assert(pindex->nSproutValue != std::nullopt);
             }
         } else {
             LogPrintf(
@@ -4772,9 +4772,9 @@ bool ReceivedBlockTransactions(
         }
     }
     pindexNew->nSproutValue = sproutValue;
-    pindexNew->nChainSproutValue = boost::none;
+    pindexNew->nChainSproutValue = std::nullopt;
     pindexNew->nSaplingValue = saplingValue;
-    pindexNew->nChainSaplingValue = boost::none;
+    pindexNew->nChainSaplingValue = std::nullopt;
     pindexNew->nFile = pos.nFile;
     pindexNew->nDataPos = pos.nPos;
     pindexNew->nUndoPos = 0;
@@ -4796,12 +4796,12 @@ bool ReceivedBlockTransactions(
                 if (pindex->pprev->nChainSproutValue && pindex->nSproutValue) {
                     pindex->nChainSproutValue = *pindex->pprev->nChainSproutValue + *pindex->nSproutValue;
                 } else {
-                    pindex->nChainSproutValue = boost::none;
+                    pindex->nChainSproutValue = std::nullopt;
                 }
                 if (pindex->pprev->nChainSaplingValue) {
                     pindex->nChainSaplingValue = *pindex->pprev->nChainSaplingValue + pindex->nSaplingValue;
                 } else {
-                    pindex->nChainSaplingValue = boost::none;
+                    pindex->nChainSaplingValue = std::nullopt;
                 }
             } else {
                 pindex->nChainSproutValue = pindex->nSproutValue;
@@ -5651,17 +5651,17 @@ bool static LoadBlockIndexDB()
                     if (pindex->pprev->nChainSproutValue && pindex->nSproutValue) {
                         pindex->nChainSproutValue = *pindex->pprev->nChainSproutValue + *pindex->nSproutValue;
                     } else {
-                        pindex->nChainSproutValue = boost::none;
+                        pindex->nChainSproutValue = std::nullopt;
                     }
                     if (pindex->pprev->nChainSaplingValue) {
                         pindex->nChainSaplingValue = *pindex->pprev->nChainSaplingValue + pindex->nSaplingValue;
                     } else {
-                        pindex->nChainSaplingValue = boost::none;
+                        pindex->nChainSaplingValue = std::nullopt;
                     }
                 } else {
                     pindex->nChainTx = 0;
-                    pindex->nChainSproutValue = boost::none;
-                    pindex->nChainSaplingValue = boost::none;
+                    pindex->nChainSproutValue = std::nullopt;
+                    pindex->nChainSaplingValue = std::nullopt;
                     mapBlocksUnlinked.insert(std::make_pair(pindex->pprev, pindex));
                 }
             } else {

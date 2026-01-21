@@ -37,7 +37,7 @@
 #include <utility>
 #include <vector>
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 /**
  * Settings
@@ -229,7 +229,7 @@ public:
      * transactions they are spent in. This is the same security semantics as
      * for transparent addresses.
      */
-    boost::optional<uint256> nullifier;
+    std::optional<uint256> nullifier;
 
     /**
      * Cached incremental witnesses for spendable Notes.
@@ -292,7 +292,7 @@ public:
     std::list<SaplingWitness> witnesses;
     int witnessHeight;
     libflux::SaplingIncomingViewingKey ivk;
-    boost::optional<uint256> nullifier;
+    std::optional<uint256> nullifier;
 
     ADD_SERIALIZE_METHODS;
 
@@ -1131,7 +1131,7 @@ public:
     void EraseFromWallet(const uint256 &hash);
     void WitnessNoteCommitment(
          std::vector<uint256> commitments,
-         std::vector<boost::optional<SproutWitness>>& witnesses,
+         std::vector<std::optional<SproutWitness>>& witnesses,
          uint256 &final_anchor);
     int ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate = false);
     void ReacceptWalletTransactions();
@@ -1148,7 +1148,7 @@ public:
     bool FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, int& nChangePosRet, std::string& strFailReason);
     bool CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosRet,
                            std::string& strFailReason, const CCoinControl *coinControl = NULL, bool sign = true);
-    bool CommitTransaction(CWalletTx& wtxNew, boost::optional<CReserveKey&> reservekey, CValidationState* state = nullptr);
+    bool CommitTransaction(CWalletTx& wtxNew, std::optional<std::reference_wrapper<CReserveKey>> reservekey, CValidationState* state = nullptr);
 
     static CFeeRate minTxFee;
     static CAmount GetMinimumFee(unsigned int nTxBytes, unsigned int nConfirmTarget, const CTxMemPool& pool);
@@ -1167,7 +1167,7 @@ public:
 
     std::set<CTxDestination> GetAccountAddresses(const std::string& strAccount) const;
 
-    boost::optional<uint256> GetSproutNoteNullifier(
+    std::optional<uint256> GetSproutNoteNullifier(
         const JSDescription& jsdesc,
         const libflux::SproutPaymentAddress& address,
         const ZCNoteDecryption& dec,
@@ -1180,11 +1180,11 @@ public:
 
     void GetSproutNoteWitnesses(
          std::vector<JSOutPoint> notes,
-         std::vector<boost::optional<SproutWitness>>& witnesses,
+         std::vector<std::optional<SproutWitness>>& witnesses,
          uint256 &final_anchor);
     void GetSaplingNoteWitnesses(
          std::vector<SaplingOutPoint> notes,
-         std::vector<boost::optional<SaplingWitness>>& witnesses,
+         std::vector<std::optional<SaplingWitness>>& witnesses,
          uint256 &final_anchor);
 
     isminetype IsMine(const CTxIn& txin) const;
@@ -1227,7 +1227,7 @@ public:
         }
     }
 
-    void GetScriptForMining(boost::shared_ptr<CReserveScript> &script);
+    void GetScriptForMining(std::shared_ptr<CReserveScript> &script);
     void ResetRequestCount(const uint256 &hash)
     {
         LOCK(cs_wallet);
@@ -1400,7 +1400,7 @@ public:
 // Shielded key and address generalizations
 //
 
-class PaymentAddressBelongsToWallet : public boost::static_visitor<bool>
+class PaymentAddressBelongsToWallet 
 {
 private:
     CWallet *m_wallet;
@@ -1412,7 +1412,7 @@ public:
     bool operator()(const libflux::InvalidEncoding& no) const;
 };
 
-class HaveSpendingKeyForPaymentAddress : public boost::static_visitor<bool>
+class HaveSpendingKeyForPaymentAddress 
 {
 private:
     CWallet *m_wallet;
@@ -1424,16 +1424,16 @@ public:
     bool operator()(const libflux::InvalidEncoding& no) const;
 };
 
-class GetSpendingKeyForPaymentAddress : public boost::static_visitor<boost::optional<libflux::SpendingKey>>
+class GetSpendingKeyForPaymentAddress 
 {
 private:
     CWallet *m_wallet;
 public:
     GetSpendingKeyForPaymentAddress(CWallet *wallet) : m_wallet(wallet) {}
 
-    boost::optional<libflux::SpendingKey> operator()(const libflux::SproutPaymentAddress &zaddr) const;
-    boost::optional<libflux::SpendingKey> operator()(const libflux::SaplingPaymentAddress &zaddr) const;
-    boost::optional<libflux::SpendingKey> operator()(const libflux::InvalidEncoding& no) const;
+    std::optional<libflux::SpendingKey> operator()(const libflux::SproutPaymentAddress &zaddr) const;
+    std::optional<libflux::SpendingKey> operator()(const libflux::SaplingPaymentAddress &zaddr) const;
+    std::optional<libflux::SpendingKey> operator()(const libflux::InvalidEncoding& no) const;
 };
 
 enum SpendingKeyAddResult {
@@ -1442,24 +1442,24 @@ enum SpendingKeyAddResult {
     KeyNotAdded,
 };
 
-class AddSpendingKeyToWallet : public boost::static_visitor<SpendingKeyAddResult>
+class AddSpendingKeyToWallet 
 {
 private:
     CWallet *m_wallet;
     const Consensus::Params &params;
     int64_t nTime;
-    boost::optional<std::string> hdKeypath; // currently sapling only
-    boost::optional<std::string> seedFpStr; // currently sapling only
+    std::optional<std::string> hdKeypath; // currently sapling only
+    std::optional<std::string> seedFpStr; // currently sapling only
     bool log;
 public:
     AddSpendingKeyToWallet(CWallet *wallet, const Consensus::Params &params) :
-        m_wallet(wallet), params(params), nTime(1), hdKeypath(boost::none), seedFpStr(boost::none), log(false) {}
+        m_wallet(wallet), params(params), nTime(1), hdKeypath(std::nullopt), seedFpStr(std::nullopt), log(false) {}
     AddSpendingKeyToWallet(
         CWallet *wallet,
         const Consensus::Params &params,
         int64_t _nTime,
-        boost::optional<std::string> _hdKeypath,
-        boost::optional<std::string> _seedFp,
+        std::optional<std::string> _hdKeypath,
+        std::optional<std::string> _seedFp,
         bool _log
     ) : m_wallet(wallet), params(params), nTime(_nTime), hdKeypath(_hdKeypath), seedFpStr(_seedFp), log(_log) {}
 

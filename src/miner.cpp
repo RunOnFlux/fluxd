@@ -38,7 +38,7 @@
 #include "sodium.h"
 
 #include <boost/thread.hpp>
-#include <boost/tuple/tuple.hpp>
+#include <tuple>
 #ifdef ENABLE_MINING
 #include <functional>
 #endif
@@ -76,7 +76,7 @@ uint64_t nLastBlockTx = 0;
 uint64_t nLastBlockSize = 0;
 
 // We want to sort transactions by priority and fee rate, so:
-typedef boost::tuple<double, CFeeRate, const CTransaction*> TxPriority;
+typedef std::tuple<double, CFeeRate, const CTransaction*> TxPriority;
 class TxPriorityCompare
 {
     bool byFee;
@@ -88,15 +88,15 @@ public:
     {
         if (byFee)
         {
-            if (a.get<1>() == b.get<1>())
-                return a.get<0>() < b.get<0>();
-            return a.get<1>() < b.get<1>();
+            if (std::get<1>(a) == std::get<1>(b))
+                return std::get<0>(a) < std::get<0>(b);
+            return std::get<1>(a) < std::get<1>(b);
         }
         else
         {
-            if (a.get<0>() == b.get<0>())
-                return a.get<1>() < b.get<1>();
-            return a.get<0>() < b.get<0>();
+            if (std::get<0>(a) == std::get<0>(b))
+                return std::get<1>(a) < std::get<1>(b);
+            return std::get<0>(a) < std::get<0>(b);
         }
     }
 };
@@ -106,7 +106,7 @@ void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, 
     pblock->nTime = std::max(pindexPrev->GetMedianTimePast()+1, GetAdjustedTime());
 
     // Updating time can change work required on testnet:
-    if (consensusParams.nPowAllowMinDifficultyBlocksAfterHeight != boost::none) {
+    if (consensusParams.nPowAllowMinDifficultyBlocksAfterHeight != std::nullopt) {
         pblock->nBits = GetNextWorkRequiredByFork(pindexPrev, pblock, consensusParams);
     }
 }
@@ -340,9 +340,9 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         while (!vecPriority.empty())
         {
             // Take highest priority transaction off the priority queue:
-            double dPriority = vecPriority.front().get<0>();
-            CFeeRate feeRate = vecPriority.front().get<1>();
-            const CTransaction& tx = *(vecPriority.front().get<2>());
+            double dPriority = std::get<0>(vecPriority.front());
+            CFeeRate feeRate = std::get<1>(vecPriority.front());
+            const CTransaction& tx = *(std::get<2>(vecPriority.front()));
 
             std::pop_heap(vecPriority.begin(), vecPriority.end(), comparer);
             vecPriority.pop_back();
@@ -597,15 +597,15 @@ class MinerAddressScript : public CReserveScript
     void KeepScript() {}
 };
 
-void GetScriptForMinerAddress(boost::shared_ptr<CReserveScript> &script)
+void GetScriptForMinerAddress(std::shared_ptr<CReserveScript> &script)
 {
     CTxDestination addr = DecodeDestination(GetArg("-mineraddress", ""));
     if (!IsValidDestination(addr)) {
         return;
     }
 
-    boost::shared_ptr<MinerAddressScript> mAddr(new MinerAddressScript());
-    CKeyID keyID = boost::get<CKeyID>(addr);
+    std::shared_ptr<MinerAddressScript> mAddr(new MinerAddressScript());
+    CKeyID keyID = std::get<CKeyID>(addr);
 
     script = mAddr;
     script->reserveScript = CScript() << OP_DUP << OP_HASH160 << ToByteVector(keyID) << OP_EQUALVERIFY << OP_CHECKSIG;
@@ -664,7 +664,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
     // Each thread has its own counter
     unsigned int nExtraNonce = 0;
 
-    boost::shared_ptr<CReserveScript> coinbaseScript;
+    std::shared_ptr<CReserveScript> coinbaseScript;
     GetMainSignals().ScriptForMining(coinbaseScript);
 
     std::string solver = GetArg("-equihashsolver", "default");
@@ -875,7 +875,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
                 // Update nNonce and nTime
                 pblock->nNonce = ArithToUint256(UintToArith256(pblock->nNonce) + 1);
                 UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
-                if (chainparams.GetConsensus().nPowAllowMinDifficultyBlocksAfterHeight != boost::none)
+                if (chainparams.GetConsensus().nPowAllowMinDifficultyBlocksAfterHeight != std::nullopt)
                 {
                     // Changing pblock->nTime can change work required on testnet:
                     hashTarget.SetCompact(pblock->nBits);

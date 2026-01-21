@@ -178,7 +178,7 @@ public:
 
 static CCoinsViewDB *pcoinsdbview = NULL;
 static CCoinsViewErrorCatcher *pcoinscatcher = NULL;
-static boost::scoped_ptr<ECCVerifyHandle> globalVerifyHandle;
+static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
 void Interrupt(boost::thread_group& threadGroup)
 {
@@ -1109,8 +1109,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Check Sapling migration address if set and is a valid Sapling address
     if (mapArgs.count("-migrationdestaddress")) {
         std::string migrationDestAddress = mapArgs["-migrationdestaddress"];
-        libflux::PaymentAddress address = DecodePaymentAddress(migrationDestAddress);
-        if (boost::get<libflux::SaplingPaymentAddress>(&address) == nullptr) {
+        auto address = DecodePaymentAddress(migrationDestAddress);
+        if (std::get_if<libflux::SaplingPaymentAddress>(&address) == nullptr) {
             return InitError(_("-migrationdestaddress must be a valid Sapling address."));
         }
     }
@@ -1825,7 +1825,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         if (pwalletMain) {
             // Address has already been validated
             CTxDestination addr = DecodeDestination(mapArgs["-mineraddress"]);
-            CKeyID keyID = boost::get<CKeyID>(addr);
+            CKeyID keyID = std::get<CKeyID>(addr);
             minerAddressInLocalWallet = pwalletMain->HaveKey(keyID);
         }
         if (GetBoolArg("-minetolocalwallet", true) && !minerAddressInLocalWallet) {

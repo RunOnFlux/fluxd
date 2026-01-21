@@ -137,9 +137,9 @@ bool AsyncRPCOperation_saplingmigration::main_impl() {
             // for each Sprout JoinSplit description
             // TODO: the above functionality (in comment) is not implemented in fluxd
             uint256 inputAnchor;
-            std::vector<boost::optional<SproutWitness>> vInputWitnesses;
+            std::vector<std::optional<SproutWitness>> vInputWitnesses;
             pwalletMain->GetSproutNoteWitnesses(vOutPoints, vInputWitnesses, inputAnchor);
-            builder.AddSproutInput(sproutSk, sproutEntry.note, vInputWitnesses[0].get());
+            builder.AddSproutInput(sproutSk, sproutEntry.note, vInputWitnesses[0].value());
         }
         // The amount chosen *includes* the 0.0001 FLUX fee for this transaction, i.e.
         // the value of the Sapling output will be 0.0001 FLUX less.
@@ -195,7 +195,7 @@ libflux::SaplingPaymentAddress AsyncRPCOperation_saplingmigration::getMigrationD
         fFailed = false;
         std::string migrationDestAddress = mapArgs["-migrationdestaddress"];
         auto address = DecodePaymentAddress(migrationDestAddress);
-        auto saplingAddress = boost::get<libflux::SaplingPaymentAddress>(&address);
+        auto saplingAddress = std::get_if<libflux::SaplingPaymentAddress>(&address);
         assert(saplingAddress != nullptr); // This is checked in init.cpp
         return *saplingAddress;
     }

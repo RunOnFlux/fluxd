@@ -45,9 +45,9 @@ protected:
 
 public:
 
-    static boost::optional<SaplingNoteEncryption> FromDiversifier(diversifier_t d);
+    static std::optional<SaplingNoteEncryption> FromDiversifier(diversifier_t d);
 
-    boost::optional<SaplingEncCiphertext> encrypt_to_recipient(
+    std::optional<SaplingEncCiphertext> encrypt_to_recipient(
         const uint256 &pk_d,
         const SaplingEncPlaintext &message
     );
@@ -70,7 +70,7 @@ public:
 
 // Attempts to decrypt a Sapling note. This will not check that the contents
 // of the ciphertext are correct.
-boost::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption(
+std::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption(
     const SaplingEncCiphertext &ciphertext,
     const uint256 &ivk,
     const uint256 &epk
@@ -78,7 +78,7 @@ boost::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption(
 
 // Attempts to decrypt a Sapling note using outgoing plaintext.
 // This will not check that the contents of the ciphertext are correct.
-boost::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption (
+std::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption (
     const SaplingEncCiphertext &ciphertext,
     const uint256 &epk,
     const uint256 &esk,
@@ -87,7 +87,7 @@ boost::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption (
 
 // Attempts to decrypt a Sapling note. This will not check that the contents
 // of the ciphertext are correct.
-boost::optional<SaplingOutPlaintext> AttemptSaplingOutDecryption(
+std::optional<SaplingOutPlaintext> AttemptSaplingOutDecryption(
     const SaplingOutCiphertext &ciphertext,
     const uint256 &ovk,
     const uint256 &cv,

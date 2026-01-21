@@ -451,7 +451,7 @@ UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
     bool fSent = false;
     if (GetBenchmarkSignedTransaction(tx, signedTx, errorMessage)) {
         CWalletTx walletTx(pwalletMain, signedTx);
-        fSent = pwalletMain->CommitTransaction(walletTx, reservekey);
+        fSent = pwalletMain->CommitTransaction(walletTx, std::ref(reservekey));
     } else {
         throw JSONRPCError(RPC_VERIFY_ERROR, strprintf("Benchmark failed to sign new confirmation transaction: %s\n", errorMessage));
     }
@@ -589,7 +589,7 @@ UniValue startfluxnode(const UniValue& params, bool fHelp, string cmdname)
 
                     CWalletTx walletTx(pwalletMain, tx);
                     CValidationState state;
-                    bool fCommited = pwalletMain->CommitTransaction(walletTx, reservekey, &state);
+                    bool fCommited = pwalletMain->CommitTransaction(walletTx, std::ref(reservekey), &state);
                     fluxnodeEntry.pushKV("transaction_commited", fCommited ? "successful" : "failed");
                     if (fCommited) {
                         successful++;
@@ -737,7 +737,7 @@ UniValue startdeterministicfluxnode(const UniValue& params, bool fHelp, string c
                     CTransaction tx(mutTransaction);
 
                     CWalletTx walletTx(pwalletMain, tx);
-                    pwalletMain->CommitTransaction(walletTx, reservekey);
+                    pwalletMain->CommitTransaction(walletTx, std::ref(reservekey));
                     successful++;
                 } else {
                     failed++;
@@ -920,7 +920,7 @@ UniValue startfluxnodewithdelegates(const UniValue& params, bool fHelp)
             CReserveKey reservekey(pwalletMain);
             CWalletTx walletTx(pwalletMain, tx);
 
-            if (!pwalletMain->CommitTransaction(walletTx, reservekey)) {
+            if (!pwalletMain->CommitTransaction(walletTx, std::ref(reservekey))) {
                 returnObj.pushKV("result", "failed");
                 returnObj.pushKV("error", "Failed to commit transaction");
                 return returnObj;
@@ -1164,7 +1164,7 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
     CReserveKey reservekey(pwalletMain);
     CWalletTx walletTx(pwalletMain, tx);
 
-    if (!pwalletMain->CommitTransaction(walletTx, reservekey)) {
+    if (!pwalletMain->CommitTransaction(walletTx, std::ref(reservekey))) {
         returnObj.pushKV("result", "failed");
         returnObj.pushKV("error", "Failed to commit transaction");
         return returnObj;
@@ -1390,7 +1390,7 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
     CReserveKey reservekey(pwalletMain);
     CWalletTx walletTx(pwalletMain, tx);
 
-    if (!pwalletMain->CommitTransaction(walletTx, reservekey)) {
+    if (!pwalletMain->CommitTransaction(walletTx, std::ref(reservekey))) {
         returnObj.pushKV("result", "failed");
         returnObj.pushKV("error", "Failed to commit transaction");
         return returnObj;

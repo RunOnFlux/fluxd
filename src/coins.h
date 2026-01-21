@@ -18,7 +18,7 @@
 #include <stdint.h>
 
 #include <boost/foreach.hpp>
-#include <boost/unordered_map.hpp>
+#include <unordered_map>
 #include "flux/IncrementalMerkleTree.hpp"
 
 /** 
@@ -319,10 +319,10 @@ enum ShieldedType
     SAPLING,
 };
 
-typedef boost::unordered_map<uint256, CCoinsCacheEntry, CCoinsKeyHasher> CCoinsMap;
-typedef boost::unordered_map<uint256, CAnchorsSproutCacheEntry, CCoinsKeyHasher> CAnchorsSproutMap;
-typedef boost::unordered_map<uint256, CAnchorsSaplingCacheEntry, CCoinsKeyHasher> CAnchorsSaplingMap;
-typedef boost::unordered_map<uint256, CNullifiersCacheEntry, CCoinsKeyHasher> CNullifiersMap;
+typedef std::unordered_map<uint256, CCoinsCacheEntry, CCoinsKeyHasher> CCoinsMap;
+typedef std::unordered_map<uint256, CAnchorsSproutCacheEntry, CCoinsKeyHasher> CAnchorsSproutMap;
+typedef std::unordered_map<uint256, CAnchorsSaplingCacheEntry, CCoinsKeyHasher> CAnchorsSaplingMap;
+typedef std::unordered_map<uint256, CNullifiersCacheEntry, CCoinsKeyHasher> CNullifiersMap;
 
 struct CCoinsStats
 {

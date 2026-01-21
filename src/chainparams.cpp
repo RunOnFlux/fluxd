@@ -99,7 +99,7 @@ public:
         assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
         consensus.nDigishieldMaxAdjustDown = 32; // 32% adjustment down
         consensus.nDigishieldMaxAdjustUp = 16; // 16% adjustment up
-	    consensus.nPowAllowMinDifficultyBlocksAfterHeight = boost::none;
+	    consensus.nPowAllowMinDifficultyBlocksAfterHeight = std::nullopt;
         consensus.nPowTargetSpacing = 2 * 60;
 
         consensus.ponLimit = uint256S("0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // ~1/16 chance minimum (after fork's first period)
@@ -799,8 +799,8 @@ CScript CChainParams::GetFoundersRewardScriptAtHeight(int nHeight) const {
 
     CTxDestination address = DecodeDestination(GetFoundersRewardAddressAtHeight(nHeight).c_str());
     assert(IsValidDestination(address));
-    assert(boost::get<CScriptID>(&address) != nullptr);
-    CScriptID scriptID = boost::get<CScriptID>(address); // address is a boost variant
+    assert(std::get_if<CScriptID>(&address) != nullptr);
+    CScriptID scriptID = std::get<CScriptID>(address); // address is a boost variant
     CScript script = CScript() << OP_HASH160 << ToByteVector(scriptID) << OP_EQUAL;
     return script;
 }

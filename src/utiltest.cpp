@@ -228,7 +228,7 @@ CKey AddTestCKeyToKeyStore(CBasicKeyStore& keyStore) {
 TestSaplingNote GetTestSaplingNote(const libflux::SaplingPaymentAddress& pa, CAmount value) {
     // Generate dummy Sapling note
     libflux::SaplingNote note(pa, value);
-    uint256 cm = note.cm().get();
+    uint256 cm = note.cm().value();
     SaplingMerkleTree tree;
     tree.append(cm);
     return { note, tree };

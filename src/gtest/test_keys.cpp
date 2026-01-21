@@ -28,8 +28,8 @@ TEST(Keys, EncodeAndDecodeSapling)
             auto spendingkey2 = DecodeSpendingKey(sk_string);
             EXPECT_TRUE(IsValidSpendingKey(spendingkey2));
 
-            ASSERT_TRUE(boost::get<libflux::SaplingExtendedSpendingKey>(&spendingkey2) != nullptr);
-            auto sk2 = boost::get<libflux::SaplingExtendedSpendingKey>(spendingkey2);
+            ASSERT_TRUE(std::get_if<libflux::SaplingExtendedSpendingKey>(&spendingkey2) != nullptr);
+            auto sk2 = std::get<libflux::SaplingExtendedSpendingKey>(spendingkey2);
             EXPECT_EQ(sk, sk2);
         }
         {
@@ -43,8 +43,8 @@ TEST(Keys, EncodeAndDecodeSapling)
             auto paymentaddr2 = DecodePaymentAddress(addr_string);
             EXPECT_TRUE(IsValidPaymentAddress(paymentaddr2));
 
-            ASSERT_TRUE(boost::get<libflux::SaplingPaymentAddress>(&paymentaddr2) != nullptr);
-            auto addr2 = boost::get<libflux::SaplingPaymentAddress>(paymentaddr2);
+            ASSERT_TRUE(std::get_if<libflux::SaplingPaymentAddress>(&paymentaddr2) != nullptr);
+            auto addr2 = std::get<libflux::SaplingPaymentAddress>(paymentaddr2);
             EXPECT_EQ(addr, addr2);
         }
     }

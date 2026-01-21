@@ -101,7 +101,7 @@ bool CCoinsViewDB::GetCoins(const uint256 &txid, CCoins &coins) const {
 
 bool CCoinsViewDB::GetAllBalances(std::map<std::string, CAmount>& mapBalances) const
 {
-    boost::scoped_ptr<CDBIterator> pcursor(const_cast<CDBWrapper*>(&db)->NewIterator());
+    std::unique_ptr<CDBIterator> pcursor(const_cast<CDBWrapper*>(&db)->NewIterator());
 
     pcursor->Seek(std::make_pair(DB_COINS, uint256()));
     // Load mapBlockIndex
@@ -266,7 +266,7 @@ bool CCoinsViewDB::GetStats(CCoinsStats &stats) const {
     /* It seems that there are no "const iterators" for LevelDB.  Since we
        only need read operations on it, use a const-cast to get around
        that restriction.  */
-    boost::scoped_ptr<CDBIterator> pcursor(const_cast<CDBWrapper*>(&db)->NewIterator());
+    std::unique_ptr<CDBIterator> pcursor(const_cast<CDBWrapper*>(&db)->NewIterator());
     pcursor->Seek(DB_COINS);
 
     CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
@@ -356,7 +356,7 @@ bool CBlockTreeDB::UpdateAddressUnspentIndex(const std::vector<CAddressUnspentDb
 
 bool CBlockTreeDB::ReadAddressUnspentIndex(uint160 addressHash, int type, std::vector<CAddressUnspentDbEntry> &unspentOutputs)
 {
-    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
 
     pcursor->Seek(make_pair(DB_ADDRESSUNSPENTINDEX, CAddressIndexIteratorKey(type, addressHash)));
 
@@ -393,7 +393,7 @@ bool CBlockTreeDB::ReadAddressIndex(
         std::vector<CAddressIndexDbEntry> &addressIndex,
         int start, int end)
 {
-    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
 
     if (start > 0 && end > 0) {
         pcursor->Seek(make_pair(DB_ADDRESSINDEX, CAddressIndexIteratorHeightKey(type, addressHash, start)));
@@ -442,7 +442,7 @@ bool CBlockTreeDB::WriteTimestampIndex(const CTimestampIndexKey &timestampIndex)
 bool CBlockTreeDB::ReadTimestampIndex(unsigned int high, unsigned int low,
     const bool fActiveOnly, std::vector<std::pair<uint256, unsigned int> > &hashes)
 {
-    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
 
     pcursor->Seek(make_pair(DB_TIMESTAMPINDEX, CTimestampIndexIteratorKey(low)));
 
@@ -496,9 +496,9 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
     return true;
 }
 
-bool CBlockTreeDB::LoadBlockIndexGuts(boost::function<CBlockIndex*(const uint256&)> insertBlockIndex)
+bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)> insertBlockIndex)
 {
-    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
 
     pcursor->Seek(make_pair(DB_BLOCK_INDEX, uint256()));
 

@@ -5,6 +5,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
+#include <chrono>
+
 #include "amount.h"
 #include "chainparams.h"
 #include "consensus/consensus.h"
@@ -31,7 +33,7 @@
 #include <stdint.h>
 
 #include <boost/assign/list_of.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include <univalue.h>
 #include "key_io.h"
@@ -187,7 +189,7 @@ UniValue generate(const UniValue& params, bool fHelp)
     int nHeight = 0;
     int nGenerate = params[0].get_int();
 
-    boost::shared_ptr<CReserveScript> coinbaseScript;
+    std::shared_ptr<CReserveScript> coinbaseScript;
     GetMainSignals().ScriptForMining(coinbaseScript);
 
     //throw an error if no script was provided
@@ -598,7 +600,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     {
         // Wait to respond until either the best block changes, OR a minute has passed and there are more transactions
         uint256 hashWatchedChain;
-        boost::system_time checktxtime;
+        std::chrono::system_clock::time_point checktxtime;
         unsigned int nTransactionsUpdatedLastLP;
 
         if (lpval.isStr())
@@ -619,17 +621,17 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         // Release the wallet and main lock while waiting
         LEAVE_CRITICAL_SECTION(cs_main);
         {
-            checktxtime = boost::get_system_time() + boost::posix_time::minutes(1);
+            checktxtime = std::chrono::system_clock::now() + std::chrono::minutes(1);
 
-            boost::unique_lock<boost::mutex> lock(csBestBlock);
+            std::unique_lock<std::mutex> lock(csBestBlock);
             while (chainActive.Tip()->GetBlockHash() == hashWatchedChain && IsRPCRunning())
             {
-                if (!cvBlockChange.timed_wait(lock, checktxtime))
+                if (cvBlockChange.wait_until(lock, checktxtime) == std::cv_status::timeout)
                 {
                     // Timeout: Check transactions for update
                     if (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLastLP)
                         break;
-                    checktxtime += boost::posix_time::seconds(10);
+                    checktxtime += std::chrono::seconds(10);
                 }
             }
         }
@@ -668,7 +670,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
             mapFluxnodePayouts.clear();
         }
 
-        boost::shared_ptr<CReserveScript> coinbaseScript;
+        std::shared_ptr<CReserveScript> coinbaseScript;
         GetMainSignals().ScriptForMining(coinbaseScript);
 
         // Throw an error if no script was provided

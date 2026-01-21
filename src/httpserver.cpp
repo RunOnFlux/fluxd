@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <deque>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -37,7 +38,7 @@
 
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <boost/foreach.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 
 /** HTTP request work item */
 class HTTPWorkItem : public HTTPClosure
@@ -52,7 +53,7 @@ public:
         func(req.get(), path);
     }
 
-    boost::scoped_ptr<HTTPRequest> req;
+    std::unique_ptr<HTTPRequest> req;
 
 private:
     std::string path;
@@ -82,12 +83,12 @@ private:
         WorkQueue &wq;
         ThreadCounter(WorkQueue &w): wq(w)
         {
-            boost::lock_guard<boost::mutex> lock(wq.cs);
+            std::lock_guard<std::mutex> lock(wq.cs);
             wq.numThreads += 1;
         }
         ~ThreadCounter()
         {
-            boost::lock_guard<boost::mutex> lock(wq.cs);
+            std::lock_guard<std::mutex> lock(wq.cs);
             wq.numThreads -= 1;
             wq.cond.notify_all();
         }
@@ -112,7 +113,7 @@ public:
     /** Enqueue a work item */
     bool Enqueue(WorkItem* item)
     {
-        boost::unique_lock<boost::mutex> lock(cs);
+        std::unique_lock<std::mutex> lock(cs);
         if (queue.size() >= maxDepth) {
             return false;
         }
@@ -127,7 +128,7 @@ public:
         while (running) {
             WorkItem* i = 0;
             {
-                boost::unique_lock<boost::mutex> lock(cs);
+                std::unique_lock<std::mutex> lock(cs);
                 while (running && queue.empty())
                     cond.wait(lock);
                 if (!running)
@@ -142,14 +143,14 @@ public:
     /** Interrupt and exit loops */
     void Interrupt()
     {
-        boost::unique_lock<boost::mutex> lock(cs);
+        std::unique_lock<std::mutex> lock(cs);
         running = false;
         cond.notify_all();
     }
     /** Wait for worker threads to exit */
     void WaitExit()
     {
-        boost::unique_lock<boost::mutex> lock(cs);
+        std::unique_lock<std::mutex> lock(cs);
         while (numThreads > 0)
             cond.wait(lock);
     }
@@ -157,7 +158,7 @@ public:
     /** Return current depth of queue */
     size_t Depth()
     {
-        boost::unique_lock<boost::mutex> lock(cs);
+        std::unique_lock<std::mutex> lock(cs);
         return queue.size();
     }
 };
@@ -519,7 +520,7 @@ static void httpevent_callback_fn(evutil_socket_t, short, void* data)
         delete self;
 }
 
-HTTPEvent::HTTPEvent(struct event_base* base, bool deleteWhenTriggered, const boost::function<void(void)>& handler):
+HTTPEvent::HTTPEvent(struct event_base* base, bool deleteWhenTriggered, const std::function<void(void)>& handler):
     deleteWhenTriggered(deleteWhenTriggered), handler(handler)
 {
     ev = event_new(base, -1, 0, httpevent_callback_fn, this);

@@ -5,6 +5,7 @@
 
 #include "addrman.h"
 
+#include <cmath>
 #include "hash.h"
 #include "serialize.h"
 #include "streams.h"

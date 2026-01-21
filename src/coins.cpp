@@ -571,7 +571,7 @@ CAmount CCoinsViewCache::GetValueIn(const CTransaction& tx) const
 
 bool CCoinsViewCache::HaveShieldedRequirements(const CTransaction& tx) const
 {
-    boost::unordered_map<uint256, SproutMerkleTree, CCoinsKeyHasher> intermediates;
+    std::unordered_map<uint256, SproutMerkleTree, CCoinsKeyHasher> intermediates;
 
     BOOST_FOREACH(const JSDescription &joinsplit, tx.vJoinSplit)
     {
