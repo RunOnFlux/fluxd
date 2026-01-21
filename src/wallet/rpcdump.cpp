@@ -17,9 +17,8 @@
 
 #include <fstream>
 #include <stdint.h>
-
-#include <boost/algorithm/string.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
+#include <iomanip>
+#include <sstream>
 
 #include <univalue.h>
 
@@ -37,16 +36,17 @@ std::string static EncodeDumpTime(int64_t nTime) {
 }
 
 int64_t static DecodeDumpTime(const std::string &str) {
-    static const boost::posix_time::ptime epoch = boost::posix_time::from_time_t(0);
-    static const std::locale loc(std::locale::classic(),
-        new boost::posix_time::time_input_facet("%Y-%m-%dT%H:%M:%SZ"));
+    // Using C++20 chrono instead of boost::posix_time
     std::istringstream iss(str);
-    iss.imbue(loc);
-    boost::posix_time::ptime ptime(boost::date_time::not_a_date_time);
-    iss >> ptime;
-    if (ptime.is_not_a_date_time())
+    iss.imbue(std::locale::classic());
+    std::tm tm = {};
+    iss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+    if (iss.fail())
         return 0;
-    return (ptime - epoch).total_seconds();
+
+    // Convert to time_t (assumes UTC)
+    std::time_t time = timegm(&tm);
+    return static_cast<int64_t>(time);
 }
 
 std::string static EncodeDumpString(const std::string &str) {
@@ -336,7 +336,7 @@ UniValue importwallet_impl(const UniValue& params, bool fHelp, bool fImportZKeys
             continue;
 
         std::vector<std::string> vstr;
-        boost::split(vstr, line, boost::is_any_of(" "));
+        vstr = SplitString(line, ' ');
         if (vstr.size() < 2)
             continue;
 
@@ -377,13 +377,13 @@ UniValue importwallet_impl(const UniValue& params, bool fHelp, bool fImportZKeys
         std::string strLabel;
         bool fLabel = true;
         for (unsigned int nStr = 2; nStr < vstr.size(); nStr++) {
-            if (boost::algorithm::starts_with(vstr[nStr], "#"))
+            if (StartsWith(vstr[nStr], "#"))
                 break;
             if (vstr[nStr] == "change=1")
                 fLabel = false;
             if (vstr[nStr] == "reserve=1")
                 fLabel = false;
-            if (boost::algorithm::starts_with(vstr[nStr], "label=")) {
+            if (StartsWith(vstr[nStr], "label=")) {
                 strLabel = DecodeDumpString(vstr[nStr].substr(6));
                 fLabel = true;
             }

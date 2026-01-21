@@ -8,7 +8,7 @@
 
 //
 // NOTE:
-// Using C++17 - std::thread and boost::chrono migrated to std equivalents
+// Using C++20 - std::thread and std::chrono (boost dependencies removed)
 //
 #include <functional>
 #include <chrono>

@@ -251,6 +251,32 @@ int GetNumCores();
 void SetThreadPriority(int nPriority);
 void RenameThread(const char* name);
 
+// String utility functions to replace boost::algorithm
+// Locale-independent digit check (matching Bitcoin Core)
+constexpr bool IsDigit(char c)
+{
+    return c >= '0' && c <= '9';
+}
+
+void ReplaceAll(std::string& str, const std::string& from, const std::string& to);
+void ReplaceFirst(std::string& str, const std::string& from, const std::string& to);
+std::vector<std::string> SplitString(const std::string& str, char delimiter);
+std::vector<std::string> SplitStringMulti(const std::string& str, const std::string& delimiters);
+void Trim(std::string& str);
+void TrimRight(std::string& str);
+std::string ToLower(const std::string& str);
+std::string ToUpper(const std::string& str);
+bool StartsWith(const std::string& str, const std::string& prefix);
+bool EndsWith(const std::string& str, const std::string& suffix);
+bool IStartsWith(const std::string& str, const std::string& prefix);  // Case-insensitive
+
+/**
+ * Generate a random UUID v4 string (replaces boost::uuids)
+ * Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+ * where x is any hexadecimal digit and y is one of 8, 9, A, or B
+ */
+std::string GenerateUUID();
+
 /**
  * .. and a wrapper that just calls func once
  */

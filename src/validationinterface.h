@@ -7,7 +7,6 @@
 #ifndef BITCOIN_VALIDATIONINTERFACE_H
 #define BITCOIN_VALIDATIONINTERFACE_H
 
-#include <boost/signals2/signal.hpp>
 #include <memory>
 
 #include "flux/IncrementalMerkleTree.hpp"
@@ -21,6 +20,10 @@ class CValidationInterface;
 class CValidationState;
 class uint256;
 
+namespace util {
+class TaskRunnerInterface;
+}
+
 // These functions dispatch to one or all registered wallets
 
 /** Register a wallet to receive updates from core */
@@ -33,7 +36,11 @@ void UnregisterAllValidationInterfaces();
 void SyncWithWallets(const CTransaction& tx, const CBlock* pblock = NULL);
 
 class CValidationInterface {
-protected:
+public:
+    virtual ~CValidationInterface() = default;
+
+    // NOTE: These methods were protected in the boost::signals2 version,
+    // but need to be public now since CMainSignals calls them directly
     virtual void UpdatedBlockTip(const CBlockIndex *pindex) {}
     virtual void SyncTransaction(const CTransaction &tx, const CBlock *pblock) {}
     virtual void EraseFromWallet(const uint256 &hash) {}
@@ -43,36 +50,55 @@ protected:
     virtual void Inventory(const uint256 &hash) {}
     virtual void ResendWalletTransactions(int64_t nBestBlockTime) {}
     virtual void BlockChecked(const CBlock&, const CValidationState&) {}
-    virtual void GetScriptForMining(std::shared_ptr<CReserveScript>&) {};
-    virtual void ResetRequestCount(const uint256 &hash) {};
+    virtual void GetScriptForMining(std::shared_ptr<CReserveScript>&) {}
+    virtual void ResetRequestCount(const uint256 &hash) {}
+
     friend void ::RegisterValidationInterface(CValidationInterface*);
     friend void ::UnregisterValidationInterface(CValidationInterface*);
     friend void ::UnregisterAllValidationInterfaces();
 };
 
-struct CMainSignals {
-    /** Notifies listeners of updated block chain tip */
-    boost::signals2::signal<void (const CBlockIndex *)> UpdatedBlockTip;
-    /** Notifies listeners of updated transaction data (transaction, and optionally the block it is found in. */
-    boost::signals2::signal<void (const CTransaction &, const CBlock *)> SyncTransaction;
-    /** Notifies listeners of an erased transaction (currently disabled, requires transaction replacement). */
-    boost::signals2::signal<void (const uint256 &)> EraseTransaction;
-    /** Notifies listeners of an updated transaction without new data (for now: a coinbase potentially becoming visible). */
-    boost::signals2::signal<void (const uint256 &)> UpdatedTransaction;
-    /** Notifies listeners of a change to the tip of the active block chain. */
-    boost::signals2::signal<void (const CBlockIndex *, const CBlock *, SproutMerkleTree, SaplingMerkleTree, bool)> ChainTip;
-    /** Notifies listeners of a new active block chain. */
-    boost::signals2::signal<void (const CBlockLocator &)> SetBestChain;
-    /** Notifies listeners about an inventory item being seen on the network. */
-    boost::signals2::signal<void (const uint256 &)> Inventory;
-    /** Tells listeners to broadcast their data. */
-    boost::signals2::signal<void (int64_t nBestBlockTime)> Broadcast;
-    /** Notifies listeners of a block validation result */
-    boost::signals2::signal<void (const CBlock&, const CValidationState&)> BlockChecked;
-    /** Notifies listeners that a key for mining is required (coinbase) */
-    boost::signals2::signal<void (std::shared_ptr<CReserveScript>&)> ScriptForMining;
-    /** Notifies listeners that a block has been successfully mined */
-    boost::signals2::signal<void (const uint256 &)> BlockFound;
+class ValidationSignalsImpl;
+
+/**
+ * Main validation signals dispatcher.
+ * Manages callback registration and execution without boost::signals2.
+ */
+class CMainSignals {
+private:
+    std::unique_ptr<ValidationSignalsImpl> m_internals;
+
+public:
+    /** Initialize with a task runner for async callback execution */
+    explicit CMainSignals(std::unique_ptr<util::TaskRunnerInterface> task_runner);
+    ~CMainSignals();
+
+    // Delete copy/move to prevent accidental copying
+    CMainSignals(const CMainSignals&) = delete;
+    CMainSignals& operator=(const CMainSignals&) = delete;
+
+    /** Register callbacks */
+    void RegisterCallbacks(std::shared_ptr<CValidationInterface> callbacks);
+    /** Unregister callbacks */
+    void UnregisterCallbacks(CValidationInterface* callbacks);
+    /** Unregister all callbacks */
+    void UnregisterAllCallbacks();
+
+    /** Execute a function in the validation interface queue */
+    void CallFunctionInValidationInterfaceQueue(std::function<void()> func);
+
+    // Event notification methods
+    void UpdatedBlockTip(const CBlockIndex *pindex);
+    void SyncTransaction(const CTransaction &tx, const CBlock *pblock);
+    void EraseTransaction(const uint256 &hash);
+    void UpdatedTransaction(const uint256 &hash);
+    void ChainTip(const CBlockIndex *pindex, const CBlock *pblock, SproutMerkleTree sproutTree, SaplingMerkleTree saplingTree, bool added);
+    void SetBestChain(const CBlockLocator &locator);
+    void Inventory(const uint256 &hash);
+    void Broadcast(int64_t nBestBlockTime);
+    void BlockChecked(const CBlock& block, const CValidationState& state);
+    void ScriptForMining(std::shared_ptr<CReserveScript>& script);
+    void BlockFound(const uint256 &hash);
 };
 
 CMainSignals& GetMainSignals();

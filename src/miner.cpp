@@ -920,7 +920,7 @@ void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams& chainpar
 
     minerThreads = new std::vector<std::thread>();
     for (int i = 0; i < nThreads; i++) {
-        minerThreads->emplace_back(boost::bind(&BitcoinMiner, boost::cref(chainparams)));
+        minerThreads->emplace_back([&chainparams]() { BitcoinMiner(chainparams); });
     }
 }
 

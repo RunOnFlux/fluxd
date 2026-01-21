@@ -48,7 +48,7 @@ static const unsigned char pchIPv4[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0
 static const int SOCKS5_RECV_TIMEOUT = 20 * 1000;
 
 enum Network ParseNetwork(std::string net) {
-    boost::to_lower(net);
+    net = ToLower(net);
     if (net == "ipv4") return NET_IPV4;
     if (net == "ipv6") return NET_IPV6;
     if (net == "tor" || net == "onion")  return NET_TOR;
@@ -185,7 +185,7 @@ bool LookupHost(const char *pszName, std::vector<CNetAddr>& vIP, unsigned int nM
     std::string strHost(pszName);
     if (strHost.empty())
         return false;
-    if (boost::algorithm::starts_with(strHost, "[") && boost::algorithm::ends_with(strHost, "]"))
+    if (StartsWith(strHost, "[") && EndsWith(strHost, "]"))
     {
         strHost = strHost.substr(1, strHost.size() - 2);
     }

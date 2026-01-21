@@ -624,8 +624,10 @@ void TorController::protocolinfo_cb(TorControlConnection& conn, const TorControl
             if (l.first == "AUTH") {
                 std::map<std::string,std::string> m = ParseTorReplyMapping(l.second);
                 std::map<std::string,std::string>::iterator i;
-                if ((i = m.find("METHODS")) != m.end())
-                    boost::split(methods, i->second, boost::is_any_of(","));
+                if ((i = m.find("METHODS")) != m.end()) {
+                    std::vector<std::string> methodsVec = SplitString(i->second, ',');
+                    methods = std::set<std::string>(methodsVec.begin(), methodsVec.end());
+                }
                 if ((i = m.find("COOKIEFILE")) != m.end())
                     cookiefile = i->second;
             } else if (l.first == "VERSION") {
@@ -648,7 +650,7 @@ void TorController::protocolinfo_cb(TorControlConnection& conn, const TorControl
         if (!torpassword.empty()) {
             if (methods.count("HASHEDPASSWORD")) {
                 LogPrint("tor", "tor: Using HASHEDPASSWORD authentication\n");
-                boost::replace_all(torpassword, "\"", "\\\"");
+                ReplaceAll(torpassword, "\"", "\\\"");
                 conn.Command("AUTHENTICATE \"" + torpassword + "\"", boost::bind(&TorController::auth_cb, this, _1, _2));
             } else {
                 LogPrintf("tor: Password provided with -torpassword, but HASHEDPASSWORD authentication is not available\n");
@@ -756,7 +758,7 @@ void StartTorControl(std::vector<std::thread>& threadGroup, CScheduler& schedule
         return;
     }
 
-    torControlThread = std::thread(boost::bind(&TraceThread<void (*)()>, "torcontrol", &TorControlThread));
+    torControlThread = std::thread([]() { TraceThread("torcontrol", &TorControlThread); });
 }
 
 void InterruptTorControl()

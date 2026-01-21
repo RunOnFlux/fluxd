@@ -1851,20 +1851,26 @@ void StartNode(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 
     if (!GetBoolArg("-dnsseed", true))
         LogPrintf("DNS seeding disabled\n");
-    else
-        threadGroup.emplace_back(boost::bind(&TraceThread<void (*)()>, "dnsseed", &ThreadDNSAddressSeed));
+    else {
+        LogPrintf("Creating thread #%d: dnsseed\n", threadGroup.size());
+        threadGroup.emplace_back([]() { TraceThread("dnsseed", &ThreadDNSAddressSeed); });
+    }
 
     // Send and receive from sockets, accept connections
-    threadGroup.emplace_back(boost::bind(&TraceThread<void (*)()>, "net", &ThreadSocketHandler));
+    LogPrintf("Creating thread #%d: net\n", threadGroup.size());
+    threadGroup.emplace_back([]() { TraceThread("net", &ThreadSocketHandler); });
 
     // Initiate outbound connections from -addnode
-    threadGroup.emplace_back(boost::bind(&TraceThread<void (*)()>, "addcon", &ThreadOpenAddedConnections));
+    LogPrintf("Creating thread #%d: addcon\n", threadGroup.size());
+    threadGroup.emplace_back([]() { TraceThread("addcon", &ThreadOpenAddedConnections); });
 
     // Initiate outbound connections
-    threadGroup.emplace_back(boost::bind(&TraceThread<void (*)()>, "opencon", &ThreadOpenConnections));
+    LogPrintf("Creating thread #%d: opencon\n", threadGroup.size());
+    threadGroup.emplace_back([]() { TraceThread("opencon", &ThreadOpenConnections); });
 
     // Process messages
-    threadGroup.emplace_back(boost::bind(&TraceThread<void (*)()>, "msghand", &ThreadMessageHandler));
+    LogPrintf("Creating thread #%d: msghand\n", threadGroup.size());
+    threadGroup.emplace_back([]() { TraceThread("msghand", &ThreadMessageHandler); });
 
     // Dump network addresses
     scheduler.scheduleEvery(&DumpAddresses, DUMP_ADDRESSES_INTERVAL);

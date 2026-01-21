@@ -59,6 +59,7 @@
 
 #ifndef WIN32
 #include <signal.h>
+#include <sys/stat.h>
 #endif
 
 #include <boost/algorithm/string/classification.hpp>
@@ -67,7 +68,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/bind.hpp>
 #include <filesystem>
-#include <boost/interprocess/sync/file_lock.hpp>
+#include "util/fs.h"
 #include <openssl/crypto.h>
 #include <stdlib.h>
 
@@ -213,6 +214,10 @@ void Interrupt(std::vector<std::thread>& threadGroup)
     g_metrics_interrupt();
     g_txnotify_interrupt();
     g_sendalert_interrupt();
+
+    // Release network semaphores so threads can exit
+    // This MUST be called before joining threads to prevent deadlock
+    StopNode();
 }
 
 void Shutdown()
@@ -242,7 +247,7 @@ void Shutdown()
     GenerateBitcoins(false, 0, Params());
 #endif
     StopPONMinter();
-    StopNode();
+    // StopNode() is now called in Interrupt() before joining threads to release semaphores
     StopTorControl();
 
     UnregisterNodeSignals(GetNodeSignals());
@@ -593,7 +598,7 @@ static void BlockNotifyCallback(const uint256& hashNewTip)
 {
     std::string strCmd = GetArg("-blocknotify", "");
 
-    boost::replace_all(strCmd, "%s", hashNewTip.GetHex());
+    ReplaceAll(strCmd, "%s", hashNewTip.GetHex());
     std::thread t(runCommand, strCmd); // thread runs free
     t.detach();
 }
@@ -1187,7 +1192,7 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         const vector<string>& deployments = mapMultiArgs["-nuparams"];
         for (auto i : deployments) {
             std::vector<std::string> vDeploymentParams;
-            boost::split(vDeploymentParams, i, boost::is_any_of(":"));
+            vDeploymentParams = SplitString(i, ':');
             if (vDeploymentParams.size() != 2) {
                 return InitError("Network upgrade parameters malformed, expecting hexBranchId:activationHeight");
             }
@@ -1239,12 +1244,10 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     FILE* file = fopen(pathLockFile.string().c_str(), "a"); // empty lock file; created if it doesn't exist.
     if (file) fclose(file);
 
-    try {
-        static boost::interprocess::file_lock lock(pathLockFile.string().c_str());
-        if (!lock.try_lock())
-            return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zelcash is probably already running."), strDataDir));
-    } catch(const boost::interprocess::interprocess_exception& e) {
-        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zelcash is probably already running.") + " %s.", strDataDir, e.what()));
+    // Use native OS file locking (replaces boost::interprocess::file_lock)
+    static FileLock lock(pathLockFile);
+    if (!lock.TryLock()) {
+        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zelcash is probably already running. %s"), strDataDir, lock.GetReason()));
     }
 
 #ifndef WIN32
@@ -1271,13 +1274,16 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 
     LogPrintf("Using %u threads for script verification\n", nScriptCheckThreads);
     if (nScriptCheckThreads) {
-        for (int i=0; i<nScriptCheckThreads-1; i++)
+        for (int i=0; i<nScriptCheckThreads-1; i++) {
+            LogPrintf("Creating thread #%d: scriptcheck\n", threadGroup.size());
             threadGroup.emplace_back(ThreadScriptCheck);
+        }
     }
 
     // Start the lightweight task scheduler thread
-    CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
-    threadGroup.emplace_back(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
+    LogPrintf("Creating thread #%d: scheduler\n", threadGroup.size());
+    CScheduler::Function serviceLoop = [&scheduler]() { scheduler.serviceQueue(); };
+    threadGroup.emplace_back([serviceLoop]() { TraceThread("scheduler", serviceLoop); });
 
     // Count uptime
     MarkStartTime();
@@ -1287,6 +1293,7 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
             !fPrintToConsole && !GetBoolArg("-daemon", false)) {
         // Start the persistent metrics interface
         ConnectMetricsScreen();
+        LogPrintf("Creating thread #%d: metrics\n", threadGroup.size());
         threadGroup.emplace_back([&]() { ThreadShowMetricsScreen(g_metrics_interrupt); });
     }
 
@@ -1877,7 +1884,7 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         // - If the wallet is disabled and -mineraddress is not set, the CScript
         //   argument is not modified; in practice this means it is empty, and
         //   GenerateBitcoins() returns an error.
-        GetMainSignals().ScriptForMining.connect(GetScriptForMinerAddress);
+        // NOTE: GetScriptForMinerAddress is now handled by wallet's GetScriptForMining implementation
     }
 #endif // ENABLE_MINING
 
@@ -1911,7 +1918,8 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         for (const std::string& strFile : mapMultiArgs["-loadblock"])
             vImportFiles.push_back(strFile);
     }
-    threadGroup.emplace_back(boost::bind(&ThreadImport, vImportFiles));
+    LogPrintf("Creating thread #%d: import\n", threadGroup.size());
+    threadGroup.emplace_back([vImportFiles]() { ThreadImport(vImportFiles); });
     if (chainActive.Tip() == NULL) {
         LogPrintf("Waiting for genesis block to be imported...\n");
         while (!fRequestShutdown && chainActive.Tip() == NULL)
@@ -2057,6 +2065,7 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 
     // Start the thread that notifies listeners of transactions that have been
     // recently added to the mempool.
+    LogPrintf("Creating thread #%d: txnotify\n", threadGroup.size());
     threadGroup.emplace_back([&]() { ThreadNotifyRecentlyAdded(g_txnotify_interrupt); });
 
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
@@ -2066,8 +2075,9 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected
     int64_t nPowTargetSpacing = Params().GetConsensus().nPowTargetSpacing;
-    CScheduler::Function f = boost::bind(&PartitionCheck, &IsInitialBlockDownload,
-                                         boost::ref(cs_main), boost::cref(pindexBestHeader), nPowTargetSpacing);
+    CScheduler::Function f = [nPowTargetSpacing]() {
+        PartitionCheck(&IsInitialBlockDownload, cs_main, pindexBestHeader, nPowTargetSpacing);
+    };
     scheduler.scheduleEvery(f, nPowTargetSpacing);
 
 #ifdef ENABLE_MINING
@@ -2103,11 +2113,13 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         pwalletMain->ReacceptWalletTransactions();
 
         // Run a thread to flush wallet periodically
-        threadGroup.emplace_back(boost::bind(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile)));
+        LogPrintf("Creating thread #%d: walletflush\n", threadGroup.size());
+        threadGroup.emplace_back([&walletFile = pwalletMain->strWalletFile]() { ThreadFlushWalletDB(walletFile); });
     }
 #endif
 
     // SENDALERT
+    LogPrintf("Creating thread #%d: sendalert\n", threadGroup.size());
     threadGroup.emplace_back([&]() { ThreadSendAlert(g_sendalert_interrupt); });
 
     return !fRequestShutdown;

@@ -192,7 +192,7 @@ static void MutateTxLocktime(CMutableTransaction& tx, const std::string& cmdVal)
 static void MutateTxAddInput(CMutableTransaction& tx, const std::string& strInput)
 {
     std::vector<std::string> vStrInputParts;
-    boost::split(vStrInputParts, strInput, boost::is_any_of(":"));
+    vStrInputParts = SplitString(strInput, ':');
 
     // separate TXID:VOUT in string
     if (vStrInputParts.size()<2)
@@ -599,7 +599,7 @@ static std::string readStdin()
     if (ferror(stdin))
         throw std::runtime_error("error reading stdin");
 
-    boost::algorithm::trim_right(ret);
+    TrimRight(ret);
 
     return ret;
 }

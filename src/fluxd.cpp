@@ -52,11 +52,16 @@ void WaitForShutdown(std::vector<std::thread>* threadGroup)
     if (threadGroup)
     {
         Interrupt(*threadGroup);
+        size_t threadNum = 0;
         for (auto& thread : *threadGroup) {
             if (thread.joinable()) {
+                LogPrintf("Waiting for thread %d to join...\n", threadNum);
                 thread.join();
+                LogPrintf("Thread %d joined\n", threadNum);
             }
+            threadNum++;
         }
+        LogPrintf("All threads joined\n");
     }
 }
 
@@ -150,7 +155,7 @@ bool AppInit(int argc, char* argv[])
         // Command-line RPC
         bool fCommandLine = false;
         for (int i = 1; i < argc; i++)
-            if (!IsSwitchChar(argv[i][0]) && !boost::algorithm::istarts_with(argv[i], "zelcash:"))
+            if (!IsSwitchChar(argv[i][0]) && !IStartsWith(argv[i], "zelcash:"))
                 fCommandLine = true;
 
         if (fCommandLine)

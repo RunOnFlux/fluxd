@@ -18,6 +18,9 @@
 
 #include <thread>
 #include <mutex>
+#include <sstream>
+#include <algorithm>
+#include <string_view>
 #include "clientversion.h"
 
 #include <stdarg.h>
@@ -380,8 +383,8 @@ void ParseParameters(int argc, const char* const argv[])
             str = str.substr(0, is_index);
         }
 #ifdef WIN32
-        boost::to_lower(str);
-        if (boost::algorithm::starts_with(str, "/"))
+        str = ToLower(str);
+        if (StartsWith(str, "/"))
             str = "-" + str.substr(1);
 #endif
 
@@ -1078,5 +1081,147 @@ std::string LicenseInfo()
 int GetNumCores()
 {
     return std::thread::hardware_concurrency();
+}
+
+// String utility functions to replace boost::algorithm
+void ReplaceAll(std::string& str, const std::string& from, const std::string& to)
+{
+    if (from.empty()) return;
+    size_t pos = 0;
+    while ((pos = str.find(from, pos)) != std::string::npos) {
+        str.replace(pos, from.length(), to);
+        pos += to.length();
+    }
+}
+
+void ReplaceFirst(std::string& str, const std::string& from, const std::string& to)
+{
+    if (from.empty()) return;
+    size_t pos = str.find(from);
+    if (pos != std::string::npos) {
+        str.replace(pos, from.length(), to);
+    }
+}
+
+std::vector<std::string> SplitString(const std::string& str, char delimiter)
+{
+    std::vector<std::string> result;
+    std::string token;
+    std::istringstream tokenStream(str);
+    while (std::getline(tokenStream, token, delimiter)) {
+        result.push_back(token);
+    }
+    return result;
+}
+
+std::vector<std::string> SplitStringMulti(const std::string& str, const std::string& delimiters)
+{
+    std::vector<std::string> result;
+    size_t start = 0;
+    size_t end = str.find_first_of(delimiters);
+
+    while (end != std::string::npos) {
+        // Add token (even if empty, matching Bitcoin Core behavior)
+        result.push_back(str.substr(start, end - start));
+        start = end + 1;
+        end = str.find_first_of(delimiters, start);
+    }
+
+    // Add remaining token
+    result.push_back(str.substr(start));
+
+    return result;
+}
+
+void Trim(std::string& str)
+{
+    // Trim from start
+    size_t start = str.find_first_not_of(" \t\n\r\f\v");
+    if (start == std::string::npos) {
+        str.clear();
+        return;
+    }
+
+    // Trim from end
+    size_t end = str.find_last_not_of(" \t\n\r\f\v");
+    str = str.substr(start, end - start + 1);
+}
+
+void TrimRight(std::string& str)
+{
+    size_t end = str.find_last_not_of(" \t\n\r\f\v");
+    if (end == std::string::npos) {
+        str.clear();
+        return;
+    }
+    str.erase(end + 1);
+}
+
+std::string ToLower(const std::string& str)
+{
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char c){ return std::tolower(c); });
+    return result;
+}
+
+std::string ToUpper(const std::string& str)
+{
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char c){ return std::toupper(c); });
+    return result;
+}
+
+std::string GenerateUUID()
+{
+    // Generate a random UUID v4 (replaces boost::uuids::random_generator)
+    // Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    // where x is any hexadecimal digit and y is one of 8, 9, A, or B
+
+    static const char* hex_chars = "0123456789abcdef";
+    std::string uuid;
+    uuid.reserve(36);
+
+    // Use GetRandBytes from random.h for cryptographically secure randomness
+    unsigned char random_bytes[16];
+    GetRandBytes(random_bytes, 16);
+
+    // Set version (4) and variant bits as per RFC 4122
+    random_bytes[6] = (random_bytes[6] & 0x0f) | 0x40;  // Version 4
+    random_bytes[8] = (random_bytes[8] & 0x3f) | 0x80;  // Variant is 10
+
+    // Format as UUID string
+    for (int i = 0; i < 16; i++) {
+        if (i == 4 || i == 6 || i == 8 || i == 10) {
+            uuid += '-';
+        }
+        uuid += hex_chars[(random_bytes[i] >> 4) & 0x0f];
+        uuid += hex_chars[random_bytes[i] & 0x0f];
+    }
+
+    return uuid;
+}
+
+bool StartsWith(const std::string& str, const std::string& prefix)
+{
+    // C++20: Use std::string_view::starts_with() (matching Bitcoin Core)
+    return std::string_view(str).starts_with(std::string_view(prefix));
+}
+
+bool EndsWith(const std::string& str, const std::string& suffix)
+{
+    // C++20: Use std::string_view::ends_with() (matching Bitcoin Core)
+    return std::string_view(str).ends_with(std::string_view(suffix));
+}
+
+bool IStartsWith(const std::string& str, const std::string& prefix)
+{
+    if (str.size() < prefix.size()) return false;
+    return std::equal(prefix.begin(), prefix.end(), str.begin(),
+                      [](char a, char b) {
+                          return std::tolower(static_cast<unsigned char>(a)) ==
+                                 std::tolower(static_cast<unsigned char>(b));
+                      });
 }
 
