@@ -206,7 +206,7 @@ std::string CRPCTable::help(const std::string& strCommand) const
                         strRet += "\n";
                     category = pcmd->category;
                     string firstLetter = category.substr(0,1);
-                    boost::to_upper(firstLetter);
+                    firstLetter = ToUpper(firstLetter);
                     strRet += "== " + firstLetter + category.substr(1) + " ==\n";
                 }
             }

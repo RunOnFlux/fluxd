@@ -447,7 +447,7 @@ bool StartHTTPServer()
     LogPrint("http", "Starting HTTP server\n");
     int rpcThreads = std::max((long)GetArg("-rpcthreads", DEFAULT_HTTP_THREADS), 1L);
     LogPrintf("HTTP: starting %d worker threads\n", rpcThreads);
-    threadHTTP = std::thread(boost::bind(&ThreadHTTP, eventBase, eventHTTP));
+    threadHTTP = std::thread([eventBase, eventHTTP]() { ThreadHTTP(eventBase, eventHTTP); });
 
     for (int i = 0; i < rpcThreads; i++) {
         std::thread rpc_worker(HTTPWorkQueueRun, workQueue);
@@ -601,8 +601,9 @@ void HTTPRequest::WriteReply(int nStatus, const std::string& strReply)
     struct evbuffer* evb = evhttp_request_get_output_buffer(req);
     assert(evb);
     evbuffer_add(evb, strReply.data(), strReply.size());
+    struct evhttp_request* req_copy = req;  // Copy pointer for lambda capture
     HTTPEvent* ev = new HTTPEvent(eventBase, true,
-        boost::bind(evhttp_send_reply, req, nStatus, (const char*)NULL, (struct evbuffer *)NULL));
+        [req_copy, nStatus]() { evhttp_send_reply(req_copy, nStatus, (const char*)NULL, (struct evbuffer *)NULL); });
     ev->trigger(0);
     replySent = true;
     req = 0; // transferred back to main thread

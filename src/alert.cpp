@@ -258,7 +258,7 @@ CAlert::Notify(const std::string& strMessage, bool fThread)
     std::string singleQuote("'");
     std::string safeStatus = SanitizeString(strMessage);
     safeStatus = singleQuote+safeStatus+singleQuote;
-    boost::replace_all(strCmd, "%s", safeStatus);
+    ReplaceAll(strCmd, "%s", safeStatus);
 
     if (fThread) {
         std::thread t(runCommand, strCmd); // thread runs free

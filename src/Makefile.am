@@ -210,6 +210,8 @@ BITCOIN_CORE_H = \
   utilstrencodings.h \
   utiltest.h \
   utiltime.h \
+  util/fs.h \
+  util/task_runner.h \
   util/threadinterrupt.h \
   validationinterface.h \
   version.h \
@@ -431,6 +433,7 @@ libbitcoin_util_a_SOURCES = \
   sync.cpp \
   uint256.cpp \
   util.cpp \
+  util/fs.cpp \
   util/threadinterrupt.cpp \
   utilmoneystr.cpp \
   utilstrencodings.cpp \

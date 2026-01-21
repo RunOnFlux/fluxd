@@ -21,10 +21,11 @@ struct secure_allocator : public std::allocator<T> {
     typedef std::allocator<T> base;
     typedef typename base::size_type size_type;
     typedef typename base::difference_type difference_type;
-    typedef typename base::pointer pointer;
-    typedef typename base::const_pointer const_pointer;
-    typedef typename base::reference reference;
-    typedef typename base::const_reference const_reference;
+    // C++20: std::allocator no longer defines these, define them directly
+    typedef T* pointer;
+    typedef const T* const_pointer;
+    typedef T& reference;
+    typedef const T& const_reference;
     typedef typename base::value_type value_type;
     secure_allocator() throw() {}
     secure_allocator(const secure_allocator& a) throw() : base(a) {}
@@ -41,7 +42,8 @@ struct secure_allocator : public std::allocator<T> {
     T* allocate(std::size_t n, const void* hint = 0)
     {
         T* p;
-        p = std::allocator<T>::allocate(n, hint);
+        // C++20: std::allocator::allocate() no longer accepts hint parameter
+        p = std::allocator<T>::allocate(n);
         if (p != NULL)
             LockedPageManager::Instance().LockRange(p, sizeof(T) * n);
         return p;

@@ -353,7 +353,7 @@ void StartPONMinter(const CChainParams& chainparams)
     }
     
     fPONMinter = true;
-    ponMinterThread = new std::thread(boost::bind(&PONMinter, boost::cref(chainparams)));
+    ponMinterThread = new std::thread([&chainparams]() { PONMinter(chainparams); });
     LogPrintf("PON Minter thread started\n");
 }
 
