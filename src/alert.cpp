@@ -260,8 +260,9 @@ CAlert::Notify(const std::string& strMessage, bool fThread)
     safeStatus = singleQuote+safeStatus+singleQuote;
     boost::replace_all(strCmd, "%s", safeStatus);
 
-    if (fThread)
+    if (fThread) {
         std::thread t(runCommand, strCmd); // thread runs free
-    else
+        t.detach();
+    } else
         runCommand(strCmd);
 }

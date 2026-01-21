@@ -31,6 +31,7 @@
 #include "miner.h"
 #include "pon/pon-minter.h"
 #include "net.h"
+#include "checkqueue.h"
 #include "rpc/server.h"
 #include "rpc/register.h"
 #include "script/standard.h"
@@ -40,6 +41,7 @@
 #include "torcontrol.h"
 #include "ui_interface.h"
 #include "util.h"
+#include "util/threadinterrupt.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
 #include "fluxnode/fluxnodeconfig.h"
@@ -66,7 +68,6 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/bind.hpp>
 #include <filesystem>
-#include <boost/function.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <openssl/crypto.h>
 #include <stdlib.h>
@@ -83,7 +84,8 @@
 
 using namespace std;
 
-extern void ThreadSendAlert();
+class CThreadInterrupt;
+extern void ThreadSendAlert(CThreadInterrupt& interrupt);
 
 ZCJoinSplit* pfluxParams = NULL;
 
@@ -181,6 +183,15 @@ static CCoinsViewDB *pcoinsdbview = NULL;
 static CCoinsViewErrorCatcher *pcoinscatcher = NULL;
 static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
+// Global scheduler pointer
+static CScheduler* g_scheduler = nullptr;
+
+// Global thread interrupts
+static CThreadInterrupt g_scheduler_interrupt;
+static CThreadInterrupt g_metrics_interrupt;
+static CThreadInterrupt g_txnotify_interrupt;
+static CThreadInterrupt g_sendalert_interrupt;
+
 void Interrupt(std::vector<std::thread>& threadGroup)
 {
     InterruptHTTPServer();
@@ -188,6 +199,21 @@ void Interrupt(std::vector<std::thread>& threadGroup)
     InterruptRPC();
     InterruptREST();
     InterruptTorControl();
+
+    // Stop script verification threads (16 threads waiting on scriptcheckqueue)
+    StopScriptCheckQueue();
+
+    // Stop the scheduler first, before interrupting other threads
+    // This must happen before WaitForShutdown() joins threads
+    if (g_scheduler) {
+        g_scheduler->stop();
+    }
+
+    // Interrupt all background threads
+    g_scheduler_interrupt();
+    g_metrics_interrupt();
+    g_txnotify_interrupt();
+    g_sendalert_interrupt();
 }
 
 void Shutdown()
@@ -573,6 +599,7 @@ static void BlockNotifyCallback(const uint256& hashNewTip)
 
     boost::replace_all(strCmd, "%s", hashNewTip.GetHex());
     std::thread t(runCommand, strCmd); // thread runs free
+    t.detach();
 }
 
 struct CImportingNow
@@ -690,16 +717,17 @@ void ThreadImport(std::vector<std::filesystem::path> vImportFiles)
     }
 }
 
-void ThreadNotifyRecentlyAdded()
+void ThreadNotifyRecentlyAdded(CThreadInterrupt& interrupt)
 {
-    while (true) {
+    while (!interrupt) {
         // Run the notifier on an integer second in the steady clock.
         auto now = std::chrono::steady_clock::now().time_since_epoch();
         auto nextFire = std::chrono::duration_cast<std::chrono::seconds>(
             now + std::chrono::seconds(1));
-        std::this_thread::sleep_until(
-            std::chrono::time_point<std::chrono::steady_clock>(nextFire));
+        auto wait_time = nextFire - std::chrono::duration_cast<std::chrono::seconds>(now);
 
+        if (!interrupt.sleep_for(wait_time))
+            break;
 
         mempool.NotifyRecentlyAdded();
     }
@@ -801,6 +829,9 @@ bool AppInitServers(std::vector<std::thread>& threadGroup)
  */
 bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 {
+    // Set global scheduler pointer for interrupt handling
+    g_scheduler = &scheduler;
+
     // ********************************************************* Step 1: setup
 #ifdef _MSC_VER
     // Turn off Microsoft heap dump noise
@@ -1262,7 +1293,7 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
             !fPrintToConsole && !GetBoolArg("-daemon", false)) {
         // Start the persistent metrics interface
         ConnectMetricsScreen();
-        threadGroup.emplace_back(ThreadShowMetricsScreen);
+        threadGroup.emplace_back([&]() { ThreadShowMetricsScreen(g_metrics_interrupt); });
     }
 
     // Initialize Flux circuit parameters ("ZC" in function name refers to Zelcash)
@@ -2057,7 +2088,7 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 
     // Start the thread that notifies listeners of transactions that have been
     // recently added to the mempool.
-    threadGroup.emplace_back(boost::bind(&TraceThread<void (*)()>, "txnotify", &ThreadNotifyRecentlyAdded));
+    threadGroup.emplace_back([&]() { ThreadNotifyRecentlyAdded(g_txnotify_interrupt); });
 
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
         StartTorControl(threadGroup, scheduler);
@@ -2112,7 +2143,7 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 #endif
 
     // SENDALERT
-    threadGroup.emplace_back(boost::bind(ThreadSendAlert));
+    threadGroup.emplace_back([&]() { ThreadSendAlert(g_sendalert_interrupt); });
 
     return !fRequestShutdown;
 }

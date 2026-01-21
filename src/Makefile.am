@@ -210,6 +210,7 @@ BITCOIN_CORE_H = \
   utilstrencodings.h \
   utiltest.h \
   utiltime.h \
+  util/threadinterrupt.h \
   validationinterface.h \
   version.h \
   wallet/asyncrpcoperation_common.h \
@@ -430,6 +431,7 @@ libbitcoin_util_a_SOURCES = \
   sync.cpp \
   uint256.cpp \
   util.cpp \
+  util/threadinterrupt.cpp \
   utilmoneystr.cpp \
   utilstrencodings.cpp \
   utiltime.cpp \

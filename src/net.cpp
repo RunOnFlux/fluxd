@@ -48,6 +48,22 @@
 // Dump addresses to peers.dat every 15 minutes (900s)
 #define DUMP_ADDRESSES_INTERVAL 900
 
+// Shutdown check from init.cpp
+extern bool ShutdownRequested();
+
+// Helper for interruptible sleep that checks for shutdown
+static inline bool InterruptibleSleep(int64_t milliseconds)
+{
+    // Break long sleeps into 100ms chunks to check shutdown frequently
+    const int64_t chunk = 100;
+    for (int64_t i = 0; i < milliseconds; i += chunk) {
+        if (ShutdownRequested())
+            return false;
+        MilliSleep(std::min(chunk, milliseconds - i));
+    }
+    return !ShutdownRequested();
+}
+
 #if !defined(HAVE_MSG_NOSIGNAL) && !defined(MSG_NOSIGNAL)
 #define MSG_NOSIGNAL 0
 #endif
@@ -999,7 +1015,7 @@ static void AcceptConnection(const ListenSocket& hListenSocket) {
 void ThreadSocketHandler()
 {
     unsigned int nPrevNodeCount = 0;
-    while (true)
+    while (!ShutdownRequested())
     {
         //
         // Disconnect nodes
@@ -1267,7 +1283,15 @@ void ThreadDNSAddressSeed()
     // goal: only query DNS seeds if address need is acute
     if ((addrman.size() > 0) &&
         (!GetBoolArg("-forcednsseed", false))) {
-        MilliSleep(11 * 1000);
+        // Interruptible sleep - break into 1-second chunks
+        for (int i = 0; i < 11; i++) {
+            if (ShutdownRequested())
+                return;
+            MilliSleep(1000);
+        }
+
+        if (ShutdownRequested())
+            return;
 
         LOCK(cs_vNodes);
         if (vNodes.size() >= 2) {
@@ -1276,12 +1300,18 @@ void ThreadDNSAddressSeed()
         }
     }
 
+    if (ShutdownRequested())
+        return;
+
     const vector<CDNSSeedData> &vSeeds = Params().DNSSeeds();
     int found = 0;
 
     LogPrintf("Loading addresses from DNS seeds (could take a while)\n");
 
     for (const CDNSSeedData &seed : vSeeds) {
+        if (ShutdownRequested())
+            return;
+
         if (HaveNameProxy()) {
             AddOneShot(seed.host);
         } else {
@@ -1291,6 +1321,9 @@ void ThreadDNSAddressSeed()
             {
                 for (const CNetAddr& ip : vIPs)
                 {
+                    if (ShutdownRequested())
+                        return;
+
                     int nOneDay = 24*3600;
                     CAddress addr = CAddress(CService(ip, Params().GetDefaultPort()));
                     addr.nTime = GetTime() - 3*nOneDay - GetRand(4*nOneDay); // use a random age between 3 and 7 days old
@@ -1298,6 +1331,8 @@ void ThreadDNSAddressSeed()
                     found++;
                 }
             }
+            if (ShutdownRequested())
+                return;
             addrman.Add(vAdd, CNetAddr(seed.name, true));
         }
     }
@@ -1425,17 +1460,25 @@ void ThreadOpenConnections()
     {
         for (int64_t nLoop = 0;; nLoop++)
         {
+            if (ShutdownRequested())
+                return;
+
             ProcessOneShot();
             for (const std::string& strAddr : mapMultiArgs["-connect"])
             {
+                if (ShutdownRequested())
+                    return;
+
                 CAddress addr;
                 OpenNetworkConnection(addr, NULL, strAddr.c_str());
                 for (int i = 0; i < 10 && i < nLoop; i++)
                 {
-                    MilliSleep(500);
+                    if (!InterruptibleSleep(500))
+                        return;
                 }
             }
-            MilliSleep(500);
+            if (!InterruptibleSleep(500))
+                return;
         }
     }
 
@@ -1443,13 +1486,18 @@ void ThreadOpenConnections()
     int64_t nStart = GetTime();
     static int64_t nNextFeeler = 0;
     static const int64_t FEELER_INTERVAL = 120;
-    while (true)
+    while (!ShutdownRequested())
     {
         ProcessOneShot();
 
-        MilliSleep(500);
+        if (!InterruptibleSleep(500))
+            return;
 
         CSemaphoreGrant grant(*semOutbound);
+
+        // Check shutdown again after semaphore wait
+        if (ShutdownRequested())
+            return;
 
         // Add seed nodes if DNS seeds are all down (an infrastructure attack?).
         if (addrman.size() == 0 && (GetTime() - nStart > 60)) {
@@ -1561,7 +1609,7 @@ void ThreadOpenAddedConnections()
     }
 
     if (HaveNameProxy()) {
-        while(true) {
+        while(!ShutdownRequested()) {
             list<string> lAddresses(0);
             {
                 LOCK(cs_vAddedNodes);
@@ -1569,16 +1617,21 @@ void ThreadOpenAddedConnections()
                     lAddresses.push_back(strAddNode);
             }
             for (const std::string& strAddNode : lAddresses) {
+                if (ShutdownRequested())
+                    return;
+
                 CAddress addr;
                 CSemaphoreGrant grant(*semOutbound);
                 OpenNetworkConnection(addr, &grant, strAddNode.c_str());
-                MilliSleep(500);
+                if (!InterruptibleSleep(500))
+                    return;
             }
-            MilliSleep(120000); // Retry every 2 minutes
+            if (!InterruptibleSleep(120000)) // Retry every 2 minutes
+                return;
         }
     }
 
-    for (unsigned int i = 0; true; i++)
+    for (unsigned int i = 0; !ShutdownRequested(); i++)
     {
         list<string> lAddresses(0);
         {
@@ -1616,11 +1669,16 @@ void ThreadOpenAddedConnections()
         }
         for (vector<CService>& vserv : lservAddressesToAdd)
         {
+            if (ShutdownRequested())
+                return;
+
             CSemaphoreGrant grant(*semOutbound);
             OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
-            MilliSleep(500);
+            if (!InterruptibleSleep(500))
+                return;
         }
-        MilliSleep(120000); // Retry every 2 minutes
+        if (!InterruptibleSleep(120000)) // Retry every 2 minutes
+            return;
     }
 }
 
@@ -1660,7 +1718,7 @@ void ThreadMessageHandler()
     std::unique_lock<std::mutex> lock(condition_mutex);
 
     SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
-    while (true)
+    while (!ShutdownRequested())
     {
         vector<CNode*> vNodesCopy;
         {

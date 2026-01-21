@@ -164,6 +164,15 @@ public:
     {
     }
 
+    //! Signal all worker threads to quit
+    void Quit()
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        fQuit = true;
+        condWorker.notify_all();
+        condMaster.notify_all();
+    }
+
     bool IsIdle()
     {
         std::unique_lock<std::mutex> lock(mutex);

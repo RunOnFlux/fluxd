@@ -20,6 +20,8 @@
 #include "../consensus/validation.h"
 #include "../key_io.h"
 
+// Shutdown check from init.cpp
+extern bool ShutdownRequested();
 
 static std::thread* ponMinterThread = nullptr;
 static bool fPONMinter = false;
@@ -114,7 +116,7 @@ void PONMinter(const CChainParams& chainparams)
     uint32_t lastAttemptedSlot = 0;
 
     try {
-        while (fPONMinter) {
+        while (fPONMinter && !ShutdownRequested()) {
 
             if (chainparams.MiningRequiresPeers()) {
                 // Busy-wait for the network to come online so we don't waste time mining
@@ -127,6 +129,8 @@ void PONMinter(const CChainParams& chainparams)
                     }
                     if (!fvNodesEmpty && !IsInitialBlockDownload(chainparams))
                         break;
+                    if (!fPONMinter || ShutdownRequested())
+                        return;
                     MilliSleep(30000);
                 } while (true);
             }

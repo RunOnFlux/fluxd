@@ -11,7 +11,6 @@
 #include "script/sign.h"
 #include "utilmoneystr.h"
 
-#include <boost/variant.hpp>
 #include <librustzcash.h>
 
 SpendDescriptionInfo::SpendDescriptionInfo(

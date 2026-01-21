@@ -13,8 +13,6 @@
 
 #include <assert.h>
 
-#include <boost/assign/list_of.hpp>
-
 #include "chainparamsseeds.h"
 
 #include <mutex>
@@ -255,33 +253,34 @@ public:
         nEmergencyMinSignatures = 2; // Require 2 signatures minimum
 
         checkpointData = (CCheckpointData) {
-            boost::assign::map_list_of
-            (0, consensus.hashGenesisBlock)
-            (5500, uint256S("0x0000000e7724f8bace09dd762657169c10622af4a6a8e959152cd00b9119848e"))
-            (35000, uint256S("0x000000004646dd797644b9c67aff320961e95c311b4f26985424b720d09fcaa5"))
-            (70000, uint256S("0x00000001edcf7768ed39fac55414e53a78d077b1b41fccdaf9307d7bc219626a"))
-            (94071, uint256S("0x00000005ec83876bc5288badf0971ae83ac7c6a286851f7b22a75a03e73b401a")) //Halep won French Open 2018
-            (277649, uint256S("0x00000004a53f9271d05071a052b3738b46663f3335d14b6aea965a3cb70c0cc8")) // reindex - check
-            (400000, uint256S("0x000000390342f0e52443ad79b43e5d85b78bf519667aeb3aa980d76caeda0369"))
-            (530000, uint256S("0x0000004b4459ec6904e8116d178c357b0f25a7d45c5c5836ce3714791f1ed124"))
-            (600000, uint256S("0x000000dea4478401e6ab95f6d05ade810115411e95e75fab9fd94a44df4b1e1d"))
-            (700000, uint256S("0x0000000845ef03939225cc592773fd7aef54b5232fc42790c46ef6f11ee3e8d4"))
-            (800000, uint256S("0x000000451b73f495b2f6ad38bd89d15495551fc15c2078ad7af3d54d06422cc6"))
-            (900000, uint256S("0x000001e1ad2bb5e3cabb09559b6e65b871bf1d2a51bcc141ce45fc4cbd1d9cd8"))
-            (1000000, uint256S("0x0000001a80e7f30d21fb14116cd01d51e1fad8ac84cc960896f4691a57368a47"))
-            (1040000, uint256S("0x00000007f3b465bd4b0e161e43c05a3d946144330e33ea3a91cb952e6ef86b7d"))
-            (1040577, uint256S("0x000000071fe89682ac260bc0a49621344eb28ae01659c9e7ce86e3762e45f52d"))
-            (1042126, uint256S("0x0000000295e4663178fd9e533787e74206645910a2bfb61938db5f67796eaad0"))
-            (1060000, uint256S("0x0000000fd721d8d381c4b24a4f78fc036955d7a0f98d2765b8c7badad8b66c1b"))
-            (1442798, uint256S("0x0000000cc561fecb2ecfd22ba7af09450ca8cf270f407ce8b948195ff2aa0d13"))
-            (1518503, uint256S("0x0000000dba41dc84c52a3933af49d316fff49a76b49d42bd5b6d20c4e451a0ef"))
-            (1791720, uint256S("0x0000000abc7bd62a213e0dab43c9c01220b031a568fdfb5c2ef89e6b30054bdc"))
-            // PON activation and stabilization checkpoints - EMERGENCY FORK RECOVERY
-            (2020500, uint256S("0xaf2a1bd59c61f64860b4b45bd65358743fda40d8420564b58c39df45be7da97c"))  // Shortly after PON fork at 2020490
-            (2021000, uint256S("0xd2dcec473e809575e30ec2c0f400758120f5121b8268f90cdb8a7dbefe285b0d"))  // Mid-way checkpoint
-            (2021500, uint256S("0xfa98471f31ffc1366330bababc090ad5cb6bd23c25bb3b61d1e1ed07a77d6126"))  // Recovery checkpoint
-            (2022000, uint256S("0x40a060546a56eb7fab0fd33ab3e6de834ff0d5273847d4f231a9addecfc44f61")) // Most recent verified checkpoint
-            (2029000, uint256S("0x4856dc788a973db4cc537465c9ef80288e1eb065898993d72371b1ee48c248b4")), // Most recent verified checkpoint
+            {
+                {0, consensus.hashGenesisBlock},
+                {5500, uint256S("0x0000000e7724f8bace09dd762657169c10622af4a6a8e959152cd00b9119848e")},
+                {35000, uint256S("0x000000004646dd797644b9c67aff320961e95c311b4f26985424b720d09fcaa5")},
+                {70000, uint256S("0x00000001edcf7768ed39fac55414e53a78d077b1b41fccdaf9307d7bc219626a")},
+                {94071, uint256S("0x00000005ec83876bc5288badf0971ae83ac7c6a286851f7b22a75a03e73b401a")}, //Halep won French Open 2018
+                {277649, uint256S("0x00000004a53f9271d05071a052b3738b46663f3335d14b6aea965a3cb70c0cc8")}, // reindex - check
+                {400000, uint256S("0x000000390342f0e52443ad79b43e5d85b78bf519667aeb3aa980d76caeda0369")},
+                {530000, uint256S("0x0000004b4459ec6904e8116d178c357b0f25a7d45c5c5836ce3714791f1ed124")},
+                {600000, uint256S("0x000000dea4478401e6ab95f6d05ade810115411e95e75fab9fd94a44df4b1e1d")},
+                {700000, uint256S("0x0000000845ef03939225cc592773fd7aef54b5232fc42790c46ef6f11ee3e8d4")},
+                {800000, uint256S("0x000000451b73f495b2f6ad38bd89d15495551fc15c2078ad7af3d54d06422cc6")},
+                {900000, uint256S("0x000001e1ad2bb5e3cabb09559b6e65b871bf1d2a51bcc141ce45fc4cbd1d9cd8")},
+                {1000000, uint256S("0x0000001a80e7f30d21fb14116cd01d51e1fad8ac84cc960896f4691a57368a47")},
+                {1040000, uint256S("0x00000007f3b465bd4b0e161e43c05a3d946144330e33ea3a91cb952e6ef86b7d")},
+                {1040577, uint256S("0x000000071fe89682ac260bc0a49621344eb28ae01659c9e7ce86e3762e45f52d")},
+                {1042126, uint256S("0x0000000295e4663178fd9e533787e74206645910a2bfb61938db5f67796eaad0")},
+                {1060000, uint256S("0x0000000fd721d8d381c4b24a4f78fc036955d7a0f98d2765b8c7badad8b66c1b")},
+                {1442798, uint256S("0x0000000cc561fecb2ecfd22ba7af09450ca8cf270f407ce8b948195ff2aa0d13")},
+                {1518503, uint256S("0x0000000dba41dc84c52a3933af49d316fff49a76b49d42bd5b6d20c4e451a0ef")},
+                {1791720, uint256S("0x0000000abc7bd62a213e0dab43c9c01220b031a568fdfb5c2ef89e6b30054bdc")},
+                // PON activation and stabilization checkpoints - EMERGENCY FORK RECOVERY
+                {2020500, uint256S("0xaf2a1bd59c61f64860b4b45bd65358743fda40d8420564b58c39df45be7da97c")},  // Shortly after PON fork at 2020490
+                {2021000, uint256S("0xd2dcec473e809575e30ec2c0f400758120f5121b8268f90cdb8a7dbefe285b0d")},  // Mid-way checkpoint
+                {2021500, uint256S("0xfa98471f31ffc1366330bababc090ad5cb6bd23c25bb3b61d1e1ed07a77d6126")},  // Recovery checkpoint
+                {2022000, uint256S("0x40a060546a56eb7fab0fd33ab3e6de834ff0d5273847d4f231a9addecfc44f61")}, // Most recent verified checkpoint
+                {2029000, uint256S("0x4856dc788a973db4cc537465c9ef80288e1eb065898993d72371b1ee48c248b4")} // Most recent verified checkpoint
+            },
             1761701944,     // * UNIX timestamp of last checkpoint block (2022000)
             118366352,      // * total number of transactions between genesis and last checkpoint
                             //   (the tx=... number in the SetBestChain debug.log lines)
@@ -470,10 +469,11 @@ public:
         assert(vecBenchmarkingPublicKeys.size() > 0);
 
         checkpointData = (CCheckpointData) {
-            boost::assign::map_list_of
-            (0, consensus.hashGenesisBlock)
-            (320, uint256S("0x0237bf16aba912b0c68933809a7e7fe9553ddff1bc0782d2463fc5d161af1c46")),
-            // (1249, uint256S("0x00c364ea9772696665c857e3967c7c5d3345a8df8671b4b504565131a9efa5ed")),
+            {
+                {0, consensus.hashGenesisBlock},
+                {320, uint256S("0x0237bf16aba912b0c68933809a7e7fe9553ddff1bc0782d2463fc5d161af1c46")}
+                // {1249, uint256S("0x00c364ea9772696665c857e3967c7c5d3345a8df8671b4b504565131a9efa5ed")}
+            },
             1693928849,  // * UNIX timestamp of last checkpoint block
             0,           // * total number of transactions between genesis and last checkpoint
                          //   (the tx=... number in the SetBestChain debug.log lines)
@@ -660,8 +660,9 @@ public:
         assert(vecBenchmarkingPublicKeys.size() > 0);
 
         checkpointData = (CCheckpointData){
-            boost::assign::map_list_of
-            ( 0, uint256S("0x01998760a88dc2b5715f69d2f18c1d90e0b604612242d9099eaff3048dd1e0ce")),
+            {
+                {0, uint256S("0x01998760a88dc2b5715f69d2f18c1d90e0b604612242d9099eaff3048dd1e0ce")}
+            },
             0,
             0,
             0

@@ -2081,9 +2081,9 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 
 
     if (params.size() == 4) {
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR)(UniValue::VSTR)(UniValue::VNUM), false);
+        RPCTypeCheck(params, {UniValue::VSTR, UniValue::VSTR, UniValue::VSTR, UniValue::VNUM}, false);
     } else {
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR)(UniValue::VSTR)(UniValue::VNUM)(UniValue::VARR), false);
+        RPCTypeCheck(params, {UniValue::VSTR, UniValue::VSTR, UniValue::VSTR, UniValue::VNUM, UniValue::VARR}, false);
     }
 
 
@@ -2231,9 +2231,9 @@ UniValue signp2shstarttx(const UniValue& params, bool fHelp)
     LOCK(cs_main);
 #endif
     if (params.size() == 1) {
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR), false);
+        RPCTypeCheck(params, {UniValue::VSTR}, false);
     } else {
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR), false);
+        RPCTypeCheck(params, {UniValue::VSTR, UniValue::VSTR}, false);
     }
 
     std::string strRawTx = params[0].get_str();
@@ -2338,7 +2338,7 @@ UniValue sendp2shstarttx(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("sendp2shstarttx", "\"rawtransactionhex\"") + HelpExampleRpc("sendp2shstarttx", "\"rawtransactionhex\""));
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR), false);
+    RPCTypeCheck(params, {UniValue::VSTR}, false);
 
     std::string strRawTx = params[0].get_str();
 

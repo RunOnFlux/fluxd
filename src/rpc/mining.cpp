@@ -32,7 +32,6 @@
 
 #include <stdint.h>
 
-#include <boost/assign/list_of.hpp>
 #include <memory>
 
 #include <univalue.h>
@@ -930,7 +929,7 @@ UniValue estimatefee(const UniValue& params, bool fHelp)
             + HelpExampleCli("estimatefee", "6")
             );
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VNUM));
+    RPCTypeCheck(params, {UniValue::VNUM});
 
     int nBlocks = params[0].get_int();
     if (nBlocks < 1)
@@ -962,7 +961,7 @@ UniValue estimatepriority(const UniValue& params, bool fHelp)
             + HelpExampleCli("estimatepriority", "6")
             );
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VNUM));
+    RPCTypeCheck(params, {UniValue::VNUM});
 
     int nBlocks = params[0].get_int();
     if (nBlocks < 1)

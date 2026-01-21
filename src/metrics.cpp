@@ -10,6 +10,7 @@
 #include "main.h"
 #include "ui_interface.h"
 #include "util.h"
+#include "util/threadinterrupt.h"
 #include "utiltime.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
@@ -464,7 +465,7 @@ bool enableVTMode()
 }
 #endif
 
-void ThreadShowMetricsScreen()
+void ThreadShowMetricsScreen(CThreadInterrupt& interrupt)
 {
     // Make this thread recognisable as the metrics screen thread
     RenameThread("flux-metrics-screen");
@@ -496,7 +497,7 @@ void ThreadShowMetricsScreen()
         std::cout << std::endl;
     }
 
-    while (true) {
+    while (!interrupt) {
         // Number of lines that are always displayed
         int lines = 1;
         int cols = 80;
@@ -553,13 +554,21 @@ void ThreadShowMetricsScreen()
         }
 
         nNextRefresh = GetTime() + nRefresh;
-        while (GetTime() < nNextRefresh.get()) {
-            MilliSleep(200);
+        while (GetTime() < nNextRefresh.get() && !interrupt) {
+            interrupt.sleep_for(std::chrono::milliseconds(200));
         }
 
         if (isScreen) {
             // Return to the top of the updating section
             std::cout << "\e[" << lines << "A";
         }
+    }
+
+    // Clean up terminal on exit
+    if (isScreen) {
+        // Move cursor down past all content and clear to end of screen
+        std::cout << "\e[9999B\e[J";
+        std::cout << std::endl;
+        std::cout.flush();
     }
 }
