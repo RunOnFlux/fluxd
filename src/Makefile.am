@@ -27,6 +27,7 @@ $(LIBLEVELDB) $(LIBMEMENV):
 endif
 
 BITCOIN_CONFIG_INCLUDES=-I$(builddir)/config
+# BOOST_CPPFLAGS needed for header-only libraries (Signals2) - no linking required
 BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(LEVELDB_CPPFLAGS) $(CRYPTO_CFLAGS) $(SSL_CFLAGS)
 
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1/include
@@ -481,7 +482,6 @@ fluxd_LDADD = \
   $(LIBSECP256K1)
 
 fluxd_LDADD += \
-  $(BOOST_LIBS) \
   $(BDB_LIBS) \
   $(SSL_LIBS) \
   $(CRYPTO_LIBS) \
@@ -506,7 +506,6 @@ flux_cli_LDADD = \
   $(LIBBITCOIN_CLI) \
   $(LIBUNIVALUE) \
   $(LIBBITCOIN_UTIL) \
-  $(BOOST_LIBS) \
   $(SSL_LIBS) \
   $(CRYPTO_LIBS) \
   $(EVENT_LIBS) \
@@ -535,7 +534,7 @@ flux_tx_LDADD = \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBFLUX_LIBS)
 
-flux_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
+flux_tx_LDADD += $(CRYPTO_LIBS)
 #
 
 # zelcash protocol primitives #
@@ -550,7 +549,7 @@ libflux_a_SOURCES = \
   flux/util.cpp \
   flux/zip32.cpp
 
-libflux_a_CPPFLAGS = $(AM_CPPFLAGS) $(PIC_FLAGS) -DBINARY_OUTPUT -DCURVE_ALT_BN128 -DBOOST_SPIRIT_THREADSAFE -fvisibility=hidden -DSTATIC $(BITCOIN_INCLUDES)
+libflux_a_CPPFLAGS = $(AM_CPPFLAGS) $(PIC_FLAGS) -DBINARY_OUTPUT -DCURVE_ALT_BN128 -fvisibility=hidden -DSTATIC $(BITCOIN_INCLUDES)
 libflux_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libflux_a_LDFLAGS = $(AM_LDFLAGS)
 
@@ -625,6 +624,9 @@ endif
 	$(AM_V_GEN) $(PROTOC) --cpp_out=$(@D) --proto_path=$(abspath $(<D) $<)
 
 if ENABLE_TESTS
-include Makefile.test.include
+# NOTE: Boost.Test based tests (Makefile.test.include) are deprecated and disabled.
+# Boost libraries were removed during C++20 upgrade. Use flux-gtest (Google Test suite) instead.
+# The test_bitcoin suite in test/ directory still contains Boost.Test code and cannot be built.
+# include Makefile.test.include
 include Makefile.gtest.include
 endif

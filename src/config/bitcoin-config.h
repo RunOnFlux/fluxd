@@ -44,24 +44,6 @@
 /* define if the Boost library is available */
 #define HAVE_BOOST /**/
 
-/* define if the Boost::Chrono library is available */
-#define HAVE_BOOST_CHRONO /**/
-
-/* define if the Boost::Filesystem library is available */
-#define HAVE_BOOST_FILESYSTEM /**/
-
-/* define if the Boost::PROGRAM_OPTIONS library is available */
-#define HAVE_BOOST_PROGRAM_OPTIONS /**/
-
-/* define if the Boost::System library is available */
-#define HAVE_BOOST_SYSTEM /**/
-
-/* define if the Boost::Thread library is available */
-#define HAVE_BOOST_THREAD /**/
-
-/* define if the Boost::Unit_Test_Framework library is available */
-#define HAVE_BOOST_UNIT_TEST_FRAMEWORK /**/
-
 /* Define to 1 if you have the <byteswap.h> header file. */
 #define HAVE_BYTESWAP_H 1
 

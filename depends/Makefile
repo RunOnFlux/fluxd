@@ -155,4 +155,26 @@ download-win:
 	@$(MAKE) -s HOST=x86_64-w64-mingw32 download-one
 download: download-osx download-linux download-win
 
-.PHONY: install cached download-one download-osx download-linux download-win download check-packages check-sources
+# Clean targets
+clean:
+	@echo "Cleaning built packages for $(host)..."
+	rm -rf $(host_prefix)
+	rm -rf $(base_build_dir)/$(host)
+	rm -rf $(base_staging_dir)/$(host)
+
+clean-all:
+	@echo "Cleaning all built packages..."
+	rm -rf $(BASEDIR)/x86_64-*
+	rm -rf $(BASEDIR)/i686-*
+	rm -rf $(BASEDIR)/aarch64-*
+	rm -rf $(BASEDIR)/arm-*
+	rm -rf $(base_build_dir)
+	rm -rf $(base_staging_dir)
+	rm -rf $(BASE_CACHE)
+
+distclean: clean-all
+	@echo "Cleaning downloads and sources..."
+	rm -rf $(base_download_dir)
+	rm -rf $(SOURCES_PATH)
+
+.PHONY: install cached download-one download-osx download-linux download-win download check-packages check-sources clean clean-all distclean
