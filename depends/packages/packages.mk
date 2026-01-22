@@ -35,6 +35,7 @@ rust_crates := \
 rust_packages := rust $(rust_crates) librustzcash
 proton_packages := proton
 zcash_packages := libsodium
+# Boost is included for header-only libraries (Signals2) - no compiled libraries are linked
 packages := boost openssl libevent zeromq $(zcash_packages) googletest
 native_packages := native_ccache
 
