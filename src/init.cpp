@@ -62,6 +62,7 @@
 #include <sys/stat.h>
 #endif
 
+#include <chrono>
 #include <filesystem>
 #include "util/fs.h"
 #include <openssl/crypto.h>
@@ -750,9 +751,6 @@ static void ZC_LoadParams(
     const CChainParams& chainparams
 )
 {
-    struct timeval tv_start, tv_end;
-    float elapsed;
-
     std::filesystem::path sapling_spend = ZC_GetParamsDir() / "sapling-spend.params";
     std::filesystem::path sapling_output = ZC_GetParamsDir() / "sapling-output.params";
     std::filesystem::path sprout_groth16 = ZC_GetParamsDir() / "sprout-groth16.params";
@@ -784,7 +782,7 @@ static void ZC_LoadParams(
     LogPrintf("Loading Sapling (Spend) parameters from %s\n", sapling_spend.string().c_str());
     LogPrintf("Loading Sapling (Output) parameters from %s\n", sapling_output.string().c_str());
     LogPrintf("Loading Sapling (Sprout Groth16) parameters from %s\n", sprout_groth16.string().c_str());
-    gettimeofday(&tv_start, 0);
+    auto start = std::chrono::steady_clock::now();
 
     librustzcash_init_zksnark_params(
         reinterpret_cast<const codeunit*>(sapling_spend_str.c_str()),
@@ -798,8 +796,8 @@ static void ZC_LoadParams(
         "e9b238411bd6c0ec4791e9d04245ec350c9c5744f5610dfcce4365d5ca49dfefd5054e371842b3f88fa1b9d7e8e075249b3ebabd167fa8b0f3161292d36c180a"
     );
 
-    gettimeofday(&tv_end, 0);
-    elapsed = float(tv_end.tv_sec-tv_start.tv_sec) + (tv_end.tv_usec-tv_start.tv_usec)/float(1000000);
+    auto end = std::chrono::steady_clock::now();
+    float elapsed = std::chrono::duration<float>(end - start).count();
     LogPrintf("Loaded Sapling parameters in %fs seconds.\n", elapsed);
 }
 

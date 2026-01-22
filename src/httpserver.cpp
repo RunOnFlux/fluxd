@@ -446,7 +446,7 @@ bool StartHTTPServer()
     LogPrint("http", "Starting HTTP server\n");
     int rpcThreads = std::max((long)GetArg("-rpcthreads", DEFAULT_HTTP_THREADS), 1L);
     LogPrintf("HTTP: starting %d worker threads\n", rpcThreads);
-    threadHTTP = std::thread([eventBase, eventHTTP]() { ThreadHTTP(eventBase, eventHTTP); });
+    threadHTTP = std::thread([]() { ThreadHTTP(eventBase, eventHTTP); });
 
     for (int i = 0; i < rpcThreads; i++) {
         std::thread rpc_worker(HTTPWorkQueueRun, workQueue);
