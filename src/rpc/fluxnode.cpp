@@ -62,9 +62,8 @@ static bool FindFluxnodeTxForCollateral(const COutPoint& collateralOutpoint, CTr
             continue;
 
         for (const CTransaction& tx : block.vtx) {
-            // Check if this is a fluxnode START or CONFIRM transaction with matching collateralIn
-            if ((tx.nType == FLUXNODE_START_TX_TYPE || tx.nType == FLUXNODE_CONFIRM_TX_TYPE) &&
-                tx.collateralIn == collateralOutpoint) {
+            // Only look for START transactions - CONFIRM transactions don't have collateralPubkey field
+            if (tx.nType == FLUXNODE_START_TX_TYPE && tx.collateralIn == collateralOutpoint) {
                 // Check if it has valid keys we need
                 if (tx.pubKey.IsValid() && (tx.collateralPubkey.IsValid() || tx.P2SHRedeemScript.size() > 0)) {
                     foundTx = tx;
