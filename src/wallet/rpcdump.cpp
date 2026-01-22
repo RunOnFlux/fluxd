@@ -45,7 +45,11 @@ int64_t static DecodeDumpTime(const std::string &str) {
         return 0;
 
     // Convert to time_t (assumes UTC)
+#ifdef WIN32
+    std::time_t time = _mkgmtime(&tm);
+#else
     std::time_t time = timegm(&tm);
+#endif
     return static_cast<int64_t>(time);
 }
 

@@ -20,16 +20,16 @@ jobs:
             container: ubuntu:20.04
           - arch: arm64
             runs-on: ubuntu-24.04
-            ubuntu-version: "20.04"
-            container: ubuntu:20.04
+            ubuntu-version: "22.04"
+            container: ubuntu:22.04
           # - arch: i386
           #   runs-on: ubuntu-24.04
           #   ubuntu-version: "20.04"
           #   container: ubuntu:20.04
           - arch: windows
             runs-on: ubuntu-24.04
-            ubuntu-version: "20.04"
-            container: ubuntu:20.04
+            ubuntu-version: "24.04"
+            container: ubuntu:24.04
     
     runs-on: ${{ matrix.runs-on }}
     container: ${{ matrix.container }}
@@ -44,19 +44,39 @@ jobs:
           # Set timezone non-interactively to avoid prompts
           export DEBIAN_FRONTEND=noninteractive
           ln -fs /usr/share/zoneinfo/UTC /etc/localtime
-          
+
           apt-get update
-          if [[ "${{ matrix.arch }}" == "amd64" ]]; then
-            apt-get install -y build-essential pkg-config libc6-dev m4 autoconf libtool unzip git wget curl bsdmainutils automake g++-multilib ncurses-dev python3 python3-zmq zlib1g-dev
-          elif [[ "${{ matrix.arch }}" == "arm64" ]]; then
-            apt-get install -y build-essential pkg-config libc6-dev m4 autoconf libtool unzip git wget curl bsdmainutils automake g++-aarch64-linux-gnu ncurses-dev python3 python3-zmq zlib1g-dev
-          elif [[ "${{ matrix.arch }}" == "i386" ]]; then
-            # Enable i386 architecture for 32-bit packages
-            dpkg --add-architecture i386
+
+          if [[ "${{ matrix.ubuntu-version }}" == "24.04" ]]; then
+            # Ubuntu 24.04 has GCC-13 with full C++20 support
+            if [[ "${{ matrix.arch }}" == "windows" ]]; then
+              apt-get install -y build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python3 python3-zmq zlib1g-dev wget curl bsdmainutils automake mingw-w64 mingw-w64-tools cmake zip
+              # Configure MinGW to use POSIX threads for C++20 support
+              update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix
+              update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
+            fi
+          elif [[ "${{ matrix.ubuntu-version }}" == "22.04" ]]; then
+            # Ubuntu 22.04 has native GCC-11 with C++20 support
+            if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+              apt-get install -y build-essential pkg-config libc6-dev m4 autoconf libtool unzip git wget curl bsdmainutils automake g++-aarch64-linux-gnu ncurses-dev python3 python3-zmq zlib1g-dev
+            fi
+          else
+            # Ubuntu 20.04 - install GCC-11 from toolchain PPA for C++20 support
+            apt-get install -y software-properties-common
+            add-apt-repository -y ppa:ubuntu-toolchain-r/test
             apt-get update
-            apt-get install -y build-essential pkg-config libc6-dev:i386 m4 autoconf libtool unzip git wget curl bsdmainutils automake g++-multilib gcc-multilib ncurses-dev python3 python3-zmq zlib1g-dev
-          elif [[ "${{ matrix.arch }}" == "windows" ]]; then
-            apt-get install -y build-essential pkg-config libc6-dev m4 g++-multilib autoconf libtool ncurses-dev unzip git python3 python3-zmq zlib1g-dev wget curl bsdmainutils automake mingw-w64 mingw-w64-tools gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 cmake zip
+
+            if [[ "${{ matrix.arch }}" == "amd64" ]]; then
+              apt-get install -y build-essential pkg-config libc6-dev m4 autoconf libtool unzip git wget curl bsdmainutils automake ncurses-dev python3 python3-zmq zlib1g-dev gcc-11 g++-11 g++-11-multilib
+              update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
+              update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100
+            elif [[ "${{ matrix.arch }}" == "i386" ]]; then
+              dpkg --add-architecture i386
+              apt-get update
+              apt-get install -y build-essential pkg-config libc6-dev:i386 m4 autoconf libtool unzip git wget curl bsdmainutils automake ncurses-dev python3 python3-zmq zlib1g-dev gcc-11 g++-11 gcc-11-multilib g++-11-multilib
+              update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
+              update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100
+            fi
           fi
 
       - name: Set version and branch

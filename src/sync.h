@@ -121,8 +121,7 @@ private:
     bool TryEnter(const char* pszName, const char* pszFile, int nLine)
     {
         EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()), true);
-        lock.try_lock();
-        if (!lock.owns_lock())
+        if (!lock.try_lock())
             LeaveCritical();
         return lock.owns_lock();
     }
