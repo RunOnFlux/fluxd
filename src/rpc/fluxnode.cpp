@@ -1081,10 +1081,13 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
         return returnObj;
     }
 
-    // Scan blockchain for a previous fluxnode transaction to get the keys
-    // (cache won't have data since we already verified node is not active)
+    // Only scan blockchain if keys are not provided as parameters and not in arcane mode
+    // This avoids expensive blockchain scan when keys are known or when running in arcane mode
     CTransaction blockchainTx;
-    bool hasBlockchainTx = FindFluxnodeTxForCollateral(outpoint, blockchainTx);
+    bool hasBlockchainTx = false;
+    if (!fArcane && (strVpsPubKey.empty() || strCollateralPubKey.empty())) {
+        hasBlockchainTx = FindFluxnodeTxForCollateral(outpoint, blockchainTx);
+    }
 
     // Get VPS public key - either from parameter or blockchain
     CPubKey vpsPubKey;
@@ -1304,10 +1307,13 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
         return returnObj;
     }
 
-    // Scan blockchain for a previous fluxnode transaction to get the keys
-    // (cache won't have data since we already verified node is not active)
+    // Only scan blockchain if keys are not provided as parameters and not in arcane mode
+    // This avoids expensive blockchain scan when keys are known or when running in arcane mode
     CTransaction blockchainTx;
-    bool hasBlockchainTx = FindFluxnodeTxForCollateral(outpoint, blockchainTx);
+    bool hasBlockchainTx = false;
+    if (!fArcane && (strVpsPubKey.empty() || strRedeemScript.empty())) {
+        hasBlockchainTx = FindFluxnodeTxForCollateral(outpoint, blockchainTx);
+    }
 
     // Get VPS public key - either from parameter or blockchain
     CPubKey vpsPubKey;
