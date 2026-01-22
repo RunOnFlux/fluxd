@@ -3717,12 +3717,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             } else {
                 for (const auto& input : tx.vin) {
                     setSpentOutPoints.insert(input.prevout);
-
-                    // Check if this spent UTXO has delegates - if so, mark for cleanup
-                    CFluxnodeDelegates delegates;
-                    if (g_fluxnodeCache.GetDelegates(input.prevout, delegates)) {
-                        p_fluxnodeCache->setDelegateToErase.insert(input.prevout);
-                    }
                 }
             }
 
