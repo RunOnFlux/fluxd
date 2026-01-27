@@ -58,30 +58,30 @@ bool ValidateEmergencyBlockSignatures(const CBlockHeader& block) {
         return false;
     }
 
-    // NEW: Log emergency block usage for transparency
-    int currentHeight = chainActive.Height() + 1;
-    LogPrintf("=== EMERGENCY BLOCK DETECTED ===\n");
-    LogPrintf("Height: %d\n", currentHeight);
-    LogPrintf("Hash: %s\n", block.GetHash().ToString());
-    LogPrintf("Timestamp: %d (%s)\n", block.nTime, DateTimeStrFormat("%Y-%m-%d %H:%M:%S", block.nTime));
-    LogPrintf("Previous: %s\n", block.hashPrevBlock.ToString());
-    LogPrintf("================================\n");
-
     const std::vector<std::string>& emergencyPubKeys = Params().GetEmergencyPublicKeys();
     const int nMinSigs = Params().GetEmergencyMinSignatures();
+    const size_t nMaxSigs = emergencyPubKeys.size();
 
     // Decode multiple signatures from vchBlockSig
     std::vector<std::vector<unsigned char>> vSignatures = DecodeMultiSig(block.vchBlockSig);
 
+    // Early exit: can't have more valid signatures than authorized keys
+    // This bounds the work we do on attacker-controlled data
+    if (vSignatures.size() > nMaxSigs) {
+        LogPrint("emergency", "Emergency block validation failed: too many signatures (%d > %d)\n",
+                  vSignatures.size(), nMaxSigs);
+        return false;
+    }
+
     if (vSignatures.size() < (size_t)nMinSigs) {
-        LogPrintf("Emergency block validation failed: insufficient signatures (%d < %d)\n",
+        LogPrint("emergency", "Emergency block validation failed: insufficient signatures (%d < %d)\n",
                   vSignatures.size(), nMinSigs);
         return false;
     }
 
     // For regtest, allow any valid signatures for testing
     if (Params().NetworkIDString() == "regtest") {
-        LogPrintf("Emergency block validation: Using regtest bypass, accepting %d signatures\n", vSignatures.size());
+        LogPrint("emergency", "Emergency block validation: Using regtest bypass, accepting %d signatures\n", vSignatures.size());
         return true;
     }
 
@@ -93,6 +93,12 @@ bool ValidateEmergencyBlockSignatures(const CBlockHeader& block) {
 
     // Verify each signature against the emergency public keys
     for (const auto& vchSig : vSignatures) {
+        // Reject if any signature is oversized - valid ECDSA DER sigs are at most 73 bytes
+        if (vchSig.size() > MAX_BLOCK_SIG_SIZE) {
+            LogPrint("emergency", "Emergency block validation failed: oversized signature (%d bytes)\n", vchSig.size());
+            return false;
+        }
+
         bool sigValid = false;
 
         for (const auto& strPubKey : emergencyPubKeys) {
@@ -106,7 +112,7 @@ bool ValidateEmergencyBlockSignatures(const CBlockHeader& block) {
             CPubKey pubKey(vchPubKey);
 
             if (!pubKey.IsValid()) {
-                LogPrintf("Emergency block validation: invalid public key %s\n", strPubKey);
+                LogPrint("emergency", "Emergency block validation: invalid public key %s\n", strPubKey);
                 continue;
             }
 
@@ -115,23 +121,30 @@ bool ValidateEmergencyBlockSignatures(const CBlockHeader& block) {
                 validSigs++;
                 usedPubKeys.insert(strPubKey);
                 sigValid = true;
-                LogPrintf("Emergency block validation: valid signature from key %s\n", strPubKey);
+                LogPrint("emergency", "Emergency block validation: valid signature from key %s\n", strPubKey);
                 break;
             }
         }
 
         if (!sigValid) {
-            LogPrintf("Emergency block validation: signature does not match any authorized key\n");
+            LogPrint("emergency", "Emergency block validation: signature does not match any authorized key\n");
         }
 
         if (validSigs >= nMinSigs) {
-            LogPrintf("Emergency block validation successful: %d/%d valid signatures\n",
-                     validSigs, nMinSigs);
+            // Validation successful - now log the banner for transparency
+            int currentHeight = chainActive.Height() + 1;
+            LogPrintf("=== EMERGENCY BLOCK ACCEPTED ===\n");
+            LogPrintf("Height: %d\n", currentHeight);
+            LogPrintf("Hash: %s\n", block.GetHash().ToString());
+            LogPrintf("Timestamp: %d (%s)\n", block.nTime, DateTimeStrFormat("%Y-%m-%d %H:%M:%S", block.nTime));
+            LogPrintf("Previous: %s\n", block.hashPrevBlock.ToString());
+            LogPrintf("Valid signatures: %d/%d\n", validSigs, nMinSigs);
+            LogPrintf("================================\n");
             return true;
         }
     }
 
-    LogPrintf("Emergency block validation failed: only %d/%d valid signatures\n",
+    LogPrint("emergency", "Emergency block validation failed: only %d/%d valid signatures\n",
               validSigs, nMinSigs);
     return false;
 }
