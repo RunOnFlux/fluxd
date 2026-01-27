@@ -4946,6 +4946,14 @@ bool CheckBlockHeader(
 
     // PON blocks have different validation rules
     if (block.IsPON()) {
+        // Check block signature size to prevent oversized payloads from being stored
+        // Emergency blocks can have multiple signatures, regular PON blocks have one
+        unsigned int maxSigSize = IsEmergencyBlock(block) ? MAX_EMERGENCY_BLOCK_SIG_SIZE : MAX_BLOCK_SIG_SIZE;
+        if (block.vchBlockSig.size() > maxSigSize)
+            return state.DoS(100, error("CheckBlockHeader(): vchBlockSig size %u exceeds maximum %u",
+                             block.vchBlockSig.size(), maxSigSize),
+                             REJECT_INVALID, "bad-pon-sig-size");
+
         if (!IsEmergencyBlock((block))) {
             // Check proof of work matches claimed amount
             if (fCheckPOW && !CheckProofOfNode(GetPONHash(block), block.nBits, chainparams.GetConsensus()))
