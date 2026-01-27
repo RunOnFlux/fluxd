@@ -23,6 +23,10 @@ static const int32_t SAPLING_MAX_TX_VERSION = 4;
 static const unsigned int MAX_BLOCK_SIZE = 2000000;
 /** The maximum allowed number of signature check operations in a block (network rule) */
 static const unsigned int MAX_BLOCK_SIGOPS = 20000;
+/** The maximum allowed size for a PON block signature (DER-encoded ECDSA) */
+static const unsigned int MAX_BLOCK_SIG_SIZE = 73;
+/** The maximum allowed size for an emergency block signature (multiple DER-encoded ECDSA signatures) */
+static const unsigned int MAX_EMERGENCY_BLOCK_SIG_SIZE = 512;
 /** The maximum size of a transaction (network rule) */
 static const unsigned int MAX_TX_SIZE_BEFORE_SAPLING = 100000;
 static const unsigned int MAX_TX_SIZE_AFTER_SAPLING = MAX_BLOCK_SIZE;
