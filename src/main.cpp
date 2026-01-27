@@ -5512,8 +5512,9 @@ bool ContextualCheckBlockHeader(
     // Check if this should be a PON block
     if (IsPONActive(nHeight)) {
         if (block.IsPON()) {
-            // Validate PON block header
-            if (!ContextualCheckPONBlockHeader(block, pindexPrev, consensusParams, false)) {
+            // Validate PON block header (no signature check at this stage)
+            bool fSigFailureUnused = false;
+            if (!ContextualCheckPONBlockHeader(block, pindexPrev, consensusParams, false, fSigFailureUnused)) {
                 return state.DoS(100, error("ContextualCheckBlockHeader: Invalid PON block header"),
                                  REJECT_INVALID, "bad-pon-header");
             }
@@ -5606,10 +5607,14 @@ bool ContextualCheckBlock(
     // PON-specific validation if PON is active
     if (IsPONActive(nHeight)) {
         if (block.IsPON()) {
-            // Validate the full PON block!  (Including signature - If not coming from fFromAccept)
-            if (!ContextualCheckPONBlockHeader(block, pindexPrev, consensusParams, fCheckPONSignature)) {
+            // Validate the full PON block (including signature if fCheckPONSignature is true)
+            // fSignatureFailure indicates if failure was due to signature (not committed to hash)
+            bool fSignatureFailure = false;
+            if (!ContextualCheckPONBlockHeader(block, pindexPrev, consensusParams, fCheckPONSignature, fSignatureFailure)) {
+                // Signature failures should NOT permanently invalidate by hash (signature not committed to hash)
+                // This prevents hash-poison DoS where attacker sends invalid sig, blocking valid block
                 return state.DoS(100, error("ContextualCheckBlock: Invalid PON block"),
-                                 REJECT_INVALID, "bad-pon-block");
+                                 REJECT_INVALID, "bad-pon-block", fSignatureFailure);
             }
         } else {
             // Non-PON block when PON is required
@@ -5744,6 +5749,15 @@ static bool AcceptBlock(const CBlock& block, CValidationState& state, const CCha
             setDirtyBlockIndex.insert(pindex);
         }
         return false;
+    }
+
+    // Update block index with validated signature from the accepted block.
+    // The header may have arrived earlier with a different (possibly invalid) signature,
+    // since vchBlockSig is not committed to the block hash. Now that we've validated
+    // the full block with a valid signature, update the index to store the correct one.
+    if (block.IsPON() && pindex->vchBlockSig != block.vchBlockSig) {
+        pindex->vchBlockSig = block.vchBlockSig;
+        setDirtyBlockIndex.insert(pindex);
     }
 
     int nHeight = pindex->nHeight;
