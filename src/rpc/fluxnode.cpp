@@ -24,6 +24,7 @@
 #include <boost/tokenizer.hpp>
 #include <fstream>
 #include <consensus/validation.h>
+#include <consensus/params.h>
 #include <undo.h>
 #include "core_io.h"
 #include "boost/assign/list_of.hpp"
@@ -34,6 +35,46 @@
 std::string CRPCFluxnodeCache::filter = "";
 int64_t CRPCFluxnodeCache::nHeight = -1;
 UniValue CRPCFluxnodeCache::list = NullUniValue;
+
+// Scan blockchain to find a fluxnode transaction for a given collateral outpoint
+// that contains the keys we need (collateralPubkey, pubKey, P2SHRedeemScript)
+// Returns true if found and fills in the foundTx parameter
+// Scans from tip back to KAMATA activation (when deterministic fluxnodes went live)
+static bool FindFluxnodeTxForCollateral(const COutPoint& collateralOutpoint, CTransaction& foundTx)
+{
+    LOCK(cs_main);
+
+    if (!chainActive.Tip())
+        return false;
+
+    // Only scan back to KAMATA activation - no fluxnode transactions exist before that
+    int nMinHeight = Params().GetConsensus().vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight;
+
+    // Scan from most recent to oldest - usually finds match within first few hundred blocks
+    // if the node was recently active (CONFIRM transactions every ~640 blocks)
+    for (int height = chainActive.Height(); height >= nMinHeight; height--) {
+        CBlockIndex* pindex = chainActive[height];
+        if (!pindex)
+            continue;
+
+        CBlock block;
+        if (!ReadBlockFromDisk(block, pindex, Params().GetConsensus()))
+            continue;
+
+        for (const CTransaction& tx : block.vtx) {
+            // Only look for START transactions - CONFIRM transactions don't have collateralPubkey field
+            if (tx.nType == FLUXNODE_START_TX_TYPE && tx.collateralIn == collateralOutpoint) {
+                // Check if it has valid keys we need
+                if (tx.pubKey.IsValid() && (tx.collateralPubkey.IsValid() || tx.P2SHRedeemScript.size() > 0)) {
+                    foundTx = tx;
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
 
 UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
     if (fHelp || params.size() > 0)
@@ -916,15 +957,16 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
         throw runtime_error("deterministic fluxnodes transactions is not active yet");
     }
 
-    if (fHelp || params.size() != 4)
+    if (fHelp || params.size() < 3 || params.size() > 5)
         throw runtime_error(
-                "startfluxnodeasdelegate \"txhash\" \"outputindex\" \"delegatekey\" \"vpspubkey\"\n"
+                "startfluxnodeasdelegate \"txhash\" \"outputindex\" \"delegatekey\" (\"vpspubkey\") (\"collateralpubkey\")\n"
                 "\nStart a Fluxnode as an authorized delegate instead of the collateral owner.\n"
                 "\nArguments:\n"
-                "1. txhash         (string, required) The transaction hash of the collateral.\n"
-                "2. outputindex    (string, required) The output index of the collateral.\n"
-                "3. delegatekey    (string, required) The private key of an authorized delegate.\n"
-                "4. vpspubkey      (string, required) The public key for VPS verification.\n"
+                "1. txhash            (string, required) The transaction hash of the collateral.\n"
+                "2. outputindex       (string, required) The output index of the collateral.\n"
+                "3. delegatekey       (string, required) The private key of an authorized delegate.\n"
+                "4. vpspubkey         (string, optional) The public key for VPS verification. If not provided or empty, will be looked up from previous start transaction.\n"
+                "5. collateralpubkey  (string, optional) The public key of the collateral owner. If not provided or empty, will be looked up from previous start transaction.\n"
                 "\nResult:\n"
                 "{\n"
                 "  \"result\": \"xxxx\",     (string) 'success' or 'failed'\n"
@@ -934,13 +976,14 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
                 "}\n"
                 "\nNote: The delegate must first be authorized by the collateral owner using 'startfluxnodewithdelegates'.\n"
                 "\nExamples:\n" +
-                HelpExampleCli("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\" \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\"") +
-                HelpExampleRpc("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\", \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\""));
+                HelpExampleCli("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\"") +
+                HelpExampleRpc("startfluxnodeasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\""));
 
     std::string strTxHash = params[0].get_str();
     std::string strOutputIndex = params[1].get_str();
     std::string strDelegateKey = params[2].get_str();
-    std::string strVpsPubKey = params[3].get_str();
+    std::string strVpsPubKey = params.size() > 3 ? params[3].get_str() : "";
+    std::string strCollateralPubKey = params.size() > 4 ? params[4].get_str() : "";
 
     UniValue returnObj(UniValue::VOBJ);
 
@@ -993,14 +1036,6 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
 
     CPubKey delegatePubKey = delegateKey.GetPubKey();
 
-    // Parse and validate VPS public key
-    CPubKey vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
-    if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
-        returnObj.pushKV("result", "failed");
-        returnObj.pushKV("error", "Invalid VPS public key");
-        return returnObj;
-    }
-
     // Check if this delegate is authorized
     CFluxnodeDelegates storedDelegates;
     bool isDelegateAuthorized = false;
@@ -1046,11 +1081,54 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
         return returnObj;
     }
 
+    // Only scan blockchain if keys are not provided as parameters and not in arcane mode
+    // This avoids expensive blockchain scan when keys are known or when running in arcane mode
+    CTransaction blockchainTx;
+    bool hasBlockchainTx = false;
+    if (!fArcane && (strVpsPubKey.empty() || strCollateralPubKey.empty())) {
+        hasBlockchainTx = FindFluxnodeTxForCollateral(outpoint, blockchainTx);
+    }
+
+    // Get VPS public key - either from parameter or blockchain
+    CPubKey vpsPubKey;
+    if (!strVpsPubKey.empty()) {
+        vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
+        if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
+            returnObj.pushKV("result", "failed");
+            returnObj.pushKV("error", "Invalid VPS public key");
+            return returnObj;
+        }
+    } else if (hasBlockchainTx && blockchainTx.pubKey.IsValid()) {
+        vpsPubKey = blockchainTx.pubKey;
+    } else {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Could not find VPS public key in blockchain. Please provide it as a parameter.");
+        return returnObj;
+    }
+
+    // Get collateral public key - either from parameter or blockchain
+    CPubKey collateralPubKey;
+    if (!strCollateralPubKey.empty()) {
+        collateralPubKey = CPubKey(ParseHex(strCollateralPubKey));
+        if (!collateralPubKey.IsValid() || !collateralPubKey.IsFullyValid()) {
+            returnObj.pushKV("result", "failed");
+            returnObj.pushKV("error", "Invalid collateral public key");
+            return returnObj;
+        }
+    } else if (hasBlockchainTx && blockchainTx.collateralPubkey.IsValid()) {
+        collateralPubKey = blockchainTx.collateralPubkey;
+    } else {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Could not find collateral public key in blockchain. Please provide it as a parameter.");
+        return returnObj;
+    }
+
     // Create the transaction
     CMutableTransaction mutTransaction;
     mutTransaction.nVersion = FLUXNODE_TX_UPGRADEABLE_VERSION; // Use upgradeable version for delegate support
     mutTransaction.nType = FLUXNODE_START_TX_TYPE;
     mutTransaction.collateralIn = outpoint;
+    mutTransaction.collateralPubkey = collateralPubKey;
     mutTransaction.pubKey = vpsPubKey; // Use VPS pubkey for VPS verification
 
     // Set the FluxTx version with delegate feature bit
@@ -1105,16 +1183,16 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
         throw runtime_error("deterministic fluxnodes transactions is not active yet");
     }
 
-    if (fHelp || params.size() != 5)
+    if (fHelp || params.size() < 3 || params.size() > 5)
         throw runtime_error(
-                "startp2shasdelegate \"redeemscript\" \"collateraltxid\" \"outputindex\" \"delegatekey\" \"vpspubkey\"\n"
+                "startp2shasdelegate \"txhash\" \"outputindex\" \"delegatekey\" (\"vpspubkey\") (\"redeemscript\")\n"
                 "\nStart a P2SH (multisig) Fluxnode as an authorized delegate.\n"
                 "\nArguments:\n"
-                "1. redeemscript    (string, required) The hex-encoded redeem script of the P2SH address.\n"
-                "2. collateraltxid  (string, required) The transaction ID of the collateral.\n"
-                "3. outputindex     (string, required) The output index of the collateral.\n"
-                "4. delegatekey     (string, required) The private key of an authorized delegate.\n"
-                "5. vpspubkey       (string, required) The public key for VPS verification.\n"
+                "1. txhash          (string, required) The transaction ID of the collateral.\n"
+                "2. outputindex     (string, required) The output index of the collateral.\n"
+                "3. delegatekey     (string, required) The private key of an authorized delegate.\n"
+                "4. vpspubkey       (string, optional) The public key for VPS verification. If not provided or empty, will be looked up from previous start transaction.\n"
+                "5. redeemscript    (string, optional) The hex-encoded redeem script of the P2SH address. If not provided or empty, will be looked up from previous start transaction.\n"
                 "\nResult:\n"
                 "{\n"
                 "  \"result\": \"xxxx\",     (string) 'success' or 'failed'\n"
@@ -1124,20 +1202,16 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
                 "}\n"
                 "\nNote: The delegate must first be authorized using 'updatefluxnodedelegates'.\n"
                 "\nExamples:\n" +
-                HelpExampleCli("startp2shasdelegate", "\"512103...\" \"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\" \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\"") +
-                HelpExampleRpc("startp2shasdelegate", "\"512103...\", \"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\", \"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\""));
+                HelpExampleCli("startp2shasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" \"0\" \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\"") +
+                HelpExampleRpc("startp2shasdelegate", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\", \"0\", \"93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg\""));
 
-    std::string strRedeemScript = params[0].get_str();
-    std::string strTxHash = params[1].get_str();
-    std::string strOutputIndex = params[2].get_str();
-    std::string strDelegateKey = params[3].get_str();
-    std::string strVpsPubKey = params[4].get_str();
+    std::string strTxHash = params[0].get_str();
+    std::string strOutputIndex = params[1].get_str();
+    std::string strDelegateKey = params[2].get_str();
+    std::string strVpsPubKey = params.size() > 3 ? params[3].get_str() : "";
+    std::string strRedeemScript = params.size() > 4 ? params[4].get_str() : "";
 
     UniValue returnObj(UniValue::VOBJ);
-
-    // Parse the redeem script
-    std::vector<unsigned char> redeemScriptData = ParseHex(strRedeemScript);
-    CScript redeemScript(redeemScriptData.begin(), redeemScriptData.end());
 
     // Validate the transaction hash
     uint256 txHash = uint256S(strTxHash);
@@ -1188,14 +1262,6 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
 
     CPubKey delegatePubKey = delegateKey.GetPubKey();
 
-    // Parse and validate VPS public key
-    CPubKey vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
-    if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
-        returnObj.pushKV("result", "failed");
-        returnObj.pushKV("error", "Invalid VPS public key");
-        return returnObj;
-    }
-
     // Check if this delegate is authorized
     CFluxnodeDelegates storedDelegates;
     bool hasDelegates = false;
@@ -1238,6 +1304,44 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
     if (nOutputIndex >= (int)collateralTx.vout.size()) {
         returnObj.pushKV("result", "failed");
         returnObj.pushKV("error", "Invalid output index for transaction");
+        return returnObj;
+    }
+
+    // Only scan blockchain if keys are not provided as parameters and not in arcane mode
+    // This avoids expensive blockchain scan when keys are known or when running in arcane mode
+    CTransaction blockchainTx;
+    bool hasBlockchainTx = false;
+    if (!fArcane && (strVpsPubKey.empty() || strRedeemScript.empty())) {
+        hasBlockchainTx = FindFluxnodeTxForCollateral(outpoint, blockchainTx);
+    }
+
+    // Get VPS public key - either from parameter or blockchain
+    CPubKey vpsPubKey;
+    if (!strVpsPubKey.empty()) {
+        vpsPubKey = CPubKey(ParseHex(strVpsPubKey));
+        if (!vpsPubKey.IsValid() || !vpsPubKey.IsFullyValid()) {
+            returnObj.pushKV("result", "failed");
+            returnObj.pushKV("error", "Invalid VPS public key");
+            return returnObj;
+        }
+    } else if (hasBlockchainTx && blockchainTx.pubKey.IsValid()) {
+        vpsPubKey = blockchainTx.pubKey;
+    } else {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Could not find VPS public key in blockchain. Please provide it as a parameter.");
+        return returnObj;
+    }
+
+    // Get redeem script - either from parameter or blockchain
+    CScript redeemScript;
+    if (!strRedeemScript.empty()) {
+        std::vector<unsigned char> redeemScriptData = ParseHex(strRedeemScript);
+        redeemScript = CScript(redeemScriptData.begin(), redeemScriptData.end());
+    } else if (hasBlockchainTx && blockchainTx.P2SHRedeemScript.size() > 0) {
+        redeemScript = blockchainTx.P2SHRedeemScript;
+    } else {
+        returnObj.pushKV("result", "failed");
+        returnObj.pushKV("error", "Could not find redeem script in blockchain. Please provide it as a parameter.");
         return returnObj;
     }
 

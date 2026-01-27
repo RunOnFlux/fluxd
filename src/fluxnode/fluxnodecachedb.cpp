@@ -81,7 +81,7 @@ bool CDeterministicFluxnodeDB::LoadFluxnodeCacheData()
 
 bool CDeterministicFluxnodeDB::WriteFluxnodeDelegates(const COutPoint& outpoint, const CFluxnodeDelegates& delegates)
 {
-    LogPrintf("Writing Delgate data for : %s n", outpoint.ToFullString());
+    LogPrintf("Writing Delgate data for : %s \n", outpoint.ToFullString());
     return Write(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint), delegates);
 }
 
@@ -97,7 +97,7 @@ bool CDeterministicFluxnodeDB::ReadFluxnodeDelegates(const COutPoint& outpoint, 
 
 bool CDeterministicFluxnodeDB::EraseFluxnodeDelegate(const COutPoint& outpoint)
 {
-    LogPrintf("Erasing Delgate data for : %s n", outpoint.ToFullString());
+    LogPrintf("Erasing Delgate data for : %s \n", outpoint.ToFullString());
     return Erase(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint));
 }
 
