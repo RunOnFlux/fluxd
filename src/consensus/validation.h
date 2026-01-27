@@ -32,10 +32,11 @@ private:
     std::string strRejectReason;
     unsigned char chRejectCode;
     bool corruptionPossible;
+    bool fluxnodeTxSignatureFailure;  // Fluxnode tx signature validation failed (sig not committed to txid, don't blacklist by hash)
     CTransaction txInvalidTx;
 
 public:
-    CValidationState() : mode(MODE_VALID), nDoS(0), chRejectCode(0), corruptionPossible(false), txInvalidTx(CTransaction()) {}
+    CValidationState() : mode(MODE_VALID), nDoS(0), chRejectCode(0), corruptionPossible(false), fluxnodeTxSignatureFailure(false), txInvalidTx(CTransaction()) {}
     virtual bool DoS(int level, bool ret = false,
              unsigned char chRejectCodeIn=0, std::string strRejectReasonIn="",
              bool corruptionIn=false) {
@@ -89,6 +90,12 @@ public:
     }
     virtual bool CorruptionPossible() const {
         return corruptionPossible;
+    }
+    virtual bool IsFluxnodeTxSignatureFailure() const {
+        return fluxnodeTxSignatureFailure;
+    }
+    virtual void SetFluxnodeTxSignatureFailure(bool failure = true) {
+        fluxnodeTxSignatureFailure = failure;
     }
     virtual unsigned char GetRejectCode() const { return chRejectCode; }
     virtual std::string GetRejectReason() const { return strRejectReason; }
