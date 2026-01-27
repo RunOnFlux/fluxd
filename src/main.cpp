@@ -1789,6 +1789,9 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
         }
 
         if (!CheckFluxnodeTxSignatures(tx)) {
+            // Signature is not committed to txid (excluded via SER_GETHASH), so signature failures
+            // should not blacklist by txid - another peer may send valid signature for same txid
+            state.SetFluxnodeTxSignatureFailure();
             return state.DoS(10, error("CheckTransaction(): Is Fluxnode Tx, invalid signatures"),
                              REJECT_INVALID, "bad-txns-fluxnode-tx-invalid-signature");
         }
@@ -7733,7 +7736,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                             LogPrint("mempool", "   removed orphan tx %s\n", orphanHash.ToString());
                             vEraseQueue.push_back(orphanHash);
                             assert(recentRejects);
-                            recentRejects->insert(orphanHash);
+                            // Don't blacklist by txid if failure was due to fluxnode signature validation
+                            if (!stateDummy.IsFluxnodeTxSignatureFailure()) {
+                                recentRejects->insert(orphanHash);
+                            }
                             // Add to extra pool for compact block reconstruction
                             AddTxToExtraPool(orphanTx);
                         }
@@ -7759,7 +7765,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
             } else {
                 assert(recentRejects);
-                recentRejects->insert(tx.GetHash());
+                // Don't blacklist by txid if failure was due to fluxnode signature validation.
+                // Fluxnode tx signatures are not committed to the txid (excluded via SER_GETHASH),
+                // so an attacker could poison the hash with an invalid signature, blocking valid txs.
+                // We still DoS the peer that sent the invalid signature.
+                if (!state.IsFluxnodeTxSignatureFailure()) {
+                    recentRejects->insert(tx.GetHash());
+                }
                 // Add to extra pool for compact block reconstruction
                 AddTxToExtraPool(tx);
 
