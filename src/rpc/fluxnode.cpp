@@ -1578,7 +1578,6 @@ UniValue getfluxnodesnapshot(const UniValue& params, bool fHelp)
     result.pushKV("nodes", nodes);
     return result;
 }
-}
 
 UniValue listzelnodes(const UniValue& params, bool fHelp)
 {
