@@ -26,3 +26,8 @@ bool CZMQAbstractNotifier::NotifyTransaction(const CTransaction &/*transaction*/
 {
     return true;
 }
+
+bool CZMQAbstractNotifier::NotifyChainReorg(const CBlockIndex * /*pindexOldTip*/, const CBlockIndex * /*pindexNewTip*/, const CBlockIndex * /*pindexFork*/)
+{
+    return true;
+}

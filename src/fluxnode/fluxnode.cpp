@@ -20,11 +20,54 @@
 #include "pon/pon-fork.h"
 
 FluxnodeCache g_fluxnodeCache;
+FluxNodeDelta g_fluxnodeDelta;
 
 // Keep track of the active Fluxnode
 ActiveFluxnode activeFluxnode;
 
 COutPoint fluxnodeOutPoint;
+
+// FluxNodeDelta implementation
+void FluxNodeDelta::Clear() {
+    LOCK(cs);
+    mapAdded.clear();
+    setRemoved.clear();
+    mapUpdated.clear();
+    fDirty = false;
+}
+
+void FluxNodeDelta::RecordAdded(const COutPoint& outpoint, const FluxnodeCacheData& data) {
+    LOCK(cs);
+    // Handle reorg case: node removed then re-added
+    if (setRemoved.count(outpoint)) {
+        setRemoved.erase(outpoint);
+        mapUpdated[outpoint] = data;  // Net result: update
+    } else {
+        mapAdded[outpoint] = data;
+    }
+    fDirty = true;
+}
+
+void FluxNodeDelta::RecordRemoved(const COutPoint& outpoint) {
+    LOCK(cs);
+    // Handle same-block case: node added then removed
+    if (mapAdded.count(outpoint)) {
+        mapAdded.erase(outpoint);  // Net result: nothing
+    } else {
+        setRemoved.insert(outpoint);
+    }
+    fDirty = true;
+}
+
+void FluxNodeDelta::RecordUpdated(const COutPoint& outpoint, const FluxnodeCacheData& data) {
+    LOCK(cs);
+    // Only record if not already added this block
+    if (!mapAdded.count(outpoint)) {
+        mapUpdated[outpoint] = data;
+        fDirty = true;
+    }
+    // If already added, the add already has latest data
+}
 
 std::string TierToString(int tier)
 {
@@ -945,6 +988,10 @@ void FluxnodeCache::AddBackUndoData(const CFluxnodeTxBlockUndo& p_undoData)
             mapConfirmedFluxnodeData[item.first].nLastConfirmedBlockHeight = item.second;
             LogPrintf("UNDO PREPARE: Copying to local cache for %s: globalValue=%d, willRestoreTo=%d\n",
                       item.first.ToString(), oldValueInGlobal, item.second);
+
+            // Record delta for ZMQ (undo confirm height update)
+            g_fluxnodeDelta.RecordUpdated(item.first, mapConfirmedFluxnodeData[item.first]);
+            LogPrint("zmq", "FluxNode delta: Reverted confirm height %s\n", item.first.ToFullString());
         } else {
             if (!fIsVerifying)
                 error("%s : This should never happen. When undo an update confirm nLastConfirmedBlockHeight . FluxnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
@@ -972,10 +1019,21 @@ void FluxnodeCache::AddBackUndoData(const CFluxnodeTxBlockUndo& p_undoData)
     // Undo the Confirms that were Expired
     for (const auto& item : p_undoData.vecExpiredConfirmedData) {
         setUndoExpireConfirm.insert(item);
+        // Record delta for ZMQ (restoring expired nodes)
+        g_fluxnodeDelta.RecordAdded(item.collateralIn, item);
+        LogPrint("zmq", "FluxNode delta: Restored expired node %s\n", item.collateralIn.ToFullString());
     }
 
     for (const auto& item : p_undoData.mapLastPaidHeights) {
         mapUndoPaidNodes[item.first] = item.second;
+        // Record delta for ZMQ (undo paid heights)
+        LOCK(g_fluxnodeCache.cs);
+        if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.first)) {
+            FluxnodeCacheData updatedData = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first);
+            updatedData.nLastPaidHeight = item.second;  // Will be reverted to this value
+            g_fluxnodeDelta.RecordUpdated(item.first, updatedData);
+            LogPrint("zmq", "FluxNode delta: Reverted payment height %s\n", item.first.ToFullString());
+        }
     }
 }
 
@@ -1115,6 +1173,10 @@ bool FluxnodeCache::Flush()
             // Add the data to the confirm trackers
             g_fluxnodeCache.mapConfirmedFluxnodeData[data.collateralIn] = data;
 
+            // Record delta for ZMQ
+            g_fluxnodeDelta.RecordAdded(data.collateralIn, data);
+            LogPrint("zmq", "FluxNode delta: Added node %s\n", data.collateralIn.ToFullString());
+
             // Because we don't automatically remove nodes that have expired from the list, to help not sort it as often
             // If this node is already in the list. We wont add it let. We need to wait for the node to be removed from the list.
             // Then we can add it to the list
@@ -1154,6 +1216,10 @@ bool FluxnodeCache::Flush()
 
             // Remove from Confirm Tracking
             g_fluxnodeCache.mapConfirmedFluxnodeData.erase(item);
+
+            // Record delta for ZMQ
+            g_fluxnodeDelta.RecordRemoved(item);
+            LogPrint("zmq", "FluxNode delta: Removed node (undo confirm) %s\n", item.ToFullString());
 
             // adding it to this set, means that it will go and remove the outpoint from the list, and the set if it is in there
             setRemoveFromList.insert(data.collateralIn);
@@ -1201,6 +1267,10 @@ bool FluxnodeCache::Flush()
             // Update IP address
             g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first).ip = item.second;
 
+            // Record delta for ZMQ
+            g_fluxnodeDelta.RecordUpdated(item.first, g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first));
+            LogPrint("zmq", "FluxNode delta: Updated node (confirm) %s\n", item.first.ToFullString());
+
             g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
         } else {
             error("%s : This should never happen. When updating a fluxnode from the confirm map. FluxnodeData not found. Report this to the dev team to figure out what is happening: %s\n", __func__, item.first.hash.GetHex());
@@ -1218,6 +1288,10 @@ bool FluxnodeCache::Flush()
 
             // Erase the data from the map and set
             g_fluxnodeCache.mapConfirmedFluxnodeData.erase(item);
+
+            // Record delta for ZMQ
+            g_fluxnodeDelta.RecordRemoved(item);
+            LogPrint("zmq", "FluxNode delta: Removed node (expired) %s\n", item.ToFullString());
 
             // IMPORTANT:: the item stays in the list and the set. This is because we don't want to have to resort the list everytime something expires.
             // Only when new added is added to the list.
@@ -1241,6 +1315,11 @@ bool FluxnodeCache::Flush()
 
             // Set the new last paid height
             g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.second.second).nLastPaidHeight = item.second.first;
+
+            // Record delta for ZMQ
+            g_fluxnodeDelta.RecordUpdated(item.second.second, g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.second.second));
+            LogPrint("zmq", "FluxNode delta: Updated node (payment) %s\n", item.second.second.ToFullString());
+
             g_fluxnodeCache.setDirtyOutPoint.insert(item.second.second);
 
             if (!g_fluxnodeCache.mapFluxnodeList.count(currentTier)) {

@@ -1542,6 +1542,44 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
     return viewdeterministicfluxnodelist(params, fHelp, __func__);
 }
 
+UniValue getfluxnodesnapshot(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() > 0)
+        throw runtime_error(
+            "getfluxnodesnapshot\n"
+            "Returns the complete FluxNode list with block height for ZMQ synchronization.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"height\": n,        (numeric) Current block height\n"
+            "  \"nodes\": [...]      (array) FluxNode list (same format as viewdeterministicfluxnodelist)\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getfluxnodesnapshot", ""));
+
+    if (IsInitialBlockDownload(Params())) {
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Wait until chain is synced closer to tip");
+    }
+
+    UniValue result(UniValue::VOBJ);
+    UniValue nodes(UniValue::VARR);
+
+    {
+        LOCK2(cs_main, g_fluxnodeCache.cs);
+
+        // Atomic: get height and nodes under same lock
+        result.pushKV("height", chainActive.Height());
+
+        // Use same logic as viewdeterministicfluxnodelist
+        for (int tier = CUMULUS; tier != LAST; tier++) {
+            GetDeterministicListData(nodes, "", (Tier)tier);
+        }
+    }
+
+    result.pushKV("nodes", nodes);
+    return result;
+}
+}
+
 UniValue listzelnodes(const UniValue& params, bool fHelp)
 {
     return viewdeterministicfluxnodelist(params, fHelp, __func__);
@@ -2551,6 +2589,7 @@ static const CRPCCommand commands[] =
                 { "fluxnode",   "startfluxnodeasdelegate", &startfluxnodeasdelegate, false },
                 { "fluxnode",   "startp2shasdelegate", &startp2shasdelegate, false },
                 { "fluxnode",   "viewdeterministicfluxnodelist", &viewdeterministicfluxnodelist, false },
+                { "fluxnode",   "getfluxnodesnapshot", &getfluxnodesnapshot, false },
 
                 { "benchmarks", "getbenchmarks",         &getbenchmarks,           false  },
                 { "benchmarks", "getbenchstatus",        &getbenchstatus,          false  },

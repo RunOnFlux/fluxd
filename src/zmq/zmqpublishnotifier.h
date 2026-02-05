@@ -59,4 +59,29 @@ public:
     bool NotifyBlock(const CBlock &block);
 };
 
+class CZMQPublishHashBlockHeightNotifier : public CZMQAbstractPublishNotifier
+{
+public:
+    bool NotifyBlock(const CBlockIndex *pindex);
+};
+
+class CZMQPublishChainReorgNotifier : public CZMQAbstractPublishNotifier
+{
+public:
+    bool NotifyChainReorg(const CBlockIndex *pindexOldTip, const CBlockIndex *pindexNewTip, const CBlockIndex *pindexFork);
+};
+
+class CZMQPublishFluxNodeListNotifier : public CZMQAbstractPublishNotifier
+{
+private:
+    int nLastDeltaHeight;
+    bool fInitialized;
+
+    bool SendDelta(int nFromHeight, int nToHeight);
+
+public:
+    CZMQPublishFluxNodeListNotifier() : nLastDeltaHeight(0), fInitialized(false) {}
+    bool NotifyBlock(const CBlockIndex *pindex);
+};
+
 #endif // BITCOIN_ZMQ_ZMQPUBLISHNOTIFIER_H

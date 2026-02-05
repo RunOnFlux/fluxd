@@ -452,6 +452,9 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-zmqpubhashtx=<address>", _("Enable publish hash transaction in <address>"));
     strUsage += HelpMessageOpt("-zmqpubrawblock=<address>", _("Enable publish raw block in <address>"));
     strUsage += HelpMessageOpt("-zmqpubrawtx=<address>", _("Enable publish raw transaction in <address>"));
+    strUsage += HelpMessageOpt("-zmqpubhashblockheight=<address>", _("Enable publish hash block with height in <address>"));
+    strUsage += HelpMessageOpt("-zmqpubchainreorg=<address>", _("Enable publish chain reorganization in <address>"));
+    strUsage += HelpMessageOpt("-zmqpubfluxnodelistdelta=<address>", _("Enable publish FluxNode list delta in <address>"));
 #endif
 
 #if ENABLE_PROTON

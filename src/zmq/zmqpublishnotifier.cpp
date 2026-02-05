@@ -7,6 +7,8 @@
 #include "zmqpublishnotifier.h"
 #include "main.h"
 #include "util.h"
+#include "fluxnode/fluxnode.h"
+#include "streams.h"
 
 static std::multimap<std::string, CZMQAbstractPublishNotifier*> mapPublishNotifiers;
 
@@ -15,6 +17,9 @@ static const char *MSG_HASHTX    = "hashtx";
 static const char *MSG_RAWBLOCK  = "rawblock";
 static const char *MSG_RAWTX     = "rawtx";
 static const char *MSG_CHECKEDBLOCK = "checkedblock";
+static const char *MSG_HASHBLOCKHEIGHT = "hashblockheight";
+static const char *MSG_CHAINREORG = "chainreorg";
+static const char *MSG_FLUXNODELISTDELTA = "fluxnodelistdelta";
 
 // Internal function to send multipart message
 static int zmq_send_multipart(void *sock, const void* data, size_t size, ...)
@@ -203,4 +208,132 @@ bool CZMQPublishRawTransactionNotifier::NotifyTransaction(const CTransaction &tr
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss << transaction;
     return SendMessage(MSG_RAWTX, &(*ss.begin()), ss.size());
+}
+
+bool CZMQPublishHashBlockHeightNotifier::NotifyBlock(const CBlockIndex *pindex)
+{
+    uint256 hash = pindex->GetBlockHash();
+    LogPrint("zmq", "zmq: Publish hashblockheight %s height %d\n", hash.GetHex(), pindex->nHeight);
+    unsigned char data[36];
+
+    // Hash (reversed for display)
+    for (unsigned int i = 0; i < 32; i++)
+        data[31 - i] = hash.begin()[i];
+
+    // Height (little-endian)
+    WriteLE32(&data[32], (uint32_t)pindex->nHeight);
+
+    return SendMessage(MSG_HASHBLOCKHEIGHT, data, 36);
+}
+
+bool CZMQPublishChainReorgNotifier::NotifyChainReorg(const CBlockIndex *pindexOldTip, const CBlockIndex *pindexNewTip, const CBlockIndex *pindexFork)
+{
+    if (!pindexOldTip || !pindexNewTip || !pindexFork) {
+        LogPrint("zmq", "zmq: ChainReorg notification skipped (null pointer)\n");
+        return true;
+    }
+
+    uint256 hashOldTip = pindexOldTip->GetBlockHash();
+    uint256 hashNewTip = pindexNewTip->GetBlockHash();
+
+    LogPrint("zmq", "zmq: Publish chainreorg old_height=%d new_height=%d fork_height=%d\n",
+             pindexOldTip->nHeight, pindexNewTip->nHeight, pindexFork->nHeight);
+
+    unsigned char data[76];
+
+    // Old tip hash (internal format, NOT reversed)
+    memcpy(&data[0], hashOldTip.begin(), 32);
+
+    // Old tip height (little-endian)
+    WriteLE32(&data[32], (uint32_t)pindexOldTip->nHeight);
+
+    // New tip hash (internal format)
+    memcpy(&data[36], hashNewTip.begin(), 32);
+
+    // New tip height (little-endian)
+    WriteLE32(&data[68], (uint32_t)pindexNewTip->nHeight);
+
+    // Fork point height (little-endian)
+    WriteLE32(&data[72], (uint32_t)pindexFork->nHeight);
+
+    return SendMessage(MSG_CHAINREORG, data, 76);
+}
+
+bool CZMQPublishFluxNodeListNotifier::NotifyBlock(const CBlockIndex *pindex)
+{
+    if (!fInitialized) {
+        // First block after daemon start - skip delta
+        // (Client uses RPC for initial state, not first delta)
+        g_fluxnodeDelta.Clear();
+        nLastDeltaHeight = pindex->nHeight;
+        fInitialized = true;
+        LogPrint("zmq", "zmq: FluxNode delta initialized at height %d (skipping first delta)\n", pindex->nHeight);
+        return true;
+    }
+
+    return SendDelta(nLastDeltaHeight, pindex->nHeight);
+}
+
+bool CZMQPublishFluxNodeListNotifier::SendDelta(int nFromHeight, int nToHeight)
+{
+    // Check if any changes occurred
+    {
+        LOCK(g_fluxnodeDelta.cs);
+        if (!g_fluxnodeDelta.fDirty) {
+            LogPrint("zmq", "zmq: No FluxNode changes at height %d, skipping delta\n", nToHeight);
+            nLastDeltaHeight = nToHeight;
+            return true;  // No changes, skip entirely
+        }
+    }
+
+    // Build delta message from tracked changes
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    ss << (uint32_t)nFromHeight;
+    ss << (uint32_t)nToHeight;
+
+    {
+        LOCK(g_fluxnodeDelta.cs);
+
+        // Serialize added nodes (full data)
+        WriteCompactSize(ss, g_fluxnodeDelta.mapAdded.size());
+        for (const auto& item : g_fluxnodeDelta.mapAdded) {
+            const COutPoint& outpoint = item.first;
+            const FluxnodeCacheData& data = item.second;
+            ss << outpoint << data.collateralPubkey << data.pubKey
+               << (uint32_t)data.nConfirmedBlockHeight
+               << (uint32_t)data.nLastPaidHeight
+               << data.nTier << data.nStatus << data.ip;
+        }
+
+        // Serialize removed nodes (outpoint only - saves bandwidth!)
+        WriteCompactSize(ss, g_fluxnodeDelta.setRemoved.size());
+        for (const auto& outpoint : g_fluxnodeDelta.setRemoved) {
+            ss << outpoint;  // Only 36 bytes vs ~200 for full data
+        }
+
+        // Serialize updated nodes (full data)
+        WriteCompactSize(ss, g_fluxnodeDelta.mapUpdated.size());
+        for (const auto& item : g_fluxnodeDelta.mapUpdated) {
+            const COutPoint& outpoint = item.first;
+            const FluxnodeCacheData& data = item.second;
+            ss << outpoint << data.collateralPubkey << data.pubKey
+               << (uint32_t)data.nConfirmedBlockHeight
+               << (uint32_t)data.nLastPaidHeight
+               << data.nTier << data.nStatus << data.ip;
+        }
+
+        LogPrint("zmq", "zmq: FluxNode delta %d->%d: added=%d removed=%d updated=%d size=%d\n",
+                 nFromHeight, nToHeight,
+                 g_fluxnodeDelta.mapAdded.size(),
+                 g_fluxnodeDelta.setRemoved.size(),
+                 g_fluxnodeDelta.mapUpdated.size(),
+                 ss.size());
+
+        // Clear for next block
+        g_fluxnodeDelta.Clear();
+    }
+
+    nLastDeltaHeight = nToHeight;
+
+    return SendMessage(MSG_FLUXNODELISTDELTA, &(*ss.begin()), ss.size());
 }

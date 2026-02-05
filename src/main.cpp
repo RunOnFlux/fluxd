@@ -4525,6 +4525,11 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
     }
 
     if (fBlocksDisconnected) {
+        // Fire reorg notification
+        LogPrint("zmq", "Chain reorg: old_height=%d new_height=%d fork_height=%d\n",
+                 pindexOldTip->nHeight, chainActive.Tip()->nHeight, pindexFork->nHeight);
+        GetMainSignals().ChainReorg(pindexOldTip, chainActive.Tip(), pindexFork);
+
         mempool.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
     }
     mempool.removeWithoutBranchId(

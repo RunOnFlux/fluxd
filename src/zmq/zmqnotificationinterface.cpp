@@ -41,6 +41,9 @@ CZMQNotificationInterface* CZMQNotificationInterface::CreateWithArguments(const 
     factories["pubrawblock"] = CZMQAbstractNotifier::Create<CZMQPublishRawBlockNotifier>;
     factories["pubrawtx"] = CZMQAbstractNotifier::Create<CZMQPublishRawTransactionNotifier>;
     factories["pubcheckedblock"] = CZMQAbstractNotifier::Create<CZMQPublishCheckedBlockNotifier>;
+    factories["pubhashblockheight"] = CZMQAbstractNotifier::Create<CZMQPublishHashBlockHeightNotifier>;
+    factories["pubchainreorg"] = CZMQAbstractNotifier::Create<CZMQPublishChainReorgNotifier>;
+    factories["pubfluxnodelistdelta"] = CZMQAbstractNotifier::Create<CZMQPublishFluxNodeListNotifier>;
 
     for (std::map<std::string, CZMQNotifierFactory>::const_iterator i=factories.begin(); i!=factories.end(); ++i)
     {
@@ -170,6 +173,23 @@ void CZMQNotificationInterface::SyncTransaction(const CTransaction &tx, const CB
     {
         CZMQAbstractNotifier *notifier = *i;
         if (notifier->NotifyTransaction(tx))
+        {
+            i++;
+        }
+        else
+        {
+            notifier->Shutdown();
+            i = notifiers.erase(i);
+        }
+    }
+}
+
+void CZMQNotificationInterface::ChainReorg(const CBlockIndex *pindexOldTip, const CBlockIndex *pindexNewTip, const CBlockIndex *pindexFork)
+{
+    for (std::list<CZMQAbstractNotifier*>::iterator i = notifiers.begin(); i!=notifiers.end(); )
+    {
+        CZMQAbstractNotifier *notifier = *i;
+        if (notifier->NotifyChainReorg(pindexOldTip, pindexNewTip, pindexFork))
         {
             i++;
         }
