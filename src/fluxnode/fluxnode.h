@@ -84,7 +84,6 @@ struct FluxNodeDelta {
     std::map<COutPoint, FluxnodeCacheData> mapAdded;
     std::set<COutPoint> setRemoved;
     std::map<COutPoint, FluxnodeCacheData> mapUpdated;
-    bool fDirty;
     CCriticalSection cs;
 
     void Clear();

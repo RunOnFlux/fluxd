@@ -276,16 +276,6 @@ bool CZMQPublishFluxNodeListNotifier::NotifyBlock(const CBlockIndex *pindex)
 
 bool CZMQPublishFluxNodeListNotifier::SendDelta(int nFromHeight, int nToHeight)
 {
-    // Check if any changes occurred
-    {
-        LOCK(g_fluxnodeDelta.cs);
-        if (!g_fluxnodeDelta.fDirty) {
-            LogPrint("zmq", "zmq: No FluxNode changes at height %d, skipping delta\n", nToHeight);
-            nLastDeltaHeight = nToHeight;
-            return true;  // No changes, skip entirely
-        }
-    }
-
     // Build delta message from tracked changes
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss << (uint32_t)nFromHeight;

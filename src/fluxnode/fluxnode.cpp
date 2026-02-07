@@ -33,7 +33,6 @@ void FluxNodeDelta::Clear() {
     mapAdded.clear();
     setRemoved.clear();
     mapUpdated.clear();
-    fDirty = false;
 }
 
 void FluxNodeDelta::RecordAdded(const COutPoint& outpoint, const FluxnodeCacheData& data) {
@@ -45,7 +44,6 @@ void FluxNodeDelta::RecordAdded(const COutPoint& outpoint, const FluxnodeCacheDa
     } else {
         mapAdded[outpoint] = data;
     }
-    fDirty = true;
 }
 
 void FluxNodeDelta::RecordRemoved(const COutPoint& outpoint) {
@@ -56,7 +54,6 @@ void FluxNodeDelta::RecordRemoved(const COutPoint& outpoint) {
     } else {
         setRemoved.insert(outpoint);
     }
-    fDirty = true;
 }
 
 void FluxNodeDelta::RecordUpdated(const COutPoint& outpoint, const FluxnodeCacheData& data) {
@@ -64,7 +61,6 @@ void FluxNodeDelta::RecordUpdated(const COutPoint& outpoint, const FluxnodeCache
     // Only record if not already added this block
     if (!mapAdded.count(outpoint)) {
         mapUpdated[outpoint] = data;
-        fDirty = true;
     }
     // If already added, the add already has latest data
 }
