@@ -4125,6 +4125,10 @@ void PruneAndFlush() {
  * Should be called whenever blocks are disconnected from the active chain.
  */
 void static NotifyChainReorg(const CBlockIndex* pindexOldTip, const CBlockIndex* pindexNewTip, const CBlockIndex* pindexFork) {
+    if (!pindexOldTip || !pindexNewTip || !pindexFork) {
+        LogPrint("zmq", "Chain reorg notification skipped (null pointer)\n");
+        return;
+    }
     LogPrint("zmq", "Chain reorg: old_height=%d new_height=%d fork_height=%d\n",
              pindexOldTip->nHeight, pindexNewTip->nHeight, pindexFork->nHeight);
     GetMainSignals().ChainReorg(pindexOldTip, pindexNewTip, pindexFork);

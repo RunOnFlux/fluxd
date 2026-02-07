@@ -54,6 +54,7 @@ void FluxNodeDelta::RecordRemoved(const COutPoint& outpoint) {
     } else {
         setRemoved.insert(outpoint);
     }
+    mapUpdated.erase(outpoint);  // Clean up stale update if present
 }
 
 void FluxNodeDelta::RecordUpdated(const COutPoint& outpoint, const FluxnodeCacheData& data) {
@@ -985,9 +986,6 @@ void FluxnodeCache::AddBackUndoData(const CFluxnodeTxBlockUndo& p_undoData)
             LogPrintf("UNDO PREPARE: Copying to local cache for %s: globalValue=%d, willRestoreTo=%d\n",
                       item.first.ToString(), oldValueInGlobal, item.second);
 
-            // Record delta for ZMQ (undo confirm height update)
-            g_fluxnodeDelta.RecordUpdated(item.first, mapConfirmedFluxnodeData[item.first]);
-            LogPrint("zmq", "FluxNode delta: Reverted confirm height %s\n", item.first.ToFullString());
         } else {
             if (!fIsVerifying)
                 error("%s : This should never happen. When undo an update confirm nLastConfirmedBlockHeight . FluxnodeData not found. Report this to the dev team to figure out what is happening: %s\n",
@@ -1015,21 +1013,10 @@ void FluxnodeCache::AddBackUndoData(const CFluxnodeTxBlockUndo& p_undoData)
     // Undo the Confirms that were Expired
     for (const auto& item : p_undoData.vecExpiredConfirmedData) {
         setUndoExpireConfirm.insert(item);
-        // Record delta for ZMQ (restoring expired nodes)
-        g_fluxnodeDelta.RecordAdded(item.collateralIn, item);
-        LogPrint("zmq", "FluxNode delta: Restored expired node %s\n", item.collateralIn.ToFullString());
     }
 
     for (const auto& item : p_undoData.mapLastPaidHeights) {
         mapUndoPaidNodes[item.first] = item.second;
-        // Record delta for ZMQ (undo paid heights)
-        LOCK(g_fluxnodeCache.cs);
-        if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.first)) {
-            FluxnodeCacheData updatedData = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first);
-            updatedData.nLastPaidHeight = item.second;  // Will be reverted to this value
-            g_fluxnodeDelta.RecordUpdated(item.first, updatedData);
-            LogPrint("zmq", "FluxNode delta: Reverted payment height %s\n", item.first.ToFullString());
-        }
     }
 }
 
@@ -1104,6 +1091,10 @@ bool FluxnodeCache::Flush()
         g_fluxnodeCache.mapConfirmedFluxnodeData[item.first].ip = item.second.ip;
         g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
 
+        // Record delta for ZMQ
+        g_fluxnodeDelta.RecordUpdated(item.first, g_fluxnodeCache.mapConfirmedFluxnodeData[item.first]);
+        LogPrint("zmq", "FluxNode delta: Updated node (undo confirm) %s\n", item.first.ToFullString());
+
         LogPrintf("FLUSH BACKWARD: Applying UNDO for %s: currentInGlobal=%d -> restoredValue=%d\n",
                   item.first.ToString(), currentValueInGlobal, restoredValue);
     }
@@ -1122,6 +1113,10 @@ bool FluxnodeCache::Flush()
     for (const auto& item : setUndoExpireConfirm) {
         g_fluxnodeCache.mapConfirmedFluxnodeData[item.collateralIn] = item;
         g_fluxnodeCache.setDirtyOutPoint.insert(item.collateralIn);
+
+        // Record delta for ZMQ
+        g_fluxnodeDelta.RecordAdded(item.collateralIn, item);
+        LogPrint("zmq", "FluxNode delta: Restored expired node %s\n", item.collateralIn.ToFullString());
 
         if (g_fluxnodeCache.CheckListHas(item)) {
             // already in set, and therefor list. Skip it
@@ -1350,6 +1345,10 @@ bool FluxnodeCache::Flush()
             // Set the height back to the last value
             g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first).nLastPaidHeight = item.second;
             g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
+
+            // Record delta for ZMQ
+            g_fluxnodeDelta.RecordUpdated(item.first, g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first));
+            LogPrint("zmq", "FluxNode delta: Updated node (undo payment) %s\n", item.first.ToFullString());
 
             Tier tier = (Tier)g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.first).nTier;
 

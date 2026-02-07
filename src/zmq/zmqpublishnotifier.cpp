@@ -235,28 +235,35 @@ bool CZMQPublishChainReorgNotifier::NotifyChainReorg(const CBlockIndex *pindexOl
 
     uint256 hashOldTip = pindexOldTip->GetBlockHash();
     uint256 hashNewTip = pindexNewTip->GetBlockHash();
+    uint256 hashFork = pindexFork->GetBlockHash();
 
     LogPrint("zmq", "zmq: Publish chainreorg old_height=%d new_height=%d fork_height=%d\n",
              pindexOldTip->nHeight, pindexNewTip->nHeight, pindexFork->nHeight);
 
-    unsigned char data[76];
+    unsigned char data[108];
 
-    // Old tip hash (internal format, NOT reversed)
-    memcpy(&data[0], hashOldTip.begin(), 32);
+    // Old tip hash (reversed for display byte order)
+    for (unsigned int i = 0; i < 32; i++)
+        data[31 - i] = hashOldTip.begin()[i];
 
     // Old tip height (little-endian)
     WriteLE32(&data[32], (uint32_t)pindexOldTip->nHeight);
 
-    // New tip hash (internal format)
-    memcpy(&data[36], hashNewTip.begin(), 32);
+    // New tip hash (reversed for display byte order)
+    for (unsigned int i = 0; i < 32; i++)
+        data[67 - i] = hashNewTip.begin()[i];
 
     // New tip height (little-endian)
     WriteLE32(&data[68], (uint32_t)pindexNewTip->nHeight);
 
-    // Fork point height (little-endian)
-    WriteLE32(&data[72], (uint32_t)pindexFork->nHeight);
+    // Fork hash (reversed for display byte order)
+    for (unsigned int i = 0; i < 32; i++)
+        data[103 - i] = hashFork.begin()[i];
 
-    return SendMessage(MSG_CHAINREORG, data, 76);
+    // Fork point height (little-endian)
+    WriteLE32(&data[104], (uint32_t)pindexFork->nHeight);
+
+    return SendMessage(MSG_CHAINREORG, data, 108);
 }
 
 bool CZMQPublishFluxNodeListNotifier::NotifyBlock(const CBlockIndex *pindex)
