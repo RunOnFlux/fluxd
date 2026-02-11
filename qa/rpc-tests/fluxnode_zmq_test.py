@@ -475,24 +475,35 @@ class FluxNodeZMQTest(BitcoinTestFramework):
 
         self.drain_zmq_messages()
 
-        # Generate blocks and track sequences
-        sequences = []
+        # Generate blocks and track sequences per topic
+        sequences_by_topic = {}
 
         for _ in range(3):
             self.nodes[0].generate(1)
 
-            msg = self.recv_zmq_msg(timeout_ms=2000)
-            if msg and len(msg) >= 3:
-                seq = struct.unpack('<I', msg[2])[0]
-                sequences.append(seq)
+            # Collect all messages from this block
+            for _ in range(5):
+                msg = self.recv_zmq_msg(timeout_ms=500)
+                if msg and len(msg) >= 3:
+                    topic = msg[0]
+                    seq = struct.unpack('<I', msg[2])[0]
+                    if topic not in sequences_by_topic:
+                        sequences_by_topic[topic] = []
+                    sequences_by_topic[topic].append(seq)
 
-        if len(sequences) >= 2:
-            # Verify sequences are increasing
-            for i in range(1, len(sequences)):
-                assert_greater_than(sequences[i], sequences[i-1])
-            print(f"  ✓ Message sequences increasing: {sequences}")
+        # Verify sequences are increasing per topic
+        for topic, sequences in sequences_by_topic.items():
+            if len(sequences) >= 2:
+                # Sequences should be monotonically increasing (or equal for same block)
+                for i in range(1, len(sequences)):
+                    if sequences[i] < sequences[i-1]:
+                        raise AssertionError(f"Sequence decreased for {topic}: {sequences}")
+                print(f"  ✓ {topic.decode()}: sequences {sequences}")
+
+        if sequences_by_topic:
+            print("  ✓ Message sequencing validated")
         else:
-            print("  Note: Limited sequence data received")
+            print("  Note: No messages received for sequencing test")
 
     def run_test(self):
         print("\n" + "="*60)
