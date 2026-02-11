@@ -159,7 +159,7 @@ class FluxNodeZMQTest(BitcoinTestFramework):
 
         topic, data, seq = msg
         assert_equal(topic, b"fluxnodelistdelta")
-        assert_greater_than(len(data), 72, "Delta should have at least 72-byte header")
+        assert_greater_than(len(data), 72)
 
         # Parse header
         from_height = struct.unpack('<I', data[0:4])[0]
@@ -282,9 +282,9 @@ class FluxNodeZMQTest(BitcoinTestFramework):
         print(f"    Fork at:  height={fork_height}, hash={fork_hash[:16]}...")
 
         # Validate reorg makes sense
-        assert_greater_than(new_height, old_height, "New chain should be longer")
-        assert_greater_than(old_height, fork_height, "Fork should be before old tip")
-        assert_greater_than(new_height, fork_height, "Fork should be before new tip")
+        assert_greater_than(new_height, old_height)
+        assert_greater_than(old_height, fork_height)
+        assert_greater_than(new_height, fork_height)
 
         # Verify new tip matches RPC
         rpc_hash = self.nodes[0].getbestblockhash()
@@ -489,8 +489,7 @@ class FluxNodeZMQTest(BitcoinTestFramework):
         if len(sequences) >= 2:
             # Verify sequences are increasing
             for i in range(1, len(sequences)):
-                assert_greater_than(sequences[i], sequences[i-1],
-                                  "Message sequences should increase")
+                assert_greater_than(sequences[i], sequences[i-1])
             print(f"  ✓ Message sequences increasing: {sequences}")
         else:
             print("  Note: Limited sequence data received")
