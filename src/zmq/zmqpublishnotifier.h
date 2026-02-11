@@ -77,7 +77,7 @@ private:
     int nLastDeltaHeight;
     bool fInitialized;
 
-    bool SendDelta(int nFromHeight, int nToHeight);
+    bool SendDelta(int nFromHeight, int nToHeight, const CBlockIndex *pindexTo);
 
 public:
     CZMQPublishFluxNodeListNotifier() : nLastDeltaHeight(0), fInitialized(false) {}

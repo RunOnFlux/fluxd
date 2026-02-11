@@ -1547,10 +1547,11 @@ UniValue getfluxnodesnapshot(const UniValue& params, bool fHelp)
     if (fHelp || params.size() > 0)
         throw runtime_error(
             "getfluxnodesnapshot\n"
-            "Returns the complete FluxNode list with block height for ZMQ synchronization.\n"
+            "Returns the complete FluxNode list with block height and hash for ZMQ synchronization.\n"
             "\nResult:\n"
             "{\n"
             "  \"height\": n,        (numeric) Current block height\n"
+            "  \"blockhash\": \"hex\",  (string) Current block hash\n"
             "  \"nodes\": [...]      (array) FluxNode list (same format as viewdeterministicfluxnodelist)\n"
             "}\n"
             "\nExamples:\n" +
@@ -1566,8 +1567,9 @@ UniValue getfluxnodesnapshot(const UniValue& params, bool fHelp)
     {
         LOCK2(cs_main, g_fluxnodeCache.cs);
 
-        // Atomic: get height and nodes under same lock
+        // Atomic: get height, blockhash, and nodes under same lock
         result.pushKV("height", chainActive.Height());
+        result.pushKV("blockhash", chainActive.Tip()->GetBlockHash().GetHex());
 
         // Use same logic as viewdeterministicfluxnodelist
         for (int tier = CUMULUS; tier != LAST; tier++) {

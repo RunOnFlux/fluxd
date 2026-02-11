@@ -278,15 +278,38 @@ bool CZMQPublishFluxNodeListNotifier::NotifyBlock(const CBlockIndex *pindex)
         return true;
     }
 
-    return SendDelta(nLastDeltaHeight, pindex->nHeight);
+    return SendDelta(nLastDeltaHeight, pindex->nHeight, pindex);
 }
 
-bool CZMQPublishFluxNodeListNotifier::SendDelta(int nFromHeight, int nToHeight)
+bool CZMQPublishFluxNodeListNotifier::SendDelta(int nFromHeight, int nToHeight, const CBlockIndex *pindexTo)
 {
+    // Get block indices for from and to heights
+    CBlockIndex *pindexFrom = chainActive[nFromHeight];
+    if (!pindexFrom || !pindexTo) {
+        LogPrint("zmq", "zmq: FluxNode delta skipped (null block index)\n");
+        return false;
+    }
+
+    uint256 hashFrom = pindexFrom->GetBlockHash();
+    uint256 hashTo = pindexTo->GetBlockHash();
+
     // Build delta message from tracked changes
+    // Format: from_height (4) + to_height (4) + from_hash (32) + to_hash (32) + node data
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss << (uint32_t)nFromHeight;
     ss << (uint32_t)nToHeight;
+
+    // From block hash (reversed for display byte order)
+    unsigned char from_hash_bytes[32];
+    for (unsigned int i = 0; i < 32; i++)
+        from_hash_bytes[31 - i] = hashFrom.begin()[i];
+    ss.write((const char*)from_hash_bytes, 32);
+
+    // To block hash (reversed for display byte order)
+    unsigned char to_hash_bytes[32];
+    for (unsigned int i = 0; i < 32; i++)
+        to_hash_bytes[31 - i] = hashTo.begin()[i];
+    ss.write((const char*)to_hash_bytes, 32);
 
     {
         LOCK(g_fluxnodeDelta.cs);
