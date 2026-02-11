@@ -102,8 +102,14 @@ class FluxNodeZMQTest(BitcoinTestFramework):
         # Generate a block
         block_hashes = self.nodes[0].generate(1)
 
-        # Receive hashblockheight message
-        msg = self.recv_zmq_msg()
+        # Find hashblockheight message (may not be first)
+        msg = None
+        for _ in range(10):
+            m = self.recv_zmq_msg()
+            if m and m[0] == b"hashblockheight":
+                msg = m
+                break
+
         assert msg is not None, "Should receive hashblockheight message"
 
         topic, data, seq = msg
