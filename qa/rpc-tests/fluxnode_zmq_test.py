@@ -286,13 +286,17 @@ class FluxNodeZMQTest(BitcoinTestFramework):
 
         # Look for chainreorg message
         reorg_msg = None
+        all_messages = []
         for _ in range(20):  # Check many messages
             msg = self.recv_zmq_msg(timeout_ms=1000)
-            if msg and msg[0] == b"chainreorg":
-                reorg_msg = msg
-                break
+            if msg:
+                all_messages.append(msg[0].decode('utf-8') if msg else 'None')
+                if msg[0] == b"chainreorg":
+                    reorg_msg = msg
+                    break
 
         if reorg_msg is None:
+            print(f"  DEBUG: Received {len(all_messages)} messages: {all_messages}")
             raise AssertionError(f"Reorg occurred but no chainreorg message received! "
                                f"Old hash: {node0_hash_before[:16]}... → New hash: {node0_hash_after[:16]}...")
 
