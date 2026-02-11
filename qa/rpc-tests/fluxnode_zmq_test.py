@@ -234,8 +234,10 @@ class FluxNodeZMQTest(BitcoinTestFramework):
         """Test chainreorg event during network split and rejoin"""
         print("Testing chainreorg event...")
 
-        # Get initial height
+        # Get initial state
         initial_height = self.nodes[0].getblockcount()
+        initial_hash = self.nodes[0].getbestblockhash()
+        print(f"  Initial state: height={initial_height}, hash={initial_hash[:16]}...")
 
         # Split network
         print("  Splitting network...")
@@ -249,9 +251,38 @@ class FluxNodeZMQTest(BitcoinTestFramework):
         self.nodes[0].generate(3)  # Shorter chain
         self.nodes[2].generate(5)  # Longer chain (will win)
 
+        # Capture state before rejoin
+        node0_height_before = self.nodes[0].getblockcount()
+        node0_hash_before = self.nodes[0].getbestblockhash()
+        node2_height_before = self.nodes[2].getblockcount()
+        node2_hash_before = self.nodes[2].getbestblockhash()
+
+        print(f"  Before rejoin:")
+        print(f"    Node 0: height={node0_height_before}, hash={node0_hash_before[:16]}...")
+        print(f"    Node 2: height={node2_height_before}, hash={node2_hash_before[:16]}...")
+
         # Rejoin network - should trigger reorg on node 0
         print("  Rejoining network (should trigger reorg)...")
         self.join_network()
+
+        # Give nodes time to sync
+        time.sleep(2)
+        self.sync_all()
+
+        # Capture state after rejoin
+        node0_height_after = self.nodes[0].getblockcount()
+        node0_hash_after = self.nodes[0].getbestblockhash()
+
+        print(f"  After rejoin:")
+        print(f"    Node 0: height={node0_height_after}, hash={node0_hash_after[:16]}...")
+
+        # Detect if a reorg actually occurred
+        reorg_occurred = (node0_hash_before != node0_hash_after)
+        print(f"  Reorg occurred: {reorg_occurred}")
+
+        if not reorg_occurred:
+            print("  Note: Network rejoin did not cause a reorg (chains may have been equal)")
+            return
 
         # Look for chainreorg message
         reorg_msg = None
@@ -262,8 +293,8 @@ class FluxNodeZMQTest(BitcoinTestFramework):
                 break
 
         if reorg_msg is None:
-            print("  Warning: No chainreorg message received (might not have reorged)")
-            return
+            raise AssertionError(f"Reorg occurred but no chainreorg message received! "
+                               f"Old hash: {node0_hash_before[:16]}... → New hash: {node0_hash_after[:16]}...")
 
         topic, data, seq = reorg_msg
         assert_equal(len(data), 108, "chainreorg should be 108 bytes")
