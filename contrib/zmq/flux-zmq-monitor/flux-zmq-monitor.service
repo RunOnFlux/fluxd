@@ -1,0 +1,40 @@
+[Unit]
+Description=FluxD ZMQ Event Monitor
+Documentation=https://github.com/runonflux/fluxd/tree/master/contrib/zmq
+After=network.target fluxd.service
+Wants=fluxd.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/flux-zmq-monitor
+
+# UV cache directory (will be /var/cache/flux-zmq-monitor)
+Environment="UV_CACHE_DIR=/var/cache/flux-zmq-monitor"
+CacheDirectory=flux-zmq-monitor
+CacheDirectoryMode=0755
+
+# Run with uv
+ExecStart=/usr/local/bin/uv run --frozen flux-zmq-monitor --log-file /var/log/flux-zmq-monitor/events.log
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=flux-zmq-monitor
+LogsDirectory=flux-zmq-monitor
+LogsDirectoryMode=0755
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/flux-zmq-monitor
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+[project]
+name = "flux-zmq-monitor"
+version = "0.1.0"
+description = "Real-time monitoring of FluxD ZMQ events (hashblockheight, chainreorg, fluxnodelistdelta)"
+readme = "README.md"
+authors = [
+    { name = "David White", email = "david@runonflux.io" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "pyzmq>=27.1.0",
+    "typer>=0.21.1",
+]
+
+[project.scripts]
+flux-zmq-monitor = "flux_zmq_monitor.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.10.0,<0.11.0"]
+build-backend = "uv_build"
