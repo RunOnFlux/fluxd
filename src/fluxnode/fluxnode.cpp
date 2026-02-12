@@ -1123,16 +1123,18 @@ bool FluxnodeCache::Flush()
         g_fluxnodeCache.mapConfirmedFluxnodeData[item.collateralIn] = item;
         g_fluxnodeCache.setDirtyOutPoint.insert(item.collateralIn);
 
-        // Record delta for ZMQ
-        g_fluxnodeDelta.RecordAdded(item.collateralIn, item);
-        LogPrint("zmq", "FluxNode delta: Restored expired node %s\n", item.collateralIn.ToFullString());
-
         if (g_fluxnodeCache.CheckListHas(item)) {
-            // already in set, and therefor list. Skip it
+            // Node already in list - just restore to cache, no delta needed
+            // (This can happen if node was expired but not yet removed from deterministic list)
             continue;
         } else {
+            // Node not in list - actually adding it back
             vecNodesToAdd.emplace_back(item);
             undoExpiredTiers.insert((Tier)item.nTier);
+
+            // Record delta for ZMQ - node is being added back to deterministic list
+            g_fluxnodeDelta.RecordAdded(item.collateralIn, item);
+            LogPrint("zmq", "FluxNode delta: Restored expired node %s\n", item.collateralIn.ToFullString());
         }
     }
 
