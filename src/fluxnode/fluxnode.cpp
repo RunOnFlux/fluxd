@@ -1240,11 +1240,12 @@ bool FluxnodeCache::Flush()
             // Add the data back into the Start tracker
             g_fluxnodeCache.mapStartTxTracker[item] = data;
 
-            // Record delta for ZMQ - node added back to unconfirmed state
-            g_fluxnodeDelta.RecordAdded(item, data);
-            LogPrint("zmq", "FluxNode delta: Added node (undo confirm - back to unconfirmed) %s\n", item.ToFullString());
-
             g_fluxnodeCache.setDirtyOutPoint.insert(item);
+
+            // NOTE: We do NOT call RecordAdded here because the node is not added back to the
+            // deterministic list (see comment below). The node is only tracked internally in
+            // mapStartTxTracker. From the external view (snapshots/deltas), the node is simply
+            // removed, not re-added as unconfirmed.
 
             // IMPORTANT: We don't update the list of fluxnodes. Because if we wanted to, we would have to scan through the list until we found the OutPoint that matches
             // Instead we leave the list untouched, and when seeing who to pay next. We check the setConfirmedTxInList to verify they are still confirmed
