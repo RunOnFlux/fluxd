@@ -348,10 +348,6 @@ void FluxnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_n
     LOCK(cs);
     mapStartTxTracker[p_transaction.collateralIn] = data;
     setDirtyOutPoint.insert(p_transaction.collateralIn);
-
-    // Record delta for ZMQ - node is added to list in unconfirmed state
-    g_fluxnodeDelta.RecordAdded(p_transaction.collateralIn, data);
-    LogPrint("zmq", "FluxNode delta: Added node (unconfirmed) %s\n", p_transaction.collateralIn.ToFullString());
 }
 
 void FluxnodeCache::UndoNewStart(const CTransaction& p_transaction, const int p_nHeight)
@@ -1036,10 +1032,15 @@ bool FluxnodeCache::Flush()
      * 1. Add the nodes transaction data into the start transaction map
      * 2. Add the nodes collateral into the map that tracks all collaterals added at its height
      * 3. Mark the collateral as dirty so it can be databased when the daemon shutdowns.
+     * 4. Record delta for ZMQ
      */
     for (const auto& item : mapStartTxTracker) {
         g_fluxnodeCache.mapStartTxTracker[item.first] = item.second;
         g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
+
+        // Record delta for ZMQ - node is added to global state in unconfirmed state
+        g_fluxnodeDelta.RecordAdded(item.first, item.second);
+        LogPrint("zmq", "FluxNode delta: Added node (unconfirmed) %s\n", item.first.ToFullString());
     }
 
     /**
@@ -1124,15 +1125,12 @@ bool FluxnodeCache::Flush()
         g_fluxnodeCache.setDirtyOutPoint.insert(item.collateralIn);
 
         if (g_fluxnodeCache.CheckListHas(item)) {
-            // Node already in list - just restore to cache, no delta needed
-            // (This can happen if node was expired but not yet removed from deterministic list)
+            // already in set, and therefor list. Skip it
             continue;
         } else {
-            // Node not in list - actually adding it back
             vecNodesToAdd.emplace_back(item);
             undoExpiredTiers.insert((Tier)item.nTier);
 
-            // Record delta for ZMQ - node is being added back to deterministic list
             g_fluxnodeDelta.RecordAdded(item.collateralIn, item);
             LogPrint("zmq", "FluxNode delta: Restored expired node %s\n", item.collateralIn.ToFullString());
         }
@@ -1243,11 +1241,6 @@ bool FluxnodeCache::Flush()
             g_fluxnodeCache.mapStartTxTracker[item] = data;
 
             g_fluxnodeCache.setDirtyOutPoint.insert(item);
-
-            // NOTE: We do NOT call RecordAdded here because the node is not added back to the
-            // deterministic list (see comment below). The node is only tracked internally in
-            // mapStartTxTracker. From the external view (snapshots/deltas), the node is simply
-            // removed, not re-added as unconfirmed.
 
             // IMPORTANT: We don't update the list of fluxnodes. Because if we wanted to, we would have to scan through the list until we found the OutPoint that matches
             // Instead we leave the list untouched, and when seeing who to pay next. We check the setConfirmedTxInList to verify they are still confirmed
