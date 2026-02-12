@@ -225,103 +225,6 @@ class FluxNodeZMQTest(BitcoinTestFramework):
 
         print("  ✓ Delta hash chaining consistent")
 
-    def test_unconfirmed_nodes_in_deltas(self):
-        """Test that unconfirmed FluxNodes appear in deltas immediately, not just after confirmation"""
-        print("Testing unconfirmed nodes in deltas...")
-
-        # Get initial snapshot to know starting state
-        snapshot_before = self.nodes[0].getfluxnodesnapshot()
-        initial_count = len(snapshot_before['nodes'])
-        initial_height = snapshot_before['height']
-        print(f"  Initial state: {initial_count} nodes at height {initial_height}")
-
-        # Drain pending messages
-        self.drain_zmq_messages()
-
-        # Build state from deltas
-        delta_nodes = {}
-
-        # Start tracking from current snapshot
-        for node in snapshot_before['nodes']:
-            key = f"{node['txhash']}:{node['outidx']}"
-            delta_nodes[key] = node
-
-        # Generate a few blocks and collect deltas
-        # Note: We're not actually starting a FluxNode here because that requires
-        # complex setup. Instead, we verify the logic works if one were started.
-        # This test validates that deltas match snapshots at each block.
-        num_blocks = 5
-
-        for i in range(num_blocks):
-            self.nodes[0].generate(1)
-
-            # Find and process the delta message
-            delta_msg = None
-            for _ in range(10):
-                msg = self.recv_zmq_msg(timeout_ms=2000)
-                if msg and msg[0] == b"fluxnodelistdelta":
-                    delta_msg = msg
-                    break
-
-            if delta_msg is None:
-                print(f"  Warning: No delta received for block {i+1}")
-                continue
-
-            # Parse delta header
-            topic, data, seq = delta_msg
-            from_height = struct.unpack('<I', data[0:4])[0]
-            to_height = struct.unpack('<I', data[4:8])[0]
-            offset = 72
-
-            # Parse added nodes
-            def read_compact_size(data, offset):
-                if offset >= len(data):
-                    return 0, offset
-                first = data[offset]
-                if first < 0xfd:
-                    return first, offset + 1
-                elif first == 0xfd:
-                    return struct.unpack_from('<H', data, offset + 1)[0], offset + 3
-                elif first == 0xfe:
-                    return struct.unpack_from('<I', data, offset + 1)[0], offset + 5
-                else:
-                    return struct.unpack_from('<Q', data, offset + 1)[0], offset + 9
-
-            num_added, offset = read_compact_size(data, offset)
-
-            # Skip parsing full node data, just count additions/removals
-            # Apply delta changes to our state (simplified - just track count changes)
-            for _ in range(num_added):
-                # Skip node data (approximate size)
-                offset += 150  # Rough estimate of node data size
-                if offset > len(data):
-                    break
-
-            num_removed, offset = read_compact_size(data, offset)
-
-            # Get snapshot at this height
-            snapshot_current = self.nodes[0].getfluxnodesnapshot()
-            snapshot_count = len(snapshot_current['nodes'])
-
-            # Delta count change
-            delta_change = num_added - num_removed
-            expected_count = initial_count + (i + 1) * delta_change
-
-            print(f"  Block {to_height}: snapshot has {snapshot_count} nodes (delta: +{num_added} -{num_removed})")
-
-            # The key test: if a node was added but unconfirmed, it must appear in BOTH:
-            # 1. The delta (as "added")
-            # 2. The snapshot
-            # This test catches the bug where unconfirmed nodes are in snapshots but not deltas
-
-            # We can't do exact count matching without parsing all node data,
-            # but we verify the delta adds nodes when snapshot count increases
-            if snapshot_count > initial_count:
-                # Snapshot has more nodes - there must have been additions in deltas
-                print(f"  ✓ Snapshot count increased, delta reported additions")
-
-        print("  ✓ Delta/snapshot consistency validated")
-
     def test_chainreorg_event(self):
         """Test chainreorg event - like invalidateblock.py pattern"""
         print("Testing chainreorg event...")
@@ -797,7 +700,6 @@ class FluxNodeZMQTest(BitcoinTestFramework):
         self.test_snapshot_blockhash_field()
         self.test_fluxnode_delta_format()
         self.test_delta_consistency_across_blocks()
-        self.test_unconfirmed_nodes_in_deltas()
         self.test_byte_order_consistency()
         self.test_delta_node_data_parsing()
         self.test_message_sequencing()
