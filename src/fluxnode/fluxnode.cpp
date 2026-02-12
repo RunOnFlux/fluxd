@@ -348,6 +348,10 @@ void FluxnodeCache::AddNewStart(const CTransaction& p_transaction, const int p_n
     LOCK(cs);
     mapStartTxTracker[p_transaction.collateralIn] = data;
     setDirtyOutPoint.insert(p_transaction.collateralIn);
+
+    // Record delta for ZMQ - node is added to list in unconfirmed state
+    g_fluxnodeDelta.RecordAdded(p_transaction.collateralIn, data);
+    LogPrint("zmq", "FluxNode delta: Added node (unconfirmed) %s\n", p_transaction.collateralIn.ToFullString());
 }
 
 void FluxnodeCache::UndoNewStart(const CTransaction& p_transaction, const int p_nHeight)
@@ -1164,9 +1168,9 @@ bool FluxnodeCache::Flush()
             // Add the data to the confirm trackers
             g_fluxnodeCache.mapConfirmedFluxnodeData[data.collateralIn] = data;
 
-            // Record delta for ZMQ
-            g_fluxnodeDelta.RecordAdded(data.collateralIn, data);
-            LogPrint("zmq", "FluxNode delta: Added node %s\n", data.collateralIn.ToFullString());
+            // Record delta for ZMQ - node status changing from unconfirmed to confirmed
+            g_fluxnodeDelta.RecordUpdated(data.collateralIn, data);
+            LogPrint("zmq", "FluxNode delta: Updated node (confirmed) %s\n", data.collateralIn.ToFullString());
 
             // Because we don't automatically remove nodes that have expired from the list, to help not sort it as often
             // If this node is already in the list. We wont add it let. We need to wait for the node to be removed from the list.
