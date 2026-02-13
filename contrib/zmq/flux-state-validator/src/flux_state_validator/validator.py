@@ -73,8 +73,8 @@ class Outpoint:
         if offset + cls.SIZE > len(data):
             raise ValueError(f"Insufficient data for Outpoint at offset {offset}")
 
-        # Reverse txhash for display order
-        txhash = data[offset:offset+32][::-1].hex()
+        # Daemon now sends hash in display byte order (matches RPC snapshots)
+        txhash = data[offset:offset+32].hex()
         index = struct.unpack_from('<I', data, offset + 32)[0]
 
         return cls(txhash=txhash, index=index), offset + cls.SIZE

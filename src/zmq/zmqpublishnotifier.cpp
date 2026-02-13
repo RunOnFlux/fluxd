@@ -312,6 +312,18 @@ bool CZMQPublishFluxNodeListNotifier::SendDelta(int nFromHeight, int nToHeight, 
     ss.write((const char*)to_hash_bytes, 32);
 
     {
+        // Helper lambda to serialize outpoint in display byte order (matches RPC snapshots)
+        auto WriteOutpointDisplayOrder = [&ss](const COutPoint& outpoint) {
+            // Write hash in reversed byte order (display order) to match ToString()
+            // Use stack buffer to avoid heap allocation
+            unsigned char reversed_hash[32];
+            for (int i = 0; i < 32; i++) {
+                reversed_hash[i] = *(outpoint.hash.begin() + (31 - i));
+            }
+            ss.write((char*)reversed_hash, 32);
+            ss << outpoint.n;
+        };
+
         LOCK(g_fluxnodeDelta.cs);
 
         // Serialize added nodes (full data)
@@ -319,7 +331,8 @@ bool CZMQPublishFluxNodeListNotifier::SendDelta(int nFromHeight, int nToHeight, 
         for (const auto& item : g_fluxnodeDelta.mapAdded) {
             const COutPoint& outpoint = item.first;
             const FluxnodeCacheData& data = item.second;
-            ss << outpoint << data.collateralPubkey << data.pubKey
+            WriteOutpointDisplayOrder(outpoint);
+            ss << data.collateralPubkey << data.pubKey
                << (uint32_t)data.nConfirmedBlockHeight
                << (uint32_t)data.nLastPaidHeight
                << data.nTier << data.nStatus << data.ip;
@@ -328,7 +341,7 @@ bool CZMQPublishFluxNodeListNotifier::SendDelta(int nFromHeight, int nToHeight, 
         // Serialize removed nodes (outpoint only - saves bandwidth!)
         WriteCompactSize(ss, g_fluxnodeDelta.setRemoved.size());
         for (const auto& outpoint : g_fluxnodeDelta.setRemoved) {
-            ss << outpoint;  // Only 36 bytes vs ~200 for full data
+            WriteOutpointDisplayOrder(outpoint);
         }
 
         // Serialize updated nodes (full data)
@@ -336,7 +349,8 @@ bool CZMQPublishFluxNodeListNotifier::SendDelta(int nFromHeight, int nToHeight, 
         for (const auto& item : g_fluxnodeDelta.mapUpdated) {
             const COutPoint& outpoint = item.first;
             const FluxnodeCacheData& data = item.second;
-            ss << outpoint << data.collateralPubkey << data.pubKey
+            WriteOutpointDisplayOrder(outpoint);
+            ss << data.collateralPubkey << data.pubKey
                << (uint32_t)data.nConfirmedBlockHeight
                << (uint32_t)data.nLastPaidHeight
                << data.nTier << data.nStatus << data.ip;
