@@ -1043,16 +1043,11 @@ bool FluxnodeCache::Flush()
      * 1. Add the node into the DOS tracker
      * 2. Remove the node from the start tracker
      * 3. Mark the collateral as dirty so it can be databased when the daemon shutdowns
-     * 4. Record the removal in delta for ZMQ
      */
     for (const auto& item : mapStartTxDOSTracker) {
         g_fluxnodeCache.mapStartTxDOSTracker[item.first] = item.second;
         g_fluxnodeCache.mapStartTxTracker.erase(item.first);
         g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
-
-        // Record delta for ZMQ - node removed (moved to DOS tracker)
-        g_fluxnodeDelta.RecordRemoved(item.first);
-        LogPrint("zmq", "FluxNode delta: Removed node (DOS) %s\n", item.first.ToFullString());
     }
 
     /**
@@ -1135,15 +1130,10 @@ bool FluxnodeCache::Flush()
      * If we are undoing a block, and this block contained a start node transaction, We need to do the following:
      * 1. Remove the node from the start tracker
      * 2. Mark the collateral as dirty so it can be databased when the daemon shutdowns
-     * 3. Record the removal in delta for ZMQ
      */
     for (const auto& item : setUndoStartTx) {
         g_fluxnodeCache.mapStartTxTracker.erase(item);
         g_fluxnodeCache.setDirtyOutPoint.insert(item);
-
-        // Record delta for ZMQ - node removed due to block disconnect/undo
-        g_fluxnodeDelta.RecordRemoved(item);
-        LogPrint("zmq", "FluxNode delta: Removed node (undo start) %s\n", item.ToFullString());
     }
 
     /**
