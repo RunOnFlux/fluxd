@@ -1032,15 +1032,10 @@ bool FluxnodeCache::Flush()
      * 1. Add the nodes transaction data into the start transaction map
      * 2. Add the nodes collateral into the map that tracks all collaterals added at its height
      * 3. Mark the collateral as dirty so it can be databased when the daemon shutdowns.
-     * 4. Record delta for ZMQ
      */
     for (const auto& item : mapStartTxTracker) {
         g_fluxnodeCache.mapStartTxTracker[item.first] = item.second;
         g_fluxnodeCache.setDirtyOutPoint.insert(item.first);
-
-        // Record delta for ZMQ - node is added to global state in unconfirmed state
-        g_fluxnodeDelta.RecordAdded(item.first, item.second);
-        LogPrint("zmq", "FluxNode delta: Added node (unconfirmed) %s\n", item.first.ToFullString());
     }
 
     /**
@@ -1178,9 +1173,9 @@ bool FluxnodeCache::Flush()
             // Add the data to the confirm trackers
             g_fluxnodeCache.mapConfirmedFluxnodeData[data.collateralIn] = data;
 
-            // Record delta for ZMQ - node status changing from unconfirmed to confirmed
-            g_fluxnodeDelta.RecordUpdated(data.collateralIn, data);
-            LogPrint("zmq", "FluxNode delta: Updated node (confirmed) %s\n", data.collateralIn.ToFullString());
+            // Record delta for ZMQ - node is added to deterministic list when confirmed
+            g_fluxnodeDelta.RecordAdded(data.collateralIn, data);
+            LogPrint("zmq", "FluxNode delta: Added node (confirmed) %s\n", data.collateralIn.ToFullString());
 
             // Because we don't automatically remove nodes that have expired from the list, to help not sort it as often
             // If this node is already in the list. We wont add it let. We need to wait for the node to be removed from the list.
