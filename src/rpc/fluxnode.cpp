@@ -1474,7 +1474,7 @@ UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp, strin
     if (fHelp || params.size() > 1)
         throw runtime_error(
                 cmdname + " ( \"filter\" )\n"
-                "\nView the list of deterministric fluxnode(s)\n"
+                "\nView the list of deterministic fluxnode(s)\n"
 
                 "\nResult:\n"
                 "[\n"
@@ -1611,7 +1611,7 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getdoslist", "") + HelpExampleRpc("getdoslist", ""));
 
-    
+
     UniValue wholelist(UniValue::VARR);
 
     std::map<int, std::vector<UniValue>> mapOrderedDosList;
