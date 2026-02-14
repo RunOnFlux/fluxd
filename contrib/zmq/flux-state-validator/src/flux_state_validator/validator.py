@@ -174,6 +174,7 @@ class FluxNodeData:
     last_paid_height: int
     collateral_outpoint: str
     status: str
+    rank: int = -1
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for comparison"""
@@ -196,6 +197,7 @@ class FluxNodeData:
             last_paid_height=node_data.get('last_paid_height', 0),
             collateral_outpoint=node_data.get('txhash', ''),
             status='CONFIRMED',  # RPC doesn't return status
+            rank=node_data.get('rank', -1),
         )
 
     @classmethod
@@ -559,7 +561,11 @@ class FluxNodeStateValidator:
         if snapshot_only:
             self.log(f"Nodes only in snapshot ({len(snapshot_only)}):", "ERROR")
             for outpoint in list(snapshot_only)[:10]:
-                self.log(f"  - {outpoint}", "ERROR")
+                node = snapshot_nodes.get(outpoint)
+                if node:
+                    self.log(f"  - {outpoint}  tier={node.tier} ip={node.ip_address} confirmed={node.confirmed_height} last_paid={node.last_paid_height} rank={node.rank}", "ERROR")
+                else:
+                    self.log(f"  - {outpoint}", "ERROR")
 
     async def resync(self):
         """Re-sync local state from RPC snapshot"""
