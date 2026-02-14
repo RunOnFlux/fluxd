@@ -1408,11 +1408,10 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
     int count = -1;
     for (const auto& item : g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes) {
 
-        const auto data = g_fluxnodeCache.GetFluxnodeData(item.out);
-
         UniValue info(UniValue::VOBJ);
 
-        if (!data.IsNull()) {
+        if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.out)) {
+            const auto data = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.out);
             std::string strTxHash = data.collateralIn.GetTxHash();
 
 
