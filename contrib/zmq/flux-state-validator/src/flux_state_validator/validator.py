@@ -251,6 +251,25 @@ class FluxNodeStateValidator:
             if key in tier_dict:
                 tier_dict.move_to_end(key)
 
+    @staticmethod
+    def _sort_key(item: tuple[str, FluxNodeData]) -> tuple:
+        """Sort key matching the daemon's FluxnodeListData::operator<
+        Nodes sorted by comparator height (lower = closer to payment).
+        Paid nodes lose ties to unpaid nodes at the same height."""
+        key, node = item
+        h = node.last_paid_height if node.last_paid_height > 0 else node.confirmed_height
+        # paid=1 sorts after paid=0 at the same height (unpaid wins ties)
+        paid = 1 if node.last_paid_height > 0 else 0
+        return (h, paid, key)
+
+    def sort_tier(self, tier: str):
+        """Full sort of a tier's payment queue using the daemon's sort criteria"""
+        tier_dict = self.tier_lists[tier]
+        sorted_items = sorted(tier_dict.items(), key=self._sort_key)
+        tier_dict.clear()
+        for k, v in sorted_items:
+            tier_dict[k] = v
+
     def log(self, message: str, level: str = "INFO"):
         """Log message to file and stdout"""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -446,17 +465,17 @@ class FluxNodeStateValidator:
                 await self.resync()
                 return False
 
-        # Validate block hash (reorg/fork detection)
-        # Only validate if we have both hashes (skip for backward compat with old daemons)
+        # Detect reorg via block hash mismatch
+        # After a reorg, the daemon's from_hash is from the new chain, not the old one
+        is_reorg = False
         if self.current_blockhash and from_blockhash:
             if from_blockhash != self.current_blockhash:
-                self.log(f"BLOCK HASH MISMATCH! Delta {from_height}→{to_height}", "ERROR")
-                self.log(f"  Current  hash: {self.current_blockhash}", "ERROR")
-                self.log(f"  Delta from:    {from_blockhash}", "ERROR")
-                self.log(f"  Delta to:      {to_blockhash}", "ERROR")
-                self.log("Fork/reorg detected - re-syncing!", "ERROR")
-                await self.resync()
-                return False
+                is_reorg = True
+                self.reorgs_handled += 1
+                self.log(f"REORG DETECTED in delta {from_height}→{to_height}", "REORG")
+                self.log(f"  Our blockhash:   {self.current_blockhash[:16]}...", "REORG")
+                self.log(f"  Delta from hash: {from_blockhash[:16]}...", "REORG")
+                self.log(f"  Delta to hash:   {to_blockhash[:16]}...", "REORG")
 
         # Step 1: Remove nodes
         removed_count = 0
@@ -500,17 +519,23 @@ class FluxNodeStateValidator:
             for key, node_data in sorted(added_by_tier[tier], key=lambda x: x[0]):
                 self.tier_lists[tier][key] = node_data
 
-        # Step 4: Move paid nodes to end (after new nodes)
-        for tier in TIERS:
-            self.move_paid_to_end(tier, paid_keys_by_tier[tier])
+        if is_reorg:
+            # Reorg: can't trust ordering, do a full sort per tier
+            for tier in TIERS:
+                self.sort_tier(tier)
+        else:
+            # Normal block: move paid nodes to end (after new nodes)
+            for tier in TIERS:
+                self.move_paid_to_end(tier, paid_keys_by_tier[tier])
 
         self.current_height = to_height
         self.current_blockhash = to_blockhash
         self.deltas_applied += 1
 
         direction = "→" if to_height >= from_height else "←"
+        label = " [REORG]" if is_reorg else ""
         self.log(f"Applied delta {from_height} {direction} {to_height} (hash: {to_blockhash[:16]}...): "
-                f"+{added_count} -{removed_count} ~{updated_count} (total: {self.node_count})")
+                f"+{added_count} -{removed_count} ~{updated_count} (total: {self.node_count}){label}")
 
         return True
 
@@ -545,6 +570,9 @@ class FluxNodeStateValidator:
             self.log(f"Node count - Local: {local_total}, Snapshot: {snapshot_total}")
 
             mismatches = []
+            nodes_checked = 0
+            fields_checked = 0
+            ranks_checked = 0
 
             for tier in TIERS:
                 local_tier = self.tier_lists[tier]
@@ -571,21 +599,25 @@ class FluxNodeStateValidator:
                     )
 
                 # Compare data fields for common nodes
-                for outpoint in local_keys & snapshot_keys:
+                common_keys = local_keys & snapshot_keys
+                for outpoint in common_keys:
                     local_dict = local_tier[outpoint].to_dict()
                     snapshot_dict = snapshot_tier[outpoint].to_dict()
                     for field in local_dict.keys():
+                        fields_checked += 1
                         if local_dict[field] != snapshot_dict[field]:
                             mismatches.append(
                                 f"[{tier}] {outpoint[:16]}... field '{field}': "
                                 f"local={local_dict[field]}, snapshot={snapshot_dict[field]}"
                             )
+                    nodes_checked += 1
 
                 # Compare rank order
                 local_order = list(local_tier.keys())
                 snapshot_order = list(snapshot_tier.keys())
                 rank_mismatches = 0
                 for rank, (local_key, snap_key) in enumerate(zip(local_order, snapshot_order)):
+                    ranks_checked += 1
                     if local_key != snap_key:
                         if rank_mismatches < 5:
                             mismatches.append(
@@ -604,7 +636,9 @@ class FluxNodeStateValidator:
                 self.validations_failed += 1
                 return False
 
-            self.log("✓ VALIDATION PASSED - State matches snapshot perfectly!", "SUCCESS")
+            tier_counts = " | ".join(f"{t}: {len(self.tier_lists[t])}" for t in TIERS)
+            self.log(f"✓ VALIDATION PASSED ({tier_counts})", "SUCCESS")
+            self.log(f"  Checked {nodes_checked} nodes, {fields_checked} fields, {ranks_checked} rank positions")
             self.validations_passed += 1
             self.last_validation_height = self.current_height
             return True
