@@ -25,11 +25,14 @@ import time
 import sys
 import asyncio
 import aiohttp
+from collections import OrderedDict
 from datetime import datetime
 from typing import Dict, Optional, Set, List, Any
 from dataclasses import dataclass
 from typing import ClassVar
 from pathlib import Path
+
+TIERS = ["CUMULUS", "NIMBUS", "STRATUS"]
 
 
 def read_compact_size(data: bytes, offset: int) -> tuple[int, int]:
@@ -220,10 +223,12 @@ class FluxNodeStateValidator:
         self.log_file = log_file
         self.validation_interval = validation_interval
 
-        # State tracking
+        # State tracking - per-tier ordered dicts maintain payment queue order
         self.current_height: Optional[int] = None
         self.current_blockhash: Optional[str] = None
-        self.node_list: Dict[str, FluxNodeData] = {}  # outpoint -> FluxNodeData
+        self.tier_lists: Dict[str, OrderedDict[str, FluxNodeData]] = {
+            tier: OrderedDict() for tier in TIERS
+        }
         self.pending_deltas: List[Dict] = []
         self.initialized = False
         self.last_validation_height = 0
@@ -234,6 +239,17 @@ class FluxNodeStateValidator:
         self.validations_passed = 0
         self.validations_failed = 0
         self.reorgs_handled = 0
+
+    @property
+    def node_count(self) -> int:
+        return sum(len(tier) for tier in self.tier_lists.values())
+
+    def move_paid_to_end(self, tier: str, keys: List[str]):
+        """Move paid nodes to the end of their tier's payment queue"""
+        tier_dict = self.tier_lists[tier]
+        for key in keys:
+            if key in tier_dict:
+                tier_dict.move_to_end(key)
 
     def log(self, message: str, level: str = "INFO"):
         """Log message to file and stdout"""
@@ -297,25 +313,31 @@ class FluxNodeStateValidator:
             self.log(f"RPC call failed: {e}", "ERROR")
             raise
 
-    async def get_snapshot(self) -> tuple[int, str, Dict[str, FluxNodeData]]:
-        """Fetch current FluxNode snapshot from RPC"""
+    async def get_snapshot(self) -> tuple[int, str, Dict[str, OrderedDict[str, FluxNodeData]]]:
+        """Fetch current FluxNode snapshot from RPC.
+        Returns per-tier OrderedDicts preserving rank order from the RPC."""
         self.log("Fetching snapshot from RPC...")
         snapshot = await self.rpc_call('getfluxnodesnapshot')
 
         height = snapshot.get('height', 0)
         blockhash = snapshot.get('blockhash', '')
-        nodes = {}
+        tier_lists: Dict[str, OrderedDict[str, FluxNodeData]] = {
+            tier: OrderedDict() for tier in TIERS
+        }
+        total = 0
 
+        # Snapshot returns nodes in rank order, grouped by tier (CUMULUS, NIMBUS, STRATUS)
         for node_data in snapshot.get('nodes', []):
             txhash = node_data.get('txhash', '')
             outidx = node_data.get('outidx', '')
-            if txhash and outidx:
-                # Use txhash:outidx as key to handle multiple outputs from same tx
+            tier = node_data.get('tier', '')
+            if txhash and outidx and tier in tier_lists:
                 key = f"{txhash}:{outidx}"
-                nodes[key] = FluxNodeData.from_rpc(node_data)
+                tier_lists[tier][key] = FluxNodeData.from_rpc(node_data)
+                total += 1
 
-        self.log(f"Snapshot received: height {height}, blockhash {blockhash[:16]}..., {len(nodes)} nodes")
-        return height, blockhash, nodes
+        self.log(f"Snapshot received: height {height}, blockhash {blockhash[:16]}..., {total} nodes")
+        return height, blockhash, tier_lists
 
     def parse_delta(self, data: bytes) -> Dict[str, Any]:
         """Parse fluxnodelistdelta ZMQ message (binary format with block hashes)"""
@@ -436,46 +458,70 @@ class FluxNodeStateValidator:
                 await self.resync()
                 return False
 
-        # Apply changes
-        added_count = 0
-        for entry in delta['added']:
-            # Use full outpoint (txhash:index) as key
-            key = str(entry.outpoint)
-            self.node_list[key] = FluxNodeData.from_delta_entry(entry)
-            added_count += 1
-
+        # Step 1: Remove nodes
         removed_count = 0
         for outpoint_str in delta['removed']:
-            # outpoint_str is in format "txhash:index"
-            if outpoint_str in self.node_list:
-                del self.node_list[outpoint_str]
-                removed_count += 1
+            for tier_dict in self.tier_lists.values():
+                if outpoint_str in tier_dict:
+                    del tier_dict[outpoint_str]
+                    removed_count += 1
+                    break
 
+        # Step 2: Update existing nodes (preserves position in OrderedDict)
+        # Track which nodes were paid this block (last_paid_height changed to current)
+        paid_keys_by_tier: Dict[str, List[str]] = {tier: [] for tier in TIERS}
         updated_count = 0
         for entry in delta['updated']:
-            # Use full outpoint (txhash:index) as key
             key = str(entry.outpoint)
-            self.node_list[key] = FluxNodeData.from_delta_entry(entry)
-            updated_count += 1
+            new_data = FluxNodeData.from_delta_entry(entry)
+            for tier_name, tier_dict in self.tier_lists.items():
+                if key in tier_dict:
+                    old_data = tier_dict[key]
+                    # Detect payment: last_paid_height changed to current block
+                    if new_data.last_paid_height == to_height and old_data.last_paid_height != to_height:
+                        paid_keys_by_tier[tier_name].append(key)
+                    tier_dict[key] = new_data
+                    updated_count += 1
+                    break
+
+        # Step 3: Add new nodes, sorted by outpoint within each tier
+        added_by_tier: Dict[str, List[tuple[str, FluxNodeData]]] = {tier: [] for tier in TIERS}
+        added_count = 0
+        for entry in delta['added']:
+            key = str(entry.outpoint)
+            node_data = FluxNodeData.from_delta_entry(entry)
+            tier = node_data.tier
+            if tier in added_by_tier:
+                added_by_tier[tier].append((key, node_data))
+                added_count += 1
+
+        # Append new nodes sorted by outpoint (multiple adds in same tier same block)
+        for tier in TIERS:
+            for key, node_data in sorted(added_by_tier[tier], key=lambda x: x[0]):
+                self.tier_lists[tier][key] = node_data
+
+        # Step 4: Move paid nodes to end (after new nodes)
+        for tier in TIERS:
+            self.move_paid_to_end(tier, paid_keys_by_tier[tier])
 
         self.current_height = to_height
-        self.current_blockhash = to_blockhash  # Update to the new block's hash
+        self.current_blockhash = to_blockhash
         self.deltas_applied += 1
 
         direction = "→" if to_height >= from_height else "←"
         self.log(f"Applied delta {from_height} {direction} {to_height} (hash: {to_blockhash[:16]}...): "
-                f"+{added_count} -{removed_count} ~{updated_count} (total: {len(self.node_list)})")
+                f"+{added_count} -{removed_count} ~{updated_count} (total: {self.node_count})")
 
         return True
 
     async def validate_state(self) -> bool:
-        """Validate local state against RPC snapshot"""
+        """Validate local state against RPC snapshot, including rank order per tier"""
         self.log("=" * 60)
         self.log("VALIDATION CHECKPOINT")
         self.log("=" * 60)
 
         try:
-            snapshot_height, snapshot_blockhash, snapshot_nodes = await self.get_snapshot()
+            snapshot_height, snapshot_blockhash, snapshot_tiers = await self.get_snapshot()
 
             # Check if height changed during validation
             if snapshot_height != self.current_height:
@@ -493,48 +539,68 @@ class FluxNodeStateValidator:
 
             self.validations_performed += 1
 
-            # Compare node counts
-            local_count = len(self.node_list)
-            snapshot_count = len(snapshot_nodes)
+            # Compare per-tier
+            local_total = self.node_count
+            snapshot_total = sum(len(t) for t in snapshot_tiers.values())
+            self.log(f"Node count - Local: {local_total}, Snapshot: {snapshot_total}")
 
-            self.log(f"Node count - Local: {local_count}, Snapshot: {snapshot_count}")
-
-            if local_count != snapshot_count:
-                self.log(f"NODE COUNT MISMATCH!", "ERROR")
-                self.validations_failed += 1
-                self.log_discrepancy(snapshot_nodes)
-                return False
-
-            # Compare each node
             mismatches = []
-            for outpoint, local_node in self.node_list.items():
-                if outpoint not in snapshot_nodes:
-                    mismatches.append(f"Node {outpoint[:16]}... exists locally but NOT in snapshot")
-                    continue
 
-                snapshot_node = snapshot_nodes[outpoint]
-                local_dict = local_node.to_dict()
-                snapshot_dict = snapshot_node.to_dict()
+            for tier in TIERS:
+                local_tier = self.tier_lists[tier]
+                snapshot_tier = snapshot_tiers[tier]
 
-                # Compare fields
-                for field in local_dict.keys():
-                    if local_dict[field] != snapshot_dict[field]:
-                        mismatches.append(
-                            f"Node {outpoint[:16]}... field '{field}': "
-                            f"local={local_dict[field]}, snapshot={snapshot_dict[field]}"
-                        )
+                # Check node count per tier
+                if len(local_tier) != len(snapshot_tier):
+                    mismatches.append(
+                        f"[{tier}] Count mismatch: local={len(local_tier)}, snapshot={len(snapshot_tier)}"
+                    )
 
-            # Check for nodes in snapshot but not local
-            for outpoint in snapshot_nodes.keys():
-                if outpoint not in self.node_list:
-                    mismatches.append(f"Node {outpoint[:16]}... exists in snapshot but NOT locally")
+                # Check membership and data
+                local_keys = set(local_tier.keys())
+                snapshot_keys = set(snapshot_tier.keys())
+
+                for outpoint in local_keys - snapshot_keys:
+                    mismatches.append(f"[{tier}] {outpoint[:16]}... in local but NOT in snapshot")
+
+                for outpoint in snapshot_keys - local_keys:
+                    node = snapshot_tier[outpoint]
+                    mismatches.append(
+                        f"[{tier}] {outpoint[:16]}... in snapshot but NOT in local"
+                        f"  (confirmed={node.confirmed_height} last_paid={node.last_paid_height} rank={node.rank})"
+                    )
+
+                # Compare data fields for common nodes
+                for outpoint in local_keys & snapshot_keys:
+                    local_dict = local_tier[outpoint].to_dict()
+                    snapshot_dict = snapshot_tier[outpoint].to_dict()
+                    for field in local_dict.keys():
+                        if local_dict[field] != snapshot_dict[field]:
+                            mismatches.append(
+                                f"[{tier}] {outpoint[:16]}... field '{field}': "
+                                f"local={local_dict[field]}, snapshot={snapshot_dict[field]}"
+                            )
+
+                # Compare rank order
+                local_order = list(local_tier.keys())
+                snapshot_order = list(snapshot_tier.keys())
+                rank_mismatches = 0
+                for rank, (local_key, snap_key) in enumerate(zip(local_order, snapshot_order)):
+                    if local_key != snap_key:
+                        if rank_mismatches < 5:
+                            mismatches.append(
+                                f"[{tier}] Rank {rank}: local={local_key[:16]}..., snapshot={snap_key[:16]}..."
+                            )
+                        rank_mismatches += 1
+                if rank_mismatches > 5:
+                    mismatches.append(f"[{tier}] ... and {rank_mismatches - 5} more rank mismatches")
 
             if mismatches:
                 self.log(f"VALIDATION FAILED! Found {len(mismatches)} discrepancies:", "ERROR")
-                for mismatch in mismatches[:20]:  # Log first 20
+                for mismatch in mismatches[:30]:
                     self.log(f"  - {mismatch}", "ERROR")
-                if len(mismatches) > 20:
-                    self.log(f"  ... and {len(mismatches) - 20} more", "ERROR")
+                if len(mismatches) > 30:
+                    self.log(f"  ... and {len(mismatches) - 30} more", "ERROR")
                 self.validations_failed += 1
                 return False
 
@@ -548,31 +614,12 @@ class FluxNodeStateValidator:
             self.validations_failed += 1
             return False
 
-    def log_discrepancy(self, snapshot_nodes: Dict[str, FluxNodeData]):
-        """Log detailed discrepancy information"""
-        local_only = set(self.node_list.keys()) - set(snapshot_nodes.keys())
-        snapshot_only = set(snapshot_nodes.keys()) - set(self.node_list.keys())
-
-        if local_only:
-            self.log(f"Nodes only in local state ({len(local_only)}):", "ERROR")
-            for outpoint in list(local_only)[:10]:
-                self.log(f"  - {outpoint}", "ERROR")
-
-        if snapshot_only:
-            self.log(f"Nodes only in snapshot ({len(snapshot_only)}):", "ERROR")
-            for outpoint in list(snapshot_only)[:10]:
-                node = snapshot_nodes.get(outpoint)
-                if node:
-                    self.log(f"  - {outpoint}  tier={node.tier} ip={node.ip_address} confirmed={node.confirmed_height} last_paid={node.last_paid_height} rank={node.rank}", "ERROR")
-                else:
-                    self.log(f"  - {outpoint}", "ERROR")
-
     async def resync(self):
         """Re-sync local state from RPC snapshot"""
         self.log("Re-syncing state from RPC...", "WARN")
-        self.current_height, self.current_blockhash, self.node_list = await self.get_snapshot()
+        self.current_height, self.current_blockhash, self.tier_lists = await self.get_snapshot()
         self.last_validation_height = self.current_height
-        self.log(f"Re-sync complete: height {self.current_height}, {len(self.node_list)} nodes")
+        self.log(f"Re-sync complete: height {self.current_height}, {self.node_count} nodes")
 
     def handle_reorg(self, reorg_data: Dict[str, Any]):
         """Handle chainreorg event"""
@@ -592,7 +639,7 @@ class FluxNodeStateValidator:
     async def initialize(self):
         """Initialize by getting snapshot and processing buffered deltas"""
         self.log("Initializing state...")
-        self.current_height, self.current_blockhash, self.node_list = await self.get_snapshot()
+        self.current_height, self.current_blockhash, self.tier_lists = await self.get_snapshot()
         self.last_validation_height = self.current_height
 
         # Process buffered deltas
@@ -620,7 +667,7 @@ class FluxNodeStateValidator:
         self.log("-" * 60)
         self.log("STATISTICS")
         self.log(f"  Current height: {self.current_height}")
-        self.log(f"  Nodes tracked: {len(self.node_list)}")
+        self.log(f"  Nodes tracked: {self.node_count}")
         self.log(f"  Deltas applied: {self.deltas_applied}")
         self.log(f"  Reorgs handled: {self.reorgs_handled}")
         self.log(f"  Validations: {self.validations_performed} "
