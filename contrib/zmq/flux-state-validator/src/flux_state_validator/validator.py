@@ -479,8 +479,7 @@ class FluxNodeStateValidator:
         if self.current_blockhash and from_blockhash:
             if from_blockhash != self.current_blockhash:
                 is_reorg = True
-                self.reorgs_handled += 1
-                self.log(f"REORG DETECTED in delta {from_height}→{to_height}", "REORG")
+                self.log(f"Hash mismatch in delta {from_height}→{to_height} (reorg delta)", "REORG")
                 self.log(f"  Our blockhash:   {self.current_blockhash[:16]}...", "REORG")
                 self.log(f"  Delta from hash: {from_blockhash[:16]}...", "REORG")
                 self.log(f"  Delta to hash:   {to_blockhash[:16]}...", "REORG")
