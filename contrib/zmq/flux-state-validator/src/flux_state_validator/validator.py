@@ -252,6 +252,14 @@ class FluxNodeStateValidator:
                 tier_dict.move_to_end(key)
 
     @staticmethod
+    def _outpoint_sort_key(key: str) -> tuple:
+        """Convert outpoint key to daemon's COutPoint::operator< order.
+        Daemon uses memcmp on internal bytes (little-endian), not display hex."""
+        txhash, idx = key.rsplit(':', 1)
+        internal_order = bytes.fromhex(txhash)[::-1]
+        return (internal_order, int(idx))
+
+    @staticmethod
     def _sort_key(item: tuple[str, FluxNodeData]) -> tuple:
         """Sort key matching the daemon's FluxnodeListData::operator<
         Nodes sorted by comparator height (lower = closer to payment).
@@ -260,7 +268,7 @@ class FluxNodeStateValidator:
         h = node.last_paid_height if node.last_paid_height > 0 else node.confirmed_height
         # paid=1 sorts after paid=0 at the same height (unpaid wins ties)
         paid = 1 if node.last_paid_height > 0 else 0
-        return (h, paid, key)
+        return (h, paid, *FluxNodeStateValidator._outpoint_sort_key(key))
 
     def sort_tier(self, tier: str):
         """Full sort of a tier's payment queue using the daemon's sort criteria"""
@@ -516,7 +524,7 @@ class FluxNodeStateValidator:
 
         # Append new nodes sorted by outpoint (multiple adds in same tier same block)
         for tier in TIERS:
-            for key, node_data in sorted(added_by_tier[tier], key=lambda x: x[0]):
+            for key, node_data in sorted(added_by_tier[tier], key=lambda x: self._outpoint_sort_key(x[0])):
                 self.tier_lists[tier][key] = node_data
 
         if is_reorg:
