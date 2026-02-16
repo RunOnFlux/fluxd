@@ -43,21 +43,23 @@ def decode_hashblockheight(data):
 
 
 def decode_chainreorg(data):
-    """Decode chainreorg message (76 bytes)."""
-    if len(data) != 76:
+    """Decode chainreorg message (108 bytes with fork hash)."""
+    if len(data) != 108:
         return f"Invalid size: {len(data)} bytes"
 
+    # All hashes are in display byte order (daemon reverses them)
     old_tip_hash = hash_to_hex(data[0:32])
     old_height = struct.unpack('<I', data[32:36])[0]
     new_tip_hash = hash_to_hex(data[36:68])
     new_height = struct.unpack('<I', data[68:72])[0]
-    fork_height = struct.unpack('<I', data[72:76])[0]
+    fork_hash = hash_to_hex(data[72:104])
+    fork_height = struct.unpack('<I', data[104:108])[0]
     depth = old_height - fork_height
 
     return (f"\n  🔄 CHAIN REORG DETECTED!\n"
             f"  Old tip: {old_tip_hash[:16]}... (height {old_height})\n"
             f"  New tip: {new_tip_hash[:16]}... (height {new_height})\n"
-            f"  Fork at: height {fork_height}\n"
+            f"  Fork:    {fork_hash[:16]}... (height {fork_height})\n"
             f"  Reorg depth: {depth} blocks")
 
 
