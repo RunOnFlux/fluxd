@@ -281,10 +281,21 @@ bool CZMQPublishFluxNodeListNotifier::NotifyBlock(const CBlockIndex *pindex)
     return SendDelta(nLastDeltaHeight, pindex->nHeight, pindex);
 }
 
+bool CZMQPublishFluxNodeListNotifier::NotifyChainReorg(const CBlockIndex *pindexOldTip, const CBlockIndex *pindexNewTip, const CBlockIndex *pindexFork)
+{
+    // Cache the old tip so the next delta sends the correct from_hash
+    // (chainActive will have already moved to the new chain by the time NotifyBlock fires)
+    pindexReorgFrom = pindexOldTip;
+    return true;
+}
+
 bool CZMQPublishFluxNodeListNotifier::SendDelta(int nFromHeight, int nToHeight, const CBlockIndex *pindexTo)
 {
-    // Get block indices for from and to heights
-    CBlockIndex *pindexFrom = chainActive[nFromHeight];
+    // After a reorg, use the cached old tip rather than chainActive (which has already switched)
+    const CBlockIndex *pindexFrom = pindexReorgFrom ? pindexReorgFrom : chainActive[nFromHeight];
+    bool fIsReorg = (pindexReorgFrom != nullptr);
+    pindexReorgFrom = nullptr;
+
     if (!pindexFrom || !pindexTo) {
         LogPrint("zmq", "zmq: FluxNode delta skipped (null block index)\n");
         return false;
@@ -294,7 +305,7 @@ bool CZMQPublishFluxNodeListNotifier::SendDelta(int nFromHeight, int nToHeight, 
     uint256 hashTo = pindexTo->GetBlockHash();
 
     // Build delta message from tracked changes
-    // Format: from_height (4) + to_height (4) + from_hash (32) + to_hash (32) + node data
+    // Format: from_height (4) + to_height (4) + from_hash (32) + to_hash (32) + flags (1) + node data
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss << (uint32_t)nFromHeight;
     ss << (uint32_t)nToHeight;
@@ -310,6 +321,10 @@ bool CZMQPublishFluxNodeListNotifier::SendDelta(int nFromHeight, int nToHeight, 
     for (unsigned int i = 0; i < 32; i++)
         to_hash_bytes[31 - i] = hashTo.begin()[i];
     ss.write((const char*)to_hash_bytes, 32);
+
+    // Flags byte: bit 0 = is_reorg
+    uint8_t flags = fIsReorg ? 0x01 : 0x00;
+    ss << flags;
 
     {
         // Helper lambda to serialize outpoint in display byte order (matches RPC snapshots)

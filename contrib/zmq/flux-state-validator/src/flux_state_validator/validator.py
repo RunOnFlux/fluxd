@@ -367,11 +367,11 @@ class FluxNodeStateValidator:
         return height, blockhash, tier_lists
 
     def parse_delta(self, data: bytes) -> Dict[str, Any]:
-        """Parse fluxnodelistdelta ZMQ message (binary format with block hashes)"""
-        if len(data) < 72:
-            raise ValueError(f"Delta too short: {len(data)} bytes (need at least 72 for header)")
+        """Parse fluxnodelistdelta ZMQ message (binary format with block hashes and flags)"""
+        if len(data) < 73:
+            raise ValueError(f"Delta too short: {len(data)} bytes (need at least 73 for header)")
 
-        # Parse header: from_height (4) + to_height (4) + from_hash (32) + to_hash (32)
+        # Parse header: from_height (4) + to_height (4) + from_hash (32) + to_hash (32) + flags (1)
         from_height, to_height = struct.unpack_from('<II', data, 0)
 
         # Daemon sends hashes in big-endian (display byte order) on wire
@@ -380,7 +380,11 @@ class FluxNodeStateValidator:
         from_blockhash = data[8:40].hex()
         to_blockhash = data[40:72].hex()
 
-        offset = 72
+        # Flags byte: bit 0 = is_reorg
+        flags = data[72]
+        is_reorg = bool(flags & 0x01)
+
+        offset = 73
 
         try:
             # Parse added nodes
@@ -418,6 +422,7 @@ class FluxNodeStateValidator:
                 'to_height': to_height,
                 'from_blockhash': from_blockhash,
                 'to_blockhash': to_blockhash,
+                'is_reorg': is_reorg,
                 'added': added,
                 'removed': removed,
                 'updated': updated,
@@ -473,16 +478,23 @@ class FluxNodeStateValidator:
                 await self.resync()
                 return False
 
-        # Detect reorg via block hash mismatch
-        # After a reorg, the daemon's from_hash is from the new chain, not the old one
-        is_reorg = False
+        # Reorg detection via flags byte in delta header
+        is_reorg = delta.get('is_reorg', False)
+        if is_reorg:
+            self.reorgs_handled += 1
+            self.log(f"Reorg delta {from_height}→{to_height}", "REORG")
+            self.log(f"  Old tip (from): {from_blockhash[:16]}...", "REORG")
+            self.log(f"  New tip (to):   {to_blockhash[:16]}...", "REORG")
+
+        # Verify chain continuity (from_hash should match our current blockhash)
         if self.current_blockhash and from_blockhash:
             if from_blockhash != self.current_blockhash:
-                is_reorg = True
-                self.log(f"Hash mismatch in delta {from_height}→{to_height} (reorg delta)", "REORG")
-                self.log(f"  Our blockhash:   {self.current_blockhash[:16]}...", "REORG")
-                self.log(f"  Delta from hash: {from_blockhash[:16]}...", "REORG")
-                self.log(f"  Delta to hash:   {to_blockhash[:16]}...", "REORG")
+                self.log(f"Hash mismatch in delta {from_height}→{to_height}", "ERROR")
+                self.log(f"  Our blockhash:   {self.current_blockhash[:16]}...", "ERROR")
+                self.log(f"  Delta from hash: {from_blockhash[:16]}...", "ERROR")
+                self.log("Re-syncing from RPC...", "ERROR")
+                await self.resync()
+                return False
 
         # Step 1: Remove nodes
         removed_count = 0
@@ -663,8 +675,7 @@ class FluxNodeStateValidator:
         self.log(f"Re-sync complete: height {self.current_height}, {self.node_count} nodes")
 
     def handle_reorg(self, reorg_data: Dict[str, Any]):
-        """Handle chainreorg event"""
-        self.reorgs_handled += 1
+        """Handle chainreorg event (supplementary - reorg count tracked via delta flags)"""
         self.log("=" * 60, "REORG")
         self.log("CHAIN REORG DETECTED!", "REORG")
         self.log(f"  Old tip: {reorg_data['old_hash'][:16]}... (height {reorg_data['old_height']})", "REORG")

@@ -76,12 +76,14 @@ class CZMQPublishFluxNodeListNotifier : public CZMQAbstractPublishNotifier
 private:
     int nLastDeltaHeight;
     bool fInitialized;
+    const CBlockIndex* pindexReorgFrom;
 
     bool SendDelta(int nFromHeight, int nToHeight, const CBlockIndex *pindexTo);
 
 public:
-    CZMQPublishFluxNodeListNotifier() : nLastDeltaHeight(0), fInitialized(false) {}
+    CZMQPublishFluxNodeListNotifier() : nLastDeltaHeight(0), fInitialized(false), pindexReorgFrom(nullptr) {}
     bool NotifyBlock(const CBlockIndex *pindex);
+    bool NotifyChainReorg(const CBlockIndex *pindexOldTip, const CBlockIndex *pindexNewTip, const CBlockIndex *pindexFork);
 };
 
 #endif // BITCOIN_ZMQ_ZMQPUBLISHNOTIFIER_H

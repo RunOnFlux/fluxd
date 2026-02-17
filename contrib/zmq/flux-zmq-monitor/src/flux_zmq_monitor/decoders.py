@@ -135,18 +135,20 @@ def decode_fluxnode_data(data, offset):
 
 
 def decode_fluxnodelistdelta(data):
-    """Decode fluxnodelistdelta message with block hashes (72+ bytes)."""
+    """Decode fluxnodelistdelta message with block hashes and flags (73+ bytes)."""
     try:
-        if len(data) < 72:
-            return f"Invalid size: {len(data)} bytes (expected at least 72 for header)"
+        if len(data) < 73:
+            return f"Invalid size: {len(data)} bytes (expected at least 73 for header)"
 
-        # Parse header: from_height (4) + to_height (4) + from_hash (32) + to_hash (32)
+        # Parse header: from_height (4) + to_height (4) + from_hash (32) + to_hash (32) + flags (1)
         from_height = struct.unpack('<I', data[0:4])[0]
         to_height = struct.unpack('<I', data[4:8])[0]
         # Hashes are already in display byte order on wire (daemon sends them reversed)
         from_hash = hash_to_hex(data[8:40], reverse=False)
         to_hash = hash_to_hex(data[40:72], reverse=False)
-        offset = 72
+        flags = data[72]
+        is_reorg = bool(flags & 0x01)
+        offset = 73
 
         num_added, offset = read_compact_size(data, offset)
         added = []
@@ -169,7 +171,8 @@ def decode_fluxnodelistdelta(data):
         return (f"\n  ❌ Error decoding delta message (size={len(data)} bytes): {e}\n"
                 f"  This may indicate a protocol mismatch or corrupt data.")
 
-    result = f"\n  📊 FluxNode Delta: height {from_height} → {to_height}"
+    reorg_label = " [REORG]" if is_reorg else ""
+    result = f"\n  📊 FluxNode Delta: height {from_height} → {to_height}{reorg_label}"
     result += f"\n  From hash: {from_hash[:16]}..."
     result += f"\n  To hash:   {to_hash[:16]}..."
     result += f"\n  Summary: {len(added)} added, {len(removed)} removed, {len(updated)} updated"

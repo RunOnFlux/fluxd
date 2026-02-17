@@ -563,8 +563,8 @@ class FluxNodeZMQTest(BitcoinTestFramework):
 
         topic, data, seq = msg
 
-        # Parse header
-        offset = 72  # Skip header
+        # Parse header (72 bytes of hashes/heights + 1 byte flags)
+        offset = 73  # Skip header
 
         # Read compact size for added nodes
         def read_compact_size(data, offset):
