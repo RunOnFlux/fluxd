@@ -8,6 +8,7 @@
 #include "main.h"
 #include "util.h"
 #include "fluxnode/fluxnode.h"
+#include "fluxnode/activefluxnode.h"
 #include "streams.h"
 
 static std::multimap<std::string, CZMQAbstractPublishNotifier*> mapPublishNotifiers;
@@ -20,6 +21,7 @@ static const char *MSG_CHECKEDBLOCK = "checkedblock";
 static const char *MSG_HASHBLOCKHEIGHT = "hashblockheight";
 static const char *MSG_CHAINREORG = "chainreorg";
 static const char *MSG_FLUXNODELISTDELTA = "fluxnodelistdelta";
+static const char *MSG_FLUXNODESTATUS = "fluxnodestatus";
 
 // Internal function to send multipart message
 static int zmq_send_multipart(void *sock, const void* data, size_t size, ...)
@@ -287,6 +289,66 @@ bool CZMQPublishFluxNodeListNotifier::NotifyChainReorg(const CBlockIndex *pindex
     // (chainActive will have already moved to the new chain by the time NotifyBlock fires)
     pindexReorgFrom = pindexOldTip;
     return true;
+}
+
+bool CZMQPublishFluxNodeStatusNotifier::NotifyBlock(const CBlockIndex *pindex)
+{
+    if (!fFluxnode)
+        return true;
+
+    int nLocation = FLUXNODE_TX_ERROR;
+    auto data = g_fluxnodeCache.GetFluxnodeData(activeFluxnode.deterministicOutPoint, &nLocation);
+
+    // Use EXPIRED when node is no longer in any map
+    if (data.IsNull())
+        nLocation = FLUXNODE_TX_EXPIRED;
+
+    // Check if anything changed (or first run)
+    bool fChanged = (nLastLocation == -1) ||
+                    (nLocation != nLastLocation) ||
+                    (data.nLastPaidHeight != nLastPaidHeight) ||
+                    (data.nConfirmedBlockHeight != nLastConfirmedHeight) ||
+                    (data.nLastConfirmedBlockHeight != nLastLastConfirmedHeight) ||
+                    (data.ip != strLastIP) ||
+                    (data.nTier != nLastTier);
+
+    if (!fChanged)
+        return true;
+
+    LogPrint("zmq", "zmq: Publish fluxnodestatus at height %d (location=%d tier=%d ip=%s)\n",
+             pindex->nHeight, nLocation, data.nTier, data.ip);
+
+    // Serialize binary message
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    ss << (uint32_t)pindex->nHeight;
+    ss << (uint8_t)nLocation;
+    ss << (uint8_t)data.nTier;
+    ss << (uint32_t)data.nConfirmedBlockHeight;
+    ss << (uint32_t)data.nLastConfirmedBlockHeight;
+    ss << (uint32_t)data.nLastPaidHeight;
+
+    // Outpoint txid in display byte order
+    unsigned char txhash[32];
+    for (unsigned int i = 0; i < 32; i++)
+        txhash[31 - i] = activeFluxnode.deterministicOutPoint.hash.begin()[i];
+    ss.write((const char*)txhash, 32);
+    ss << activeFluxnode.deterministicOutPoint.n;
+
+    // IP as CompactSize + string bytes
+    ss << data.ip;
+
+    bool rc = SendMessage(MSG_FLUXNODESTATUS, &(*ss.begin()), ss.size());
+
+    if (rc) {
+        nLastLocation = nLocation;
+        nLastPaidHeight = data.nLastPaidHeight;
+        nLastConfirmedHeight = data.nConfirmedBlockHeight;
+        nLastLastConfirmedHeight = data.nLastConfirmedBlockHeight;
+        strLastIP = data.ip;
+        nLastTier = data.nTier;
+    }
+
+    return rc;
 }
 
 bool CZMQPublishFluxNodeListNotifier::SendDelta(int nFromHeight, int nToHeight, const CBlockIndex *pindexTo)

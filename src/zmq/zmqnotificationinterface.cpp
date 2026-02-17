@@ -44,6 +44,7 @@ CZMQNotificationInterface* CZMQNotificationInterface::CreateWithArguments(const 
     factories["pubhashblockheight"] = CZMQAbstractNotifier::Create<CZMQPublishHashBlockHeightNotifier>;
     factories["pubchainreorg"] = CZMQAbstractNotifier::Create<CZMQPublishChainReorgNotifier>;
     factories["pubfluxnodelistdelta"] = CZMQAbstractNotifier::Create<CZMQPublishFluxNodeListNotifier>;
+    factories["pubfluxnodestatus"] = CZMQAbstractNotifier::Create<CZMQPublishFluxNodeStatusNotifier>;
 
     for (std::map<std::string, CZMQNotifierFactory>::const_iterator i=factories.begin(); i!=factories.end(); ++i)
     {

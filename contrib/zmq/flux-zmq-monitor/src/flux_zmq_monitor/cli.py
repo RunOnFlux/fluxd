@@ -12,7 +12,7 @@ import zmq
 import typer
 from rich.console import Console
 
-from .decoders import decode_hashblockheight, decode_chainreorg, decode_fluxnodelistdelta
+from .decoders import decode_hashblockheight, decode_chainreorg, decode_fluxnodelistdelta, decode_fluxnodestatus
 
 app = typer.Typer(help="Monitor FluxD ZMQ events in real-time")
 console = Console()
@@ -62,6 +62,7 @@ def monitor(
         'hashblockheight': decode_hashblockheight,
         'chainreorg': decode_chainreorg,
         'fluxnodelistdelta': decode_fluxnodelistdelta,
+        'fluxnodestatus': decode_fluxnodestatus,
     }
 
     sockets = []

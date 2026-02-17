@@ -134,6 +134,41 @@ def decode_fluxnode_data(data, offset):
     }, offset
 
 
+def decode_fluxnodestatus(data):
+    """Decode fluxnodestatus message (variable length, 54+ bytes)."""
+    try:
+        if len(data) < 54:
+            return f"Invalid size: {len(data)} bytes (expected at least 54)"
+
+        block_height = struct.unpack_from('<I', data, 0)[0]
+        status = data[4]
+        status_name = {
+            0: "ERROR",
+            1: "STARTED",
+            2: "DOS_PROTECTION",
+            3: "CONFIRMED",
+            4: "MISS_CONFIRMED",
+            5: "EXPIRED"
+        }.get(status, f"UNKNOWN({status})")
+        tier = data[5]
+        tier_name = {1: "CUMULUS", 2: "NIMBUS", 3: "STRATUS"}.get(tier, f"UNKNOWN({tier})")
+        confirmed_height = struct.unpack_from('<I', data, 6)[0]
+        last_confirmed_height = struct.unpack_from('<I', data, 10)[0]
+        last_paid_height = struct.unpack_from('<I', data, 14)[0]
+        txhash = hash_to_hex(data[18:50])
+        outidx = struct.unpack_from('<I', data, 50)[0]
+
+        ip_len, offset = read_compact_size(data, 54)
+        ip = data[offset:offset+ip_len].decode('utf-8', errors='ignore')
+    except Exception as e:
+        return f"Error decoding fluxnodestatus ({len(data)} bytes): {e}"
+
+    return (f"\n  Status: {status_name} | Tier: {tier_name} | Block: {block_height}"
+            f"\n  Outpoint: {txhash}:{outidx}"
+            f"\n  IP: {ip}"
+            f"\n  Confirmed: {confirmed_height} | LastConfirmed: {last_confirmed_height} | LastPaid: {last_paid_height}")
+
+
 def decode_fluxnodelistdelta(data):
     """Decode fluxnodelistdelta message with block hashes and flags (73+ bytes)."""
     try:
