@@ -11,7 +11,8 @@ Real-time monitoring package that subscribes to FluxD ZMQ events and displays th
 **Events monitored:**
 - `hashblockheight` - New block notifications with hash and height
 - `chainreorg` - Chain reorganization events
-- `fluxnodelistdelta` - FluxNode state changes (added, removed, updated nodes)
+- `fluxnodelistdelta` - FluxNode list changes (added, removed, updated nodes per block)
+- `fluxnodestatus` - Local fluxnode status changes (confirmed, paid, expired, etc.)
 
 **Installation:**
 ```bash
@@ -49,6 +50,7 @@ flux-zmq-monitor --log-file /var/log/flux-zmq-monitor/events.log
 ✓ Subscribed to hashblockheight on tcp://127.0.0.1:16123
 ✓ Subscribed to chainreorg on tcp://127.0.0.1:16123
 ✓ Subscribed to fluxnodelistdelta on tcp://127.0.0.1:16123
+✓ Subscribed to fluxnodestatus on tcp://127.0.0.1:16123
 
 👂 Listening for events... (Ctrl+C to stop)
 
@@ -165,7 +167,8 @@ To use these tools, FluxD must be started with ZMQ publishing enabled:
 fluxd \
   -zmqpubhashblockheight=tcp://127.0.0.1:16123 \
   -zmqpubchainreorg=tcp://127.0.0.1:16123 \
-  -zmqpubfluxnodelistdelta=tcp://127.0.0.1:16123
+  -zmqpubfluxnodelistdelta=tcp://127.0.0.1:16123 \
+  -zmqpubfluxnodestatus=tcp://127.0.0.1:16123
 ```
 
 Or add to `flux.conf`:
@@ -173,11 +176,15 @@ Or add to `flux.conf`:
 zmqpubhashblockheight=tcp://127.0.0.1:16123
 zmqpubchainreorg=tcp://127.0.0.1:16123
 zmqpubfluxnodelistdelta=tcp://127.0.0.1:16123
+zmqpubfluxnodestatus=tcp://127.0.0.1:16123
 ```
+
+**Note:** `zmqpubfluxnodestatus` is only useful on fluxnodes (`fluxnode=1`). It publishes the local node's status on each block where a change is detected (e.g. confirmed, paid, expired). Non-fluxnodes skip it with a single bool check.
 
 ## Systemd Services
 
 Both packages include hardened systemd service files with:
+- `Wants=fluxd.service` - Soft dependency so ZMQ auto-reconnects survive daemon restarts
 - `NoNewPrivileges=true` - Prevents privilege escalation
 - `PrivateTmp=true` - Isolated /tmp directory
 - `ProtectSystem=strict` - Read-only filesystem
@@ -223,14 +230,26 @@ tail -f /var/log/flux-state-validator/validation.log
 [hash: 32 bytes reversed][height: 4 bytes little-endian]
 ```
 
-### fluxnodelistdelta (72+ bytes)
+### fluxnodelistdelta (73+ bytes)
 ```
 [from_height: 4][to_height: 4]
 [from_hash: 32 reversed][to_hash: 32 reversed]
+[flags: 1 (bit 0 = is_reorg)]
 [added_nodes: CompactSize + node data]
 [removed_nodes: CompactSize + outpoints]
 [updated_nodes: CompactSize + node data]
 ```
+
+### fluxnodestatus (54+ bytes)
+```
+[block_height: 4][status: 1][tier: 1]
+[confirmed_height: 4][last_confirmed_height: 4][last_paid_height: 4]
+[txhash: 32 reversed][outidx: 4]
+[ip: CompactSize + string bytes]
+```
+
+Status values: 0=ERROR, 1=STARTED, 2=DOS_PROTECTION, 3=CONFIRMED, 4=MISS_CONFIRMED, 5=EXPIRED.
+Only published when a field changes (or on first block after startup).
 
 ### chainreorg (108 bytes)
 ```
@@ -239,7 +258,7 @@ tail -f /var/log/flux-state-validator/validation.log
 [fork_hash: 32 reversed][fork_height: 4]
 ```
 
-**Note:** All hashes are reversed for display byte order. Heights are little-endian.
+**Note:** All hashes are in display byte order. Heights are little-endian uint32.
 
 ## Related Documentation
 

@@ -37,7 +37,8 @@ flux-zmq-monitor --log-file /var/log/flux-zmq-monitor/events.log
 
 - `hashblockheight` - New block notifications
 - `chainreorg` - Chain reorganization events
-- `fluxnodelistdelta` - FluxNode state changes
+- `fluxnodelistdelta` - FluxNode list changes (added/removed/updated nodes per block)
+- `fluxnodestatus` - Local fluxnode status changes (confirmed, paid, expired, etc.)
 
 ## See Also
 
