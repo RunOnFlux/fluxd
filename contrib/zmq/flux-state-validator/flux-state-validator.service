@@ -2,7 +2,7 @@
 Description=FluxNode State Validator
 Documentation=https://github.com/runonflux/fluxd/tree/master/contrib/zmq
 After=network.target fluxd.service
-Requires=fluxd.service
+Wants=fluxd.service
 StartLimitIntervalSec=60
 StartLimitBurst=5
 
