@@ -8,8 +8,6 @@
 
 #include <boost/test/unit_test.hpp>
 
-// ---------- Timeout constant tests (no node infrastructure needed) ----------
-
 BOOST_FIXTURE_TEST_SUITE(net_timeout_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(timeout_interval_relationship)
@@ -28,12 +26,6 @@ BOOST_AUTO_TEST_CASE(timeout_interval_sane_for_flux)
     BOOST_CHECK(TIMEOUT_INTERVAL >= 3 * PING_INTERVAL);
     BOOST_CHECK(TIMEOUT_INTERVAL <= 600); // at most 10 minutes
 }
-
-BOOST_AUTO_TEST_SUITE_END()
-
-// ---------- Tests that need full node infrastructure (CNode creation) ----------
-
-BOOST_FIXTURE_TEST_SUITE(net_stale_tip_tests, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(zombie_peer_unanswered_ping)
 {
