@@ -279,6 +279,7 @@ public:
     bool fClient;
     bool fInbound;
     bool fNetworkNode;
+    bool fFeeler;
     bool fSuccessfullyConnected;
     bool fDisconnect;
     // We use fRelayTxes for two purposes -
@@ -690,6 +691,17 @@ public:
     CAddrDB();
     bool Write(const CAddrMan& addr);
     bool Read(CAddrMan& addr);
+};
+
+/** Access to the anchor database (anchors.dat) */
+class CAnchorDB
+{
+private:
+    boost::filesystem::path pathAnchor;
+public:
+    CAnchorDB();
+    bool Write(const std::vector<CAddress>& anchors);
+    bool Read(std::vector<CAddress>& anchors);
 };
 
 #endif // BITCOIN_NET_H

@@ -213,6 +213,7 @@ void CAddrMan::Good_(const CService& addr, int64_t nTime)
     info.nLastSuccess = nTime;
     info.nLastTry = nTime;
     info.nAttempts = 0;
+    m_last_good = nTime;
     // nTime is not updated here, to avoid leaking information about
     // currently-connected peers.
 
@@ -327,7 +328,13 @@ void CAddrMan::Attempt_(const CService& addr, int64_t nTime)
 
     // update info
     info.nLastTry = nTime;
-    info.nAttempts++;
+    // Only count attempt as failure if no successful connection has happened
+    // since last count (Bitcoin Core PR #11560 — prevents penalty spiral
+    // during network blips)
+    if (info.nLastCountAttempt < m_last_good) {
+        info.nLastCountAttempt = nTime;
+        info.nAttempts++;
+    }
 }
 
 CAddrInfo CAddrMan::Select_(bool newOnly)
