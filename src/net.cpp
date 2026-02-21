@@ -1496,11 +1496,7 @@ void ThreadOpenConnections()
                 grant.Release();
                 CSemaphoreGrant feelerGrant(*semOutbound, true);
                 if (feelerGrant) {
-                    OpenNetworkConnection(addrConnect, &feelerGrant);
-                    // Mark the node as a feeler so it disconnects after handshake
-                    CNode* pfeeler = FindNode(addrConnect.ToStringIPPort());
-                    if (pfeeler)
-                        pfeeler->fFeeler = true;
+                    OpenNetworkConnection(addrConnect, &feelerGrant, NULL, false, true);
                 }
             } else {
                 OpenNetworkConnection(addrConnect, &grant);
@@ -1581,7 +1577,7 @@ void ThreadOpenAddedConnections()
 }
 
 // if successful, this moves the passed grant to the constructed node
-bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot)
+bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot, bool fFeeler)
 {
     //
     // Initiate outbound network connection
@@ -1605,6 +1601,8 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
     pnode->fNetworkNode = true;
     if (fOneShot)
         pnode->fOneShot = true;
+    if (fFeeler)
+        pnode->fFeeler = true;
 
     return true;
 }
