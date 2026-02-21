@@ -80,6 +80,7 @@ BITCOIN_TESTS =\
   test/multisig_tests.cpp \
   test/netbase_tests.cpp \
   test/net_reseed_tests.cpp \
+  test/net_timeout_tests.cpp \
   test/pmt_tests.cpp \
   test/policyestimator_tests.cpp \
   test/pow_tests.cpp \
