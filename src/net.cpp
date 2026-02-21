@@ -1291,6 +1291,7 @@ void ThreadDNSAddressSeed()
 }
 
 static int64_t nLastReseed = 0;
+static bool fPeerLossDetected = false;
 
 static void DNSReseedIfNeeded()
 {
@@ -1303,8 +1304,14 @@ static void DNSReseedIfNeeded()
                 nOutbound++;
         }
     }
-    if (nOutbound >= 2)
+    if (nOutbound >= 2) {
+        if (fPeerLossDetected) {
+            LogPrintf("Network recovery: outbound peers restored to %d\n", nOutbound);
+            fPeerLossDetected = false;
+        }
         return;
+    }
+    fPeerLossDetected = true;
 
     int64_t nNow = GetTime();
     if (nNow - nLastReseed < 120) // 2-minute cooldown

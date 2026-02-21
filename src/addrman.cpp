@@ -334,6 +334,8 @@ void CAddrMan::Attempt_(const CService& addr, int64_t nTime)
     if (info.nLastCountAttempt < m_last_good) {
         info.nLastCountAttempt = nTime;
         info.nAttempts++;
+    } else {
+        LogPrint("addrman", "Suppressed attempt penalty for %s (failure epoch unchanged)\n", addr.ToString());
     }
 }
 
