@@ -53,7 +53,6 @@ public:
     // Expose attempt count for testing smart failure counting
     int GetAttempts(const CNetAddr& addr)
     {
-        LOCK(cs);
         CAddrInfo* info = Find(addr);
         if (!info) return -1;
         return info->GetAttempts();
