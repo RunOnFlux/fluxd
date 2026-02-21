@@ -1481,7 +1481,6 @@ void ThreadOpenConnections()
         ProcessOneShot();
 
         DNSReseedIfNeeded();
-        CheckStaleTip();
 
         MilliSleep(500);
 
@@ -1755,6 +1754,9 @@ void ThreadMessageHandler()
             BOOST_FOREACH(CNode* pnode, vNodesCopy)
                 pnode->Release();
         }
+
+        // Check for stale tip / zombie peers (runs on its own internal timers)
+        CheckStaleTip();
 
         if (fSleep)
             messageHandlerCondition.timed_wait(lock, boost::posix_time::microsec_clock::universal_time() + boost::posix_time::milliseconds(100));
