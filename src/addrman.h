@@ -29,7 +29,7 @@ public:
     //! last try whatsoever by us (memory only)
     int64_t nLastTry;
 
-    //! last time this addr incremented nAttempts (memory only)
+    //! epoch at which this addr last incremented nAttempts (memory only)
     int64_t nLastCountAttempt;
 
 private:
@@ -207,7 +207,7 @@ private:
     //! list of "new" buckets
     int vvNew[ADDRMAN_NEW_BUCKET_COUNT][ADDRMAN_BUCKET_SIZE];
 
-    //! timestamp of last successful inbound/outbound connection (memory only)
+    //! epoch counter incremented on each Good_() call (memory only)
     int64_t m_last_good;
 
 protected:
