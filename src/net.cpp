@@ -1338,6 +1338,90 @@ static void DNSReseedIfNeeded()
     LogPrintf("DNSReseedIfNeeded: added %d addresses from DNS seeds\n", nFound);
 }
 
+static const int STALE_TIP_PROBE_SECONDS = 180;   // 3 minutes without a new block triggers probing
+static const int STALE_TIP_PROBE_INTERVAL = 60;   // re-probe every 60 seconds while tip is stale
+static const int STALE_TIP_PING_TIMEOUT  = 30;    // 30 seconds to answer a probe ping
+
+static void CheckStaleTip()
+{
+    // Track when chain height last changed
+    static int nLastTipHeight = 0;
+    static int64_t nLastTipChange = 0;
+    static int64_t nLastProbe = 0;
+
+    int height;
+    {
+        LOCK(cs_main);
+        height = chainActive.Height();
+    }
+
+    int64_t nNow = GetTime();
+
+    // Tip advanced — reset everything
+    if (height != nLastTipHeight) {
+        nLastTipHeight = height;
+        nLastTipChange = nNow;
+        nLastProbe = 0;
+        return;
+    }
+
+    // Initialize on first call
+    if (nLastTipChange == 0) {
+        nLastTipChange = nNow;
+        nLastTipHeight = height;
+        return;
+    }
+
+    int64_t nStaleSeconds = nNow - nLastTipChange;
+    if (nStaleSeconds < STALE_TIP_PROBE_SECONDS)
+        return;
+
+    // Time to send new probes? (every STALE_TIP_PROBE_INTERVAL while stale)
+    if (nNow - nLastProbe >= STALE_TIP_PROBE_INTERVAL) {
+        int nProbed = 0;
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodes) {
+                if (pnode->fInbound || pnode->fOneShot || pnode->fDisconnect)
+                    continue;
+                pnode->fPingQueued = true;
+                nProbed++;
+            }
+        }
+        if (nProbed > 0) {
+            LogPrintf("Stale tip (height %d, %ds old): probing %d outbound peers\n",
+                      height, nStaleSeconds, nProbed);
+        }
+        nLastProbe = nNow;
+        return;
+    }
+
+    // Check for zombies: 30s after probes were sent, any unanswered ping = zombie
+    if (nNow - nLastProbe >= STALE_TIP_PING_TIMEOUT) {
+        int nZombie = 0;
+        int nOutbound = 0;
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodes) {
+                if (pnode->fInbound || pnode->fOneShot || pnode->fDisconnect)
+                    continue;
+                nOutbound++;
+                if (pnode->nPingNonceSent != 0 &&
+                    pnode->nPingUsecStart + STALE_TIP_PING_TIMEOUT * 1000000LL < GetTimeMicros()) {
+                    LogPrintf("Stale tip: peer %s ping unanswered for %ds, disconnecting\n",
+                              pnode->addr.ToString(),
+                              (int)((GetTimeMicros() - pnode->nPingUsecStart) / 1000000));
+                    pnode->fDisconnect = true;
+                    nZombie++;
+                }
+            }
+        }
+        if (nZombie > 0) {
+            LogPrintf("Stale tip: disconnected %d/%d zombie outbound peers\n", nZombie, nOutbound);
+        }
+    }
+}
+
 void DumpAddresses()
 {
     int64_t nStart = GetTimeMillis();
@@ -1397,6 +1481,7 @@ void ThreadOpenConnections()
         ProcessOneShot();
 
         DNSReseedIfNeeded();
+        CheckStaleTip();
 
         MilliSleep(500);
 
