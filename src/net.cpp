@@ -1290,54 +1290,6 @@ void ThreadDNSAddressSeed()
     LogPrintf("%d addresses found from DNS seeds\n", found);
 }
 
-static int64_t nLastReseed = 0;
-static bool fPeerLossDetected = false;
-
-static void DNSReseedIfNeeded()
-{
-    // Only reseed if we have very few outbound peers
-    int nOutbound = 0;
-    {
-        LOCK(cs_vNodes);
-        BOOST_FOREACH(CNode* pnode, vNodes) {
-            if (!pnode->fInbound && !pnode->fOneShot && !pnode->fDisconnect)
-                nOutbound++;
-        }
-    }
-    if (nOutbound >= 2) {
-        if (fPeerLossDetected) {
-            LogPrintf("Network recovery: outbound peers restored to %d\n", nOutbound);
-            fPeerLossDetected = false;
-        }
-        return;
-    }
-    fPeerLossDetected = true;
-
-    int64_t nNow = GetTime();
-    if (nNow - nLastReseed < 120) // 2-minute cooldown
-        return;
-    nLastReseed = nNow;
-
-    LogPrintf("DNSReseedIfNeeded: only %d outbound peers, re-querying DNS seeds\n", nOutbound);
-
-    const vector<CDNSSeedData>& vSeeds = Params().DNSSeeds();
-    int nFound = 0;
-    BOOST_FOREACH(const CDNSSeedData& seed, vSeeds) {
-        vector<CNetAddr> vIPs;
-        vector<CAddress> vAdd;
-        if (LookupHost(seed.host.c_str(), vIPs, 256, true)) {
-            BOOST_FOREACH(const CNetAddr& ip, vIPs) {
-                CAddress addr = CAddress(CService(ip, Params().GetDefaultPort()));
-                addr.nTime = GetTime();
-                vAdd.push_back(addr);
-                nFound++;
-            }
-        }
-        addrman.Add(vAdd, CNetAddr(seed.name, true));
-    }
-    LogPrintf("DNSReseedIfNeeded: added %d addresses from DNS seeds\n", nFound);
-}
-
 static const int STALE_TIP_PROBE_SECONDS = 180;   // 3 minutes without a new block triggers probing
 static const int STALE_TIP_PROBE_INTERVAL = 60;   // re-probe every 60 seconds while tip is stale
 static const int STALE_TIP_PING_TIMEOUT  = 30;    // 30 seconds to answer a probe ping
@@ -1479,8 +1431,6 @@ void ThreadOpenConnections()
     while (true)
     {
         ProcessOneShot();
-
-        DNSReseedIfNeeded();
 
         MilliSleep(500);
 
