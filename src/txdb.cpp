@@ -509,8 +509,18 @@ bool CBlockTreeDB::LoadBlockIndexGuts(boost::function<CBlockIndex*(const uint256
         if (pcursor->GetKey(key) && key.first == DB_BLOCK_INDEX) {
             CDiskBlockIndex diskindex;
             if (pcursor->GetValue(diskindex)) {
-                // Construct block index object
-                CBlockIndex* pindexNew = insertBlockIndex(diskindex.GetBlockHash());
+                // Verify computed hash matches LevelDB key to detect on-disk
+                // corruption (e.g. bit flips). Without this, a corrupt entry
+                // gets inserted under a wrong hash, leaving stub entries with
+                // NULL pprev that crash in BuildSkip/GetAncestor.
+                uint256 computedHash = diskindex.GetBlockHash();
+                if (computedHash != key.second)
+                    return error("LoadBlockIndex(): corrupt block index entry at height %d: "
+                        "computed hash %s != stored key %s",
+                        diskindex.nHeight, computedHash.ToString(), key.second.ToString());
+
+                // Construct block index object using the stored key hash
+                CBlockIndex* pindexNew = insertBlockIndex(key.second);
                 pindexNew->pprev          = insertBlockIndex(diskindex.hashPrev);
                 pindexNew->nHeight        = diskindex.nHeight;
                 pindexNew->nFile          = diskindex.nFile;
