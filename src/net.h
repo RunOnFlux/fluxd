@@ -197,6 +197,13 @@ public:
     // Addr rate limit
     uint64_t nProcessedAddrs;
     uint64_t nRatelimitedAddrs;
+
+    // Network classification of the peer (ipv4 / ipv6 / onion / unroutable),
+    // taken from CAddress::GetNetwork() at copy time.
+    Network m_network;
+    // BIP155: peer negotiated SENDADDRV2 before VERACK and is willing to
+    // exchange addrv2 messages (and therefore v3 onion addresses) with us.
+    bool m_wants_addrv2;
 };
 
 

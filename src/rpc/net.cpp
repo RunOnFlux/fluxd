@@ -133,6 +133,13 @@ UniValue getpeerinfo(const UniValue& params, bool fHelp)
         obj.pushKV("addr", stats.addrName);
         if (!(stats.addrLocal.empty()))
             obj.pushKV("addrlocal", stats.addrLocal);
+        // BIP155: per-peer network classification ("ipv4" | "ipv6" | "onion"
+        // | "unroutable") so operators can see at a glance how many onion
+        // peers they have. The "addrv2" flag tells whether the peer
+        // negotiated SENDADDRV2 before VERACK and is therefore eligible to
+        // receive v3 onion gossip from us.
+        obj.pushKV("network", GetNetworkName(stats.m_network));
+        obj.pushKV("addrv2", stats.m_wants_addrv2);
         obj.pushKV("services", strprintf("%016x", stats.nServices));
         obj.pushKV("addr_processed", stats.nProcessedAddrs);
         obj.pushKV("addr_rate_limited", stats.nRatelimitedAddrs);
