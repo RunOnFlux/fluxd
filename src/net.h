@@ -291,6 +291,11 @@ public:
     //    until it has initialized its bloom filter.
     bool fRelayTxes;
     bool fSentAddr;
+    /** BIP155: peer has sent us SENDADDRV2 (must arrive before VERACK).
+     *  When true, we send addr gossip in addrv2 format and may transmit
+     *  v3 onion addresses to this peer; when false, we use the legacy
+     *  addr message and silently drop v3 onions for this peer. */
+    std::atomic_bool m_wants_addrv2{false};
     CSemaphoreGrant grantOutbound;
     CCriticalSection cs_filter;
     CBloomFilter* pfilter;

@@ -7189,6 +7189,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         // Potentially mark this peer as a preferred download peer.
         UpdatePreferredDownload(pfrom, State(pfrom->GetId()));
 
+        // BIP155: announce addrv2 support BEFORE verack so the peer knows our
+        // intent before completing the handshake. Only meaningful for peers
+        // running a protocol version that knows about the message at all.
+        if (pfrom->nVersion >= SENDADDRV2_VERSION) {
+            pfrom->PushMessage("sendaddrv2");
+        }
+
         // Change version
         pfrom->PushMessage("verack");
         pfrom->ssSend.SetVersion(min(pfrom->nVersion, PROTOCOL_VERSION));
@@ -7351,10 +7358,33 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     }
 
 
-    else if (strCommand == "addr")
+    else if (strCommand == "sendaddrv2")
     {
+        // BIP155: SENDADDRV2 must arrive before VERACK; receiving it after the
+        // handshake is a protocol violation.
+        if (pfrom->fSuccessfullyConnected) {
+            LogPrint("net", "sendaddrv2 received after VERACK from peer=%d; ignoring\n", pfrom->GetId());
+            Misbehaving(pfrom->GetId(), 20);
+            return false;
+        }
+        pfrom->m_wants_addrv2 = true;
+        return true;
+    }
+
+
+    else if (strCommand == "addr" || strCommand == "addrv2")
+    {
+        const bool fIsV2 = (strCommand == "addrv2");
         vector<CAddress> vAddr;
-        vRecv >> vAddr;
+        if (fIsV2) {
+            // Read the BIP155-encoded vector via the dedicated wrapper. Bounds
+            // are enforced inside CAddrVecV2::Unserialize (max 1000 entries,
+            // max 512-byte address payload).
+            CAddrVecV2 wrap(vAddr);
+            vRecv >> wrap;
+        } else {
+            vRecv >> vAddr;
+        }
 
         // Don't want addr from older versions unless seeding
         if (pfrom->nVersion < CADDR_TIME_VERSION && addrman.size() > 1000)
@@ -7362,7 +7392,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         if (vAddr.size() > 1000)
         {
             Misbehaving(pfrom->GetId(), 20);
-            return error("message addr size() = %u", vAddr.size());
+            return error("message %s size() = %u", strCommand, vAddr.size());
         }
 
         // Store the new addresses
@@ -8248,12 +8278,15 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     // to users' AddrMan and later request them by sending getaddr messages.
     // Making nodes which are behind NAT and can only make outgoing connections ignore
     // the getaddr message mitigates the attack.
-    else if ((strCommand == "getaddr") && (pfrom->fInbound))
+    else if ((strCommand == "getaddr" || strCommand == "getaddrv2") && (pfrom->fInbound))
     {
-        // Only send one GetAddr response per connection to reduce resource waste
-        //  and discourage addr stamping of INV announcements.
+        // Both v1 and v2 dump the address book the same way; the actual wire
+        // format is selected at flush time in SendMessages based on
+        // pfrom->m_wants_addrv2 (which the peer asserts via SENDADDRV2 before
+        // VERACK). Per BIP155, getaddrv2 from a peer that never sent
+        // sendaddrv2 is still answered, just in addr (v1) format.
         if (pfrom->fSentAddr) {
-            LogPrint("net", "Ignoring repeated \"getaddr\". peer=%d\n", pfrom->id);
+            LogPrint("net", "Ignoring repeated \"%s\". peer=%d\n", strCommand, pfrom->id);
             return true;
         }
         pfrom->fSentAddr = true;
@@ -8705,14 +8738,26 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         }
 
         //
-        // Message: addr
+        // Message: addr / addrv2
         //
+        // BIP155: peers that have sent us SENDADDRV2 (negotiated before
+        // VERACK) receive the addrv2 message and are eligible to learn about
+        // v3 onion addresses; everyone else gets the legacy addr message and
+        // we silently filter out any v3 onions before sending so that the
+        // peer doesn't see a confusing 16-zero-byte "address".
         if (fSendTrickle)
         {
+            const bool fUseV2 = pto->m_wants_addrv2.load();
+            const char* msg_type = fUseV2 ? "addrv2" : "addr";
+
             vector<CAddress> vAddr;
             vAddr.reserve(pto->vAddrToSend.size());
             for (const CAddress& addr : pto->vAddrToSend)
             {
+                // Drop v3 onion addresses on the floor for legacy peers — the
+                // V1 wire format simply cannot represent them.
+                if (!fUseV2 && addr.IsTor())
+                    continue;
                 if (!pto->addrKnown.contains(addr.GetKey()))
                 {
                     pto->addrKnown.insert(addr.GetKey());
@@ -8720,14 +8765,25 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     // receiver rejects addr messages larger than 1000
                     if (vAddr.size() >= 1000)
                     {
-                        pto->PushMessage("addr", vAddr);
+                        if (fUseV2) {
+                            CAddrVecV2 wrap(vAddr);
+                            pto->PushMessage(msg_type, wrap);
+                        } else {
+                            pto->PushMessage(msg_type, vAddr);
+                        }
                         vAddr.clear();
                     }
                 }
             }
             pto->vAddrToSend.clear();
-            if (!vAddr.empty())
-                pto->PushMessage("addr", vAddr);
+            if (!vAddr.empty()) {
+                if (fUseV2) {
+                    CAddrVecV2 wrap(vAddr);
+                    pto->PushMessage(msg_type, wrap);
+                } else {
+                    pto->PushMessage(msg_type, vAddr);
+                }
+            }
         }
 
         CNodeState &state = *State(pto->GetId());
