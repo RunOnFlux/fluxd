@@ -10,6 +10,7 @@
 
 #include "netbase.h"
 
+#include "crypto/sha3.h"
 #include "hash.h"
 #include "sync.h"
 #include "uint256.h"
@@ -39,7 +40,8 @@ static CCriticalSection cs_proxyInfos;
 int nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 bool fNameLookup = false;
 
-static const unsigned char pchIPv4[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff };
+// pchIPv4 lives in netbase.h so that templated header serializers can
+// reference the same named constant. Intentionally no definition here.
 
 // Need ample time for negotiation for very slow proxies such as Tor (milliseconds)
 static const int SOCKS5_RECV_TIMEOUT = 20 * 1000;
@@ -48,7 +50,7 @@ enum Network ParseNetwork(std::string net) {
     net = ToLower(net);
     if (net == "ipv4") return NET_IPV4;
     if (net == "ipv6") return NET_IPV6;
-    if (net == "tor" || net == "onion")  return NET_TOR;
+    if (net == "tor" || net == "onion")  return NET_ONION;
     return NET_UNROUTABLE;
 }
 
@@ -57,7 +59,7 @@ std::string GetNetworkName(enum Network net) {
     {
     case NET_IPV4: return "ipv4";
     case NET_IPV6: return "ipv6";
-    case NET_TOR: return "onion";
+    case NET_ONION: return "onion";
     default: return "";
     }
 }
@@ -629,42 +631,151 @@ bool ConnectSocketByName(CService &addr, SOCKET& hSocketRet, const char *pszDest
 
 void CNetAddr::Init()
 {
-    memset(ip, 0, sizeof(ip));
+    // Default-constructed addresses present as the unspecified IPv6 address
+    // (::/128). IsValid() will reject it. This matches the pre-refactor
+    // behavior of `unsigned char ip[16] = {0}`.
+    m_net = NET_IPV6;
+    m_addr.assign(16, 0);
 }
 
 void CNetAddr::SetIP(const CNetAddr& ipIn)
 {
-    memcpy(ip, ipIn.ip, sizeof(ip));
+    m_net = ipIn.m_net;
+    m_addr = ipIn.m_addr;
 }
 
 void CNetAddr::SetRaw(Network network, const uint8_t *ip_in)
 {
-    switch(network)
-    {
-        case NET_IPV4:
-            memcpy(ip, pchIPv4, 12);
-            memcpy(ip+12, ip_in, 4);
-            break;
-        case NET_IPV6:
-            memcpy(ip, ip_in, 16);
-            break;
-        default:
-            assert(!"invalid network");
+    switch (network) {
+    case NET_IPV4:
+        m_net = NET_IPV4;
+        m_addr.assign(ip_in, ip_in + 4);
+        break;
+    case NET_IPV6:
+        // Normalize IPv4-mapped-IPv6 addresses (::ffff:a.b.c.d) to NET_IPV4
+        // so that an address constructed from a sockaddr_in6 holding an
+        // IPv4-mapped form compares equal to one constructed from the
+        // corresponding sockaddr_in. This was an implicit guarantee of the
+        // legacy ip[16] design (IsIPv4() checked the byte prefix at every
+        // call site) and we must preserve it for operator==/<, GetGroup,
+        // GetHash, and addrman bucketing.
+        SetLegacyIPv6(ip_in);
+        break;
+    default:
+        assert(!"SetRaw: only NET_IPV4 / NET_IPV6 are valid");
     }
 }
 
-static const unsigned char pchOnionCat[] = {0xFD,0x87,0xD8,0x7E,0xEB,0x43};
+// ----- Legacy IPv6-form bridge -----
+//
+// SerializeV1Array() produces the 16-byte representation that pre-refactor
+// code stored directly in `unsigned char ip[16]`:
+//   NET_IPV4 -> pchIPv4 (12 bytes) || m_addr (4 bytes)
+//   NET_IPV6 -> m_addr (16 bytes), padded with zeros if shorter
+//   anything else -> 16 zero bytes
+//
+// This is the linchpin that makes the refactor byte-compatible: every
+// legacy code path that thought in terms of a 16-byte ip[] (GetByte,
+// GetHash, GetGroup, CSubNet matching, V1 wire serialization) now goes
+// through this helper and gets the same bytes it would have gotten from
+// the old field. Byte-identical hash output for IPv4/IPv6 means addrman
+// buckets do not reshuffle on upgrade.
+void CNetAddr::SerializeV1Array(uint8_t out[16]) const
+{
+    memset(out, 0, 16);
+    if (m_net == NET_IPV4 && m_addr.size() == 4) {
+        memcpy(out, pchIPv4, sizeof(pchIPv4));
+        memcpy(out + 12, m_addr.data(), 4);
+    } else if (m_net == NET_IPV6) {
+        const size_t n = std::min<size_t>(m_addr.size(), 16);
+        if (n) memcpy(out, m_addr.data(), n);
+    }
+    // NET_ONION and any unknown state intentionally yield 16 zero bytes — the
+    // V1 wire / disk path emits these zeros and the receiver rejects them
+    // via IsValid() (unspecified IPv6).
+}
+
+void CNetAddr::SetLegacyIPv6(const uint8_t bytes[16])
+{
+    if (memcmp(bytes, pchIPv4, sizeof(pchIPv4)) == 0) {
+        m_net = NET_IPV4;
+        m_addr.assign(bytes + 12, bytes + 16);
+    } else {
+        m_net = NET_IPV6;
+        m_addr.assign(bytes, bytes + 16);
+    }
+}
+
+// Constants and helpers for the TORv3 .onion address format.
+// Reference: https://gitlab.torproject.org/tpo/core/torspec/-/tree/main/spec/rend-spec
+// and BIP155.
+//
+// The on-the-wire .onion address is base32(pubkey || checksum || version) + ".onion",
+// where:
+//   pubkey   = 32-byte ed25519 public key
+//   checksum = first 2 bytes of SHA3-256(".onion checksum" || pubkey || version)
+//   version  = single byte 0x03
+// 35 bytes payload → 56 base32 characters → 56 + 6 = 62 char .onion string.
+namespace torv3 {
+static const size_t CHECKSUM_LEN = 2;
+static const unsigned char VERSION[1] = {3};
+static const size_t TOTAL_LEN = ADDR_TORV3_SIZE + CHECKSUM_LEN + sizeof(VERSION); // 35
+
+static void Checksum(const unsigned char* pubkey, unsigned char (&checksum)[CHECKSUM_LEN])
+{
+    // SHA3-256(".onion checksum" || pubkey || {0x03})[:2]
+    static const unsigned char prefix[15] = {'.','o','n','i','o','n',' ','c','h','e','c','k','s','u','m'};
+    SHA3_256 hasher;
+    hasher.Write(prefix, sizeof(prefix));
+    hasher.Write(pubkey, ADDR_TORV3_SIZE);
+    hasher.Write(VERSION, sizeof(VERSION));
+    unsigned char full[SHA3_256::OUTPUT_SIZE];
+    hasher.Finalize(full);
+    memcpy(checksum, full, CHECKSUM_LEN);
+}
+} // namespace torv3
+
+bool CNetAddr::SetTor(const std::string &strName)
+{
+    static const std::string suffix = ".onion";
+    if (strName.size() <= suffix.size())
+        return false;
+    if (strName.compare(strName.size() - suffix.size(), suffix.size(), suffix) != 0)
+        return false;
+
+    const std::string b32 = strName.substr(0, strName.size() - suffix.size());
+    bool invalid = false;
+    std::vector<unsigned char> input = DecodeBase32(b32.c_str(), &invalid);
+    if (invalid)
+        return false;
+    if (input.size() != torv3::TOTAL_LEN)
+        return false;
+
+    // Layout: [ pubkey: 32 ][ checksum: 2 ][ version: 1 ]
+    const unsigned char* pubkey       = input.data();
+    const unsigned char* checksum_in  = input.data() + ADDR_TORV3_SIZE;
+    const unsigned char* version_in   = input.data() + ADDR_TORV3_SIZE + torv3::CHECKSUM_LEN;
+
+    if (memcmp(version_in, torv3::VERSION, sizeof(torv3::VERSION)) != 0)
+        return false;
+
+    unsigned char calc_checksum[torv3::CHECKSUM_LEN];
+    torv3::Checksum(pubkey, calc_checksum);
+    if (memcmp(checksum_in, calc_checksum, torv3::CHECKSUM_LEN) != 0)
+        return false;
+
+    // Valid v3 onion. Set the type tag and store the 32-byte ed25519 pubkey
+    // as the canonical address. V1 wire serialization will emit 16 zero
+    // bytes for this address (legacy peers reject those via IsValid()).
+    m_net = NET_ONION;
+    m_addr.assign(pubkey, pubkey + ADDR_TORV3_SIZE);
+    return true;
+}
 
 bool CNetAddr::SetSpecial(const std::string &strName)
 {
-    if (strName.size()>6 && strName.substr(strName.size() - 6, 6) == ".onion") {
-        std::vector<unsigned char> vchAddr = DecodeBase32(strName.substr(0, strName.size() - 6).c_str());
-        if (vchAddr.size() != 16-sizeof(pchOnionCat))
-            return false;
-        memcpy(ip, pchOnionCat, sizeof(pchOnionCat));
-        for (unsigned int i=0; i<16-sizeof(pchOnionCat); i++)
-            ip[i + sizeof(pchOnionCat)] = vchAddr[i];
-        return true;
+    if (strName.size() > 6 && strName.substr(strName.size() - 6, 6) == ".onion") {
+        return SetTor(strName);
     }
     return false;
 }
@@ -702,17 +813,21 @@ CNetAddr::CNetAddr(const std::string &strIp, bool fAllowLookup)
 
 unsigned int CNetAddr::GetByte(int n) const
 {
-    return ip[15-n];
+    // Indexed from the end of the legacy IPv6-form representation, matching
+    // the historical contract: GetByte(0) is the last byte of ip[16], etc.
+    uint8_t v1[16];
+    SerializeV1Array(v1);
+    return v1[15 - n];
 }
 
 bool CNetAddr::IsIPv4() const
 {
-    return (memcmp(ip, pchIPv4, sizeof(pchIPv4)) == 0);
+    return m_net == NET_IPV4;
 }
 
 bool CNetAddr::IsIPv6() const
 {
-    return (!IsIPv4() && !IsTor());
+    return m_net == NET_IPV6;
 }
 
 bool CNetAddr::IsRFC1918() const
@@ -758,7 +873,9 @@ bool CNetAddr::IsRFC3964() const
 bool CNetAddr::IsRFC6052() const
 {
     static const unsigned char pchRFC6052[] = {0,0x64,0xFF,0x9B,0,0,0,0,0,0,0,0};
-    return (memcmp(ip, pchRFC6052, sizeof(pchRFC6052)) == 0);
+    uint8_t v1[16];
+    SerializeV1Array(v1);
+    return memcmp(v1, pchRFC6052, sizeof(pchRFC6052)) == 0;
 }
 
 bool CNetAddr::IsRFC4380() const
@@ -769,7 +886,9 @@ bool CNetAddr::IsRFC4380() const
 bool CNetAddr::IsRFC4862() const
 {
     static const unsigned char pchRFC4862[] = {0xFE,0x80,0,0,0,0,0,0};
-    return (memcmp(ip, pchRFC4862, sizeof(pchRFC4862)) == 0);
+    uint8_t v1[16];
+    SerializeV1Array(v1);
+    return memcmp(v1, pchRFC4862, sizeof(pchRFC4862)) == 0;
 }
 
 bool CNetAddr::IsRFC4193() const
@@ -780,7 +899,9 @@ bool CNetAddr::IsRFC4193() const
 bool CNetAddr::IsRFC6145() const
 {
     static const unsigned char pchRFC6145[] = {0,0,0,0,0,0,0,0,0xFF,0xFF,0,0};
-    return (memcmp(ip, pchRFC6145, sizeof(pchRFC6145)) == 0);
+    uint8_t v1[16];
+    SerializeV1Array(v1);
+    return memcmp(v1, pchRFC6145, sizeof(pchRFC6145)) == 0;
 }
 
 bool CNetAddr::IsRFC4843() const
@@ -790,21 +911,23 @@ bool CNetAddr::IsRFC4843() const
 
 bool CNetAddr::IsTor() const
 {
-    return (memcmp(ip, pchOnionCat, sizeof(pchOnionCat)) == 0);
+    return m_net == NET_ONION;
 }
 
 bool CNetAddr::IsLocal() const
 {
     // IPv4 loopback
-   if (IsIPv4() && (GetByte(3) == 127 || GetByte(3) == 0))
-       return true;
+    if (IsIPv4() && (GetByte(3) == 127 || GetByte(3) == 0))
+        return true;
 
-   // IPv6 loopback (::1/128)
-   static const unsigned char pchLocal[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
-   if (memcmp(ip, pchLocal, 16) == 0)
-       return true;
+    // IPv6 loopback (::1/128)
+    static const unsigned char pchLocal[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
+    uint8_t v1[16];
+    SerializeV1Array(v1);
+    if (memcmp(v1, pchLocal, 16) == 0)
+        return true;
 
-   return false;
+    return false;
 }
 
 bool CNetAddr::IsMulticast() const
@@ -815,34 +938,40 @@ bool CNetAddr::IsMulticast() const
 
 bool CNetAddr::IsValid() const
 {
+    // A v3 onion address is valid iff m_addr is exactly the 32-byte pubkey.
+    if (IsTor())
+        return m_addr.size() == ADDR_TORV3_SIZE;
+
+    uint8_t v1[16];
+    SerializeV1Array(v1);
+
     // Cleanup 3-byte shifted addresses caused by garbage in size field
     // of addr messages from versions before 0.2.9 checksum.
     // Two consecutive addr messages look like this:
     // header20 vectorlen3 addr26 addr26 addr26 header20 vectorlen3 addr26 addr26 addr26...
     // so if the first length field is garbled, it reads the second batch
     // of addr misaligned by 3 bytes.
-    if (memcmp(ip, pchIPv4+3, sizeof(pchIPv4)-3) == 0)
+    if (memcmp(v1, pchIPv4 + 3, sizeof(pchIPv4) - 3) == 0)
         return false;
 
     // unspecified IPv6 address (::/128)
     unsigned char ipNone[16] = {};
-    if (memcmp(ip, ipNone, 16) == 0)
+    if (memcmp(v1, ipNone, 16) == 0)
         return false;
 
     // documentation IPv6 address
     if (IsRFC3849())
         return false;
 
-    if (IsIPv4())
-    {
+    if (IsIPv4()) {
         // INADDR_NONE
-        uint32_t ipNone = INADDR_NONE;
-        if (memcmp(ip+12, &ipNone, 4) == 0)
+        uint32_t ipNoneV = INADDR_NONE;
+        if (memcmp(v1 + 12, &ipNoneV, 4) == 0)
             return false;
 
         // 0
-        ipNone = 0;
-        if (memcmp(ip+12, &ipNone, 4) == 0)
+        ipNoneV = 0;
+        if (memcmp(v1 + 12, &ipNoneV, 4) == 0)
             return false;
     }
 
@@ -858,20 +987,21 @@ enum Network CNetAddr::GetNetwork() const
 {
     if (!IsRoutable())
         return NET_UNROUTABLE;
-
-    if (IsIPv4())
-        return NET_IPV4;
-
-    if (IsTor())
-        return NET_TOR;
-
-    return NET_IPV6;
+    return m_net;
 }
 
 std::string CNetAddr::ToStringIP() const
 {
-    if (IsTor())
-        return EncodeBase32(&ip[6], 10) + ".onion";
+    if (IsTor()) {
+        // Encode as base32(pubkey || checksum || version) + ".onion".
+        unsigned char buf[ADDR_TORV3_SIZE + torv3::CHECKSUM_LEN + sizeof(torv3::VERSION)];
+        memcpy(buf, m_addr.data(), ADDR_TORV3_SIZE);
+        unsigned char checksum[torv3::CHECKSUM_LEN];
+        torv3::Checksum(m_addr.data(), checksum);
+        memcpy(buf + ADDR_TORV3_SIZE, checksum, torv3::CHECKSUM_LEN);
+        memcpy(buf + ADDR_TORV3_SIZE + torv3::CHECKSUM_LEN, torv3::VERSION, sizeof(torv3::VERSION));
+        return EncodeBase32(buf, sizeof(buf)) + ".onion";
+    }
     CService serv(*this, 0);
     struct sockaddr_storage sockaddr;
     socklen_t socklen = sizeof(sockaddr);
@@ -897,35 +1027,46 @@ std::string CNetAddr::ToString() const
 
 bool operator==(const CNetAddr& a, const CNetAddr& b)
 {
-    return (memcmp(a.ip, b.ip, 16) == 0);
+    return a.m_net == b.m_net && a.m_addr == b.m_addr;
 }
 
 bool operator!=(const CNetAddr& a, const CNetAddr& b)
 {
-    return (memcmp(a.ip, b.ip, 16) != 0);
+    return !(a == b);
 }
 
 bool operator<(const CNetAddr& a, const CNetAddr& b)
 {
-    return (memcmp(a.ip, b.ip, 16) < 0);
+    if (a.m_net != b.m_net) return a.m_net < b.m_net;
+    return a.m_addr < b.m_addr;
 }
 
 bool CNetAddr::GetInAddr(struct in_addr* pipv4Addr) const
 {
-    if (!IsIPv4())
+    if (!IsIPv4() || m_addr.size() != 4)
         return false;
-    memcpy(pipv4Addr, ip+12, 4);
+    memcpy(pipv4Addr, m_addr.data(), 4);
     return true;
 }
 
 bool CNetAddr::GetIn6Addr(struct in6_addr* pipv6Addr) const
 {
-    memcpy(pipv6Addr, ip, 16);
+    uint8_t v1[16];
+    SerializeV1Array(v1);
+    memcpy(pipv6Addr, v1, 16);
     return true;
 }
 
-// get canonical identifier of an address' group
-// no two connections will be attempted to addresses with the same group
+// Get canonical identifier of an address' group.
+// No two connections will be attempted to addresses with the same group.
+//
+// IMPORTANT: The byte-level output of this function for IPv4 and IPv6 addresses
+// MUST remain identical to the pre-Phase-2 implementation, because addrman
+// uses GetGroup() output as part of bucket placement. Any change here would
+// reshuffle every existing peer entry on first run after upgrade. The function
+// is therefore left structurally identical to the legacy version; the only
+// real change is that GetByte() now reads from the SerializeV1Array bridge
+// instead of a stored ip[16] field.
 std::vector<unsigned char> CNetAddr::GetGroup() const
 {
     std::vector<unsigned char> vchRet;
@@ -969,9 +1110,12 @@ std::vector<unsigned char> CNetAddr::GetGroup() const
     }
     else if (IsTor())
     {
-        nClass = NET_TOR;
-        nStartByte = 6;
-        nBits = 4;
+        // For TORv3 onions there is no concept of network locality / sub-prefix:
+        // every onion service has an independent ed25519 keypair. Place all of
+        // them into a single bucket keyed only by the network class. This matches
+        // Bitcoin Core's behavior post-BIP155.
+        vchRet.push_back(NET_ONION);
+        return vchRet;
     }
     // for he.net, use /36 groups
     else if (GetByte(15) == 0x20 && GetByte(14) == 0x01 && GetByte(13) == 0x04 && GetByte(12) == 0x70)
@@ -995,7 +1139,20 @@ std::vector<unsigned char> CNetAddr::GetGroup() const
 
 uint64_t CNetAddr::GetHash() const
 {
-    uint256 hash = Hash(&ip[0], &ip[16]);
+    uint256 hash;
+    if (IsTor()) {
+        // Hash the 32-byte ed25519 pubkey directly. Different onions hash to
+        // different addrman buckets even though their V1 representation is
+        // 16 zero bytes for all of them.
+        hash = Hash(m_addr.begin(), m_addr.end());
+    } else {
+        // For IPv4/IPv6 hash exactly the same 16 bytes the legacy
+        // implementation would have hashed. This is what keeps addrman
+        // bucket placement byte-identical across the refactor.
+        uint8_t v1[16];
+        SerializeV1Array(v1);
+        hash = Hash(&v1[0], &v1[16]);
+    }
     uint64_t nRet;
     memcpy(&nRet, &hash, sizeof(nRet));
     return nRet;
@@ -1047,11 +1204,11 @@ int CNetAddr::GetReachabilityFrom(const CNetAddr *paddrPartner) const
         case NET_IPV4:   return REACH_IPV4;
         case NET_IPV6:   return fTunnel ? REACH_IPV6_WEAK : REACH_IPV6_STRONG; // only prefer giving our IPv6 address if it's not tunnelled
         }
-    case NET_TOR:
+    case NET_ONION:
         switch(ourNet) {
         default:         return REACH_DEFAULT;
         case NET_IPV4:   return REACH_IPV4; // Tor users can connect to IPv4 as well
-        case NET_TOR:    return REACH_PRIVATE;
+        case NET_ONION:    return REACH_PRIVATE;
         }
     case NET_TEREDO:
         switch(ourNet) {
@@ -1068,7 +1225,7 @@ int CNetAddr::GetReachabilityFrom(const CNetAddr *paddrPartner) const
         case NET_TEREDO:  return REACH_TEREDO;
         case NET_IPV6:    return REACH_IPV6_WEAK;
         case NET_IPV4:    return REACH_IPV4;
-        case NET_TOR:     return REACH_PRIVATE; // either from Tor, or don't care about our address
+        case NET_ONION:     return REACH_PRIVATE; // either from Tor, or don't care about our address
         }
     }
 }
@@ -1202,12 +1359,22 @@ bool CService::GetSockAddr(struct sockaddr* paddr, socklen_t *addrlen) const
 
 std::vector<unsigned char> CService::GetKey() const
 {
-     std::vector<unsigned char> vKey;
-     vKey.resize(18);
-     memcpy(&vKey[0], ip, 16);
-     vKey[16] = port / 0x100;
-     vKey[17] = port & 0x0FF;
-     return vKey;
+    std::vector<unsigned char> vKey;
+    if (IsTor()) {
+        // For NET_ONION key off the 32-byte ed25519 pubkey + port. Without this
+        // every v3 onion address with the same port would collide on the
+        // 16 zero bytes of the V1 representation and end up in the same addrman slot.
+        vKey.reserve(ADDR_TORV3_SIZE + 2);
+        vKey.insert(vKey.end(), m_addr.begin(), m_addr.end());
+    } else {
+        // For IPv4/IPv6 use exactly the legacy 16-byte representation so the
+        // addrman key is byte-identical across the refactor.
+        vKey.resize(16);
+        SerializeV1Array(vKey.data());
+    }
+    vKey.push_back(port / 0x100);
+    vKey.push_back(port & 0x0FF);
+    return vKey;
 }
 
 std::string CService::ToStringPort() const
@@ -1279,8 +1446,10 @@ CSubNet::CSubNet(const std::string &strSubnet, bool fAllowLookup)
                 {
                     // Copy only the *last* four bytes in case of IPv4, the rest of the mask should stay 1's as
                     // we don't want pchIPv4 to be part of the mask.
-                    for(int x=astartofs; x<16; ++x)
-                        netmask[x] = vIP[0].ip[x];
+                    uint8_t maskV1[16];
+                    vIP[0].SerializeV1Array(maskV1);
+                    for (int x = astartofs; x < 16; ++x)
+                        netmask[x] = maskV1[x];
                 }
                 else
                 {
@@ -1294,17 +1463,27 @@ CSubNet::CSubNet(const std::string &strSubnet, bool fAllowLookup)
         valid = false;
     }
 
-    // Normalize network according to netmask
-    for(int x=0; x<16; ++x)
-        network.ip[x] &= netmask[x];
+    // Normalize network according to netmask. We do this through the legacy
+    // 16-byte view: extract, AND, then re-set via SetLegacyIPv6.
+    uint8_t netV1[16];
+    network.SerializeV1Array(netV1);
+    for (int x = 0; x < 16; ++x) netV1[x] &= netmask[x];
+    network.SetLegacyIPv6(netV1);
 }
 
 bool CSubNet::Match(const CNetAddr &addr) const
 {
     if (!valid || !addr.IsValid())
         return false;
-    for(int x=0; x<16; ++x)
-        if ((addr.ip[x] & netmask[x]) != network.ip[x])
+    // Subnets only make sense for IPv4/IPv6. A v3 onion address has no
+    // subnet semantics; reject the match outright.
+    if (addr.IsTor())
+        return false;
+    uint8_t addrV1[16], netV1[16];
+    addr.SerializeV1Array(addrV1);
+    network.SerializeV1Array(netV1);
+    for (int x = 0; x < 16; ++x)
+        if ((addrV1[x] & netmask[x]) != netV1[x])
             return false;
     return true;
 }

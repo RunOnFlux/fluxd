@@ -33,16 +33,58 @@ enum Network
     NET_UNROUTABLE = 0,
     NET_IPV4,
     NET_IPV6,
-    NET_TOR,
+    NET_ONION,                   // v3 onion services (ed25519 / 32-byte pubkey)
 
     NET_MAX,
 };
 
-/** IP address (IPv6, or IPv4 using mapped IPv6 range (::FFFF:0:0/96)) */
+/** BIP155 network identifiers (used in the addrv2 wire format).
+ *  Reference: https://github.com/bitcoin/bips/blob/master/bip-0155.mediawiki
+ *  We only emit IPV4/IPV6/TORV3. TORV2/I2P/CJDNS are reserved as enum values
+ *  so we can recognize and skip them on the wire. */
+enum BIP155Network : uint8_t
+{
+    BIP155_NONE  = 0,
+    BIP155_IPV4  = 1,
+    BIP155_IPV6  = 2,
+    BIP155_TORV2 = 3,    // deprecated; we never emit and silently drop on receive
+    BIP155_TORV3 = 4,
+    BIP155_I2P   = 5,    // not implemented; recognized to skip
+    BIP155_CJDNS = 6,    // not implemented; recognized to skip
+};
+
+/** Size of a TORv3 ed25519 public key. See BIP155 + rend-spec-v3. */
+static const size_t ADDR_TORV3_SIZE = 32;
+/** BIP155 maximum encoded address length (defensive cap on the wire). */
+static const size_t ADDRV2_MAX_ADDRESS_SIZE = 512;
+
+/** RFC 4291 IPv4-mapped-IPv6 prefix.
+ *  Promoted from a file-static in netbase.cpp so that header-defined templated
+ *  serializers (e.g. CNetAddr::UnserializeV2) can reference the same named
+ *  constant instead of inlining magic bytes. */
+static const unsigned char pchIPv4[12] = { 0,0,0,0,0,0,0,0,0,0,0xff,0xff };
+
+/** IP address (IPv6, IPv4 mapped, TORv3 onion). */
 class CNetAddr
 {
     protected:
-        unsigned char ip[16]; // in network byte order
+        /** Authoritative network type tag. Every accessor dispatches on this. */
+        Network m_net;
+
+        /** Raw address bytes. Length is determined by m_net:
+         *    NET_IPV4       -> 4   bytes
+         *    NET_IPV6       -> 16  bytes
+         *    NET_ONION        -> 32  bytes (ed25519 ed25519 pubkey, BIP155 TORV3)
+         *    NET_UNROUTABLE -> 0..16 bytes (treated as IPv6 for legacy validation) */
+        std::vector<unsigned char> m_addr;
+
+        /** Reconstruct the legacy 16-byte "IPv4-mapped-IPv6" representation
+         *  that pre-Phase-2 code stored in `unsigned char ip[16]`. Used by
+         *  GetByte / GetHash / GetGroup / V1 wire serialization / CSubNet so
+         *  the byte-level outputs (and hence addrman bucketing) stay
+         *  identical for IPv4/IPv6 across the refactor. NET_ONION and any
+         *  unrecognized state produces all zeros. */
+        void SerializeV1Array(uint8_t out[16]) const;
 
     public:
         CNetAddr();
@@ -58,7 +100,14 @@ class CNetAddr
          */
         void SetRaw(Network network, const uint8_t *data);
 
-        bool SetSpecial(const std::string &strName); // for Tor addresses
+        /**
+         * Parse a TORv3 ".onion" address (56-char base32 + ".onion" suffix),
+         * validate its SHA3-256 checksum, and on success set m_net=NET_ONION
+         * with m_addr holding the 32-byte ed25519 pubkey.
+         */
+        bool SetTor(const std::string &strName);
+
+        bool SetSpecial(const std::string &strName); // dispatches to SetTor for .onion
         bool IsIPv4() const;    // IPv4 mapped address (::FFFF:0:0/96, 0.0.0.0/0)
         bool IsIPv6() const;    // IPv6 address (not mapped IPv4, not Tor)
         bool IsRFC1918() const; // IPv4 private networks (10.0.0.0/8, 192.168.0.0/16, 172.16.0.0/12)
@@ -97,10 +146,33 @@ class CNetAddr
 
         ADD_SERIALIZE_METHODS;
 
+        // V1 wire format: always 16 bytes in IPv4-mapped-IPv6 layout. NET_ONION
+        // and any other non-IP state writes 16 zero bytes (which the receiver
+        // rejects via IsValid()), so legacy peers see no change in behavior.
         template <typename Stream, typename Operation>
         inline void SerializationOp(Stream& s, Operation ser_action) {
-            READWRITE(FLATDATA(ip));
+            uint8_t serialized[16];
+            if (ser_action.ForRead()) {
+                READWRITE(FLATDATA(serialized));
+                SetLegacyIPv6(serialized);
+            } else {
+                SerializeV1Array(serialized);
+                READWRITE(FLATDATA(serialized));
+            }
         }
+
+        /** Decode a 16-byte IPv4-mapped-IPv6 representation (the legacy V1
+         *  wire format and on-disk format) and store the result. Sets m_net
+         *  to NET_IPV4 if the bytes start with the pchIPv4 prefix; otherwise
+         *  NET_IPV6. Never produces NET_ONION (the V1 format cannot carry it). */
+        void SetLegacyIPv6(const uint8_t bytes[16]);
+
+        // ----- BIP155 (addrv2) wire format -----
+        // Explicit member functions, NOT part of the SerializationOp dispatch.
+        // Callers reach the V2 path through the CAddrVecV2 wrapper. V1 wire
+        // and on-disk formats are provably untouched by the V2 code path.
+        template <typename Stream> void SerializeV2(Stream& s) const;
+        template <typename Stream> void UnserializeV2(Stream& s);
 
         friend class CSubNet;
 };
@@ -164,12 +236,162 @@ class CService : public CNetAddr
 
         template <typename Stream, typename Operation>
         inline void SerializationOp(Stream& s, Operation ser_action) {
-            READWRITE(FLATDATA(ip));
-            unsigned short portN = htons(port);
-            READWRITE(FLATDATA(portN));
-            if (ser_action.ForRead())
-                 port = ntohs(portN);
+            uint8_t serialized[16];
+            unsigned short portN;
+            if (ser_action.ForRead()) {
+                READWRITE(FLATDATA(serialized));
+                READWRITE(FLATDATA(portN));
+                SetLegacyIPv6(serialized);
+                port = ntohs(portN);
+            } else {
+                SerializeV1Array(serialized);
+                portN = htons(port);
+                READWRITE(FLATDATA(serialized));
+                READWRITE(FLATDATA(portN));
+            }
         }
+
+        // ----- BIP155 (addrv2) wire format -----
+        template <typename Stream> void SerializeV2(Stream& s) const;
+        template <typename Stream> void UnserializeV2(Stream& s);
+};
+
+// =================================================================
+// BIP155 (addrv2) wire-format member templates.
+//
+// These are explicit member functions, NOT routed through the
+// CNetAddr/CService::SerializationOp dispatch. The intent is that
+// callers reach the V2 path only by going through CAddrVecV2 (below)
+// or by invoking SerializeV2/UnserializeV2 directly. The legacy V1
+// SerializationOp is therefore provably untouched, and on-disk and
+// V1 wire formats are unaffected by anything in this section.
+//
+// Why explicit methods instead of a stream-flag dispatch:
+// fluxd's serializer (circa 2013) uses an int nType bit-bag and has
+// no per-call parameter mechanism. Setting a SER_ADDRV2 bit on the
+// shared per-connection ssSend stream would require flipping a flag
+// mid-message and is fragile. Bypassing SerializationOp via dedicated
+// methods is the cleanest port of Bitcoin's BIP155 work to this
+// generation of the codebase.
+// =================================================================
+
+template <typename Stream>
+inline void CNetAddr::SerializeV2(Stream& s) const
+{
+    switch (m_net) {
+    case NET_IPV4:
+        ser_writedata8(s, (uint8_t)BIP155_IPV4);
+        WriteCompactSize(s, m_addr.size());
+        if (!m_addr.empty()) s.write((const char*)m_addr.data(), m_addr.size());
+        break;
+    case NET_ONION:
+        ser_writedata8(s, (uint8_t)BIP155_TORV3);
+        WriteCompactSize(s, m_addr.size());
+        if (!m_addr.empty()) s.write((const char*)m_addr.data(), m_addr.size());
+        break;
+    case NET_IPV6:
+    case NET_UNROUTABLE:
+    default: {
+        // For NET_IPV6 (and any unrecognized state) emit a 16-byte IPv6 entry.
+        // Unroutable entries are emitted as the legacy 16-byte representation
+        // and dropped by the receiver via IsValid() / IsRoutable().
+        ser_writedata8(s, (uint8_t)BIP155_IPV6);
+        WriteCompactSize(s, 16);
+        uint8_t v1bytes[16];
+        SerializeV1Array(v1bytes);
+        s.write((const char*)v1bytes, 16);
+        break;
+    }
+    }
+}
+
+template <typename Stream>
+inline void CNetAddr::UnserializeV2(Stream& s)
+{
+    uint8_t network_id = ser_readdata8(s);
+    uint64_t addr_size = ReadCompactSize(s);
+    if (addr_size > ADDRV2_MAX_ADDRESS_SIZE) {
+        throw std::ios_base::failure("BIP155 address payload exceeds 512 bytes");
+    }
+    std::vector<unsigned char> raw(addr_size);
+    if (addr_size > 0) {
+        s.read((char*)raw.data(), addr_size);
+    }
+    switch (network_id) {
+    case BIP155_IPV4:
+        if (addr_size == 4) {
+            m_net = NET_IPV4;
+            m_addr = std::move(raw);
+            return;
+        }
+        break;
+    case BIP155_IPV6:
+        if (addr_size == 16) {
+            m_net = NET_IPV6;
+            m_addr = std::move(raw);
+            return;
+        }
+        break;
+    case BIP155_TORV3:
+        if (addr_size == ADDR_TORV3_SIZE) {
+            m_net = NET_ONION;
+            m_addr = std::move(raw);
+            return;
+        }
+        break;
+    case BIP155_TORV2:
+    case BIP155_I2P:
+    case BIP155_CJDNS:
+    default:
+        break;
+    }
+    // Unrecognized / size-mismatched / unsupported network: present as
+    // unspecified IPv6 so IsValid() rejects it and the caller drops the entry.
+    m_net = NET_IPV6;
+    m_addr.assign(16, 0);
+}
+
+template <typename Stream>
+inline void CService::SerializeV2(Stream& s) const
+{
+    CNetAddr::SerializeV2(s);
+    // BIP155: port is 2 bytes in network byte order.
+    uint8_t pbuf[2] = { (uint8_t)((port >> 8) & 0xff), (uint8_t)(port & 0xff) };
+    s.write((const char*)pbuf, 2);
+}
+
+template <typename Stream>
+inline void CService::UnserializeV2(Stream& s)
+{
+    CNetAddr::UnserializeV2(s);
+    uint8_t pbuf[2];
+    s.read((char*)pbuf, 2);
+    port = ((unsigned short)pbuf[0] << 8) | (unsigned short)pbuf[1];
+}
+
+// Forward decl — full definition lives in protocol.h, but CAddrVecV2 below
+// references it via SerializeV2/UnserializeV2 instances declared there.
+class CAddress;
+
+/** Wrapper that lets a std::vector<CAddress> ride fluxd's standard ssSend
+ *  serializer pipeline (i.e. PushMessage("addrv2", CAddrVecV2(vAddr))) while
+ *  still routing each element through the explicit BIP155 methods.
+ *
+ *  We hold a const reference for sends and a mutable pointer for receives.
+ *  The latter requires constructing the wrapper around an empty vector and
+ *  then calling Unserialize on it. */
+class CAddrVecV2
+{
+public:
+    explicit CAddrVecV2(const std::vector<CAddress>& v) : m_const(&v), m_mut(nullptr) {}
+    explicit CAddrVecV2(std::vector<CAddress>& v)       : m_const(&v), m_mut(&v) {}
+
+    template <typename Stream> void Serialize(Stream& s) const;
+    template <typename Stream> void Unserialize(Stream& s);
+
+private:
+    const std::vector<CAddress>* m_const;
+    std::vector<CAddress>*       m_mut;
 };
 
 class proxyType

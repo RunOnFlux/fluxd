@@ -117,6 +117,30 @@ public:
         READWRITE(*(CService*)this);
     }
 
+    // ----- BIP155 (addrv2) wire format -----
+    // Same field order as the V1 wire format (time, services, address) but the
+    // address is encoded with the BIP155 type-tagged scheme via CService::SerializeV2.
+    // Reached through the CAddrVecV2 wrapper, never via SerializationOp.
+    template <typename Stream>
+    inline void SerializeV2(Stream& s) const
+    {
+        ser_writedata32(s, nTime);
+        // Services field is a CompactSize-encoded varint in BIP155 (vs. fixed 8-byte
+        // little-endian uint64 in V1). This is the only addrv2 quirk worth noting:
+        // the savings on the wire are real but it requires the asymmetric encoding.
+        WriteCompactSize(s, nServices);
+        ((const CService*)this)->SerializeV2(s);
+    }
+
+    template <typename Stream>
+    inline void UnserializeV2(Stream& s)
+    {
+        Init();
+        nTime = ser_readdata32(s);
+        nServices = ReadCompactSize(s);
+        ((CService*)this)->UnserializeV2(s);
+    }
+
     // TODO: make private (improves encapsulation)
 public:
     uint64_t nServices;
@@ -124,6 +148,33 @@ public:
     // disk and network only
     unsigned int nTime;
 };
+
+// CAddrVecV2 template definitions — placed here (rather than in netbase.h)
+// because they need the full CAddress definition above.
+template <typename Stream>
+inline void CAddrVecV2::Serialize(Stream& s) const
+{
+    WriteCompactSize(s, m_const->size());
+    for (size_t i = 0; i < m_const->size(); ++i) {
+        (*m_const)[i].SerializeV2(s);
+    }
+}
+
+template <typename Stream>
+inline void CAddrVecV2::Unserialize(Stream& s)
+{
+    assert(m_mut != nullptr); // wrapper was constructed read-only
+    uint64_t n = ReadCompactSize(s);
+    // BIP155: an addrv2 message MUST contain at most 1000 entries (same as addr).
+    if (n > 1000) {
+        throw std::ios_base::failure("addrv2 vector too long");
+    }
+    m_mut->clear();
+    m_mut->resize(n);
+    for (uint64_t i = 0; i < n; ++i) {
+        (*m_mut)[i].UnserializeV2(s);
+    }
+}
 
 /** inv message data */
 class CInv
