@@ -65,6 +65,29 @@ public:
         READWRITE(nAttempts);
     }
 
+    // ----- BIP155-aware on-disk format (peers.dat format version 2) -----
+    //
+    // Encodes both the embedded CAddress and the `source` CNetAddr through
+    // their explicit SerializeV2 / UnserializeV2 methods so that v3 onion
+    // entries (whose 32-byte ed25519 pubkeys can't fit in the legacy
+    // 16-byte slot) survive across restarts. The trailing nLastSuccess /
+    // nAttempts metadata is unchanged.
+    template <typename Stream>
+    inline void SerializeV2(Stream& s) const {
+        ((const CAddress*)this)->SerializeV2(s);
+        source.SerializeV2(s);
+        ser_writedata64(s, nLastSuccess);
+        ser_writedata32(s, nAttempts);
+    }
+
+    template <typename Stream>
+    inline void UnserializeV2(Stream& s) {
+        ((CAddress*)this)->UnserializeV2(s);
+        source.UnserializeV2(s);
+        nLastSuccess = ser_readdata64(s);
+        nAttempts = ser_readdata32(s);
+    }
+
     void Init()
     {
         nLastSuccess = 0;
@@ -262,20 +285,32 @@ protected:
 public:
     /**
      * serialized format:
-     * * version byte (currently 1)
+     * * version byte (1 = legacy, 2 = BIP155-aware addrv2 entries)
      * * 0x20 + nKey (serialized as if it were a vector, for backward compatibility)
      * * nNew
      * * nTried
      * * number of "new" buckets XOR 2**30
-     * * all nNew addrinfos in vvNew
-     * * all nTried addrinfos in vvTried
+     * * all nNew addrinfos in vvNew  (V1 dispatch for v=1, SerializeV2 for v=2)
+     * * all nTried addrinfos in vvTried (same)
      * * for each bucket:
      *   * number of elements
      *   * for each element: index
      *
+     * Format 2 is the same shape as format 1, but each CAddrInfo entry is
+     * encoded via CAddrInfo::SerializeV2 / UnserializeV2, which uses the
+     * BIP155 type-tagged address layout. This is what allows v3 onion peers
+     * (32-byte ed25519 pubkeys) to survive across restarts in peers.dat.
+     *
      * 2**30 is xorred with the number of buckets to make addrman deserializer v0 detect it
      * as incompatible. This is necessary because it did not check the version number on
      * deserialization.
+     *
+     * Backwards compatibility:
+     *  - A new fluxd reading a format-1 peers.dat: works (legacy V1 path).
+     *  - An old fluxd reading a format-2 peers.dat: bounds checks on the
+     *    garbage-shaped entries will throw, addrman starts empty, the node
+     *    relearns its peers from the network. addrman is a cache, not
+     *    consensus state, so this is acceptable.
      *
      * Notice that vvTried, mapAddr and vVector are never encoded explicitly;
      * they are instead reconstructed from the other information.
@@ -289,12 +324,14 @@ public:
      * We don't use ADD_SERIALIZE_METHODS since the serialization and deserialization code has
      * very little in common.
      */
+    static const unsigned char ADDRMAN_FORMAT_VERSION = 2;
+
     template<typename Stream>
     void Serialize(Stream &s) const
     {
         LOCK(cs);
 
-        unsigned char nVersion = 1;
+        unsigned char nVersion = ADDRMAN_FORMAT_VERSION;
         s << nVersion;
         s << ((unsigned char)32);
         s << nKey;
@@ -310,7 +347,7 @@ public:
             const CAddrInfo &info = (*it).second;
             if (info.nRefCount) {
                 assert(nIds != nNew); // this means nNew was wrong, oh ow
-                s << info;
+                info.SerializeV2(s);
                 nIds++;
             }
         }
@@ -319,7 +356,7 @@ public:
             const CAddrInfo &info = (*it).second;
             if (info.fInTried) {
                 assert(nIds != nTried); // this means nTried was wrong, oh ow
-                s << info;
+                info.SerializeV2(s);
                 nIds++;
             }
         }
@@ -348,6 +385,14 @@ public:
 
         unsigned char nVersion;
         s >> nVersion;
+        // We accept format 1 (legacy V1 entries) and format 2 (BIP155 entries).
+        // Anything else is unrecognized — we throw and let the caller treat
+        // peers.dat as missing (graceful empty start).
+        if (nVersion != 1 && nVersion != 2) {
+            throw std::ios_base::failure("Unknown CAddrMan format version");
+        }
+        const bool fV2 = (nVersion == 2);
+
         unsigned char nKeySize;
         s >> nKeySize;
         if (nKeySize != 32) throw std::ios_base::failure("Incorrect keysize in addrman deserialization");
@@ -371,12 +416,13 @@ public:
         // Deserialize entries from the new table.
         for (int n = 0; n < nNew; n++) {
             CAddrInfo &info = mapInfo[n];
-            s >> info;
+            if (fV2) info.UnserializeV2(s);
+            else     s >> info;
             mapAddr[info] = n;
             info.nRandomPos = vRandom.size();
             vRandom.push_back(n);
-            if (nVersion != 1 || nUBuckets != ADDRMAN_NEW_BUCKET_COUNT) {
-                // In case the new table data cannot be used (nVersion unknown, or bucket count wrong),
+            if (nUBuckets != ADDRMAN_NEW_BUCKET_COUNT) {
+                // In case the new table data cannot be used (bucket count wrong),
                 // immediately try to give them a reference based on their primary source address.
                 int nUBucket = info.GetNewBucket(nKey);
                 int nUBucketPos = info.GetBucketPosition(nKey, true, nUBucket);
@@ -392,7 +438,8 @@ public:
         int nLost = 0;
         for (int n = 0; n < nTried; n++) {
             CAddrInfo info;
-            s >> info;
+            if (fV2) info.UnserializeV2(s);
+            else     s >> info;
             int nKBucket = info.GetTriedBucket(nKey);
             int nKBucketPos = info.GetBucketPosition(nKey, false, nKBucket);
             if (vvTried[nKBucket][nKBucketPos] == -1) {
@@ -419,7 +466,7 @@ public:
                 if (nIndex >= 0 && nIndex < nNew) {
                     CAddrInfo &info = mapInfo[nIndex];
                     int nUBucketPos = info.GetBucketPosition(nKey, true, bucket);
-                    if (nVersion == 1 && nUBuckets == ADDRMAN_NEW_BUCKET_COUNT && vvNew[bucket][nUBucketPos] == -1 && info.nRefCount < ADDRMAN_NEW_BUCKETS_PER_ADDRESS) {
+                    if (nUBuckets == ADDRMAN_NEW_BUCKET_COUNT && vvNew[bucket][nUBucketPos] == -1 && info.nRefCount < ADDRMAN_NEW_BUCKETS_PER_ADDRESS) {
                         info.nRefCount++;
                         vvNew[bucket][nUBucketPos] = nIndex;
                     }
