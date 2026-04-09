@@ -784,6 +784,50 @@ None of the macOS environment fixes are part of the fluxd source
 tree. They are noted here only so a future macOS developer doesn't
 have to rediscover them.
 
+### 5.7. `src/config/bitcoin-config.h` should not be tracked in git
+
+`src/config/bitcoin-config.h` is an autoconf-generated file (its
+first two lines literally say `Generated from bitcoin-config.h.in
+by configure`). fluxd inherited the practice of tracking this file
+in git from old Bitcoin Core, presumably so a fresh clone doesn't
+have to run autoconf before the first build. Bitcoin Core itself
+moved this file out of the tracked tree years ago, for the reasons
+that bit me during this work:
+
+- **It captures the build environment of whoever last ran configure.**
+  When I ran `./configure` on macOS during validation (without
+  specifying `--with-incompatible-bdb` initially), the regenerated
+  file flipped `ENABLE_WALLET 1 → /* #undef */`, `ENABLE_ZMQ 1 → 0`,
+  and undefined every `HAVE_BOOST*` flag (because modern Boost 1.90's
+  layout isn't picked up by fluxd's older `configure.ac` macros).
+  If those modifications had been committed, anyone building the
+  branch would have suddenly found their wallet and ZMQ disabled —
+  a real footgun for CI, packagers, and operators.
+
+- **Every developer who runs `./configure` locally gets working-tree
+  noise** that's trivially reset (`git restore
+  src/config/bitcoin-config.h`) but easy to forget about, and
+  catastrophic if accidentally `git add .`'d into a commit.
+
+- **Generated files in version control are a recurring source of
+  merge conflicts** that can't be resolved by reading the source —
+  you have to re-run configure to get the canonical state.
+
+**Recommended cleanup (out of scope for the BIP155 work):**
+
+1. Add `src/config/bitcoin-config.h` to `.gitignore`
+2. `git rm --cached src/config/bitcoin-config.h` (removes from
+   tracking without deleting the working-tree file)
+3. Verify a fresh clone + `./autogen.sh && ./configure && make`
+   works — autoconf should recreate the file from `bitcoin-config.h.in`
+4. Make sure no CI script assumes the file exists pre-build
+
+This is a one-commit cleanup. It's worth doing as a separate
+quality-of-life PR before the next time someone hits the same
+footgun. **It is not part of the BIP155 work and should not be
+bundled with this branch** — separate concern, separate review,
+separate revert path if it breaks anything.
+
 
 ## 6. Files modified summary
 
