@@ -584,6 +584,9 @@ void CNode::copyStats(CNodeStats &stats)
     stats.fWhitelisted = fWhitelisted;
     stats.nProcessedAddrs = nProcessedAddrs;
     stats.nRatelimitedAddrs = nRatelimitedAddrs;
+    // Network classification & BIP155 negotiation state for getpeerinfo.
+    stats.m_network = addr.GetNetwork();
+    stats.m_wants_addrv2 = m_wants_addrv2.load();
 
     // It is common for nodes with good ping times to suddenly become lagged,
     // due to a new block arriving or other large transfer.
