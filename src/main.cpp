@@ -9,6 +9,7 @@
 #include "sodium.h"
 
 #include "addrman.h"
+#include "torcontrol.h"
 #include "alert.h"
 #include "arith_uint256.h"
 #include "blockencodings.h"
@@ -7454,9 +7455,27 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 pfrom->fTorAuthSent = true;
             }
 
+            // Sign challenge with Tor hidden service ed25519 key for onion proof
+            std::vector<unsigned char> vchOnionSig;
+            std::vector<unsigned char> vchOnionPubKey;
+            unsigned char torSK[crypto_sign_SECRETKEYBYTES];
+            unsigned char torPK[crypto_sign_PUBLICKEYBYTES];
+            if (GetTorServiceEd25519Key(torSK, torPK)) {
+                vchOnionSig.resize(crypto_sign_BYTES);
+                if (crypto_sign_detached(vchOnionSig.data(), NULL,
+                        challenge.begin(), 32, torSK) == 0) {
+                    vchOnionPubKey.assign(torPK, torPK + crypto_sign_PUBLICKEYBYTES);
+                } else {
+                    vchOnionSig.clear();
+                }
+                sodium_memzero(torSK, sizeof(torSK));
+            }
+
             pfrom->PushMessage("torauthresp", fluxnodeOutPoint, vchSig,
-                               pfrom->nTorAuthChallenge);
-            LogPrint("tor", "torauth: responded to challenge from peer=%d\n", pfrom->id);
+                               pfrom->nTorAuthChallenge,
+                               vchOnionSig, vchOnionPubKey);
+            LogPrint("tor", "torauth: responded to challenge from peer=%d (onion proof: %s)\n",
+                     pfrom->id, vchOnionPubKey.empty() ? "no" : "yes");
         }
         return true;
     }
@@ -7483,6 +7502,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         std::vector<unsigned char> vchSig;
         uint256 peerChallenge;
         vRecv >> peerOutpoint >> vchSig >> peerChallenge;
+
+        // Read optional onion proof fields (backward compatible)
+        std::vector<unsigned char> vchOnionSig;
+        std::vector<unsigned char> vchOnionPubKey;
+        if (!vRecv.empty()) {
+            vRecv >> vchOnionSig >> vchOnionPubKey;
+        }
 
         // Look up peer's fluxnode pubkey
         CPubKey peerPubKey;
@@ -7535,6 +7561,29 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             }
         }
 
+        // Verify onion address proof of ownership
+        if (vchOnionSig.size() == crypto_sign_BYTES &&
+            vchOnionPubKey.size() == crypto_sign_PUBLICKEYBYTES) {
+
+            if (crypto_sign_verify_detached(vchOnionSig.data(),
+                    pfrom->nTorAuthChallenge.begin(), 32,
+                    vchOnionPubKey.data()) == 0) {
+
+                // Reconstruct .onion address from the verified pubkey
+                std::string onionAddr = OnionAddressFromEd25519Pubkey(vchOnionPubKey.data());
+                CService onionService(onionAddr, Params().GetDefaultPort(), false);
+                if (onionService.IsValid()) {
+                    pfrom->addr = CAddress(onionService);
+                    pfrom->addrName = onionService.ToStringIPPort();
+                    LogPrint("tor", "torauth: peer=%d onion address verified: %s\n",
+                             pfrom->id, onionAddr);
+                }
+            } else {
+                LogPrint("tor", "torauth: peer=%d onion ed25519 signature INVALID\n",
+                         pfrom->id);
+            }
+        }
+
         // If peer sent us a challenge back (mutual auth), sign and respond
         if (!peerChallenge.IsNull() && fFluxnode && !strFluxnodePrivKey.empty()) {
             CKey key;
@@ -7544,8 +7593,26 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 std::string strPeerChallenge = peerChallenge.ToString();
                 std::vector<unsigned char> vchSig2;
                 if (obfuScationSigner.SignMessage(strPeerChallenge, errorMessage2, vchSig2, key)) {
+                    // Include onion proof in mutual-auth response too
+                    std::vector<unsigned char> vchOnionSig2;
+                    std::vector<unsigned char> vchOnionPubKey2;
+                    unsigned char torSK[crypto_sign_SECRETKEYBYTES];
+                    unsigned char torPK[crypto_sign_PUBLICKEYBYTES];
+                    if (GetTorServiceEd25519Key(torSK, torPK)) {
+                        vchOnionSig2.resize(crypto_sign_BYTES);
+                        if (crypto_sign_detached(vchOnionSig2.data(), NULL,
+                                peerChallenge.begin(), 32, torSK) == 0) {
+                            vchOnionPubKey2.assign(torPK, torPK + crypto_sign_PUBLICKEYBYTES);
+                        } else {
+                            vchOnionSig2.clear();
+                        }
+                        sodium_memzero(torSK, sizeof(torSK));
+                    }
+
                     uint256 nullChallenge;
-                    pfrom->PushMessage("torauthresp", fluxnodeOutPoint, vchSig2, nullChallenge);
+                    pfrom->PushMessage("torauthresp", fluxnodeOutPoint, vchSig2,
+                                       nullChallenge,
+                                       vchOnionSig2, vchOnionPubKey2);
                 }
             }
         }
