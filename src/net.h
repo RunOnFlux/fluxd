@@ -11,6 +11,7 @@
 
 #include "bloom.h"
 #include "compat.h"
+#include "primitives/transaction.h"
 #include "hash.h"
 #include "limitedmap.h"
 #include "mruset.h"
@@ -304,6 +305,14 @@ public:
      *  v3 onion addresses to this peer; when false, we use the legacy
      *  addr message and silently drop v3 onions for this peer. */
     std::atomic_bool m_wants_addrv2{false};
+
+    // Tor fluxnode authentication state
+    uint256 nTorAuthChallenge;         // random nonce we sent to peer
+    bool fTorAuthSent;                 // we have sent a torauthreq
+    bool fTorAuthenticated;            // peer has proven fluxnode identity
+    COutPoint torAuthOutpoint;         // peer's verified fluxnode outpoint
+    int64_t nTorAuthTimestamp;         // when we sent the challenge
+
     CSemaphoreGrant grantOutbound;
     CCriticalSection cs_filter;
     CBloomFilter* pfilter;
