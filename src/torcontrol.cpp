@@ -517,8 +517,6 @@ void TorController::add_onion_cb(TorControlConnection& conn, const TorControlRep
             std::map<std::string,std::string>::iterator i;
             if ((i = m.find("ServiceID")) != m.end())
                 service_id = i->second;
-            if ((i = m.find("PrivateKey")) != m.end())
-                private_key = i->second;
         }
         if (service_id.empty()) {
             LogPrintf("tor: Error parsing ADD_ONION parameters:\n");
@@ -529,35 +527,15 @@ void TorController::add_onion_cb(TorControlConnection& conn, const TorControlRep
         }
 
         service = CService(service_id+".onion", GetListenPort(), false);
-        LogPrintf("tor: Got service ID %s, advertizing service %s\n", service_id, service.ToString());
-        if (WriteBinaryFile(GetPrivateKeyFile(), private_key)) {
-            LogPrint("tor", "tor: Cached service private key to %s\n", GetPrivateKeyFile());
-        } else {
-            LogPrintf("tor: Error writing service private key to %s\n", GetPrivateKeyFile());
-        }
+        LogPrintf("tor: Got service ID %s, advertizing service %s\n",
+                  service_id, service.ToString());
         AddLocal(service, LOCAL_MANUAL);
 
-        // Cache ed25519 key material for torauth onion proof
         {
             LOCK(cs_torkey);
-            const std::string prefix = "ED25519-V3:";
-            if (private_key.size() > prefix.size() &&
-                private_key.substr(0, prefix.size()) == prefix) {
-                bool invalid = false;
-                std::vector<unsigned char> decoded = DecodeBase64(
-                    private_key.substr(prefix.size()).c_str(), &invalid);
-                if (!invalid && decoded.size() == 64) {
-                    // Tor stores [seed(32) || pubkey(32)].  Expand the seed
-                    // into libsodium's crypto_sign secret key format.
-                    crypto_sign_seed_keypair(torEd25519PK, torEd25519SK,
-                                            decoded.data());
-                    strTorServiceID = service_id;
-                    fTorKeyAvailable = true;
-                    LogPrint("tor", "tor: Cached ed25519 key for onion proof\n");
-                }
-            }
+            strTorServiceID = service_id;
+            // fTorKeyAvailable was already set in auth_cb before ADD_ONION
         }
-        // ... onion requested - keep connection open
     } else if (reply.code == 510) { // 510 Unrecognized command
         LogPrintf("tor: Add onion failed with unrecognized command (You probably need to upgrade Tor)\n");
     } else {
@@ -578,13 +556,46 @@ void TorController::auth_cb(TorControlConnection& conn, const TorControlReply& r
             SetLimited(NET_ONION, false);
         }
 
-        // Finally - now create the service
-        if (private_key.empty()) // No private key, generate one
-            private_key = "NEW:ED25519-V3"; // Explicitly request a TORv3 ed25519 key
-        // Request hidden service, redirect port.
-        // Note that the 'virtual' port doesn't have to be the same as our internal port, but this is just a convenient
-        // choice.  TODO; refactor the shutdown sequence some day.
-        conn.Command(strprintf("ADD_ONION %s Port=%i,127.0.0.1:%i", private_key, GetListenPort(), GetListenPort()),
+        // Finally - now create the service.
+        //
+        // We store the raw 32-byte ed25519 seed as the authoritative key.
+        // This lets us sign with libsodium (which needs the seed) and
+        // derive Tor's expanded format on the fly for ADD_ONION.
+        if (private_key.empty()) {
+            unsigned char seed[crypto_sign_ed25519_SEEDBYTES];
+            randombytes_buf(seed, sizeof(seed));
+            private_key.assign(reinterpret_cast<char*>(seed), sizeof(seed));
+            if (WriteBinaryFile(GetPrivateKeyFile(),
+                    std::string(reinterpret_cast<char*>(seed), sizeof(seed)))) {
+                LogPrint("tor", "tor: Generated and cached new onion seed\n");
+            } else {
+                LogPrintf("tor: Error writing onion seed to %s\n",
+                          GetPrivateKeyFile());
+            }
+            sodium_memzero(seed, sizeof(seed));
+        }
+
+        // Expand seed to Tor's ADD_ONION format
+        unsigned char expanded[64];
+        crypto_hash_sha512(expanded,
+            reinterpret_cast<const unsigned char*>(private_key.data()), 32);
+        expanded[0]  &= 248;
+        expanded[31] &= 127;
+        expanded[31] |= 64;
+        std::string torKey = "ED25519-V3:" +
+            EncodeBase64(std::string(reinterpret_cast<char*>(expanded), 64));
+        sodium_memzero(expanded, sizeof(expanded));
+
+        // Cache the libsodium keypair for torauth signing
+        {
+            LOCK(cs_torkey);
+            crypto_sign_seed_keypair(torEd25519PK, torEd25519SK,
+                reinterpret_cast<const unsigned char*>(private_key.data()));
+            fTorKeyAvailable = true;
+        }
+
+        conn.Command(strprintf("ADD_ONION %s Port=%i,127.0.0.1:%i",
+            torKey, GetListenPort(), GetListenPort()),
             [this](TorControlConnection& conn, const TorControlReply& reply) { add_onion_cb(conn, reply); });
     } else {
         LogPrintf("tor: Authentication failed\n");
