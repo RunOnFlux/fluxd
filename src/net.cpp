@@ -32,6 +32,7 @@
 #endif
 
 #include <filesystem>
+#include <string_view>
 #include <condition_variable>
 #include <mutex>
 #include <condition_variable>
@@ -74,6 +75,7 @@ using namespace std;
 
 namespace {
     const int MAX_OUTBOUND_CONNECTIONS = 16;
+    const int DEFAULT_MAX_ONION_OUTBOUND = 2;
 
     struct ListenSocket {
         SOCKET socket;
@@ -97,6 +99,7 @@ uint64_t nLocalHostNonce = 0;
 static std::vector<ListenSocket> vhListenSocket;
 CAddrMan addrman;
 int nMaxConnections = DEFAULT_MAX_PEER_CONNECTIONS;
+int nMaxOnionOutbound = DEFAULT_MAX_ONION_OUTBOUND;
 bool fAddressesInitialized = false;
 std::string strSubVersion;
 
@@ -1521,6 +1524,7 @@ void ThreadOpenConnections()
         // Only connect out to one peer per network group (/16 for IPv4).
         // Do this here so we don't have to critsect vNodes inside mapAddresses critsect.
         int nOutbound = 0;
+        int nOnionOutbound = 0;
         set<vector<unsigned char> > setConnected;
         {
             LOCK(cs_vNodes);
@@ -1528,6 +1532,8 @@ void ThreadOpenConnections()
                 if (!pnode->fInbound) {
                     setConnected.insert(pnode->addr.GetGroup());
                     nOutbound++;
+                    if (pnode->addr.IsTor())
+                        nOnionOutbound++;
                 }
             }
         }
@@ -1548,7 +1554,11 @@ void ThreadOpenConnections()
             CAddrInfo addr = addrman.Select(fFeeler);
 
             // if we selected an invalid address, restart
-            if (!addr.IsValid() || setConnected.count(addr.GetGroup()) || IsLocal(addr))
+            // Exempt Tor from the group check (all onion share one group);
+            // onion outbound is governed by nMaxOnionOutbound instead.
+            if (!addr.IsValid() || IsLocal(addr))
+                break;
+            if (setConnected.count(addr.GetGroup()) && !addr.IsTor())
                 break;
 
             // If we didn't find an appropriate destination after trying 100 addresses fetched from addrman,
@@ -1566,6 +1576,10 @@ void ThreadOpenConnections()
                 addrConnect = addr;
                 break;
             }
+
+            // Enforce onion outbound cap
+            if (addr.IsTor() && nOnionOutbound >= nMaxOnionOutbound)
+                continue;
 
             // only consider very recently tried nodes after 30 failed attempts
             if (nANow - addr.nLastTry < 600 && nTries < 30)
@@ -1682,6 +1696,19 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
     //
     // Initiate outbound network connection
     //
+    // Enforce onion outbound cap for both addrman and addnode paths
+    bool fIsOnionDest = addrConnect.IsTor() ||
+        (pszDest && std::string_view(pszDest).ends_with(".onion"));
+    if (fIsOnionDest) {
+        int nOnionOut = 0;
+        LOCK(cs_vNodes);
+        for (CNode* pnode : vNodes)
+            if (!pnode->fInbound && pnode->addr.IsTor())
+                nOnionOut++;
+        if (nOnionOut >= nMaxOnionOutbound)
+            return false;
+    }
+
     if (!pszDest) {
         if (IsLocal(addrConnect) ||
             FindNode((CNetAddr)addrConnect) || CNode::IsBanned(addrConnect) ||

@@ -1365,6 +1365,9 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         }
     }
 
+    if (mapArgs.count("-maxonionoutbound"))
+        nMaxOnionOutbound = GetArg("-maxonionoutbound", nMaxOnionOutbound);
+
     if (mapArgs.count("-whitelist")) {
         for (const std::string& net : mapMultiArgs["-whitelist"]) {
             CSubNet subnet(net);
@@ -1963,6 +1966,12 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
             return InitError("Fluxnode can be run only on Linux");
         }
     #endif
+
+    // Fluxnodes must remain reachable on clearnet (IPv4).
+    if (fFluxnode && IsLimited(NET_IPV4)) {
+        return InitError(_("Fluxnodes must remain reachable on IPv4. "
+                           "Cannot use -onlynet without including ipv4."));
+    }
 
     if (fFluxnode) {
         LogPrintf("IS FLUXNODE\n");
