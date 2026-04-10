@@ -7356,6 +7356,26 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         // Set after verack (not after version) so that BIP155 sendaddrv2,
         // which must arrive between version and verack, is accepted.
         pfrom->fSuccessfullyConnected = true;
+
+        // Initiate Tor authentication for fluxnode peers.
+        // Only when we are a fluxnode and not in initial block download.
+        if (fFluxnode && !fluxnodeOutPoint.IsNull() && !IsInitialBlockDownload(chainparams)) {
+            bool fNeedsTorAuth = false;
+            if (pfrom->fInbound && pfrom->addr.IsLocal()) {
+                // Inbound from 127.0.0.1 = Tor hidden service connection
+                fNeedsTorAuth = true;
+            } else if (!pfrom->fInbound && pfrom->addr.IsTor()) {
+                // Outbound to a .onion address
+                fNeedsTorAuth = true;
+            }
+            if (fNeedsTorAuth) {
+                GetRandBytes(pfrom->nTorAuthChallenge.begin(), 32);
+                pfrom->nTorAuthTimestamp = GetTime();
+                pfrom->fTorAuthSent = true;
+                pfrom->PushMessage("torauthreq", fluxnodeOutPoint, pfrom->nTorAuthChallenge);
+                LogPrint("tor", "torauth: sent challenge to peer=%d\n", pfrom->id);
+            }
+        }
     }
 
 
@@ -7385,6 +7405,136 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             return false;
         }
         pfrom->m_wants_addrv2 = true;
+        return true;
+    }
+
+
+    else if (strCommand == "torauthreq")
+    {
+        if (!pfrom->fSuccessfullyConnected) {
+            Misbehaving(pfrom->GetId(), 10);
+            return false;
+        }
+
+        COutPoint peerOutpoint;
+        uint256 challenge;
+        vRecv >> peerOutpoint >> challenge;
+
+        // Self-connection detection
+        if (peerOutpoint == fluxnodeOutPoint) {
+            LogPrintf("torauth: self-connection detected from peer=%d; disconnecting\n", pfrom->id);
+            pfrom->fDisconnect = true;
+            return true;
+        }
+
+        // Verify the sender claims a real fluxnode identity
+        {
+            LOCK(g_fluxnodeCache.cs);
+            if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(peerOutpoint) == 0) {
+                LogPrint("tor", "torauth: peer=%d claims unknown outpoint %s; ignoring\n",
+                         pfrom->id, peerOutpoint.ToFullString());
+                return true;
+            }
+        }
+
+        // If WE are a fluxnode, sign the challenge and respond
+        if (fFluxnode && !strFluxnodePrivKey.empty()) {
+            CKey key;
+            CPubKey pubkey;
+            std::string errorMessage;
+            if (!obfuScationSigner.SetKey(strFluxnodePrivKey, errorMessage, key, pubkey)) {
+                LogPrintf("torauth: failed to set signing key: %s\n", errorMessage);
+                return true;
+            }
+
+            std::string strChallenge = challenge.ToString();
+            std::vector<unsigned char> vchSig;
+            if (!obfuScationSigner.SignMessage(strChallenge, errorMessage, vchSig, key)) {
+                LogPrintf("torauth: failed to sign challenge: %s\n", errorMessage);
+                return true;
+            }
+
+            // Generate our own challenge for mutual auth (if we haven't already)
+            if (!pfrom->fTorAuthSent) {
+                GetRandBytes(pfrom->nTorAuthChallenge.begin(), 32);
+                pfrom->nTorAuthTimestamp = GetTime();
+                pfrom->fTorAuthSent = true;
+            }
+
+            pfrom->PushMessage("torauthresp", fluxnodeOutPoint, vchSig,
+                               pfrom->nTorAuthChallenge);
+            LogPrint("tor", "torauth: responded to challenge from peer=%d\n", pfrom->id);
+        }
+        return true;
+    }
+
+
+    else if (strCommand == "torauthresp")
+    {
+        if (!pfrom->fSuccessfullyConnected) {
+            Misbehaving(pfrom->GetId(), 10);
+            return false;
+        }
+
+        // Already authenticated — ignore duplicate
+        if (pfrom->fTorAuthenticated)
+            return true;
+
+        if (!pfrom->fTorAuthSent) {
+            // We never sent a challenge to this peer
+            Misbehaving(pfrom->GetId(), 20);
+            return false;
+        }
+
+        COutPoint peerOutpoint;
+        std::vector<unsigned char> vchSig;
+        uint256 peerChallenge;
+        vRecv >> peerOutpoint >> vchSig >> peerChallenge;
+
+        // Look up peer's fluxnode pubkey
+        CPubKey peerPubKey;
+        {
+            LOCK(g_fluxnodeCache.cs);
+            if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(peerOutpoint) == 0) {
+                LogPrint("tor", "torauth: peer=%d response claims unknown outpoint %s\n",
+                         pfrom->id, peerOutpoint.ToFullString());
+                Misbehaving(pfrom->GetId(), 10);
+                return false;
+            }
+            peerPubKey = g_fluxnodeCache.mapConfirmedFluxnodeData[peerOutpoint].pubKey;
+        }
+
+        // Verify the signature against our challenge
+        std::string strChallenge = pfrom->nTorAuthChallenge.ToString();
+        std::string errorMessage;
+        if (!obfuScationSigner.VerifyMessage(peerPubKey, vchSig, strChallenge, errorMessage)) {
+            LogPrint("tor", "torauth: peer=%d signature verification FAILED: %s\n",
+                     pfrom->id, errorMessage);
+            Misbehaving(pfrom->GetId(), 50);
+            return false;
+        }
+
+        // Authentication succeeded
+        pfrom->fTorAuthenticated = true;
+        pfrom->torAuthOutpoint = peerOutpoint;
+        LogPrint("tor", "torauth: peer=%d authenticated as fluxnode %s\n",
+                 pfrom->id, peerOutpoint.ToFullString());
+
+        // If peer sent us a challenge back (mutual auth), sign and respond
+        if (!peerChallenge.IsNull() && fFluxnode && !strFluxnodePrivKey.empty()) {
+            CKey key;
+            CPubKey pubkey;
+            std::string errorMessage2;
+            if (obfuScationSigner.SetKey(strFluxnodePrivKey, errorMessage2, key, pubkey)) {
+                std::string strPeerChallenge = peerChallenge.ToString();
+                std::vector<unsigned char> vchSig2;
+                if (obfuScationSigner.SignMessage(strPeerChallenge, errorMessage2, vchSig2, key)) {
+                    uint256 nullChallenge;
+                    pfrom->PushMessage("torauthresp", fluxnodeOutPoint, vchSig2, nullChallenge);
+                }
+            }
+        }
+
         return true;
     }
 
