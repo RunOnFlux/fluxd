@@ -7174,11 +7174,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             return true;
         }
 
-        // Detect duplicate connections for inbound Tor hidden service peers.
+        // Best-effort early duplicate detection for inbound Tor peers.
         // Inbound hidden-service connections arrive from 127.0.0.1, so the
-        // normal FindNode() duplicate check (which uses pnode->addr) misses
-        // them.  The peer's self-announced addrFrom carries its .onion
-        // address, so we check that against existing outbound connections.
+        // normal FindNode() duplicate check misses them.  If the peer
+        // advertises its .onion in addrFrom we can catch it here.  This is
+        // unreliable (addrFrom may be 0.0.0.0 if the peer's Tor hidden
+        // service is externally configured), so fluxnodes get a second,
+        // cryptographic duplicate check after torauth completes.
         if (pfrom->fInbound && addrFrom.IsValid() && addrFrom.IsTor()) {
             CNode* pDup = FindNode((CNetAddr)addrFrom);
             if (pDup && !pDup->fInbound) {
@@ -7519,6 +7521,28 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         pfrom->torAuthOutpoint = peerOutpoint;
         LogPrint("tor", "torauth: peer=%d authenticated as fluxnode %s\n",
                  pfrom->id, peerOutpoint.ToFullString());
+
+        // Detect duplicate connections by fluxnode identity.
+        // Inbound Tor connections arrive from 127.0.0.1, so address-based
+        // duplicate detection misses them.  Now that we have a cryptographic
+        // identity (the verified outpoint), check whether another peer already
+        // authenticated with the same outpoint and disconnect the duplicate.
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodes) {
+                if (pnode == pfrom)
+                    continue;
+                if (pnode->fTorAuthenticated && pnode->torAuthOutpoint == peerOutpoint) {
+                    // Prefer the outbound connection (we initiated it, so it's
+                    // harder to spoof).  Disconnect whichever is inbound.
+                    CNode* pDisconnect = pfrom->fInbound ? pfrom : pnode;
+                    LogPrintf("torauth: duplicate fluxnode %s on peer=%d and peer=%d; disconnecting peer=%d\n",
+                              peerOutpoint.ToFullString(), pfrom->id, pnode->id, pDisconnect->id);
+                    pDisconnect->fDisconnect = true;
+                    break;
+                }
+            }
+        }
 
         // If peer sent us a challenge back (mutual auth), sign and respond
         if (!peerChallenge.IsNull() && fFluxnode && !strFluxnodePrivKey.empty()) {
