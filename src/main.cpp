@@ -7165,6 +7165,21 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             return true;
         }
 
+        // Detect duplicate connections for inbound Tor hidden service peers.
+        // Inbound hidden-service connections arrive from 127.0.0.1, so the
+        // normal FindNode() duplicate check (which uses pnode->addr) misses
+        // them.  The peer's self-announced addrFrom carries its .onion
+        // address, so we check that against existing outbound connections.
+        if (pfrom->fInbound && addrFrom.IsValid() && addrFrom.IsTor()) {
+            CNode* pDup = FindNode((CNetAddr)addrFrom);
+            if (pDup && !pDup->fInbound) {
+                LogPrintf("duplicate connection from %s (inbound vs existing outbound peer=%d); disconnecting inbound peer=%d\n",
+                          addrFrom.ToString(), pDup->GetId(), pfrom->GetId());
+                pfrom->fDisconnect = true;
+                return true;
+            }
+        }
+
         pfrom->addrLocal = addrMe;
         if (pfrom->fInbound && addrMe.IsRoutable())
         {
