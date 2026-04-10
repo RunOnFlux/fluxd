@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <assert.h>
+#include <iterator>
 #include <string.h>
 
 namespace {
