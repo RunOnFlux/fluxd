@@ -1264,6 +1264,15 @@ void ThreadSocketHandler()
                     LogPrintf("ping timeout: %fs\n", 0.000001 * (GetTimeMicros() - pnode->nPingUsecStart));
                     pnode->fDisconnect = true;
                 }
+                // Tor authentication timeout: disconnect inbound Tor peers
+                // that haven't authenticated within 60 seconds
+                else if (pnode->fInbound && pnode->addr.IsLocal()
+                         && pnode->fTorAuthSent && !pnode->fTorAuthenticated
+                         && nTime - pnode->nTorAuthTimestamp > 60)
+                {
+                    LogPrint("net", "torauth: peer=%d failed to authenticate within timeout; disconnecting\n", pnode->id);
+                    pnode->fDisconnect = true;
+                }
             }
         }
         {
@@ -2458,6 +2467,10 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     fFeeler = false;
     fSuccessfullyConnected = false;
     fDisconnect = false;
+    nTorAuthChallenge.SetNull();
+    fTorAuthSent = false;
+    fTorAuthenticated = false;
+    nTorAuthTimestamp = 0;
     nRefCount = 0;
     nSendSize = 0;
     nSendOffset = 0;
