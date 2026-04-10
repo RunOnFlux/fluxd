@@ -7243,10 +7243,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 alert.RelayTo(pfrom);
         }
 
-        pfrom->fSuccessfullyConnected = true;
-
         if (pfrom->fFeeler) {
-            // Feeler connection succeeded — address is verified good, disconnect
             LogPrint("net", "Feeler connection to %s succeeded, disconnecting\n", pfrom->addr.ToString());
             pfrom->fDisconnect = true;
             return true;
@@ -7339,6 +7336,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     LogPrint("net", "Peer %d will send us compact blocks (high-bandwidth mode)\n", pfrom->id);
             }
         }
+
+        // Handshake complete: version + verack exchange finished.
+        // Set after verack (not after version) so that BIP155 sendaddrv2,
+        // which must arrive between version and verack, is accepted.
+        pfrom->fSuccessfullyConnected = true;
     }
 
 
