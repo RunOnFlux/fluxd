@@ -10,6 +10,9 @@
 #include "net.h"
 #include "util.h"
 #include "crypto/hmac_sha256.h"
+#include "sync.h"
+
+#include <sodium.h>
 
 #include <vector>
 #include <deque>
@@ -400,6 +403,30 @@ static bool WriteBinaryFile(const std::string &filename, const std::string &data
     return true;
 }
 
+/****** Tor hidden service ed25519 key cache ********/
+
+static CCriticalSection cs_torkey;
+static bool fTorKeyAvailable = false;
+static unsigned char torEd25519SK[crypto_sign_SECRETKEYBYTES]; // 64
+static unsigned char torEd25519PK[crypto_sign_PUBLICKEYBYTES]; // 32
+static std::string strTorServiceID;
+
+bool GetTorServiceEd25519Key(unsigned char sk[64], unsigned char pk[32])
+{
+    LOCK(cs_torkey);
+    if (!fTorKeyAvailable)
+        return false;
+    memcpy(sk, torEd25519SK, crypto_sign_SECRETKEYBYTES);
+    memcpy(pk, torEd25519PK, crypto_sign_PUBLICKEYBYTES);
+    return true;
+}
+
+std::string GetTorServiceID()
+{
+    LOCK(cs_torkey);
+    return strTorServiceID;
+}
+
 /****** Bitcoin specific TorController implementation ********/
 
 /** Controller that connects to Tor control socket, authenticate, then create
@@ -509,6 +536,27 @@ void TorController::add_onion_cb(TorControlConnection& conn, const TorControlRep
             LogPrintf("tor: Error writing service private key to %s\n", GetPrivateKeyFile());
         }
         AddLocal(service, LOCAL_MANUAL);
+
+        // Cache ed25519 key material for torauth onion proof
+        {
+            LOCK(cs_torkey);
+            const std::string prefix = "ED25519-V3:";
+            if (private_key.size() > prefix.size() &&
+                private_key.substr(0, prefix.size()) == prefix) {
+                bool invalid = false;
+                std::vector<unsigned char> decoded = DecodeBase64(
+                    private_key.substr(prefix.size()).c_str(), &invalid);
+                if (!invalid && decoded.size() == 64) {
+                    // Tor stores [seed(32) || pubkey(32)].  Expand the seed
+                    // into libsodium's crypto_sign secret key format.
+                    crypto_sign_seed_keypair(torEd25519PK, torEd25519SK,
+                                            decoded.data());
+                    strTorServiceID = service_id;
+                    fTorKeyAvailable = true;
+                    LogPrint("tor", "tor: Cached ed25519 key for onion proof\n");
+                }
+            }
+        }
         // ... onion requested - keep connection open
     } else if (reply.code == 510) { // 510 Unrecognized command
         LogPrintf("tor: Add onion failed with unrecognized command (You probably need to upgrade Tor)\n");

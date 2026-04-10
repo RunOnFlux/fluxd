@@ -735,6 +735,17 @@ static void Checksum(const unsigned char* pubkey, unsigned char (&checksum)[CHEC
 }
 } // namespace torv3
 
+std::string OnionAddressFromEd25519Pubkey(const unsigned char* pubkey)
+{
+    unsigned char buf[torv3::TOTAL_LEN];
+    memcpy(buf, pubkey, ADDR_TORV3_SIZE);
+    unsigned char checksum[torv3::CHECKSUM_LEN];
+    torv3::Checksum(pubkey, checksum);
+    memcpy(buf + ADDR_TORV3_SIZE, checksum, torv3::CHECKSUM_LEN);
+    memcpy(buf + ADDR_TORV3_SIZE + torv3::CHECKSUM_LEN, torv3::VERSION, sizeof(torv3::VERSION));
+    return EncodeBase32(buf, sizeof(buf)) + ".onion";
+}
+
 bool CNetAddr::SetTor(const std::string &strName)
 {
     static const std::string suffix = ".onion";

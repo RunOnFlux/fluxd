@@ -20,4 +20,13 @@ void StartTorControl(std::vector<std::thread>& threadGroup, CScheduler& schedule
 void InterruptTorControl();
 void StopTorControl();
 
+/** Get the raw 64-byte ed25519 secret key for the local Tor hidden service.
+ *  Returns false if the key is not yet available.  sk is in libsodium
+ *  crypto_sign format (suitable for crypto_sign_detached). */
+bool GetTorServiceEd25519Key(unsigned char sk[64], unsigned char pk[32]);
+
+/** Get our .onion service ID (56-char base32, without ".onion" suffix).
+ *  Returns empty string if not available. */
+std::string GetTorServiceID();
+
 #endif /* BITCOIN_TORCONTROL_H */
