@@ -7093,6 +7093,53 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
     }
 }
 
+// Torauth misbehaving scores — named constants so the rationale is explicit.
+static const int TORAUTH_MISBEHAVE_NO_HANDSHAKE    = 10;  // torauthreq/resp before verack
+static const int TORAUTH_MISBEHAVE_UNKNOWN_OUTPOINT = 10;  // response claims unregistered fluxnode
+static const int TORAUTH_MISBEHAVE_UNSOLICITED      = 20;  // torauthresp without us sending a challenge
+static const int TORAUTH_MISBEHAVE_BAD_SIGNATURE     = 50;  // secp256k1 signature verification failed
+
+/** Sign a torauth challenge with both the fluxnode secp256k1 key and the
+ *  Tor hidden service ed25519 key. The ed25519 signature covers
+ *  challenge || signer_outpoint.hash to bind the onion proof to the
+ *  signer's fluxnode identity, preventing relay attacks where a MITM
+ *  obtains a valid ed25519 signature from the real .onion owner and
+ *  presents it as their own. */
+static bool TorAuthSign(const uint256& challenge, const COutPoint& signerOutpoint,
+                        std::vector<unsigned char>& vchSig,
+                        std::vector<unsigned char>& vchOnionSig,
+                        std::vector<unsigned char>& vchOnionPubKey)
+{
+    CKey key;
+    CPubKey pubkey;
+    std::string errorMessage;
+    if (!obfuScationSigner.SetKey(strFluxnodePrivKey, errorMessage, key, pubkey))
+        return false;
+
+    std::string strChallenge = challenge.ToString();
+    if (!obfuScationSigner.SignMessage(strChallenge, errorMessage, vchSig, key))
+        return false;
+
+    // ed25519 onion proof: sign (challenge || outpoint_hash) so the signature
+    // is bound to this specific fluxnode's identity.
+    unsigned char torSK[crypto_sign_SECRETKEYBYTES];
+    unsigned char torPK[crypto_sign_PUBLICKEYBYTES];
+    if (GetTorServiceEd25519Key(torSK, torPK)) {
+        unsigned char signBuf[64];
+        memcpy(signBuf, challenge.begin(), 32);
+        memcpy(signBuf + 32, signerOutpoint.hash.begin(), 32);
+
+        vchOnionSig.resize(crypto_sign_BYTES);
+        if (crypto_sign_detached(vchOnionSig.data(), NULL, signBuf, 64, torSK) == 0) {
+            vchOnionPubKey.assign(torPK, torPK + crypto_sign_PUBLICKEYBYTES);
+        } else {
+            vchOnionSig.clear();
+        }
+        sodium_memzero(torSK, sizeof(torSK));
+    }
+    return true;
+}
+
 bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived)
 {
     const CChainParams& chainparams = Params();
@@ -7392,10 +7439,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     else if (strCommand == "sendaddrv2")
     {
         // BIP155: SENDADDRV2 must arrive before VERACK; receiving it after the
-        // handshake is a protocol violation.
+        // handshake is complete should be ignored per BIP155 ("MUST NOT treat
+        // as a protocol violation"). Match Bitcoin Core behavior: log + ignore.
         if (pfrom->fSuccessfullyConnected) {
             LogPrint("net", "sendaddrv2 received after VERACK from peer=%d; ignoring\n", pfrom->GetId());
-            Misbehaving(pfrom->GetId(), 20);
             return false;
         }
         pfrom->m_wants_addrv2 = true;
@@ -7406,7 +7453,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     else if (strCommand == "torauthreq")
     {
         if (!pfrom->fSuccessfullyConnected) {
-            Misbehaving(pfrom->GetId(), 10);
+            Misbehaving(pfrom->GetId(), TORAUTH_MISBEHAVE_NO_HANDSHAKE);
             return false;
         }
 
@@ -7433,21 +7480,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         // If WE are a fluxnode, sign the challenge and respond
         if (fFluxnode && !strFluxnodePrivKey.empty()) {
-            CKey key;
-            CPubKey pubkey;
-            std::string errorMessage;
-            if (!obfuScationSigner.SetKey(strFluxnodePrivKey, errorMessage, key, pubkey)) {
-                LogPrintf("torauth: failed to set signing key: %s\n", errorMessage);
-                return true;
-            }
-
-            std::string strChallenge = challenge.ToString();
-            std::vector<unsigned char> vchSig;
-            if (!obfuScationSigner.SignMessage(strChallenge, errorMessage, vchSig, key)) {
-                LogPrintf("torauth: failed to sign challenge: %s\n", errorMessage);
-                return true;
-            }
-
             // Generate our own challenge for mutual auth (if we haven't already)
             if (!pfrom->fTorAuthSent) {
                 GetRandBytes(pfrom->nTorAuthChallenge.begin(), 32);
@@ -7455,20 +7487,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 pfrom->fTorAuthSent = true;
             }
 
-            // Sign challenge with Tor hidden service ed25519 key for onion proof
+            std::vector<unsigned char> vchSig;
             std::vector<unsigned char> vchOnionSig;
             std::vector<unsigned char> vchOnionPubKey;
-            unsigned char torSK[crypto_sign_SECRETKEYBYTES];
-            unsigned char torPK[crypto_sign_PUBLICKEYBYTES];
-            if (GetTorServiceEd25519Key(torSK, torPK)) {
-                vchOnionSig.resize(crypto_sign_BYTES);
-                if (crypto_sign_detached(vchOnionSig.data(), NULL,
-                        challenge.begin(), 32, torSK) == 0) {
-                    vchOnionPubKey.assign(torPK, torPK + crypto_sign_PUBLICKEYBYTES);
-                } else {
-                    vchOnionSig.clear();
-                }
-                sodium_memzero(torSK, sizeof(torSK));
+            if (!TorAuthSign(challenge, fluxnodeOutPoint, vchSig, vchOnionSig, vchOnionPubKey)) {
+                LogPrintf("torauth: failed to sign challenge for peer=%d\n", pfrom->id);
+                return true;
             }
 
             pfrom->PushMessage("torauthresp", fluxnodeOutPoint, vchSig,
@@ -7484,7 +7508,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     else if (strCommand == "torauthresp")
     {
         if (!pfrom->fSuccessfullyConnected) {
-            Misbehaving(pfrom->GetId(), 10);
+            Misbehaving(pfrom->GetId(), TORAUTH_MISBEHAVE_NO_HANDSHAKE);
             return false;
         }
 
@@ -7494,7 +7518,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         if (!pfrom->fTorAuthSent) {
             // We never sent a challenge to this peer
-            Misbehaving(pfrom->GetId(), 20);
+            Misbehaving(pfrom->GetId(), TORAUTH_MISBEHAVE_UNSOLICITED);
             return false;
         }
 
@@ -7517,7 +7541,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(peerOutpoint) == 0) {
                 LogPrint("tor", "torauth: peer=%d response claims unknown outpoint %s\n",
                          pfrom->id, peerOutpoint.ToFullString());
-                Misbehaving(pfrom->GetId(), 10);
+                Misbehaving(pfrom->GetId(), TORAUTH_MISBEHAVE_UNKNOWN_OUTPOINT);
                 return false;
             }
             peerPubKey = g_fluxnodeCache.mapConfirmedFluxnodeData[peerOutpoint].pubKey;
@@ -7529,23 +7553,23 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         if (!obfuScationSigner.VerifyMessage(peerPubKey, vchSig, strChallenge, errorMessage)) {
             LogPrint("tor", "torauth: peer=%d signature verification FAILED: %s\n",
                      pfrom->id, errorMessage);
-            Misbehaving(pfrom->GetId(), 50);
+            Misbehaving(pfrom->GetId(), TORAUTH_MISBEHAVE_BAD_SIGNATURE);
             return false;
         }
 
-        // Authentication succeeded
-        pfrom->fTorAuthenticated = true;
-        pfrom->torAuthOutpoint = peerOutpoint;
-        LogPrint("tor", "torauth: peer=%d authenticated as fluxnode %s\n",
-                 pfrom->id, peerOutpoint.ToFullString());
-
-        // Detect duplicate connections by fluxnode identity.
-        // Inbound Tor connections arrive from 127.0.0.1, so address-based
-        // duplicate detection misses them.  Now that we have a cryptographic
-        // identity (the verified outpoint), check whether another peer already
-        // authenticated with the same outpoint and disconnect the duplicate.
+        // Authentication succeeded. Set identity and check for duplicates
+        // atomically under cs_vNodes to prevent a race where two connections
+        // from the same fluxnode both pass verification simultaneously.
         {
             LOCK(cs_vNodes);
+            pfrom->fTorAuthenticated = true;
+            pfrom->torAuthOutpoint = peerOutpoint;
+
+            // Detect duplicate connections by fluxnode identity.
+            // Inbound Tor connections arrive from 127.0.0.1, so address-based
+            // duplicate detection misses them.  Now that we have a cryptographic
+            // identity (the verified outpoint), check whether another peer already
+            // authenticated with the same outpoint and disconnect the duplicate.
             BOOST_FOREACH(CNode* pnode, vNodes) {
                 if (pnode == pfrom)
                     continue;
@@ -7560,19 +7584,28 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 }
             }
         }
+        LogPrint("tor", "torauth: peer=%d authenticated as fluxnode %s\n",
+                 pfrom->id, peerOutpoint.ToFullString());
 
-        // Verify onion address proof of ownership
+        // Verify onion address proof of ownership.
+        // The ed25519 signature covers challenge || signer_outpoint_hash to
+        // bind the proof to the peer's identity and prevent relay attacks.
         if (vchOnionSig.size() == crypto_sign_BYTES &&
             vchOnionPubKey.size() == crypto_sign_PUBLICKEYBYTES) {
 
+            unsigned char verifyBuf[64];
+            memcpy(verifyBuf, pfrom->nTorAuthChallenge.begin(), 32);
+            memcpy(verifyBuf + 32, peerOutpoint.hash.begin(), 32);
+
             if (crypto_sign_verify_detached(vchOnionSig.data(),
-                    pfrom->nTorAuthChallenge.begin(), 32,
+                    verifyBuf, 64,
                     vchOnionPubKey.data()) == 0) {
 
                 // Reconstruct .onion address from the verified pubkey
                 std::string onionAddr = OnionAddressFromEd25519Pubkey(vchOnionPubKey.data());
                 CService onionService(onionAddr, Params().GetDefaultPort(), false);
                 if (onionService.IsValid()) {
+                    LOCK(pfrom->cs_addrName);
                     pfrom->addr = CAddress(onionService);
                     pfrom->addrName = onionService.ToStringIPPort();
                     LogPrint("tor", "torauth: peer=%d onion address verified: %s\n",
@@ -7586,34 +7619,14 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         // If peer sent us a challenge back (mutual auth), sign and respond
         if (!peerChallenge.IsNull() && fFluxnode && !strFluxnodePrivKey.empty()) {
-            CKey key;
-            CPubKey pubkey;
-            std::string errorMessage2;
-            if (obfuScationSigner.SetKey(strFluxnodePrivKey, errorMessage2, key, pubkey)) {
-                std::string strPeerChallenge = peerChallenge.ToString();
-                std::vector<unsigned char> vchSig2;
-                if (obfuScationSigner.SignMessage(strPeerChallenge, errorMessage2, vchSig2, key)) {
-                    // Include onion proof in mutual-auth response too
-                    std::vector<unsigned char> vchOnionSig2;
-                    std::vector<unsigned char> vchOnionPubKey2;
-                    unsigned char torSK[crypto_sign_SECRETKEYBYTES];
-                    unsigned char torPK[crypto_sign_PUBLICKEYBYTES];
-                    if (GetTorServiceEd25519Key(torSK, torPK)) {
-                        vchOnionSig2.resize(crypto_sign_BYTES);
-                        if (crypto_sign_detached(vchOnionSig2.data(), NULL,
-                                peerChallenge.begin(), 32, torSK) == 0) {
-                            vchOnionPubKey2.assign(torPK, torPK + crypto_sign_PUBLICKEYBYTES);
-                        } else {
-                            vchOnionSig2.clear();
-                        }
-                        sodium_memzero(torSK, sizeof(torSK));
-                    }
-
-                    uint256 nullChallenge;
-                    pfrom->PushMessage("torauthresp", fluxnodeOutPoint, vchSig2,
-                                       nullChallenge,
-                                       vchOnionSig2, vchOnionPubKey2);
-                }
+            std::vector<unsigned char> vchSig2;
+            std::vector<unsigned char> vchOnionSig2;
+            std::vector<unsigned char> vchOnionPubKey2;
+            if (TorAuthSign(peerChallenge, fluxnodeOutPoint, vchSig2, vchOnionSig2, vchOnionPubKey2)) {
+                uint256 nullChallenge;
+                pfrom->PushMessage("torauthresp", fluxnodeOutPoint, vchSig2,
+                                   nullChallenge,
+                                   vchOnionSig2, vchOnionPubKey2);
             }
         }
 

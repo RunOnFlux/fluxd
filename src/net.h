@@ -306,12 +306,20 @@ public:
      *  addr message and silently drop v3 onions for this peer. */
     std::atomic_bool m_wants_addrv2{false};
 
-    // Tor fluxnode authentication state
-    uint256 nTorAuthChallenge;         // random nonce we sent to peer
-    bool fTorAuthSent;                 // we have sent a torauthreq
-    bool fTorAuthenticated;            // peer has proven fluxnode identity
-    COutPoint torAuthOutpoint;         // peer's verified fluxnode outpoint
-    int64_t nTorAuthTimestamp;         // when we sent the challenge
+    // Tor fluxnode authentication state.
+    // fTorAuthSent, fTorAuthenticated, and nTorAuthTimestamp are written in
+    // ProcessMessage (message handler thread) and read in ThreadSocketHandler
+    // (socket handler thread), so they must be atomic to avoid data races.
+    uint256 nTorAuthChallenge;                   // random nonce we sent to peer
+    std::atomic_bool fTorAuthSent{false};         // we have sent a torauthreq
+    std::atomic_bool fTorAuthenticated{false};    // peer has proven fluxnode identity
+    COutPoint torAuthOutpoint;                   // peer's verified fluxnode outpoint
+    std::atomic<int64_t> nTorAuthTimestamp{0};    // when we sent the challenge
+
+    // Guards writes to addr and addrName (e.g., torauth onion proof
+    // updating addr from 127.0.0.1 to the verified .onion address)
+    // while other threads read them in copyStats / ThreadSocketHandler.
+    CCriticalSection cs_addrName;
 
     CSemaphoreGrant grantOutbound;
     CCriticalSection cs_filter;
