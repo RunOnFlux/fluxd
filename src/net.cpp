@@ -76,6 +76,7 @@ using namespace std;
 namespace {
     const int MAX_OUTBOUND_CONNECTIONS = 16;
     const int DEFAULT_MAX_ONION_OUTBOUND = 2;
+    const int TORAUTH_TIMEOUT_SECONDS = 60;
 
     struct ListenSocket {
         SOCKET socket;
@@ -577,7 +578,6 @@ void CNode::copyStats(CNodeStats &stats)
     stats.nLastRecv = nLastRecv;
     stats.nTimeConnected = nTimeConnected;
     stats.nTimeOffset = nTimeOffset;
-    stats.addrName = addrName;
     stats.nVersion = nVersion;
     stats.cleanSubVer = cleanSubVer;
     stats.fInbound = fInbound;
@@ -587,8 +587,11 @@ void CNode::copyStats(CNodeStats &stats)
     stats.fWhitelisted = fWhitelisted;
     stats.nProcessedAddrs = nProcessedAddrs;
     stats.nRatelimitedAddrs = nRatelimitedAddrs;
-    // Network classification & BIP155 negotiation state for getpeerinfo.
-    stats.m_network = addr.GetNetwork();
+    {
+        LOCK(cs_addrName);
+        stats.addrName = addrName;
+        stats.m_network = addr.GetNetwork();
+    }
     stats.m_wants_addrv2 = m_wants_addrv2.load();
 
     // It is common for nodes with good ping times to suddenly become lagged,
@@ -1264,11 +1267,13 @@ void ThreadSocketHandler()
                     LogPrintf("ping timeout: %fs\n", 0.000001 * (GetTimeMicros() - pnode->nPingUsecStart));
                     pnode->fDisconnect = true;
                 }
-                // Tor authentication timeout: disconnect inbound Tor peers
-                // that haven't authenticated within 60 seconds
-                else if (pnode->fInbound && pnode->addr.IsLocal()
-                         && pnode->fTorAuthSent && !pnode->fTorAuthenticated
-                         && nTime - pnode->nTorAuthTimestamp > 60)
+                // Tor authentication timeout: disconnect Tor peers (both
+                // inbound hidden-service and outbound-to-onion) that
+                // haven't completed torauth within the timeout.
+                else if (pnode->fTorAuthSent && !pnode->fTorAuthenticated
+                         && nTime - pnode->nTorAuthTimestamp > TORAUTH_TIMEOUT_SECONDS
+                         && ((pnode->fInbound && pnode->addr.IsLocal())
+                             || (!pnode->fInbound && pnode->addr.IsTor())))
                 {
                     LogPrint("net", "torauth: peer=%d failed to authenticate within timeout; disconnecting\n", pnode->id);
                     pnode->fDisconnect = true;
@@ -2468,9 +2473,8 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     fSuccessfullyConnected = false;
     fDisconnect = false;
     nTorAuthChallenge.SetNull();
-    fTorAuthSent = false;
-    fTorAuthenticated = false;
-    nTorAuthTimestamp = 0;
+    // fTorAuthSent, fTorAuthenticated, nTorAuthTimestamp have atomic
+    // in-class initializers (net.h).
     nRefCount = 0;
     nSendSize = 0;
     nSendOffset = 0;
