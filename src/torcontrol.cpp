@@ -18,6 +18,9 @@
 #include <deque>
 #include <set>
 #include <stdlib.h>
+#ifndef WIN32
+#include <sys/stat.h>
+#endif
 
 #include <functional>
 #include <boost/signals2/signal.hpp>
@@ -400,6 +403,11 @@ static bool WriteBinaryFile(const std::string &filename, const std::string &data
         return false;
     }
     fclose(f);
+#ifndef WIN32
+    // Restrict permissions to owner-only — this file may contain secret
+    // key material (e.g., the ed25519 onion seed).
+    chmod(filename.c_str(), 0600);
+#endif
     return true;
 }
 
@@ -506,6 +514,13 @@ TorController::~TorController()
     if (service.IsValid()) {
         RemoveLocal(service);
     }
+    // Securely erase any key material still held in the member string.
+    // std::string does not guarantee zeroing on destruction, and may leave
+    // copies in freed heap memory after reallocation.
+    if (!private_key.empty()) {
+        sodium_memzero(&private_key[0], private_key.size());
+        private_key.clear();
+    }
 }
 
 void TorController::add_onion_cb(TorControlConnection& conn, const TorControlReply& reply)
@@ -597,6 +612,11 @@ void TorController::auth_cb(TorControlConnection& conn, const TorControlReply& r
         conn.Command(strprintf("ADD_ONION %s Port=%i,127.0.0.1:%i",
             torKey, GetListenPort(), GetListenPort()),
             [this](TorControlConnection& conn, const TorControlReply& reply) { add_onion_cb(conn, reply); });
+
+        if (!private_key.empty()) {
+            sodium_memzero(private_key.data(), private_key.size());
+            private_key.clear();
+        }
     } else {
         LogPrintf("tor: Authentication failed\n");
     }
@@ -839,6 +859,14 @@ void StopTorControl()
         torControlThread.join();
         event_base_free(gBase);
         gBase = 0;
+    }
+    // Securely erase the cached ed25519 keypair so it does not persist
+    // in process memory after shutdown.
+    {
+        LOCK(cs_torkey);
+        sodium_memzero(torEd25519SK, sizeof(torEd25519SK));
+        sodium_memzero(torEd25519PK, sizeof(torEd25519PK));
+        fTorKeyAvailable = false;
     }
 }
 

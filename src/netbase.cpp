@@ -1003,16 +1003,8 @@ enum Network CNetAddr::GetNetwork() const
 
 std::string CNetAddr::ToStringIP() const
 {
-    if (IsTor()) {
-        // Encode as base32(pubkey || checksum || version) + ".onion".
-        unsigned char buf[ADDR_TORV3_SIZE + torv3::CHECKSUM_LEN + sizeof(torv3::VERSION)];
-        memcpy(buf, m_addr.data(), ADDR_TORV3_SIZE);
-        unsigned char checksum[torv3::CHECKSUM_LEN];
-        torv3::Checksum(m_addr.data(), checksum);
-        memcpy(buf + ADDR_TORV3_SIZE, checksum, torv3::CHECKSUM_LEN);
-        memcpy(buf + ADDR_TORV3_SIZE + torv3::CHECKSUM_LEN, torv3::VERSION, sizeof(torv3::VERSION));
-        return EncodeBase32(buf, sizeof(buf)) + ".onion";
-    }
+    if (IsTor())
+        return OnionAddressFromEd25519Pubkey(m_addr.data());
     CService serv(*this, 0);
     struct sockaddr_storage sockaddr;
     socklen_t socklen = sizeof(sockaddr);
@@ -1062,6 +1054,10 @@ bool CNetAddr::GetInAddr(struct in_addr* pipv4Addr) const
 
 bool CNetAddr::GetIn6Addr(struct in6_addr* pipv6Addr) const
 {
+    // Tor addresses have no IPv6 representation; the V1 bridge would
+    // produce 16 zero bytes which is meaningless.
+    if (IsTor())
+        return false;
     uint8_t v1[16];
     SerializeV1Array(v1);
     memcpy(pipv6Addr, v1, 16);
