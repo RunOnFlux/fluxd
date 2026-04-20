@@ -200,49 +200,33 @@ public:
     //! Verification status of this block. See enum BlockStatus
     unsigned int nStatus;
 
-    //! Branch ID corresponding to the consensus rules used to validate this block.
-    //! Only cached if block validity is BLOCK_VALID_CONSENSUS.
-    //! Persisted at each activation height, memory-only for intervening blocks.
-    std::optional<uint32_t> nCachedBranchId;
-
-    //! The anchor for the tree state up to the start of this block
-    uint256 hashSproutAnchor;
-
-    //! (memory only) The anchor for the tree state up to the end of this block
-    uint256 hashFinalSproutRoot;
-
-    //! Change in value held by the Sprout circuit over this block.
-    //! Will be std::nullopt for older blocks on old nodes until a reindex has taken place.
-    std::optional<CAmount> nSproutValue;
-
-    //! (memory only) Total value held by the Sprout circuit up to and including this block.
-    //! Will be std::nullopt for on old nodes until a reindex has taken place.
-    //! Will be std::nullopt if nChainTx is zero.
-    std::optional<CAmount> nChainSproutValue;
-
-    //! Change in value held by the Sapling circuit over this block.
-    //! Not a std::optional because this was added before Sapling activated, so we can
-    //! rely on the invariant that every block before this was added had nSaplingValue = 0.
-    CAmount nSaplingValue;
-
-    //! (memory only) Total value held by the Sapling circuit up to and including this block.
-    //! Will be std::nullopt if nChainTx is zero.
-    std::optional<CAmount> nChainSaplingValue;
-
-    //! block header
+    //! block header (always resident)
     int nVersion;
     uint256 hashMerkleRoot;
     uint256 hashFinalSaplingRoot;
     unsigned int nTime;
     unsigned int nBits;
 
-    //! POW/PON proof data — stored separately to allow memory reclaim on
-    //! fluxnodes for buried blocks. Null when pruned; read from disk if needed.
+    //! Extended data — stored separately to allow memory reclaim on fluxnodes
+    //! for buried blocks (deeper than 100). Null when pruned; fields can be
+    //! read from disk or recomputed if needed.
     struct HeaderData {
+        // Consensus/tree state
+        std::optional<uint32_t> nCachedBranchId;
+        uint256 hashSproutAnchor;
+        uint256 hashFinalSproutRoot;
+        std::optional<CAmount> nSproutValue;
+        std::optional<CAmount> nChainSproutValue;
+        CAmount nSaplingValue;
+        std::optional<CAmount> nChainSaplingValue;
+
+        // Proof data (POW/PON)
         uint256 nNonce;
         std::vector<unsigned char> nSolution;
         COutPoint nodesCollateral;
         std::vector<unsigned char> vchBlockSig;
+
+        HeaderData() : nSaplingValue(0) {}
     };
     HeaderData* pHeaderData;
 
@@ -276,14 +260,7 @@ public:
         nTx = 0;
         nChainTx = 0;
         nStatus = 0;
-        nCachedBranchId = std::nullopt;
-        hashSproutAnchor = uint256();
-        hashFinalSproutRoot = uint256();
         nSequenceId = 0;
-        nSproutValue = std::nullopt;
-        nChainSproutValue = std::nullopt;
-        nSaplingValue = 0;
-        nChainSaplingValue = std::nullopt;
 
         nVersion       = 0;
         hashMerkleRoot = uint256();
@@ -320,6 +297,12 @@ public:
         pHeaderData->nSolution = block.nSolution;
         pHeaderData->nodesCollateral = block.nodesCollateral;
         pHeaderData->vchBlockSig = block.vchBlockSig;
+        pHeaderData->nCachedBranchId = std::nullopt;
+        pHeaderData->hashSproutAnchor = uint256();
+        pHeaderData->hashFinalSproutRoot = uint256();
+        pHeaderData->nSproutValue = std::nullopt;
+        pHeaderData->nChainSproutValue = std::nullopt;
+        pHeaderData->nChainSaplingValue = std::nullopt;
     }
 
     CDiskBlockPos GetBlockPos() const {
@@ -458,23 +441,22 @@ public:
             READWRITE(VARINT(nDataPos));
         if (nStatus & BLOCK_HAVE_UNDO)
             READWRITE(VARINT(nUndoPos));
+        // Ensure header data is allocated for deserialization
+        if (ser_action.ForRead())
+            AllocateHeaderData();
+
         if (nStatus & BLOCK_ACTIVATES_UPGRADE) {
             if (ser_action.ForRead()) {
                 uint32_t branchId;
                 READWRITE(branchId);
-                nCachedBranchId = branchId;
+                pHeaderData->nCachedBranchId = branchId;
             } else {
-                // nCachedBranchId must always be set if BLOCK_ACTIVATES_UPGRADE is set.
-                assert(nCachedBranchId);
-                uint32_t branchId = *nCachedBranchId;
+                assert(pHeaderData->nCachedBranchId);
+                uint32_t branchId = *pHeaderData->nCachedBranchId;
                 READWRITE(branchId);
             }
         }
-        READWRITE(hashSproutAnchor);
-
-        // Ensure header data is allocated for deserialization
-        if (ser_action.ForRead())
-            AllocateHeaderData();
+        READWRITE(pHeaderData->hashSproutAnchor);
 
         // block header
         READWRITE(this->nVersion);
@@ -492,16 +474,12 @@ public:
             READWRITE(pHeaderData->vchBlockSig);
         }
 
-        // Only read/write nSproutValue if the client version used to create
-        // this index was storing them.
         if ((s.GetType() & SER_DISK) && (nVersion >= SPROUT_VALUE_VERSION)) {
-            READWRITE(nSproutValue);
+            READWRITE(pHeaderData->nSproutValue);
         }
 
-        // Only read/write nSaplingValue if the client version used to create
-        // this index was storing them.
         if ((s.GetType() & SER_DISK) && (nVersion >= SAPLING_VALUE_VERSION)) {
-            READWRITE(nSaplingValue);
+            READWRITE(pHeaderData->nSaplingValue);
         }
 
         // For POW blocks without full data (compact headers), we need to store the hash
