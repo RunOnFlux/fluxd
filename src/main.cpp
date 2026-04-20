@@ -5,6 +5,7 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "main.h"
+#include "blockindexpool.h"
 
 #include "sodium.h"
 
@@ -68,6 +69,7 @@ using namespace std;
 CCriticalSection cs_main;
 
 BlockMap mapBlockIndex;
+CBlockIndexPool* g_blockIndexPool = nullptr;
 CChain chainActive;
 CBlockIndex *pindexBestHeader = NULL;
 static int64_t nTimeBestReceived = 0;
@@ -6030,12 +6032,28 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
     if (mi != mapBlockIndex.end())
         return (*mi).second;
 
-    // Create new
-    CBlockIndex* pindexNew = new CBlockIndex();
-    if (!pindexNew)
-        throw runtime_error("LoadBlockIndex(): new CBlockIndex failed");
-    mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
-    pindexNew->phashBlock = &((*mi).first);
+    // Allocate from pool if available, otherwise fall back to heap
+    CBlockIndex* pindexNew;
+    if (g_blockIndexPool) {
+        void* mem = g_blockIndexPool->AllocateEntry();
+        if (!mem)
+            throw runtime_error("InsertBlockIndex(): pool exhausted");
+        pindexNew = new (mem) CBlockIndex();
+
+        // Store hash in pool's parallel array and point phashBlock there
+        size_t index = g_blockIndexPool->Size() - 1;
+        uint256* pHash = static_cast<uint256*>(g_blockIndexPool->HashAt(index));
+        *pHash = hash;
+        pindexNew->phashBlock = pHash;
+
+        mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+    } else {
+        pindexNew = new CBlockIndex();
+        if (!pindexNew)
+            throw runtime_error("InsertBlockIndex(): new CBlockIndex failed");
+        mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+        pindexNew->phashBlock = &((*mi).first);
+    }
 
     return pindexNew;
 }
@@ -6043,6 +6061,20 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
 bool static LoadBlockIndexDB()
 {
     const CChainParams& chainparams = Params();
+
+    // Initialize the block index pool. 5M capacity supports ~5 years of
+    // growth at 30-second blocks. MAP_NORESERVE means only touched pages
+    // consume physical memory.
+    static const size_t POOL_CAPACITY = 5000000;
+    g_blockIndexPool = new CBlockIndexPool();
+    if (!g_blockIndexPool->Initialize(sizeof(CBlockIndex), sizeof(uint256), POOL_CAPACITY)) {
+        delete g_blockIndexPool;
+        g_blockIndexPool = nullptr;
+        LogPrintf("WARNING: Failed to initialize block index pool, falling back to heap allocation\n");
+    }
+
+    mapBlockIndex.reserve(POOL_CAPACITY);
+
     if (!pblocktree->LoadBlockIndexGuts(InsertBlockIndex))
         return false;
 
@@ -6440,7 +6472,8 @@ bool RewindBlockIndex(const CChainParams& chainparams, bool& clearWitnessCaches)
         auto ret = mapBlockIndex.find(*pindex->phashBlock);
         if (ret != mapBlockIndex.end()) {
             mapBlockIndex.erase(ret);
-            delete pindex;
+            if (!g_blockIndexPool || !g_blockIndexPool->Contains(pindex))
+                delete pindex;
         }
     }
 
@@ -6479,8 +6512,16 @@ void UnloadBlockIndex()
     mapNodeState.clear();
     recentRejects.reset(NULL);
 
-    for (BlockMap::value_type& entry : mapBlockIndex) {
-        delete entry.second;
+    if (g_blockIndexPool) {
+        g_blockIndexPool->DestroyAll([](void* p) {
+            static_cast<CBlockIndex*>(p)->~CBlockIndex();
+        });
+        delete g_blockIndexPool;
+        g_blockIndexPool = nullptr;
+    } else {
+        for (BlockMap::value_type& entry : mapBlockIndex) {
+            delete entry.second;
+        }
     }
     mapBlockIndex.clear();
     fHavePruned = false;
