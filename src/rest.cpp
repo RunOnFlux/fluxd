@@ -152,7 +152,14 @@ static bool rest_headers(HTTPRequest* req,
 
     CDataStream ssHeader(SER_NETWORK, PROTOCOL_VERSION);
     for (const CBlockIndex *pindex : headers) {
-        ssHeader << pindex->GetBlockHeader();
+        CBlockHeader header = pindex->GetBlockHeader();
+        if (header.IsPOW() && header.nSolution.empty()) {
+            CBlock block;
+            if (ReadBlockFromDisk(block, pindex, Params().GetConsensus())) {
+                header.nSolution = block.nSolution;
+            }
+        }
+        ssHeader << header;
     }
 
     switch (rf) {
