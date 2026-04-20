@@ -1599,6 +1599,59 @@ void FluxnodeCache::DumpFluxnodeCache()
     setDirtyDelegateErases.clear();
 }
 
+static const int FLUXNODE_PERSIST_INTERVAL = 10;
+
+void FluxnodeCache::PersistToDisk(const CBlockIndex* pTip, bool fForce)
+{
+    LOCK(cs);
+    if (setDirtyOutPoint.empty() && mapDirtyDelegateWrites.empty() && setDirtyDelegateErases.empty())
+        return;
+
+    if (!fForce && pTip && pTip->nHeight % FLUXNODE_PERSIST_INTERVAL != 0)
+        return;
+
+    CDBBatch batch(*pFluxnodeDB);
+
+    for (const auto& item : setDirtyOutPoint) {
+        bool found = false;
+        if (mapStartTxTracker.count(item)) {
+            found = true;
+            pFluxnodeDB->WriteBatchFluxnodeData(batch, mapStartTxTracker.at(item));
+        } else if (mapStartTxDOSTracker.count(item)) {
+            found = true;
+            pFluxnodeDB->WriteBatchFluxnodeData(batch, mapStartTxDOSTracker.at(item));
+        } else if (mapConfirmedFluxnodeData.count(item)) {
+            found = true;
+            pFluxnodeDB->WriteBatchFluxnodeData(batch, mapConfirmedFluxnodeData.at(item));
+        }
+
+        if (!found) {
+            pFluxnodeDB->EraseBatchFluxnodeData(batch, item);
+        }
+    }
+
+    for (const auto& item : mapDirtyDelegateWrites) {
+        pFluxnodeDB->WriteBatchDelegates(batch, item.first, item.second);
+    }
+
+    for (const auto& outpoint : setDirtyDelegateErases) {
+        pFluxnodeDB->EraseBatchDelegates(batch, outpoint);
+    }
+
+    if (pTip) {
+        FluxnodeSyncState syncState(pTip->GetBlockHash(), pTip->nHeight);
+        pFluxnodeDB->WriteBatchSyncState(batch, syncState);
+    }
+
+    if (pFluxnodeDB->WriteBatch(batch, true)) {
+        setDirtyOutPoint.clear();
+        mapDirtyDelegateWrites.clear();
+        setDirtyDelegateErases.clear();
+    } else {
+        LogPrintf("ERROR: PersistToDisk: Failed to write batch to database\n");
+    }
+}
+
 bool IsFluxnodeTransactionsActive()
 {
     return chainActive.Height() >= Params().GetConsensus().vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight;
