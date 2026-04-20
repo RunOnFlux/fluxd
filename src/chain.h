@@ -235,17 +235,38 @@ public:
     uint256 hashFinalSaplingRoot;
     unsigned int nTime;
     unsigned int nBits;
-    uint256 nNonce;
-    std::vector<unsigned char> nSolution;
-    
-    //! PON fields
-    COutPoint nodesCollateral;
-    std::vector<unsigned char> vchBlockSig;
-    //! PON-VRF: VRF output (committed to the block hash; fork-choice tie-breaker)
+
+    //! POW/PON proof data — stored separately to allow memory reclaim on
+    //! fluxnodes for buried blocks. Null when pruned; read from disk if needed.
+    struct HeaderData {
+        uint256 nNonce;
+        std::vector<unsigned char> nSolution;
+        COutPoint nodesCollateral;
+        std::vector<unsigned char> vchBlockSig;
+    };
+    HeaderData* pHeaderData;
+
+    //! PON-VRF: VRF output (committed to the block hash; fork-choice tie-breaker).
+    //! Kept directly on CBlockIndex (not in HeaderData) so fork choice and
+    //! load-time checks work even after header data is pruned.
     uint256 nodesVrfOutput;
 
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
+
+    void AllocateHeaderData()
+    {
+        if (!pHeaderData)
+            pHeaderData = new HeaderData();
+    }
+
+    void FreeHeaderData()
+    {
+        delete pHeaderData;
+        pHeaderData = nullptr;
+    }
+
+    bool HasHeaderData() const { return pHeaderData != nullptr; }
 
     void SetNull()
     {
@@ -271,35 +292,41 @@ public:
 
         nVersion       = 0;
         hashMerkleRoot = uint256();
-        hashFinalSaplingRoot   = uint256();
+        hashFinalSaplingRoot = uint256();
         nTime          = 0;
         nBits          = 0;
-        nNonce         = uint256();
-        nSolution.clear();
-        nodesCollateral.SetNull();
-        vchBlockSig.clear();
         nodesVrfOutput.SetNull();
+        FreeHeaderData();
     }
 
     CBlockIndex()
     {
+        pHeaderData = nullptr;
         SetNull();
+    }
+
+    ~CBlockIndex()
+    {
+        delete pHeaderData;
     }
 
     CBlockIndex(const CBlockHeader& block)
     {
+        pHeaderData = nullptr;
         SetNull();
 
         nVersion       = block.nVersion;
         hashMerkleRoot = block.hashMerkleRoot;
-        hashFinalSaplingRoot   = block.hashFinalSaplingRoot;
+        hashFinalSaplingRoot = block.hashFinalSaplingRoot;
         nTime          = block.nTime;
         nBits          = block.nBits;
-        nNonce         = block.nNonce;
-        nSolution      = block.nSolution;
-        nodesCollateral = block.nodesCollateral;
-        vchBlockSig    = block.vchBlockSig;
         nodesVrfOutput = block.nodesVrfOutput;
+
+        AllocateHeaderData();
+        pHeaderData->nNonce = block.nNonce;
+        pHeaderData->nSolution = block.nSolution;
+        pHeaderData->nodesCollateral = block.nodesCollateral;
+        pHeaderData->vchBlockSig = block.vchBlockSig;
     }
 
     CDiskBlockPos GetBlockPos() const {
@@ -327,14 +354,16 @@ public:
         if (pprev)
             block.hashPrevBlock = pprev->GetBlockHash();
         block.hashMerkleRoot = hashMerkleRoot;
-        block.hashFinalSaplingRoot   = hashFinalSaplingRoot;
+        block.hashFinalSaplingRoot = hashFinalSaplingRoot;
         block.nTime          = nTime;
         block.nBits          = nBits;
-        block.nNonce         = nNonce;
-        block.nSolution      = nSolution;
-        block.nodesCollateral = nodesCollateral;
-        block.vchBlockSig    = vchBlockSig;
         block.nodesVrfOutput = nodesVrfOutput;
+        if (pHeaderData) {
+            block.nNonce         = pHeaderData->nNonce;
+            block.nSolution      = pHeaderData->nSolution;
+            block.nodesCollateral = pHeaderData->nodesCollateral;
+            block.vchBlockSig    = pHeaderData->vchBlockSig;
+        }
         return block;
     }
 
@@ -451,6 +480,10 @@ public:
         }
         READWRITE(hashSproutAnchor);
 
+        // Ensure header data is allocated for deserialization
+        if (ser_action.ForRead())
+            AllocateHeaderData();
+
         // block header
         READWRITE(this->nVersion);
         READWRITE(hashPrev);
@@ -458,13 +491,13 @@ public:
         READWRITE(hashFinalSaplingRoot);
         READWRITE(nTime);
         READWRITE(nBits);
-        READWRITE(nNonce);
-        READWRITE(nSolution);
+        READWRITE(pHeaderData->nNonce);
+        READWRITE(pHeaderData->nSolution);
 
         // Only read/write PON fields if this is a PON block
         if (this->nVersion >= CBlockHeader::PON_VERSION) {
-            READWRITE(nodesCollateral);
-            READWRITE(vchBlockSig);
+            READWRITE(pHeaderData->nodesCollateral);
+            READWRITE(pHeaderData->vchBlockSig);
             // PON-VRF: the VRF output is committed to the block hash, so it must be
             // persisted to recompute the hash and to serve as the fork-choice tie-breaker.
             if (this->nVersion >= CBlockHeader::PON_VRF_VERSION) {
@@ -510,14 +543,16 @@ public:
         block.nVersion        = nVersion;
         block.hashPrevBlock   = hashPrev;
         block.hashMerkleRoot  = hashMerkleRoot;
-        block.hashFinalSaplingRoot    = hashFinalSaplingRoot;
+        block.hashFinalSaplingRoot = hashFinalSaplingRoot;
         block.nTime           = nTime;
         block.nBits           = nBits;
-        block.nNonce          = nNonce;
-        block.nSolution       = nSolution;
-        block.nodesCollateral = nodesCollateral;
-        block.vchBlockSig     = vchBlockSig;
         block.nodesVrfOutput  = nodesVrfOutput;
+        if (pHeaderData) {
+            block.nNonce          = pHeaderData->nNonce;
+            block.nSolution       = pHeaderData->nSolution;
+            block.nodesCollateral = pHeaderData->nodesCollateral;
+            block.vchBlockSig     = pHeaderData->vchBlockSig;
+        }
         return block.GetHash();
     }
 
