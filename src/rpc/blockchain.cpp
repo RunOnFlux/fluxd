@@ -111,29 +111,63 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
     result.pushKV("confirmations", confirmations);
     result.pushKV("height", blockindex->nHeight);
     result.pushKV("version", blockindex->nVersion);
-    result.pushKV("merkleroot", blockindex->hashMerkleRoot.GetHex());
-    result.pushKV("finalsaplingroot", blockindex->hashFinalSaplingRoot.GetHex());
+    if (blockindex->pHeaderData) {
+        result.pushKV("merkleroot", blockindex->pHeaderData->hashMerkleRoot.GetHex());
+        result.pushKV("finalsaplingroot", blockindex->pHeaderData->hashFinalSaplingRoot.GetHex());
+    } else {
+        // Header data pruned, fall back to reading from disk
+        CBlock block;
+        if (ReadBlockFromDisk(block, blockindex, Params().GetConsensus())) {
+            result.pushKV("merkleroot", block.hashMerkleRoot.GetHex());
+            result.pushKV("finalsaplingroot", block.hashFinalSaplingRoot.GetHex());
+        } else {
+            result.pushKV("merkleroot", "");
+            result.pushKV("finalsaplingroot", "");
+        }
+    }
     result.pushKV("time", (int64_t)blockindex->nTime);
-    
+
     // Add POW or PON fields based on block version
     if (blockindex->nVersion >= CBlockHeader::PON_VERSION) {
         // PON block fields
         result.pushKV("type", "PON");
-        result.pushKV("collateral", blockindex->nodesCollateral.ToString());
-        result.pushKV("blocksig", HexStr(blockindex->vchBlockSig));
+        if (blockindex->pHeaderData) {
+            result.pushKV("collateral", blockindex->pHeaderData->nodesCollateral.ToString());
+            result.pushKV("blocksig", HexStr(blockindex->pHeaderData->vchBlockSig));
+        } else {
+            CBlock block;
+            if (ReadBlockFromDisk(block, blockindex, Params().GetConsensus())) {
+                result.pushKV("collateral", block.nodesCollateral.ToString());
+                result.pushKV("blocksig", HexStr(block.vchBlockSig));
+            } else {
+                result.pushKV("collateral", "");
+                result.pushKV("blocksig", "");
+            }
+        }
     } else {
         // POW block fields
         result.pushKV("type", "POW");
-        result.pushKV("nonce", blockindex->nNonce.GetHex());
-        if (blockindex->nSolution.empty()) {
-            CBlock block;
-            if (ReadBlockFromDisk(block, blockindex, Params().GetConsensus())) {
-                result.pushKV("solution", HexStr(block.nSolution));
+        if (blockindex->pHeaderData) {
+            result.pushKV("nonce", blockindex->pHeaderData->nNonce.GetHex());
+            if (blockindex->pHeaderData->nSolution.empty()) {
+                CBlock block;
+                if (ReadBlockFromDisk(block, blockindex, Params().GetConsensus())) {
+                    result.pushKV("solution", HexStr(block.nSolution));
+                } else {
+                    result.pushKV("solution", "");
+                }
             } else {
-                result.pushKV("solution", "");
+                result.pushKV("solution", HexStr(blockindex->pHeaderData->nSolution));
             }
         } else {
-            result.pushKV("solution", HexStr(blockindex->nSolution));
+            CBlock block;
+            if (ReadBlockFromDisk(block, blockindex, Params().GetConsensus())) {
+                result.pushKV("nonce", block.nNonce.GetHex());
+                result.pushKV("solution", HexStr(block.nSolution));
+            } else {
+                result.pushKV("nonce", "");
+                result.pushKV("solution", "");
+            }
         }
     }
     
@@ -283,11 +317,15 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool tx
     result.pushKV("bits", strprintf("%08x", block.nBits));
     result.pushKV("difficulty", GetDifficulty(blockindex));
     result.pushKV("chainwork", blockindex->nChainWork.GetHex());
-    result.pushKV("anchor", blockindex->hashFinalSproutRoot.GetHex());
+    result.pushKV("anchor", blockindex->pHeaderData ? blockindex->pHeaderData->hashFinalSproutRoot.GetHex() : "");
 
     UniValue valuePools(UniValue::VARR);
-    valuePools.push_back(ValuePoolDesc("sprout", blockindex->nChainSproutValue, blockindex->nSproutValue));
-    valuePools.push_back(ValuePoolDesc("sapling", blockindex->nChainSaplingValue, blockindex->nSaplingValue));
+    valuePools.push_back(ValuePoolDesc("sprout",
+        blockindex->pHeaderData ? blockindex->pHeaderData->nChainSproutValue : std::nullopt,
+        blockindex->pHeaderData ? blockindex->pHeaderData->nSproutValue : std::nullopt));
+    valuePools.push_back(ValuePoolDesc("sapling",
+        blockindex->pHeaderData ? blockindex->pHeaderData->nChainSaplingValue : std::nullopt,
+        blockindex->pHeaderData ? std::optional<CAmount>(blockindex->pHeaderData->nSaplingValue) : std::nullopt));
     result.pushKV("valuePools", valuePools);
 
     if (blockindex->pprev)
@@ -677,11 +715,22 @@ UniValue getblockheader(const UniValue& params, bool fHelp)
 
     if (!fVerbose)
     {
-        CBlockHeader header = pblockindex->GetBlockHeader();
-        if (header.IsPOW() && header.nSolution.empty()) {
+        CBlockHeader header;
+        if (pblockindex->HasHeaderData()) {
+            header = pblockindex->GetBlockHeader();
+            if (header.IsPOW() && header.nSolution.empty()) {
+                CBlock block;
+                if (ReadBlockFromDisk(block, pblockindex, Params().GetConsensus())) {
+                    header.nSolution = block.nSolution;
+                }
+            }
+        } else {
+            // Header data pruned, read full block from disk
             CBlock block;
             if (ReadBlockFromDisk(block, pblockindex, Params().GetConsensus())) {
-                header.nSolution = block.nSolution;
+                header = block.GetBlockHeader();
+            } else {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not found on disk");
             }
         }
         CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
@@ -1082,8 +1131,8 @@ UniValue getblockchaininfo(const UniValue& params, bool fHelp)
 
     CBlockIndex* tip = chainActive.Tip();
     UniValue valuePools(UniValue::VARR);
-    valuePools.push_back(ValuePoolDesc("sprout", tip->nChainSproutValue, std::nullopt));
-    valuePools.push_back(ValuePoolDesc("sapling", tip->nChainSaplingValue, std::nullopt));
+    valuePools.push_back(ValuePoolDesc("sprout", tip->pHeaderData ? tip->pHeaderData->nChainSproutValue : std::nullopt, std::nullopt));
+    valuePools.push_back(ValuePoolDesc("sapling", tip->pHeaderData ? tip->pHeaderData->nChainSaplingValue : std::nullopt, std::nullopt));
     obj.pushKV("valuePools",            valuePools);
 
     const Consensus::Params& consensusParams = Params().GetConsensus();

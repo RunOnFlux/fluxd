@@ -200,50 +200,98 @@ public:
     //! Verification status of this block. See enum BlockStatus
     unsigned int nStatus;
 
-    //! Branch ID corresponding to the consensus rules used to validate this block.
-    //! Only cached if block validity is BLOCK_VALID_CONSENSUS.
-    //! Persisted at each activation height, memory-only for intervening blocks.
-    std::optional<uint32_t> nCachedBranchId;
-
-    //! The anchor for the tree state up to the start of this block
-    uint256 hashSproutAnchor;
-
-    //! (memory only) The anchor for the tree state up to the end of this block
-    uint256 hashFinalSproutRoot;
-
-    //! Change in value held by the Sprout circuit over this block.
-    //! Will be std::nullopt for older blocks on old nodes until a reindex has taken place.
-    std::optional<CAmount> nSproutValue;
-
-    //! (memory only) Total value held by the Sprout circuit up to and including this block.
-    //! Will be std::nullopt for on old nodes until a reindex has taken place.
-    //! Will be std::nullopt if nChainTx is zero.
-    std::optional<CAmount> nChainSproutValue;
-
-    //! Change in value held by the Sapling circuit over this block.
-    //! Not a std::optional because this was added before Sapling activated, so we can
-    //! rely on the invariant that every block before this was added had nSaplingValue = 0.
-    CAmount nSaplingValue;
-
-    //! (memory only) Total value held by the Sapling circuit up to and including this block.
-    //! Will be std::nullopt if nChainTx is zero.
-    std::optional<CAmount> nChainSaplingValue;
-
-    //! block header
+    //! block header (fields that stay in CBlockIndex)
     int nVersion;
-    uint256 hashMerkleRoot;
-    uint256 hashFinalSaplingRoot;
     unsigned int nTime;
     unsigned int nBits;
-    uint256 nNonce;
-    std::vector<unsigned char> nSolution;
 
-    //! PON fields
-    COutPoint nodesCollateral;
-    std::vector<unsigned char> vchBlockSig;
+    //! Header data that can be pruned from memory for buried blocks.
+    //! Allocated on demand; may be nullptr for old blocks after pruning.
+    struct HeaderData {
+        uint256 hashMerkleRoot;
+        uint256 hashFinalSaplingRoot;
+        std::optional<uint32_t> nCachedBranchId;
+        uint256 hashSproutAnchor;
+        uint256 hashFinalSproutRoot;
+        std::optional<CAmount> nSproutValue;
+        std::optional<CAmount> nChainSproutValue;
+        CAmount nSaplingValue;
+        std::optional<CAmount> nChainSaplingValue;
+        uint256 nNonce;
+        std::vector<unsigned char> nSolution;
+        COutPoint nodesCollateral;
+        std::vector<unsigned char> vchBlockSig;
+        HeaderData() : nSaplingValue(0) {}
+    };
+    HeaderData* pHeaderData;
 
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
+
+    void AllocateHeaderData()
+    {
+        if (!pHeaderData)
+            pHeaderData = new HeaderData();
+    }
+
+    void FreeHeaderData()
+    {
+        delete pHeaderData;
+        pHeaderData = nullptr;
+    }
+
+    bool HasHeaderData() const
+    {
+        return pHeaderData != nullptr;
+    }
+
+    ~CBlockIndex()
+    {
+        delete pHeaderData;
+    }
+
+    //! Copy constructor - deep copies pHeaderData
+    CBlockIndex(const CBlockIndex& other)
+        : phashBlock(other.phashBlock), pprev(other.pprev), pskip(other.pskip),
+          nHeight(other.nHeight), nFile(other.nFile), nDataPos(other.nDataPos),
+          nUndoPos(other.nUndoPos), nChainWork(other.nChainWork), nTx(other.nTx),
+          nChainTx(other.nChainTx), nStatus(other.nStatus),
+          nVersion(other.nVersion), nTime(other.nTime), nBits(other.nBits),
+          pHeaderData(nullptr), nSequenceId(other.nSequenceId)
+    {
+        if (other.pHeaderData) {
+            pHeaderData = new HeaderData(*other.pHeaderData);
+        }
+    }
+
+    //! Assignment operator - deep copies pHeaderData
+    CBlockIndex& operator=(const CBlockIndex& other)
+    {
+        if (this != &other) {
+            phashBlock = other.phashBlock;
+            pprev = other.pprev;
+            pskip = other.pskip;
+            nHeight = other.nHeight;
+            nFile = other.nFile;
+            nDataPos = other.nDataPos;
+            nUndoPos = other.nUndoPos;
+            nChainWork = other.nChainWork;
+            nTx = other.nTx;
+            nChainTx = other.nChainTx;
+            nStatus = other.nStatus;
+            nVersion = other.nVersion;
+            nTime = other.nTime;
+            nBits = other.nBits;
+            nSequenceId = other.nSequenceId;
+            delete pHeaderData;
+            if (other.pHeaderData) {
+                pHeaderData = new HeaderData(*other.pHeaderData);
+            } else {
+                pHeaderData = nullptr;
+            }
+        }
+        return *this;
+    }
 
     void SetNull()
     {
@@ -258,24 +306,13 @@ public:
         nTx = 0;
         nChainTx = 0;
         nStatus = 0;
-        nCachedBranchId = std::nullopt;
-        hashSproutAnchor = uint256();
-        hashFinalSproutRoot = uint256();
         nSequenceId = 0;
-        nSproutValue = std::nullopt;
-        nChainSproutValue = std::nullopt;
-        nSaplingValue = 0;
-        nChainSaplingValue = std::nullopt;
 
         nVersion       = 0;
-        hashMerkleRoot = uint256();
-        hashFinalSaplingRoot   = uint256();
         nTime          = 0;
         nBits          = 0;
-        nNonce         = uint256();
-        nSolution.clear();
-        nodesCollateral.SetNull();
-        vchBlockSig.clear();
+
+        pHeaderData = nullptr;
     }
 
     CBlockIndex()
@@ -288,14 +325,16 @@ public:
         SetNull();
 
         nVersion       = block.nVersion;
-        hashMerkleRoot = block.hashMerkleRoot;
-        hashFinalSaplingRoot   = block.hashFinalSaplingRoot;
         nTime          = block.nTime;
         nBits          = block.nBits;
-        nNonce         = block.nNonce;
-        nSolution      = block.nSolution;
-        nodesCollateral = block.nodesCollateral;
-        vchBlockSig    = block.vchBlockSig;
+
+        AllocateHeaderData();
+        pHeaderData->hashMerkleRoot = block.hashMerkleRoot;
+        pHeaderData->hashFinalSaplingRoot   = block.hashFinalSaplingRoot;
+        pHeaderData->nNonce         = block.nNonce;
+        pHeaderData->nSolution      = block.nSolution;
+        pHeaderData->nodesCollateral = block.nodesCollateral;
+        pHeaderData->vchBlockSig    = block.vchBlockSig;
     }
 
     CDiskBlockPos GetBlockPos() const {
@@ -322,14 +361,16 @@ public:
         block.nVersion       = nVersion;
         if (pprev)
             block.hashPrevBlock = pprev->GetBlockHash();
-        block.hashMerkleRoot = hashMerkleRoot;
-        block.hashFinalSaplingRoot   = hashFinalSaplingRoot;
         block.nTime          = nTime;
         block.nBits          = nBits;
-        block.nNonce         = nNonce;
-        block.nSolution      = nSolution;
-        block.nodesCollateral = nodesCollateral;
-        block.vchBlockSig    = vchBlockSig;
+        if (pHeaderData) {
+            block.hashMerkleRoot = pHeaderData->hashMerkleRoot;
+            block.hashFinalSaplingRoot   = pHeaderData->hashFinalSaplingRoot;
+            block.nNonce         = pHeaderData->nNonce;
+            block.nSolution      = pHeaderData->nSolution;
+            block.nodesCollateral = pHeaderData->nodesCollateral;
+            block.vchBlockSig    = pHeaderData->vchBlockSig;
+        }
         return block;
     }
 
@@ -363,7 +404,7 @@ public:
     {
         return strprintf("CBlockIndex(pprev=%p, nHeight=%d, merkle=%s, hashBlock=%s)",
             pprev, nHeight,
-            hashMerkleRoot.ToString(),
+            pHeaderData ? pHeaderData->hashMerkleRoot.ToString() : "pruned",
             GetBlockHash().ToString());
     }
 
@@ -423,6 +464,9 @@ public:
         if (!(s.GetType() & SER_GETHASH))
             READWRITE(VARINT(nVersion));
 
+        if (ser_action.ForRead())
+            AllocateHeaderData();
+
         READWRITE(VARINT(nHeight));
         READWRITE(VARINT(nStatus));
         READWRITE(VARINT(nTx));
@@ -436,42 +480,42 @@ public:
             if (ser_action.ForRead()) {
                 uint32_t branchId;
                 READWRITE(branchId);
-                nCachedBranchId = branchId;
+                pHeaderData->nCachedBranchId = branchId;
             } else {
                 // nCachedBranchId must always be set if BLOCK_ACTIVATES_UPGRADE is set.
-                assert(nCachedBranchId);
-                uint32_t branchId = *nCachedBranchId;
+                assert(pHeaderData->nCachedBranchId);
+                uint32_t branchId = *pHeaderData->nCachedBranchId;
                 READWRITE(branchId);
             }
         }
-        READWRITE(hashSproutAnchor);
+        READWRITE(pHeaderData->hashSproutAnchor);
 
         // block header
         READWRITE(this->nVersion);
         READWRITE(hashPrev);
-        READWRITE(hashMerkleRoot);
-        READWRITE(hashFinalSaplingRoot);
+        READWRITE(pHeaderData->hashMerkleRoot);
+        READWRITE(pHeaderData->hashFinalSaplingRoot);
         READWRITE(nTime);
         READWRITE(nBits);
-        READWRITE(nNonce);
-        READWRITE(nSolution);
-        
+        READWRITE(pHeaderData->nNonce);
+        READWRITE(pHeaderData->nSolution);
+
         // Only read/write PON fields if this is a PON block
         if (this->nVersion >= CBlockHeader::PON_VERSION) {
-            READWRITE(nodesCollateral);
-            READWRITE(vchBlockSig);
+            READWRITE(pHeaderData->nodesCollateral);
+            READWRITE(pHeaderData->vchBlockSig);
         }
 
         // Only read/write nSproutValue if the client version used to create
         // this index was storing them.
         if ((s.GetType() & SER_DISK) && (nVersion >= SPROUT_VALUE_VERSION)) {
-            READWRITE(nSproutValue);
+            READWRITE(pHeaderData->nSproutValue);
         }
 
         // Only read/write nSaplingValue if the client version used to create
         // this index was storing them.
         if ((s.GetType() & SER_DISK) && (nVersion >= SAPLING_VALUE_VERSION)) {
-            READWRITE(nSaplingValue);
+            READWRITE(pHeaderData->nSaplingValue);
         }
 
         // For POW blocks without full data (compact headers), we need to store the hash
@@ -499,14 +543,16 @@ public:
         CBlockHeader block;
         block.nVersion        = nVersion;
         block.hashPrevBlock   = hashPrev;
-        block.hashMerkleRoot  = hashMerkleRoot;
-        block.hashFinalSaplingRoot    = hashFinalSaplingRoot;
         block.nTime           = nTime;
         block.nBits           = nBits;
-        block.nNonce          = nNonce;
-        block.nSolution       = nSolution;
-        block.nodesCollateral = nodesCollateral;
-        block.vchBlockSig     = vchBlockSig;
+        if (pHeaderData) {
+            block.hashMerkleRoot  = pHeaderData->hashMerkleRoot;
+            block.hashFinalSaplingRoot    = pHeaderData->hashFinalSaplingRoot;
+            block.nNonce          = pHeaderData->nNonce;
+            block.nSolution       = pHeaderData->nSolution;
+            block.nodesCollateral = pHeaderData->nodesCollateral;
+            block.vchBlockSig     = pHeaderData->vchBlockSig;
+        }
         return block.GetHash();
     }
 
@@ -515,7 +561,7 @@ public:
     {
         return strprintf("CDiskBlockIndex(pprev=%p, nHeight=%d, merkle=%s, hashBlock=%s, hashPrev=%s)",
             pprev, nHeight,
-            hashMerkleRoot.ToString(),
+            pHeaderData ? pHeaderData->hashMerkleRoot.ToString() : "pruned",
             GetBlockHash().ToString(),
             hashPrev.ToString());
     }
