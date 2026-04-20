@@ -1913,6 +1913,24 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     if (!ActivateBestChain(state, chainparams))
         strErrors << "Failed to connect best block";
 
+    // On fluxnodes, free extended data from buried block index entries.
+    // Must run after ActivateBestChain so rewinding is complete.
+    if (fFluxnode && chainActive.Tip()) {
+        int nKeepDepth = 100;
+        int nPruneBelow = chainActive.Height() - nKeepDepth;
+        int64_t nPruned = 0;
+        for (auto& [hash, pindex] : mapBlockIndex)
+        {
+            if (pindex->nHeight < nPruneBelow && pindex->HasHeaderData()) {
+                pindex->FreeHeaderData();
+                nPruned++;
+            }
+        }
+        if (nPruned > 0) {
+            LogPrintf("Freed header data from %lld buried block index entries\n", nPruned);
+        }
+    }
+
     std::vector<std::filesystem::path> vImportFiles;
     if (mapArgs.count("-loadblock"))
     {

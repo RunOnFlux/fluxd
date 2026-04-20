@@ -6204,24 +6204,6 @@ bool static LoadBlockIndexDB()
         DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
         Checkpoints::GuessVerificationProgress(chainparams.Checkpoints(), chainActive.Tip()));
 
-    // On fluxnodes, free extended data from buried block index entries.
-    // Keep the last 100 blocks (reorg safety margin).
-    if (fFluxnode) {
-        int nKeepDepth = 100;
-        int nPruneBelow = chainActive.Height() - nKeepDepth;
-        int64_t nPruned = 0;
-        for (auto& [hash, pindex] : mapBlockIndex)
-        {
-            if (pindex->nHeight < nPruneBelow && pindex->HasHeaderData()) {
-                pindex->FreeHeaderData();
-                nPruned++;
-            }
-        }
-        if (nPruned > 0) {
-            LogPrintf("LoadBlockIndexDB(): freed header data from %lld buried block index entries\n", nPruned);
-        }
-    }
-
     // Remove deprecation requirement
     // EnforceNodeDeprecation(chainActive.Height(), true);
 
