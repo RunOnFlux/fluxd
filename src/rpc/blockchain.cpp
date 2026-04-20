@@ -125,7 +125,16 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
         // POW block fields
         result.pushKV("type", "POW");
         result.pushKV("nonce", blockindex->nNonce.GetHex());
-        result.pushKV("solution", HexStr(blockindex->nSolution));
+        if (blockindex->nSolution.empty()) {
+            CBlock block;
+            if (ReadBlockFromDisk(block, blockindex, Params().GetConsensus())) {
+                result.pushKV("solution", HexStr(block.nSolution));
+            } else {
+                result.pushKV("solution", "");
+            }
+        } else {
+            result.pushKV("solution", HexStr(blockindex->nSolution));
+        }
     }
     
     result.pushKV("bits", strprintf("%08x", blockindex->nBits));
@@ -668,8 +677,15 @@ UniValue getblockheader(const UniValue& params, bool fHelp)
 
     if (!fVerbose)
     {
+        CBlockHeader header = pblockindex->GetBlockHeader();
+        if (header.IsPOW() && header.nSolution.empty()) {
+            CBlock block;
+            if (ReadBlockFromDisk(block, pblockindex, Params().GetConsensus())) {
+                header.nSolution = block.nSolution;
+            }
+        }
         CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
-        ssBlock << pblockindex->GetBlockHeader();
+        ssBlock << header;
         std::string strHex = HexStr(ssBlock.begin(), ssBlock.end());
         return strHex;
     }
