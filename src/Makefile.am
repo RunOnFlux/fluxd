@@ -470,6 +470,7 @@ fluxd_SOURCES += fluxd-res.rc
 endif
 
 fluxd_LDADD = \
+  -ljemalloc \
   $(LIBBITCOIN_SERVER) \
   $(LIBBITCOIN_WALLET) \
   $(LIBBITCOIN_COMMON) \
