@@ -259,6 +259,7 @@ libbitcoin_server_a_SOURCES = \
   asyncrpcqueue.cpp \
   blockencodings.cpp \
   bloom.cpp \
+  blockindexpool.cpp \
   chain.cpp \
   checkpoints.cpp \
   deprecation.cpp \
