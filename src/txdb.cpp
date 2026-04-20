@@ -525,13 +525,13 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                 pindexNew->hashSproutAnchor     = diskindex.hashSproutAnchor;
                 pindexNew->nVersion       = diskindex.nVersion;
                 pindexNew->hashMerkleRoot = diskindex.hashMerkleRoot;
-                pindexNew->hashFinalSaplingRoot   = diskindex.hashFinalSaplingRoot;
+                pindexNew->hashFinalSaplingRoot = diskindex.hashFinalSaplingRoot;
                 pindexNew->nTime          = diskindex.nTime;
                 pindexNew->nBits          = diskindex.nBits;
-                pindexNew->nNonce         = diskindex.nNonce;
-                pindexNew->nSolution      = diskindex.nSolution;
-                pindexNew->nodesCollateral = diskindex.nodesCollateral;
-                pindexNew->vchBlockSig    = diskindex.vchBlockSig;
+                if (diskindex.pHeaderData) {
+                    pindexNew->AllocateHeaderData();
+                    *pindexNew->pHeaderData = *diskindex.pHeaderData;
+                }
                 pindexNew->nStatus        = diskindex.nStatus;
                 pindexNew->nCachedBranchId = diskindex.nCachedBranchId;
                 pindexNew->nTx            = diskindex.nTx;

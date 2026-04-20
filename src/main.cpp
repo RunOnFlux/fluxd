@@ -6211,23 +6211,20 @@ bool static LoadBlockIndexDB()
         DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
         Checkpoints::GuessVerificationProgress(chainparams.Checkpoints(), chainActive.Tip()));
 
-    // On fluxnodes, free memory by clearing equihash solutions from PoW block index
-    // entries. The solutions can be read from block files if an RPC needs them.
+    // On fluxnodes, free proof data (nonce, solution, collateral, sig) from
+    // buried block index entries. This data is only needed for header
+    // reconstruction and can be read from block files on demand.
     if (fFluxnode) {
         int64_t nPruned = 0;
-        int64_t nBytesFreed = 0;
         for (auto& [hash, pindex] : mapBlockIndex)
         {
-            if (pindex->nVersion < CBlockHeader::PON_VERSION && !pindex->nSolution.empty()) {
-                nBytesFreed += pindex->nSolution.capacity();
-                pindex->nSolution.clear();
-                pindex->nSolution.shrink_to_fit();
+            if (pindex->HasHeaderData()) {
+                pindex->FreeHeaderData();
                 nPruned++;
             }
         }
         if (nPruned > 0) {
-            LogPrintf("LoadBlockIndexDB(): pruned equihash solutions from %lld PoW block index entries, freeing ~%lld MB\n",
-                      nPruned, nBytesFreed / (1024 * 1024));
+            LogPrintf("LoadBlockIndexDB(): freed header data from %lld block index entries\n", nPruned);
         }
     }
 

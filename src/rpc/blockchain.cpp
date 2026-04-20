@@ -111,29 +111,33 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
     result.pushKV("confirmations", confirmations);
     result.pushKV("height", blockindex->nHeight);
     result.pushKV("version", blockindex->nVersion);
+    result.pushKV("time", (int64_t)blockindex->nTime);
+
     result.pushKV("merkleroot", blockindex->hashMerkleRoot.GetHex());
     result.pushKV("finalsaplingroot", blockindex->hashFinalSaplingRoot.GetHex());
-    result.pushKV("time", (int64_t)blockindex->nTime);
-    
-    // Add POW or PON fields based on block version
-    if (blockindex->nVersion >= CBlockHeader::PON_VERSION) {
-        // PON block fields
-        result.pushKV("type", "PON");
-        result.pushKV("collateral", blockindex->nodesCollateral.ToString());
-        result.pushKV("blocksig", HexStr(blockindex->vchBlockSig));
-    } else {
-        // POW block fields
-        result.pushKV("type", "POW");
-        result.pushKV("nonce", blockindex->nNonce.GetHex());
-        if (blockindex->nSolution.empty()) {
-            CBlock block;
-            if (ReadBlockFromDisk(block, blockindex, Params().GetConsensus())) {
-                result.pushKV("solution", HexStr(block.nSolution));
-            } else {
-                result.pushKV("solution", "");
-            }
+
+    if (blockindex->HasHeaderData()) {
+        if (blockindex->nVersion >= CBlockHeader::PON_VERSION) {
+            result.pushKV("type", "PON");
+            result.pushKV("collateral", blockindex->pHeaderData->nodesCollateral.ToString());
+            result.pushKV("blocksig", HexStr(blockindex->pHeaderData->vchBlockSig));
         } else {
-            result.pushKV("solution", HexStr(blockindex->nSolution));
+            result.pushKV("type", "POW");
+            result.pushKV("nonce", blockindex->pHeaderData->nNonce.GetHex());
+            result.pushKV("solution", HexStr(blockindex->pHeaderData->nSolution));
+        }
+    } else {
+        CBlock block;
+        if (ReadBlockFromDisk(block, blockindex, Params().GetConsensus())) {
+            if (blockindex->nVersion >= CBlockHeader::PON_VERSION) {
+                result.pushKV("type", "PON");
+                result.pushKV("collateral", block.nodesCollateral.ToString());
+                result.pushKV("blocksig", HexStr(block.vchBlockSig));
+            } else {
+                result.pushKV("type", "POW");
+                result.pushKV("nonce", block.nNonce.GetHex());
+                result.pushKV("solution", HexStr(block.nSolution));
+            }
         }
     }
     
@@ -677,12 +681,14 @@ UniValue getblockheader(const UniValue& params, bool fHelp)
 
     if (!fVerbose)
     {
-        CBlockHeader header = pblockindex->GetBlockHeader();
-        if (header.IsPOW() && header.nSolution.empty()) {
+        CBlockHeader header;
+        if (pblockindex->HasHeaderData()) {
+            header = pblockindex->GetBlockHeader();
+        } else {
             CBlock block;
-            if (ReadBlockFromDisk(block, pblockindex, Params().GetConsensus())) {
-                header.nSolution = block.nSolution;
-            }
+            if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+            header = block.GetBlockHeader();
         }
         CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
         ssBlock << header;
