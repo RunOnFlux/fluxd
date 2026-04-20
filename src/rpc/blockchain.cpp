@@ -113,8 +113,10 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
     result.pushKV("version", blockindex->nVersion);
     result.pushKV("time", (int64_t)blockindex->nTime);
 
-    result.pushKV("merkleroot", blockindex->hashMerkleRoot.GetHex());
-    result.pushKV("finalsaplingroot", blockindex->hashFinalSaplingRoot.GetHex());
+    if (blockindex->pHeaderData) {
+        result.pushKV("merkleroot", blockindex->pHeaderData->hashMerkleRoot.GetHex());
+        result.pushKV("finalsaplingroot", blockindex->pHeaderData->hashFinalSaplingRoot.GetHex());
+    }
 
     if (blockindex->HasHeaderData()) {
         if (blockindex->nVersion >= CBlockHeader::PON_VERSION) {

@@ -202,8 +202,6 @@ public:
 
     //! block header (always resident)
     int nVersion;
-    uint256 hashMerkleRoot;
-    uint256 hashFinalSaplingRoot;
     unsigned int nTime;
     unsigned int nBits;
 
@@ -211,6 +209,10 @@ public:
     //! for buried blocks (deeper than 100). Null when pruned; fields can be
     //! read from disk or recomputed if needed.
     struct HeaderData {
+        // Block header fields
+        uint256 hashMerkleRoot;
+        uint256 hashFinalSaplingRoot;
+
         // Consensus/tree state
         std::optional<uint32_t> nCachedBranchId;
         uint256 hashSproutAnchor;
@@ -268,8 +270,6 @@ public:
         nSequenceId = 0;
 
         nVersion       = 0;
-        hashMerkleRoot = uint256();
-        hashFinalSaplingRoot = uint256();
         nTime          = 0;
         nBits          = 0;
         nodesVrfOutput.SetNull();
@@ -293,13 +293,13 @@ public:
         SetNull();
 
         nVersion       = block.nVersion;
-        hashMerkleRoot = block.hashMerkleRoot;
-        hashFinalSaplingRoot = block.hashFinalSaplingRoot;
         nTime          = block.nTime;
         nBits          = block.nBits;
         nodesVrfOutput = block.nodesVrfOutput;
 
         AllocateHeaderData();
+        pHeaderData->hashMerkleRoot = block.hashMerkleRoot;
+        pHeaderData->hashFinalSaplingRoot = block.hashFinalSaplingRoot;
         pHeaderData->nNonce = block.nNonce;
         pHeaderData->nSolution = block.nSolution;
         pHeaderData->nodesCollateral = block.nodesCollateral;
@@ -336,12 +336,12 @@ public:
         block.nVersion       = nVersion;
         if (pprev)
             block.hashPrevBlock = pprev->GetBlockHash();
-        block.hashMerkleRoot = hashMerkleRoot;
-        block.hashFinalSaplingRoot = hashFinalSaplingRoot;
         block.nTime          = nTime;
         block.nBits          = nBits;
         block.nodesVrfOutput = nodesVrfOutput;
         if (pHeaderData) {
+            block.hashMerkleRoot = pHeaderData->hashMerkleRoot;
+            block.hashFinalSaplingRoot = pHeaderData->hashFinalSaplingRoot;
             block.nNonce         = pHeaderData->nNonce;
             block.nSolution      = pHeaderData->nSolution;
             block.nodesCollateral = pHeaderData->nodesCollateral;
@@ -380,7 +380,7 @@ public:
     {
         return strprintf("CBlockIndex(pprev=%p, nHeight=%d, merkle=%s, hashBlock=%s)",
             pprev, nHeight,
-            hashMerkleRoot.ToString(),
+            pHeaderData ? pHeaderData->hashMerkleRoot.ToString() : "pruned",
             GetBlockHash().ToString());
     }
 
@@ -469,8 +469,8 @@ public:
         // block header
         READWRITE(this->nVersion);
         READWRITE(hashPrev);
-        READWRITE(hashMerkleRoot);
-        READWRITE(hashFinalSaplingRoot);
+        READWRITE(pHeaderData->hashMerkleRoot);
+        READWRITE(pHeaderData->hashFinalSaplingRoot);
         READWRITE(nTime);
         READWRITE(nBits);
         READWRITE(pHeaderData->nNonce);
@@ -520,12 +520,12 @@ public:
         CBlockHeader block;
         block.nVersion        = nVersion;
         block.hashPrevBlock   = hashPrev;
-        block.hashMerkleRoot  = hashMerkleRoot;
-        block.hashFinalSaplingRoot = hashFinalSaplingRoot;
         block.nTime           = nTime;
         block.nBits           = nBits;
         block.nodesVrfOutput  = nodesVrfOutput;
         if (pHeaderData) {
+            block.hashMerkleRoot  = pHeaderData->hashMerkleRoot;
+            block.hashFinalSaplingRoot = pHeaderData->hashFinalSaplingRoot;
             block.nNonce          = pHeaderData->nNonce;
             block.nSolution       = pHeaderData->nSolution;
             block.nodesCollateral = pHeaderData->nodesCollateral;
@@ -539,7 +539,7 @@ public:
     {
         return strprintf("CDiskBlockIndex(pprev=%p, nHeight=%d, merkle=%s, hashBlock=%s, hashPrev=%s)",
             pprev, nHeight,
-            hashMerkleRoot.ToString(),
+            pHeaderData ? pHeaderData->hashMerkleRoot.ToString() : "pruned",
             GetBlockHash().ToString(),
             hashPrev.ToString());
     }
