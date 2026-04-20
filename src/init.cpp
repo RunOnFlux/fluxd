@@ -1580,6 +1580,9 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
                     g_fluxnodeCache.SortList(currentTier);
                 }
 
+                // Set fFluxnode early so LoadBlockIndex can use it
+                fFluxnode = GetBoolArg("-zelnode", false);
+
                 uiInterface.InitMessage(_("Loading block index..."));
                 if (!LoadBlockIndex()) {
                     strLoadError = _("Error loading block database");
@@ -1924,7 +1927,6 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
             MilliSleep(10);
     }
 
-    fFluxnode = GetBoolArg("-zelnode", false);
     fArcane = getenv("UNMANAGED_FLUXBENCHD") != NULL;
 
     if ((fFluxnode || fluxnodeConfig.getCount() > -1) && fTxIndex == false) {
