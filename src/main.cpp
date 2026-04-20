@@ -4403,8 +4403,10 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
         if (!pcoinsTip->Flush())
             return AbortNode(state, "Failed to write to coin database");
 
-        // Dump Fluxnode cache to database
-        g_fluxnodeCache.DumpFluxnodeCache();
+        // Flush any remaining dirty fluxnode entries on shutdown
+        if (mode == FLUSH_STATE_ALWAYS) {
+            g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
+        }
         nLastFlush = nNow;
     }
     if ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) && nNow > nLastSetChain + nNextWriteInterval * 1000000) {
@@ -4488,6 +4490,7 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
         assert(view.Flush());
         assert(fluxnodeCache.Flush());
         CRPCFluxnodeCache::ClearFluxnodeListCache();
+        g_fluxnodeCache.PersistToDisk(pindexDelete->pprev);
     }
     LogPrint("bench", "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
     uint256 sproutAnchorAfterDisconnect = pcoinsTip->GetBestAnchor(SPROUT);
@@ -4612,6 +4615,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
         assert(fluxnodeCache.Flush());
         CRPCFluxnodeCache::ClearFluxnodeListCache();
+        g_fluxnodeCache.PersistToDisk(pindexNew);
 
         LogPrint("dfluxnode", "%s : Size of global fluxnodeCache mapStartTxTracker : %u\n", __func__, g_fluxnodeCache.mapStartTxTracker.size());
         LogPrint("dfluxnode", "%s : Size of global fluxnodeCache mapStartTxDOSTrackerTxTracker : %u\n", __func__, g_fluxnodeCache.mapStartTxDOSTracker.size());
@@ -6208,6 +6212,26 @@ bool static LoadBlockIndexDB()
         DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
         Checkpoints::GuessVerificationProgress(chainparams.Checkpoints(), chainActive.Tip()));
 
+    // On fluxnodes, free memory by clearing equihash solutions from PoW block index
+    // entries. The solutions can be read from block files if an RPC needs them.
+    if (fFluxnode) {
+        int64_t nPruned = 0;
+        int64_t nBytesFreed = 0;
+        for (auto& [hash, pindex] : mapBlockIndex)
+        {
+            if (pindex->nVersion < CBlockHeader::PON_VERSION && !pindex->nSolution.empty()) {
+                nBytesFreed += pindex->nSolution.capacity();
+                pindex->nSolution.clear();
+                pindex->nSolution.shrink_to_fit();
+                nPruned++;
+            }
+        }
+        if (nPruned > 0) {
+            LogPrintf("LoadBlockIndexDB(): pruned equihash solutions from %lld PoW block index entries, freeing ~%lld MB\n",
+                      nPruned, nBytesFreed / (1024 * 1024));
+        }
+    }
+
     // Remove deprecation requirement
     // EnforceNodeDeprecation(chainActive.Height(), true);
 
@@ -7643,7 +7667,14 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
             for (; pindex; pindex = chainActive.Next(pindex))
             {
-                vHeaders.push_back(CBlock(pindex->GetBlockHeader()));
+                CBlockHeader header = pindex->GetBlockHeader();
+                if (header.IsPOW() && header.nSolution.empty()) {
+                    CBlock block;
+                    if (ReadBlockFromDisk(block, pindex, chainparams.GetConsensus())) {
+                        header.nSolution = block.nSolution;
+                    }
+                }
+                vHeaders.push_back(header);
                 if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
                     break;
             }
