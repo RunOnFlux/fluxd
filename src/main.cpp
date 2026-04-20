@@ -3625,7 +3625,7 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
     // the Sapling activation height. Otherwise, the last anchor was the
     // empty root.
     if (NetworkUpgradeActive(pindex->pprev->nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA)) {
-        view.PopAnchor(pindex->pprev->hashFinalSaplingRoot, SAPLING);
+        view.PopAnchor(pindex->pprev->pHeaderData->hashFinalSaplingRoot, SAPLING);
     } else {
         view.PopAnchor(SaplingMerkleTree::empty_root(), SAPLING);
     }

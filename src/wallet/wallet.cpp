@@ -2530,7 +2530,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
             assert(pindex->pHeaderData && pcoinsTip->GetSproutAnchorAt(pindex->pHeaderData->hashSproutAnchor, sproutTree));
             if (pindex->pprev) {
                 if (NetworkUpgradeActive(pindex->pprev->nHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
-                    assert(pcoinsTip->GetSaplingAnchorAt(pindex->pprev->hashFinalSaplingRoot, saplingTree));
+                    assert(pindex->pprev->pHeaderData && pcoinsTip->GetSaplingAnchorAt(pindex->pprev->pHeaderData->hashFinalSaplingRoot, saplingTree));
                 }
             }
             // Increment note witness caches
@@ -4548,7 +4548,7 @@ int CMerkleTx::GetDepthInMainChainINTERNAL(const CBlockIndex* &pindexRet) const
     // Make sure the merkle branch connects to this block
     if (!fMerkleVerified)
     {
-        if (CBlock::CheckMerkleBranch(GetHash(), vMerkleBranch, nIndex) != pindex->hashMerkleRoot)
+        if (!pindex->pHeaderData || CBlock::CheckMerkleBranch(GetHash(), vMerkleBranch, nIndex) != pindex->pHeaderData->hashMerkleRoot)
             return 0;
         fMerkleVerified = true;
     }
