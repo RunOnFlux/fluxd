@@ -1922,6 +1922,21 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
                   (unsigned long)g_blockIndexPool->Size());
     }
 
+    // Prune header data from buried block index entries to save memory
+    if (fFluxnode && chainActive.Tip()) {
+        int nPruneBelow = chainActive.Height() - 100;
+        int64_t nPruned = 0;
+        for (auto& [hash, pindex] : mapBlockIndex)
+        {
+            if (pindex->nHeight < nPruneBelow && pindex->HasHeaderData()) {
+                pindex->FreeHeaderData();
+                nPruned++;
+            }
+        }
+        if (nPruned > 0)
+            LogPrintf("Freed header data from %lld buried block index entries\n", nPruned);
+    }
+
     std::vector<std::filesystem::path> vImportFiles;
     if (mapArgs.count("-loadblock"))
     {
