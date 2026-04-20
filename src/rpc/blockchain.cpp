@@ -287,11 +287,17 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool tx
     result.pushKV("bits", strprintf("%08x", block.nBits));
     result.pushKV("difficulty", GetDifficulty(blockindex));
     result.pushKV("chainwork", blockindex->nChainWork.GetHex());
-    result.pushKV("anchor", blockindex->hashFinalSproutRoot.GetHex());
-
-    UniValue valuePools(UniValue::VARR);
-    valuePools.push_back(ValuePoolDesc("sprout", blockindex->nChainSproutValue, blockindex->nSproutValue));
-    valuePools.push_back(ValuePoolDesc("sapling", blockindex->nChainSaplingValue, blockindex->nSaplingValue));
+    if (blockindex->pHeaderData) {
+        result.pushKV("anchor", blockindex->pHeaderData->hashFinalSproutRoot.GetHex());
+        UniValue valuePools(UniValue::VARR);
+        valuePools.push_back(ValuePoolDesc("sprout", blockindex->pHeaderData->nChainSproutValue, blockindex->pHeaderData->nSproutValue));
+        valuePools.push_back(ValuePoolDesc("sapling", blockindex->pHeaderData->nChainSaplingValue, blockindex->pHeaderData->nSaplingValue));
+        result.pushKV("valuePools", valuePools);
+    } else {
+        result.pushKV("anchor", "");
+        UniValue valuePools(UniValue::VARR);
+        result.pushKV("valuePools", valuePools);
+    }
     result.pushKV("valuePools", valuePools);
 
     if (blockindex->pprev)
@@ -1088,8 +1094,10 @@ UniValue getblockchaininfo(const UniValue& params, bool fHelp)
 
     CBlockIndex* tip = chainActive.Tip();
     UniValue valuePools(UniValue::VARR);
-    valuePools.push_back(ValuePoolDesc("sprout", tip->nChainSproutValue, std::nullopt));
-    valuePools.push_back(ValuePoolDesc("sapling", tip->nChainSaplingValue, std::nullopt));
+    if (tip->pHeaderData) {
+        valuePools.push_back(ValuePoolDesc("sprout", tip->pHeaderData->nChainSproutValue, std::nullopt));
+        valuePools.push_back(ValuePoolDesc("sapling", tip->pHeaderData->nChainSaplingValue, std::nullopt));
+    }
     obj.pushKV("valuePools",            valuePools);
 
     const Consensus::Params& consensusParams = Params().GetConsensus();
