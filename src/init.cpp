@@ -44,6 +44,7 @@
 #include "util/threadinterrupt.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
+#include "blockindexpool.h"
 #include "fluxnode/fluxnodeconfig.h"
 #include "fluxnode/fluxnode.h"
 #include "fluxnode/obfuscation.h"
@@ -1913,22 +1914,12 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     if (!ActivateBestChain(state, chainparams))
         strErrors << "Failed to connect best block";
 
-    // On fluxnodes, free extended data from buried block index entries.
-    // Must run after ActivateBestChain so rewinding is complete.
-    if (fFluxnode && chainActive.Tip()) {
-        int nKeepDepth = 100;
-        int nPruneBelow = chainActive.Height() - nKeepDepth;
-        int64_t nPruned = 0;
-        for (auto& [hash, pindex] : mapBlockIndex)
-        {
-            if (pindex->nHeight < nPruneBelow && pindex->HasHeaderData()) {
-                pindex->FreeHeaderData();
-                nPruned++;
-            }
-        }
-        if (nPruned > 0) {
-            LogPrintf("Freed header data from %lld buried block index entries\n", nPruned);
-        }
+    // Hint to the OS that old block index pages are cold. The pool
+    // allocates sequentially so old blocks are at lower addresses.
+    if (g_blockIndexPool && chainActive.Tip()) {
+        g_blockIndexPool->AdviseOldBlocksCold(1000);
+        LogPrintf("Block index pool: %lu entries, advised OS that old pages are cold\n",
+                  (unsigned long)g_blockIndexPool->Size());
     }
 
     std::vector<std::filesystem::path> vImportFiles;

@@ -129,10 +129,10 @@ TEST(Validation, ReceivedBlockTransactions) {
     EXPECT_FALSE(fakeIndex2.IsValid(BLOCK_VALID_TRANSACTIONS));
 
     // Sprout pool values should not be set
-    EXPECT_FALSE((bool)fakeIndex1.pHeaderData->nSproutValue);
-    EXPECT_FALSE((bool)fakeIndex1.pHeaderData->nChainSproutValue);
-    EXPECT_FALSE((bool)fakeIndex2.pHeaderData->nSproutValue);
-    EXPECT_FALSE((bool)fakeIndex2.pHeaderData->nChainSproutValue);
+    EXPECT_FALSE((bool)fakeIndex1.nSproutValue);
+    EXPECT_FALSE((bool)fakeIndex1.nChainSproutValue);
+    EXPECT_FALSE((bool)fakeIndex2.nSproutValue);
+    EXPECT_FALSE((bool)fakeIndex2.nChainSproutValue);
 
     // Mark the second block's transactions as received first
     CValidationState state;
@@ -142,13 +142,13 @@ TEST(Validation, ReceivedBlockTransactions) {
 
     // Sprout pool value delta should now be set for the second block,
     // but not any chain totals
-    EXPECT_FALSE((bool)fakeIndex1.pHeaderData->nSproutValue);
-    EXPECT_FALSE((bool)fakeIndex1.pHeaderData->nChainSproutValue);
+    EXPECT_FALSE((bool)fakeIndex1.nSproutValue);
+    EXPECT_FALSE((bool)fakeIndex1.nChainSproutValue);
     {
         SCOPED_TRACE("ExpectOptionalAmount call");
-        ExpectOptionalAmount(20, fakeIndex2.pHeaderData->nSproutValue);
+        ExpectOptionalAmount(20, fakeIndex2.nSproutValue);
     }
-    EXPECT_FALSE((bool)fakeIndex2.pHeaderData->nChainSproutValue);
+    EXPECT_FALSE((bool)fakeIndex2.nChainSproutValue);
 
     // Now mark the first block's transactions as received
     EXPECT_TRUE(ReceivedBlockTransactions(block1, state, chainParams, &fakeIndex1, pos1));
@@ -158,18 +158,18 @@ TEST(Validation, ReceivedBlockTransactions) {
     // Sprout pool values should now be set for both blocks
     {
         SCOPED_TRACE("ExpectOptionalAmount call");
-        ExpectOptionalAmount(10, fakeIndex1.pHeaderData->nSproutValue);
+        ExpectOptionalAmount(10, fakeIndex1.nSproutValue);
     }
     {
         SCOPED_TRACE("ExpectOptionalAmount call");
-        ExpectOptionalAmount(10, fakeIndex1.pHeaderData->nChainSproutValue);
+        ExpectOptionalAmount(10, fakeIndex1.nChainSproutValue);
     }
     {
         SCOPED_TRACE("ExpectOptionalAmount call");
-        ExpectOptionalAmount(20, fakeIndex2.pHeaderData->nSproutValue);
+        ExpectOptionalAmount(20, fakeIndex2.nSproutValue);
     }
     {
         SCOPED_TRACE("ExpectOptionalAmount call");
-        ExpectOptionalAmount(30, fakeIndex2.pHeaderData->nChainSproutValue);
+        ExpectOptionalAmount(30, fakeIndex2.nChainSproutValue);
     }
 }
