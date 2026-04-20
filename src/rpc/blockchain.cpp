@@ -298,7 +298,6 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool tx
         UniValue valuePools(UniValue::VARR);
         result.pushKV("valuePools", valuePools);
     }
-    result.pushKV("valuePools", valuePools);
 
     if (blockindex->pprev)
         result.pushKV("previousblockhash", blockindex->pprev->GetBlockHash().GetHex());
