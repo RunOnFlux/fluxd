@@ -329,13 +329,13 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         CAmount saplingValue = 0;
         bool monitoring_pool_balances = true;
         if (chainparams.ZIP209Enabled()) {
-            if (pindexPrev->nChainSproutValue) {
-                sproutValue = *pindexPrev->nChainSproutValue;
+            if (pindexPrev->pHeaderData && pindexPrev->pHeaderData->nChainSproutValue) {
+                sproutValue = *pindexPrev->pHeaderData->nChainSproutValue;
             } else {
                 monitoring_pool_balances = false;
             }
-            if (pindexPrev->nChainSaplingValue) {
-                saplingValue = *pindexPrev->nChainSaplingValue;
+            if (pindexPrev->pHeaderData && pindexPrev->pHeaderData->nChainSaplingValue) {
+                saplingValue = *pindexPrev->pHeaderData->nChainSaplingValue;
             } else {
                 monitoring_pool_balances = false;
             }
