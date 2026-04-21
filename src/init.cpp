@@ -1224,8 +1224,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 #ifndef WIN32
     CreatePidFile(GetPidFile(), getpid());
 #endif
-    // Shrink debug.log on startup if it's too large (configurable, default 500MB) - keeps last 50MB
-    if (GetBoolArg("-shrinkdebugfile", !fDebug))
+    // Shrink debug.log on startup if it's too large (configurable, default
+    // 500 MB, capped at 10 GB). Runs regardless of -debug so the file can't
+    // grow without bound when debug logging is enabled.
+    if (GetBoolArg("-shrinkdebugfile", true))
         ShrinkDebugFile();
 
     if (fPrintToDebugLog)
@@ -2068,6 +2070,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     CScheduler::Function f = boost::bind(&PartitionCheck, &IsInitialBlockDownload,
                                          boost::ref(cs_main), boost::cref(pindexBestHeader), nPowTargetSpacing);
     scheduler.scheduleEvery(f, nPowTargetSpacing);
+
+    // Periodically cap debug.log size. Runs even when -debug is enabled so a
+    // firehose of debug output can't fill the disk. Interval: 5 minutes.
+    scheduler.scheduleEvery(&ShrinkDebugFile, 300);
 
 #ifdef ENABLE_MINING
     // Generate coins in the background

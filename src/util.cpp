@@ -892,37 +892,54 @@ void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length) {
 
 void ShrinkDebugFile()
 {
-    // Scroll debug.log if it's getting too big
+    // Scroll debug.log if it's getting too big.
+    // Safe to call at any time: reads the tail into memory, writes to a temp
+    // file, and atomically renames over debug.log. Any concurrent LogPrintStr
+    // writes land on the unlinked inode; LogPrintStr reopens on next call
+    // when fReopenDebugLog is set.
     boost::filesystem::path pathLog = GetDataDir() / "debug.log";
-    FILE* file = fopen(pathLog.string().c_str(), "r");
 
-    // Get configurable size threshold (default 500MB, min 10MB, max 10GB)
-    int64_t nMaxLogSizeMB = GetArg("-maxdebugfilesize", 500); // Default 500MB
-    if (nMaxLogSizeMB < 10) nMaxLogSizeMB = 10;       // Minimum 10MB
-    if (nMaxLogSizeMB > 2048) nMaxLogSizeMB = 2048; // Maximum 2GB
+    // Get configurable size threshold. Default 500 MB, min 10 MB. Upper cap
+    // depends on whether debug logging is active: 10 GiB with -debug on so a
+    // long debug session has room to breathe, 2 GiB otherwise.
+    int64_t nMaxLogSizeMB = GetArg("-maxdebugfilesize", 500);
+    const int64_t nUpperCapMB = fDebug ? 10240 : 2048;
+    if (nMaxLogSizeMB < 10) nMaxLogSizeMB = 10;
+    if (nMaxLogSizeMB > nUpperCapMB) nMaxLogSizeMB = nUpperCapMB;
     int64_t nMaxLogSize = nMaxLogSizeMB * 1000000;
 
-    if (file && boost::filesystem::file_size(pathLog) > nMaxLogSize)
-    {
-        LogPrintf("ShrinkDebugFile: debug.log size is %.1f MB, shrinking to last 50 MB...\n",
-                  boost::filesystem::file_size(pathLog) / 1000000.0);
+    boost::system::error_code ec;
+    uintmax_t curSize = boost::filesystem::file_size(pathLog, ec);
+    if (ec || (int64_t)curSize <= nMaxLogSize)
+        return;
 
-        // Keep last 50MB when shrinking (reasonable amount for debugging)
-        std::vector <char> vch(50000000,0);
-        fseek(file, -((long)vch.size()), SEEK_END);
-        int nBytes = fread(begin_ptr(vch), 1, vch.size(), file);
-        fclose(file);
+    // Keep last 50 MB when shrinking.
+    const size_t nKeepBytes = 50 * 1000 * 1000;
 
-        file = fopen(pathLog.string().c_str(), "w");
-        if (file)
-        {
-            fwrite(begin_ptr(vch), 1, nBytes, file);
-            fclose(file);
-            LogPrintf("ShrinkDebugFile: Shrinking complete, kept %.1f MB\n", nBytes / 1000000.0);
-        }
+    FILE* src = fopen(pathLog.string().c_str(), "rb");
+    if (!src) return;
+
+    std::vector<char> vch(nKeepBytes, 0);
+    fseek(src, -(long)vch.size(), SEEK_END);
+    size_t nBytes = fread(begin_ptr(vch), 1, vch.size(), src);
+    fclose(src);
+
+    boost::filesystem::path pathTmp = pathLog;
+    pathTmp += ".tmp";
+    FILE* dst = fopen(pathTmp.string().c_str(), "wb");
+    if (!dst) return;
+    fwrite(begin_ptr(vch), 1, nBytes, dst);
+    fclose(dst);
+
+    boost::filesystem::rename(pathTmp, pathLog, ec);
+    if (ec) {
+        boost::filesystem::remove(pathTmp, ec);
+        return;
     }
-    else if (file != NULL)
-        fclose(file);
+
+    // Tell LogPrintStr to reopen the log on its next write so future output
+    // goes to the new (truncated) file instead of the unlinked inode.
+    fReopenDebugLog = true;
 }
 
 #ifdef WIN32
