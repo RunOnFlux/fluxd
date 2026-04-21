@@ -91,8 +91,8 @@ bool CDeterministicFluxnodeDB::ReadFluxnodeDelegates(const COutPoint& outpoint, 
     if (Exists(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint)))
         return Read(std::make_pair(FLUXNODE_DELEGATE_DATA, outpoint), delegates);
 
-    // If it doesn't exist, we just return true because we don't want to fail just because it didn't exist in the db
-    return true;
+    // If it doesn't exist, return false to indicate no delegates found
+    return false;
 }
 
 bool CDeterministicFluxnodeDB::EraseFluxnodeDelegate(const COutPoint& outpoint)
