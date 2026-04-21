@@ -6348,6 +6348,64 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
     return true;
 }
 
+bool RecoverFluxnodeCache(const CChainParams& chainparams)
+{
+    LOCK(cs_main);
+
+    FluxnodeSyncState syncState;
+    if (!pFluxnodeDB || !pFluxnodeDB->ReadSyncState(syncState)) {
+        LogPrintf("RecoverFluxnodeCache: no sync state marker, skipping recovery\n");
+        return true;
+    }
+
+    if (!chainActive.Tip()) {
+        LogPrintf("RecoverFluxnodeCache: no active chain, skipping recovery\n");
+        return true;
+    }
+
+    if (syncState.bestBlockHash == chainActive.Tip()->GetBlockHash()) {
+        LogPrintf("RecoverFluxnodeCache: sync state matches chain tip at height %d, no recovery needed\n",
+                  syncState.nHeight);
+        return true;
+    }
+
+    // Find the sync state block on the active chain
+    CBlockIndex* pSyncBlock = nullptr;
+    if (syncState.nHeight >= 0 && syncState.nHeight <= chainActive.Height()) {
+        CBlockIndex* pCandidate = chainActive[syncState.nHeight];
+        if (pCandidate && pCandidate->GetBlockHash() == syncState.bestBlockHash)
+            pSyncBlock = pCandidate;
+    }
+
+    if (!pSyncBlock) {
+        LogPrintf("RecoverFluxnodeCache: sync state block %s at height %d not on active chain, skipping (ActivateBestChain will handle)\n",
+                  syncState.bestBlockHash.ToString(), syncState.nHeight);
+        return true;
+    }
+
+    int nBlocksToReplay = chainActive.Height() - pSyncBlock->nHeight;
+    if (nBlocksToReplay <= 0)
+        return true;
+
+    LogPrintf("RecoverFluxnodeCache: fluxnode cache is %d blocks behind chain tip (synced to %d, tip at %d). Disconnecting stale blocks for replay.\n",
+              nBlocksToReplay, pSyncBlock->nHeight, chainActive.Height());
+
+    CValidationState state;
+    while (chainActive.Height() > pSyncBlock->nHeight) {
+        if (!DisconnectTip(state, chainparams, true)) {
+            return error("RecoverFluxnodeCache: failed to disconnect block at height %d", chainActive.Height());
+        }
+    }
+
+    g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
+
+    if (!FlushStateToDisk(state, FLUSH_STATE_ALWAYS))
+        return false;
+
+    LogPrintf("RecoverFluxnodeCache: disconnected %d blocks, ActivateBestChain will reconnect them\n", nBlocksToReplay);
+    return true;
+}
+
 bool RewindBlockIndex(const CChainParams& chainparams, bool& clearWitnessCaches)
 {
     LOCK(cs_main);
@@ -8990,13 +9048,19 @@ static class CMainCleanup
 public:
     CMainCleanup() {}
     ~CMainCleanup() {
-        // block headers
-        BlockMap::iterator it1 = mapBlockIndex.begin();
-        for (; it1 != mapBlockIndex.end(); it1++)
-            delete (*it1).second;
+        if (g_blockIndexPool) {
+            g_blockIndexPool->DestroyAll([](void* p) {
+                static_cast<CBlockIndex*>(p)->~CBlockIndex();
+            });
+            delete g_blockIndexPool;
+            g_blockIndexPool = nullptr;
+        } else {
+            BlockMap::iterator it1 = mapBlockIndex.begin();
+            for (; it1 != mapBlockIndex.end(); it1++)
+                delete (*it1).second;
+        }
         mapBlockIndex.clear();
 
-        // orphan transactions
         mapOrphanTransactions.clear();
         mapOrphanTransactionsByPrev.clear();
     }

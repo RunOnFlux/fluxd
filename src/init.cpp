@@ -1908,6 +1908,9 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     if (mapArgs.count("-blocknotify"))
         uiInterface.NotifyBlockTip.connect(BlockNotifyCallback);
 
+    if (!RecoverFluxnodeCache(chainparams))
+        strErrors << "Failed to recover fluxnode cache";
+
     uiInterface.InitMessage(_("Activating best chain..."));
     // scan for better chains in the block chain database, that are not yet connected in the active best chain
     CValidationState state;
