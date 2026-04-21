@@ -7157,6 +7157,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         pfrom->fSuccessfullyConnected = true;
 
+        if (pfrom->fFeeler) {
+            // Feeler connection succeeded — address is verified good, disconnect
+            LogPrint("net", "Feeler connection to %s succeeded, disconnecting\n", pfrom->addr.ToString());
+            pfrom->fDisconnect = true;
+            return true;
+        }
+
         string remoteAddr;
         if (fLogIPs)
             remoteAddr = ", peeraddr=" + pfrom->addr.ToString();

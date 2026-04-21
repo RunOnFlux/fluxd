@@ -98,6 +98,9 @@ CCriticalSection cs_nLastNodeId;
 static CSemaphore *semOutbound = NULL;
 static boost::condition_variable messageHandlerCondition;
 
+static std::vector<CAddress> vAnchorAddresses;
+static const size_t MAX_ANCHOR_CONNECTIONS = 2;
+
 // Signals for message handling
 static CNodeSignals g_signals;
 CNodeSignals& GetNodeSignals() { return g_signals; }
@@ -1287,16 +1290,89 @@ void ThreadDNSAddressSeed()
     LogPrintf("%d addresses found from DNS seeds\n", found);
 }
 
+static const int STALE_TIP_PROBE_SECONDS = 180;   // 3 minutes without a new block triggers probing
+static const int STALE_TIP_PROBE_INTERVAL = 60;   // re-probe every 60 seconds while tip is stale
+static const int STALE_TIP_PING_TIMEOUT  = 30;    // 30 seconds to answer a probe ping
 
+static void CheckStaleTip()
+{
+    // Track when chain height last changed
+    static int nLastTipHeight = 0;
+    static int64_t nLastTipChange = 0;
+    static int64_t nLastProbe = 0;
 
+    int height;
+    {
+        LOCK(cs_main);
+        height = chainActive.Height();
+    }
 
+    int64_t nNow = GetTime();
 
+    // Tip advanced — reset everything
+    if (height != nLastTipHeight) {
+        nLastTipHeight = height;
+        nLastTipChange = nNow;
+        nLastProbe = 0;
+        return;
+    }
 
+    // Initialize on first call
+    if (nLastTipChange == 0) {
+        nLastTipChange = nNow;
+        nLastTipHeight = height;
+        return;
+    }
 
+    int64_t nStaleSeconds = nNow - nLastTipChange;
+    if (nStaleSeconds < STALE_TIP_PROBE_SECONDS)
+        return;
 
+    // Time to send new probes? (every STALE_TIP_PROBE_INTERVAL while stale)
+    if (nNow - nLastProbe >= STALE_TIP_PROBE_INTERVAL) {
+        int nProbed = 0;
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodes) {
+                if (pnode->fInbound || pnode->fOneShot || pnode->fDisconnect)
+                    continue;
+                pnode->fPingQueued = true;
+                nProbed++;
+            }
+        }
+        if (nProbed > 0) {
+            LogPrintf("Stale tip (height %d, %ds old): probing %d outbound peers\n",
+                      height, nStaleSeconds, nProbed);
+        }
+        nLastProbe = nNow;
+        return;
+    }
 
-
-
+    // Check for zombies: 30s after probes were sent, any unanswered ping = zombie
+    if (nNow - nLastProbe >= STALE_TIP_PING_TIMEOUT) {
+        int nZombie = 0;
+        int nOutbound = 0;
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodes) {
+                if (pnode->fInbound || pnode->fOneShot || pnode->fDisconnect)
+                    continue;
+                nOutbound++;
+                if (pnode->nPingNonceSent != 0 &&
+                    pnode->nPingUsecStart + STALE_TIP_PING_TIMEOUT * 1000000LL < GetTimeMicros()) {
+                    LogPrintf("Stale tip: peer %s ping unanswered for %ds, disconnecting\n",
+                              pnode->addr.ToString(),
+                              (int)((GetTimeMicros() - pnode->nPingUsecStart) / 1000000));
+                    pnode->fDisconnect = true;
+                    nZombie++;
+                }
+            }
+        }
+        if (nZombie > 0) {
+            LogPrintf("Stale tip: disconnected %d/%d zombie outbound peers\n", nZombie, nOutbound);
+        }
+    }
+}
 
 void DumpAddresses()
 {
@@ -1350,6 +1426,8 @@ void ThreadOpenConnections()
 
     // Initiate network connections
     int64_t nStart = GetTime();
+    static int64_t nNextFeeler = 0;
+    static const int64_t FEELER_INTERVAL = 120;
     while (true)
     {
         ProcessOneShot();
@@ -1369,10 +1447,20 @@ void ThreadOpenConnections()
             }
         }
 
+        // Try anchor connections first (Bitcoin Core PR #17428)
+        if (!vAnchorAddresses.empty()) {
+            CAddress addr = vAnchorAddresses.back();
+            vAnchorAddresses.pop_back();
+            LogPrintf("Trying anchor connection to %s\n", addr.ToString());
+            OpenNetworkConnection(addr, &grant);
+            continue;
+        }
+
         //
         // Choose an address to connect to based on most recently seen
         //
         CAddress addrConnect;
+        bool fFeeler = false;
 
         // Only connect out to one peer per network group (/16 for IPv4).
         // Do this here so we don't have to critsect vNodes inside mapAddresses critsect.
@@ -1388,12 +1476,20 @@ void ThreadOpenConnections()
             }
         }
 
+        // Feeler connections: periodically test an untried address to keep
+        // the address table fresh (Bitcoin Core PR #8282)
+        int64_t nNow = GetTime();
+        if (nNow > nNextFeeler) {
+            nNextFeeler = nNow + FEELER_INTERVAL;
+            fFeeler = true;
+        }
+
         int64_t nANow = GetAdjustedTime();
 
         int nTries = 0;
         while (true)
         {
-            CAddrInfo addr = addrman.Select();
+            CAddrInfo addr = addrman.Select(fFeeler);
 
             // if we selected an invalid address, restart
             if (!addr.IsValid() || setConnected.count(addr.GetGroup()) || IsLocal(addr))
@@ -1409,6 +1505,12 @@ void ThreadOpenConnections()
             if (IsLimited(addr))
                 continue;
 
+            // for feeler connections, skip the recently-tried and port filters
+            if (fFeeler) {
+                addrConnect = addr;
+                break;
+            }
+
             // only consider very recently tried nodes after 30 failed attempts
             if (nANow - addr.nLastTry < 600 && nTries < 30)
                 continue;
@@ -1421,8 +1523,19 @@ void ThreadOpenConnections()
             break;
         }
 
-        if (addrConnect.IsValid())
-            OpenNetworkConnection(addrConnect, &grant);
+        if (addrConnect.IsValid()) {
+            if (fFeeler) {
+                // Feeler: use a non-blocking grant so we don't consume a
+                // connection slot if all are in use
+                grant.Release();
+                CSemaphoreGrant feelerGrant(*semOutbound, true);
+                if (feelerGrant) {
+                    OpenNetworkConnection(addrConnect, &feelerGrant, NULL, false, true);
+                }
+            } else {
+                OpenNetworkConnection(addrConnect, &grant);
+            }
+        }
     }
 }
 
@@ -1498,7 +1611,7 @@ void ThreadOpenAddedConnections()
 }
 
 // if successful, this moves the passed grant to the constructed node
-bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot)
+bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot, bool fFeeler)
 {
     //
     // Initiate outbound network connection
@@ -1522,6 +1635,8 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
     pnode->fNetworkNode = true;
     if (fOneShot)
         pnode->fOneShot = true;
+    if (fFeeler)
+        pnode->fFeeler = true;
 
     return true;
 }
@@ -1589,6 +1704,9 @@ void ThreadMessageHandler()
             BOOST_FOREACH(CNode* pnode, vNodesCopy)
                 pnode->Release();
         }
+
+        // Check for stale tip / zombie peers (runs on its own internal timers)
+        CheckStaleTip();
 
         if (fSleep)
             messageHandlerCondition.timed_wait(lock, boost::posix_time::microsec_clock::universal_time() + boost::posix_time::milliseconds(100));
@@ -1766,6 +1884,16 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
            addrman.size(), GetTimeMillis() - nStart);
     fAddressesInitialized = true;
 
+    // Load anchor addresses for fast reconnection after restart
+    {
+        CAnchorDB anchordb;
+        if (anchordb.Read(vAnchorAddresses)) {
+            if (vAnchorAddresses.size() > MAX_ANCHOR_CONNECTIONS)
+                vAnchorAddresses.resize(MAX_ANCHOR_CONNECTIONS);
+            LogPrintf("Loaded %d anchor addresses from anchors.dat\n", vAnchorAddresses.size());
+        }
+    }
+
     if (semOutbound == NULL) {
         // initialize semaphore
         int nMaxOutbound = min(MAX_OUTBOUND_CONNECTIONS, nMaxConnections);
@@ -1811,6 +1939,25 @@ bool StopNode()
 
     if (fAddressesInitialized)
     {
+        // Save best outbound peers as anchors for fast reconnection
+        {
+            std::vector<CAddress> anchors;
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodes) {
+                if (!pnode->fInbound && !pnode->fOneShot && !pnode->fDisconnect &&
+                    pnode->fSuccessfullyConnected) {
+                    anchors.push_back(pnode->addr);
+                    if (anchors.size() >= MAX_ANCHOR_CONNECTIONS)
+                        break;
+                }
+            }
+            if (!anchors.empty()) {
+                CAnchorDB anchordb;
+                anchordb.Write(anchors);
+                LogPrintf("Saved %d anchor addresses to anchors.dat\n", anchors.size());
+            }
+        }
+
         DumpAddresses();
         fAddressesInitialized = false;
     }
@@ -2084,6 +2231,109 @@ bool CAddrDB::Read(CAddrMan& addr)
     return true;
 }
 
+//
+// CAnchorDB
+//
+
+CAnchorDB::CAnchorDB()
+{
+    pathAnchor = GetDataDir() / "anchors.dat";
+}
+
+bool CAnchorDB::Write(const std::vector<CAddress>& anchors)
+{
+    // Generate random temporary filename
+    unsigned short randv = 0;
+    GetRandBytes((unsigned char*)&randv, sizeof(randv));
+    std::string tmpfn = strprintf("anchors.dat.%04x", randv);
+
+    // serialize addresses, checksum data up to that point, then append csum
+    CDataStream ss(SER_DISK, CLIENT_VERSION);
+    ss << FLATDATA(Params().MessageStart());
+    ss << anchors;
+    uint256 hash = Hash(ss.begin(), ss.end());
+    ss << hash;
+
+    // open temp output file, and associate with CAutoFile
+    boost::filesystem::path pathTmp = GetDataDir() / tmpfn;
+    FILE *file = fopen(pathTmp.string().c_str(), "wb");
+    CAutoFile fileout(file, SER_DISK, CLIENT_VERSION);
+    if (fileout.IsNull())
+        return error("%s: Failed to open file %s", __func__, pathTmp.string());
+
+    // Write and commit header, data
+    try {
+        fileout << ss;
+    }
+    catch (const std::exception& e) {
+        return error("%s: Serialize or I/O error - %s", __func__, e.what());
+    }
+    FileCommit(fileout.Get());
+    fileout.fclose();
+
+    // replace existing anchors.dat, if any, with new anchors.dat.XXXX
+    if (!RenameOver(pathTmp, pathAnchor))
+        return error("%s: Rename-into-place failed", __func__);
+
+    return true;
+}
+
+bool CAnchorDB::Read(std::vector<CAddress>& anchors)
+{
+    // open input file, and associate with CAutoFile
+    FILE *file = fopen(pathAnchor.string().c_str(), "rb");
+    CAutoFile filein(file, SER_DISK, CLIENT_VERSION);
+    if (filein.IsNull())
+        return error("%s: Failed to open file %s", __func__, pathAnchor.string());
+
+    // use file size to size memory buffer
+    int fileSize = boost::filesystem::file_size(pathAnchor);
+    int dataSize = fileSize - sizeof(uint256);
+    if (dataSize < 0)
+        dataSize = 0;
+    vector<unsigned char> vchData;
+    vchData.resize(dataSize);
+    uint256 hashIn;
+
+    // read data and checksum from file
+    try {
+        filein.read((char *)&vchData[0], dataSize);
+        filein >> hashIn;
+    }
+    catch (const std::exception& e) {
+        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
+    }
+    filein.fclose();
+
+    CDataStream ss(vchData, SER_DISK, CLIENT_VERSION);
+
+    // verify stored checksum matches input data
+    uint256 hashTmp = Hash(ss.begin(), ss.end());
+    if (hashIn != hashTmp)
+        return error("%s: Checksum mismatch, data corrupted", __func__);
+
+    unsigned char pchMsgTmp[4];
+    try {
+        // de-serialize file header (network specific magic number)
+        ss >> FLATDATA(pchMsgTmp);
+
+        // verify the network matches ours
+        if (memcmp(pchMsgTmp, Params().MessageStart(), sizeof(pchMsgTmp)))
+            return error("%s: Invalid network magic number", __func__);
+
+        // de-serialize anchor addresses
+        ss >> anchors;
+    }
+    catch (const std::exception& e) {
+        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
+    }
+
+    // Delete file after reading (one-shot, prevents stale anchors after crash)
+    boost::filesystem::remove(pathAnchor);
+
+    return true;
+}
+
 unsigned int ReceiveFloodSize() { return 1000*GetArg("-maxreceivebuffer", 5*1000); }
 unsigned int SendBufferSize() { return 1000*GetArg("-maxsendbuffer", 1*1000); }
 
@@ -2110,6 +2360,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     fClient = false; // set by version message
     fInbound = fInboundIn;
     fNetworkNode = false;
+    fFeeler = false;
     fSuccessfullyConnected = false;
     fDisconnect = false;
     nRefCount = 0;

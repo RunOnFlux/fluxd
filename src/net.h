@@ -42,8 +42,10 @@ namespace boost {
 
 /** Time between pings automatically sent out for latency probing and keepalive (in seconds). */
 static const int PING_INTERVAL = 2 * 60;
-/** Time after which to disconnect, after waiting for a ping response (or inactivity). */
-static const int TIMEOUT_INTERVAL = 20 * 60;
+/** Time after which to disconnect, after waiting for a ping response (or inactivity).
+ *  3 missed ping cycles = dead connection. Reduced from Bitcoin's 20 min (designed for
+ *  10-min blocks) to match Flux's faster block times. */
+static const int TIMEOUT_INTERVAL = 3 * PING_INTERVAL;
 /** The maximum number of entries in an 'inv' protocol message */
 static const unsigned int MAX_INV_SZ = 50000;
 /** The maximum number of new addresses to accumulate before announcing. */
@@ -73,7 +75,7 @@ CNode* FindNode(const CSubNet& subNet);
 CNode* FindNode(const std::string& addrName);
 CNode* FindNode(const CService& ip);
 CNode* ConnectNode(CAddress addrConnect, const char *pszDest = NULL,  bool obfuScationMaster = false);
-bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false);
+bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
 void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler);
@@ -279,6 +281,7 @@ public:
     bool fClient;
     bool fInbound;
     bool fNetworkNode;
+    bool fFeeler;
     bool fSuccessfullyConnected;
     bool fDisconnect;
     // We use fRelayTxes for two purposes -
@@ -697,6 +700,17 @@ public:
     CAddrDB();
     bool Write(const CAddrMan& addr);
     bool Read(CAddrMan& addr);
+};
+
+/** Access to the anchor database (anchors.dat) */
+class CAnchorDB
+{
+private:
+    boost::filesystem::path pathAnchor;
+public:
+    CAnchorDB();
+    bool Write(const std::vector<CAddress>& anchors);
+    bool Read(std::vector<CAddress>& anchors);
 };
 
 #endif // BITCOIN_NET_H

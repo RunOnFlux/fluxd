@@ -49,6 +49,14 @@ public:
     {
         CAddrMan::Delete(nId);
     }
+
+    // Expose attempt count for testing smart failure counting
+    int GetAttempts(const CNetAddr& addr)
+    {
+        CAddrInfo* info = Find(addr);
+        if (!info) return -1;
+        return info->GetAttempts();
+    }
 };
 
 BOOST_FIXTURE_TEST_SUITE(addrman_tests, BasicTestingSetup)
@@ -519,4 +527,94 @@ BOOST_AUTO_TEST_CASE(caddrinfo_get_new_bucket)
     //  than 64 buckets.
     BOOST_CHECK(buckets.size() > 64);
 }
+BOOST_AUTO_TEST_CASE(addrman_smart_attempt_counting)
+{
+    CAddrManTest addrman;
+    addrman.MakeDeterministic();
+
+    CNetAddr source = CNetAddr("252.2.2.2");
+    CService addr1 = CService("250.1.1.1", 8333);
+    CService addr2 = CService("250.1.1.2", 8333);
+
+    addrman.Add(CAddress(addr1), source);
+    addrman.Add(CAddress(addr2), source);
+
+    // Multiple Attempt() calls without any Good() in between should only
+    // increment nAttempts once (smart failure counting, Bitcoin Core PR #11560)
+    addrman.Attempt(addr1);
+    addrman.Attempt(addr1);
+    addrman.Attempt(addr1);
+    BOOST_CHECK_EQUAL(addrman.GetAttempts(addr1), 1);
+
+    // Good() on a different address advances m_last_good epoch
+    addrman.Good(addr2);
+
+    // Now another Attempt() on addr1 should increment nAttempts to 2
+    addrman.Attempt(addr1);
+    BOOST_CHECK_EQUAL(addrman.GetAttempts(addr1), 2);
+
+    // But further attempts in the same epoch should not pile on
+    addrman.Attempt(addr1);
+    addrman.Attempt(addr1);
+    BOOST_CHECK_EQUAL(addrman.GetAttempts(addr1), 2);
+}
+
+BOOST_AUTO_TEST_CASE(addrman_good_resets_attempts)
+{
+    CAddrManTest addrman;
+    addrman.MakeDeterministic();
+
+    CNetAddr source = CNetAddr("252.2.2.2");
+    CService addr1 = CService("250.1.1.1", 8333);
+    CService addr2 = CService("250.1.1.2", 8333);
+
+    addrman.Add(CAddress(addr1), source);
+    addrman.Add(CAddress(addr2), source);
+
+    // Build up some attempts across multiple epochs
+    addrman.Attempt(addr1);
+    BOOST_CHECK_EQUAL(addrman.GetAttempts(addr1), 1);
+
+    addrman.Good(addr2); // advance epoch
+    addrman.Attempt(addr1);
+    BOOST_CHECK_EQUAL(addrman.GetAttempts(addr1), 2);
+
+    // Good() on addr1 itself should reset nAttempts to 0
+    addrman.Good(addr1);
+    BOOST_CHECK_EQUAL(addrman.GetAttempts(addr1), 0);
+}
+
+BOOST_AUTO_TEST_CASE(addrman_getchance_penalty_capped)
+{
+    CAddrManTest addrman;
+    addrman.MakeDeterministic();
+
+    CNetAddr source = CNetAddr("252.2.2.2");
+    CService addr1 = CService("250.1.1.1", 8333);
+
+    addrman.Add(CAddress(addr1), source);
+
+    // Simulate a network blip: multiple Attempt() calls with no Good()
+    // Smart failure counting means only 1 actual attempt is recorded
+    for (int i = 0; i < 10; i++)
+        addrman.Attempt(addr1);
+
+    // nAttempts should be 1, not 10
+    BOOST_CHECK_EQUAL(addrman.GetAttempts(addr1), 1);
+
+    // GetChance should reflect only 1 attempt's penalty, not 10
+    // With 1 attempt: penalty factor = pow(0.66, 1) = 0.66
+    // With 10 attempts (old behavior): penalty factor = pow(0.66, 8) ~= 0.036
+    CAddrInfo* info = addrman.Find(addr1);
+    BOOST_CHECK(info != NULL);
+    if (info) {
+        // Use a time far enough in the future so the 10-minute recency
+        // penalty doesn't apply
+        double chance = info->GetChance(GetAdjustedTime() + 3600);
+        // With 1 attempt, chance should be roughly 0.66
+        // With old behavior (10 attempts), chance would be ~0.036
+        BOOST_CHECK(chance > 0.5);
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

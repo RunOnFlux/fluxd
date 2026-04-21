@@ -29,6 +29,9 @@ public:
     //! last try whatsoever by us (memory only)
     int64_t nLastTry;
 
+    //! epoch at which this addr last incremented nAttempts (memory only)
+    int64_t nLastCountAttempt;
+
 private:
     //! where knowledge about this address first came from
     CNetAddr source;
@@ -66,6 +69,7 @@ public:
     {
         nLastSuccess = 0;
         nLastTry = 0;
+        nLastCountAttempt = 0;
         nAttempts = 0;
         nRefCount = 0;
         fInTried = false;
@@ -102,6 +106,9 @@ public:
 
     //! Calculate the relative chance this entry should be given when selecting nodes to connect to
     double GetChance(int64_t nNow = GetAdjustedTime()) const;
+
+    //! Return number of connection attempts since last success
+    int GetAttempts() const { return nAttempts; }
 
 };
 
@@ -199,6 +206,9 @@ private:
 
     //! list of "new" buckets
     int vvNew[ADDRMAN_NEW_BUCKET_COUNT][ADDRMAN_BUCKET_SIZE];
+
+    //! epoch counter incremented on each Good_() call (memory only)
+    int64_t m_last_good;
 
 protected:
     //! secret key to randomize bucket select with
@@ -453,6 +463,7 @@ public:
         nIdCount = 0;
         nTried = 0;
         nNew = 0;
+        m_last_good = 1;
     }
 
     CAddrMan()
