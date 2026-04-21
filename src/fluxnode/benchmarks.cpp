@@ -45,11 +45,12 @@ std::string GetSelfPath()
 {
     #if defined(__linux)
         char result[ PATH_MAX ];
-        ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
+        ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX - 1 );
 
         const char *path;
 
         if (count != -1) {
+            result[count] = '\0';
             path = dirname(result);
             return std::string(path);
         }
