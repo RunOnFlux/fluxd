@@ -549,6 +549,12 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
  */
 bool RewindBlockIndex(const CChainParams& chainparams, bool& clearWitnessCaches);
 
+/** Recover fluxnode cache after unclean shutdown.
+ *  Compares the persisted FluxnodeSyncState to the chain tip. If they
+ *  diverge, disconnects and reconnects the stale blocks so the fluxnode
+ *  cache is rebuilt through the normal ConnectBlock path. */
+bool RecoverFluxnodeCache(const CChainParams& chainparams);
+
 /** RAII wrapper for VerifyDB: Verify consistency of the block and coin databases */
 class CVerifyDB {
 public:
