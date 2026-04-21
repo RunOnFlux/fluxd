@@ -42,6 +42,7 @@
 #include "validationinterface.h"
 #include "fluxnode/fluxnodeconfig.h"
 #include "fluxnode/fluxnode.h"
+#include "fluxnode/fluxnodecachedb.h"
 #include "fluxnode/obfuscation.h"
 #include "fluxnode/activefluxnode.h"
 #include "snapshot/snapshotdb.h"
@@ -1628,6 +1629,31 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             } else {
                 return InitError(strLoadError);
             }
+        }
+    }
+
+    // Check fluxnode cache sync state for crash recovery detection
+    // If mismatch detected, log a warning
+    if (pFluxnodeDB && pcoinsTip && !fReindex) {
+        FluxnodeSyncState fluxnodeSyncState;
+        if (pFluxnodeDB->ReadSyncState(fluxnodeSyncState)) {
+            uint256 coinsBestBlock = pcoinsTip->GetBestBlock();
+            CBlockIndex* pindex = chainActive.Tip();
+            int coinsHeight = pindex ? pindex->nHeight : 0;
+
+            if (fluxnodeSyncState.bestBlockHash != coinsBestBlock) {
+                LogPrintf("WARNING: Fluxnode cache is out of sync with blockchain state.\n"
+                          "  Fluxnode DB synced to: %s (height %d)\n"
+                          "  Coins DB best block:   %s (height %d)\n"
+                          "  This may have occurred due to an unexpected shutdown or crash.\n",
+                          fluxnodeSyncState.bestBlockHash.ToString(), fluxnodeSyncState.nHeight,
+                          coinsBestBlock.ToString(), coinsHeight);
+            } else {
+                LogPrint("dfluxnode", "Fluxnode cache sync state OK: %s (height %d)\n",
+                        fluxnodeSyncState.bestBlockHash.ToString(), fluxnodeSyncState.nHeight);
+            }
+        } else {
+            LogPrint("dfluxnode", "No fluxnode sync state found (first run or pre-upgrade database)\n");
         }
     }
 
