@@ -116,6 +116,7 @@ BITCOIN_CORE_H = \
   asyncrpcqueue.h \
   base58.h \
   bech32.h \
+  blockencodings.h \
   bloom.h \
   chain.h \
   chainparams.h \
@@ -252,6 +253,7 @@ libbitcoin_server_a_SOURCES = \
   alertkeys.h \
   asyncrpcoperation.cpp \
   asyncrpcqueue.cpp \
+  blockencodings.cpp \
   bloom.cpp \
   chain.cpp \
   checkpoints.cpp \
@@ -360,7 +362,9 @@ crypto_libbitcoin_crypto_a_SOURCES = \
   crypto/sha256.cpp \
   crypto/sha256.h \
   crypto/sha512.cpp \
-  crypto/sha512.h
+  crypto/sha512.h \
+  crypto/siphash.cpp \
+  crypto/siphash.h
 
 if ENABLE_MINING
 EQUIHASH_TROMP_SOURCES = \

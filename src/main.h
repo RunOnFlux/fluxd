@@ -95,9 +95,13 @@ static const int MAX_SCRIPTCHECK_THREADS = 16;
 /** -par default (number of script-checking threads, 0 = auto) */
 static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
 /** Number of blocks that can be requested at any given time from a single peer. */
-static const int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 16;
+static const int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 128;
 /** Timeout in seconds during which a peer must stall block download progress before being disconnected. */
 static const unsigned int BLOCK_STALLING_TIMEOUT = 2;
+/** Maximum number of headers to announce when relaying blocks with headers message.
+ *  With 30-second block times, this allows announcing up to 12 minutes of blocks (24 * 30s).
+ *  Increased from Bitcoin's 8 to account for faster block times. */
+static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 24;
 /** Number of headers sent in one getheaders result. We rely on the assumption that if a peer sends
  *  less than this number, we reached its tip. Changing this value is a protocol upgrade. */
 static const unsigned int MAX_HEADERS_RESULTS = 160;
@@ -105,14 +109,26 @@ static const unsigned int MAX_HEADERS_RESULTS = 160;
  *  Larger windows tolerate larger download speed differences between peer, but increase the potential
  *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
  *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
-static const unsigned int BLOCK_DOWNLOAD_WINDOW = 1024;
-/** Time to wait (in seconds) between writing blocks/block index to disk. */
-static const unsigned int DATABASE_WRITE_INTERVAL = 60 * 60;
+static const unsigned int BLOCK_DOWNLOAD_WINDOW = 8192;
+/** Time to wait (in seconds) between writing blocks/block index to disk.
+ *  Reduced from 60 minutes to account for Flux's 30-second block time.
+ *  With 30s blocks: 15-20 min interval = 30-40 blocks max loss on crash
+ *  (vs Bitcoin's 10min blocks: 50-70 min = ~5-7 blocks max loss) */
+static const unsigned int DATABASE_WRITE_INTERVAL_MIN = 15 * 60;  // 15 minutes
+static const unsigned int DATABASE_WRITE_INTERVAL_MAX = 20 * 60;  // 20 minutes
 /** Time to wait (in seconds) between flushing chainstate to disk. */
 static const unsigned int DATABASE_FLUSH_INTERVAL = 24 * 60 * 60;
 /** Maximum length of reject messages. */
 static const unsigned int MAX_REJECT_MESSAGE_LENGTH = 111;
 static const int64_t DEFAULT_MAX_TIP_AGE = 4 * 60 * 60;
+/** Maximum number of unconnecting headers announcements before DoS score */
+static const int MAX_UNCONNECTING_HEADERS = 10;
+/** Maximum number of compact blocks in flight per block */
+static const unsigned int MAX_CMPCTBLOCKS_INFLIGHT_PER_BLOCK = 3;
+/** Maximum depth for responding to GETBLOCKTXN requests */
+static const int MAX_BLOCKTXN_DEPTH = 10;
+/** Size of extra transaction pool for compact block reconstruction */
+static const unsigned int EXTRA_TXNS_FOR_COMPACT_BLOCKS = 100;
 
 /** The maximum rate of address records we're willing to process on average.
  * Is bypassed for whitelisted connections. */
@@ -536,6 +552,9 @@ bool InvalidateBlock(CValidationState& state, const CChainParams& chainparams, C
 
 /** Remove invalidity status from a block and its descendants. */
 bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex);
+
+/** Check whether we are doing an initial block download or close to being synced (protected by cs_main). */
+bool CanDirectFetch(const Consensus::Params& consensusParams);
 
 /** The currently-connected chain of blocks (protected by cs_main). */
 extern CChain chainActive;

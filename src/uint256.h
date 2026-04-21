@@ -183,6 +183,19 @@ public:
         return result;
     }
 
+    /** Get a 64-bit integer from the hash at a given position.
+     * Used for compact blocks short transaction IDs.
+     * @param pos Position (0-3) to extract 64 bits from (pos*8 bytes offset)
+     */
+    uint64_t GetUint64(int pos) const
+    {
+        assert(pos >= 0 && pos < 4);
+        const unsigned char* ptr = data + pos * 8;
+        uint64_t result;
+        memcpy(&result, ptr, 8);
+        return result;
+    }
+
     /** A more secure, salted hash function.
      * @note This hash is not stable between little and big endian.
      */
