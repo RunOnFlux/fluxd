@@ -479,6 +479,9 @@ bool FluxnodeCache::CheckNewStartTx(const COutPoint& out, int nHeight, bool fFro
 void FluxnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
 {
     LOCK2(cs, g_fluxnodeCache.cs);
+    if (g_fluxnodeCache.mapStartTxTracker.empty()) {
+        return;
+    }
     int removalHeight = p_nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT;
 
     if (IsPONActive(p_nHeight)) {
@@ -507,6 +510,9 @@ void FluxnodeCache::CheckForExpiredStartTx(const int& p_nHeight)
 void FluxnodeCache::CheckForUndoExpiredStartTx(const int& p_nHeight)
 {
     LOCK2(cs, g_fluxnodeCache.cs);
+    if (g_fluxnodeCache.mapStartTxDOSTracker.empty()) {
+        return;
+    }
     int removalHeight = p_nHeight - FLUXNODE_START_TX_EXPIRATION_HEIGHT;
 
     if (IsPONActive(p_nHeight)) {
