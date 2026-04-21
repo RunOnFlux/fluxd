@@ -1809,6 +1809,8 @@ int GetNumberOfTiers()
 
 void FluxnodeCache::LogDebugData(const int& nHeight, const uint256& blockhash, bool fFromDisconnect)
 {
+    if (!LogAcceptCategory("fluxnode")) return;
+
     LOCK(cs);
     std::string printme = "{ \n";
     for (const auto &printitem: mapStartTxTracker) {
@@ -1823,10 +1825,10 @@ void FluxnodeCache::LogDebugData(const int& nHeight, const uint256& blockhash, b
     printme3 = printme3 + "}";
 
     if (fFromDisconnect) {
-        LogPrintf("Disconnecting - printing after block=%d, hash=%s\n, mapStart=%s\n\n, mapStartTxDOSTracker=%s\n\n",
+        LogPrint("fluxnode", "Disconnecting - printing after block=%d, hash=%s\n, mapStart=%s\n\n, mapStartTxDOSTracker=%s\n\n",
                   nHeight, blockhash.GetHex(), printme, printme3);
     } else {
-        LogPrintf("printing after block=%d, hash=%s\n, mapStart=%s\n\n, mapStartTxDOSTracker=%s\n\n",
+        LogPrint("fluxnode", "printing after block=%d, hash=%s\n, mapStart=%s\n\n, mapStartTxDOSTracker=%s\n\n",
                   nHeight, blockhash.GetHex(), printme, printme3);
     }
 
