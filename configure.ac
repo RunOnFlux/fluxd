@@ -616,7 +616,7 @@ fi
 
 dnl Check for jemalloc
 if test "x$use_jemalloc" = "xyes"; then
-  AC_CHECK_LIB([jemalloc], [je_malloc_stats_print],
+  AC_CHECK_LIB([jemalloc], [malloc_stats_print],
     [JEMALLOC_LIBS="-ljemalloc"],
     [AC_MSG_WARN([libjemalloc not found, disabling jemalloc support])
     use_jemalloc=no])
