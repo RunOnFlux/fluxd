@@ -1599,15 +1599,10 @@ void FluxnodeCache::DumpFluxnodeCache()
     setDirtyDelegateErases.clear();
 }
 
-static const int FLUXNODE_PERSIST_INTERVAL = 10;
-
 void FluxnodeCache::PersistToDisk(const CBlockIndex* pTip, bool fForce)
 {
     LOCK(cs);
     if (setDirtyOutPoint.empty() && mapDirtyDelegateWrites.empty() && setDirtyDelegateErases.empty())
-        return;
-
-    if (!fForce && pTip && pTip->nHeight % FLUXNODE_PERSIST_INTERVAL != 0)
         return;
 
     CDBBatch batch(*pFluxnodeDB);
@@ -1638,13 +1633,9 @@ void FluxnodeCache::PersistToDisk(const CBlockIndex* pTip, bool fForce)
         pFluxnodeDB->EraseBatchDelegates(batch, outpoint);
     }
 
-    if (!hashLastBlockIndexWrite.IsNull()) {
-        LOCK(cs_main);
-        BlockMap::iterator mi = mapBlockIndex.find(hashLastBlockIndexWrite);
-        if (mi != mapBlockIndex.end()) {
-            FluxnodeSyncState syncState(hashLastBlockIndexWrite, mi->second->nHeight);
-            pFluxnodeDB->WriteBatchSyncState(batch, syncState);
-        }
+    if (pTip) {
+        FluxnodeSyncState syncState(pTip->GetBlockHash(), pTip->nHeight);
+        pFluxnodeDB->WriteBatchSyncState(batch, syncState);
     }
 
     if (pFluxnodeDB->WriteBatch(batch, true)) {
