@@ -6378,21 +6378,46 @@ bool RecoverFluxnodeCache(const CChainParams& chainparams)
             pSyncBlock = pCandidate;
     }
 
-    if (!pSyncBlock) {
-        LogPrintf("RecoverFluxnodeCache: sync state block %s at height %d not on active chain, skipping (ActivateBestChain will handle)\n",
+    int nDisconnectTo;
+    if (pSyncBlock) {
+        // Sync state is on the active chain — disconnect back to it
+        nDisconnectTo = pSyncBlock->nHeight;
+    } else {
+        // Sync state is on a different fork (crash during reorg).
+        // Find the sync state block in the block index and walk back
+        // to the common ancestor with the active chain.
+        LogPrintf("RecoverFluxnodeCache: sync state block %s at height %d is NOT on active chain (crash during reorg)\n",
                   syncState.bestBlockHash.ToString(), syncState.nHeight);
-        return true;
+
+        BlockMap::iterator mi = mapBlockIndex.find(syncState.bestBlockHash);
+        if (mi == mapBlockIndex.end()) {
+            LogPrintf("RecoverFluxnodeCache: sync state block not in block index, cannot recover — need -reindex\n");
+            return true;
+        }
+
+        // Walk back from the sync state block to find where it meets the active chain
+        CBlockIndex* pFork = mi->second;
+        while (pFork && !chainActive.Contains(pFork))
+            pFork = pFork->pprev;
+
+        if (!pFork) {
+            LogPrintf("RecoverFluxnodeCache: no common ancestor found, cannot recover — need -reindex\n");
+            return true;
+        }
+
+        LogPrintf("RecoverFluxnodeCache: common ancestor at height %d\n", pFork->nHeight);
+        nDisconnectTo = pFork->nHeight;
     }
 
-    int nBlocksToReplay = chainActive.Height() - pSyncBlock->nHeight;
+    int nBlocksToReplay = chainActive.Height() - nDisconnectTo;
     if (nBlocksToReplay <= 0)
         return true;
 
-    LogPrintf("RecoverFluxnodeCache: fluxnode cache is %d blocks behind chain tip (synced to %d, tip at %d). Disconnecting stale blocks for replay.\n",
-              nBlocksToReplay, pSyncBlock->nHeight, chainActive.Height());
+    LogPrintf("RecoverFluxnodeCache: disconnecting %d blocks (tip %d -> %d) for fluxnode cache replay\n",
+              nBlocksToReplay, chainActive.Height(), nDisconnectTo);
 
     CValidationState state;
-    while (chainActive.Height() > pSyncBlock->nHeight) {
+    while (chainActive.Height() > nDisconnectTo) {
         if (!DisconnectTip(state, chainparams, true)) {
             return error("RecoverFluxnodeCache: failed to disconnect block at height %d", chainActive.Height());
         }
