@@ -77,8 +77,23 @@ class FluxnodeCache;
 class CFluxnodeTxBlockUndo;
 class ActiveFluxnode;
 class CFluxnodeDelegates;
+class FluxnodeCacheData;
+
+// Global incremental change tracking for ZMQ
+struct FluxNodeDelta {
+    std::map<COutPoint, FluxnodeCacheData> mapAdded;
+    std::set<COutPoint> setRemoved;
+    std::map<COutPoint, FluxnodeCacheData> mapUpdated;
+    CCriticalSection cs;
+
+    void Clear();
+    void RecordAdded(const COutPoint& outpoint, const FluxnodeCacheData& data);
+    void RecordRemoved(const COutPoint& outpoint);
+    void RecordUpdated(const COutPoint& outpoint, const FluxnodeCacheData& data);
+};
 
 extern FluxnodeCache g_fluxnodeCache;
+extern FluxNodeDelta g_fluxnodeDelta;
 extern ActiveFluxnode activeFluxnode;
 extern COutPoint fluxnodeOutPoint;
 

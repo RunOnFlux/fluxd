@@ -45,6 +45,7 @@ protected:
     virtual void BlockChecked(const CBlock&, const CValidationState&) {}
     virtual void GetScriptForMining(boost::shared_ptr<CReserveScript>&) {};
     virtual void ResetRequestCount(const uint256 &hash) {};
+    virtual void ChainReorg(const CBlockIndex *pindexOldTip, const CBlockIndex *pindexNewTip, const CBlockIndex *pindexFork) {}
     friend void ::RegisterValidationInterface(CValidationInterface*);
     friend void ::UnregisterValidationInterface(CValidationInterface*);
     friend void ::UnregisterAllValidationInterfaces();
@@ -73,6 +74,8 @@ struct CMainSignals {
     boost::signals2::signal<void (boost::shared_ptr<CReserveScript>&)> ScriptForMining;
     /** Notifies listeners that a block has been successfully mined */
     boost::signals2::signal<void (const uint256 &)> BlockFound;
+    /** Notifies listeners of a chain reorganization */
+    boost::signals2::signal<void (const CBlockIndex *, const CBlockIndex *, const CBlockIndex *)> ChainReorg;
 };
 
 CMainSignals& GetMainSignals();

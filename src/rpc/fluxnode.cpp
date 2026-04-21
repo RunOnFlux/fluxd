@@ -1503,11 +1503,10 @@ void GetDeterministicListData(UniValue& listData, const std::string& strFilter, 
     int count = -1;
     for (const auto& item : g_fluxnodeCache.mapFluxnodeList.at(tier).listConfirmedFluxnodes) {
 
-        const auto data = g_fluxnodeCache.GetFluxnodeData(item.out);
-
         UniValue info(UniValue::VOBJ);
 
-        if (!data.IsNull()) {
+        if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(item.out)) {
+            const auto data = g_fluxnodeCache.mapConfirmedFluxnodeData.at(item.out);
             std::string strTxHash = data.collateralIn.GetTxHash();
 
 
@@ -1570,7 +1569,7 @@ UniValue viewdeterministicfluxnodelist(const UniValue& params, bool fHelp, strin
     if (fHelp || params.size() > 1)
         throw runtime_error(
                 cmdname + " ( \"filter\" )\n"
-                "\nView the list of deterministric fluxnode(s)\n"
+                "\nView the list of deterministic fluxnode(s)\n"
 
                 "\nResult:\n"
                 "[\n"
@@ -1637,6 +1636,45 @@ UniValue viewdeterministiczelnodelist(const UniValue& params, bool fHelp)
     return viewdeterministicfluxnodelist(params, fHelp, __func__);
 }
 
+UniValue getfluxnodesnapshot(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() > 0)
+        throw runtime_error(
+            "getfluxnodesnapshot\n"
+            "Returns the complete FluxNode list with block height and hash for ZMQ synchronization.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"height\": n,        (numeric) Current block height\n"
+            "  \"blockhash\": \"hex\",  (string) Current block hash\n"
+            "  \"nodes\": [...]      (array) FluxNode list (same format as viewdeterministicfluxnodelist)\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getfluxnodesnapshot", ""));
+
+    if (IsInitialBlockDownload(Params())) {
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Wait until chain is synced closer to tip");
+    }
+
+    UniValue result(UniValue::VOBJ);
+    UniValue nodes(UniValue::VARR);
+
+    {
+        LOCK2(cs_main, g_fluxnodeCache.cs);
+
+        // Atomic: get height, blockhash, and nodes under same lock
+        result.pushKV("height", chainActive.Height());
+        result.pushKV("blockhash", chainActive.Tip()->GetBlockHash().GetHex());
+
+        // Use same logic as viewdeterministicfluxnodelist
+        for (int tier = CUMULUS; tier != LAST; tier++) {
+            GetDeterministicListData(nodes, "", (Tier)tier);
+        }
+    }
+
+    result.pushKV("nodes", nodes);
+    return result;
+}
+
 UniValue listzelnodes(const UniValue& params, bool fHelp)
 {
     return viewdeterministicfluxnodelist(params, fHelp, __func__);
@@ -1668,7 +1706,7 @@ UniValue getdoslist(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("getdoslist", "") + HelpExampleRpc("getdoslist", ""));
 
-    
+
     UniValue wholelist(UniValue::VARR);
 
     std::map<int, std::vector<UniValue>> mapOrderedDosList;
@@ -2647,6 +2685,7 @@ static const CRPCCommand commands[] =
                 { "fluxnode",   "startp2shasdelegate", &startp2shasdelegate, false },
                 { "fluxnode",   "listfluxnodedelegates", &listfluxnodedelegates, false },
                 { "fluxnode",   "viewdeterministicfluxnodelist", &viewdeterministicfluxnodelist, false },
+                { "fluxnode",   "getfluxnodesnapshot", &getfluxnodesnapshot, false },
 
                 { "benchmarks", "getbenchmarks",         &getbenchmarks,           false  },
                 { "benchmarks", "getbenchstatus",        &getbenchstatus,          false  },

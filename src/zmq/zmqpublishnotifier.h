@@ -59,4 +59,48 @@ public:
     bool NotifyBlock(const CBlock &block);
 };
 
+class CZMQPublishHashBlockHeightNotifier : public CZMQAbstractPublishNotifier
+{
+public:
+    bool NotifyBlock(const CBlockIndex *pindex);
+};
+
+class CZMQPublishChainReorgNotifier : public CZMQAbstractPublishNotifier
+{
+public:
+    bool NotifyChainReorg(const CBlockIndex *pindexOldTip, const CBlockIndex *pindexNewTip, const CBlockIndex *pindexFork);
+};
+
+class CZMQPublishFluxNodeListNotifier : public CZMQAbstractPublishNotifier
+{
+private:
+    int nLastDeltaHeight;
+    bool fInitialized;
+    const CBlockIndex* pindexReorgFrom;
+
+    bool SendDelta(int nFromHeight, int nToHeight, const CBlockIndex *pindexTo);
+
+public:
+    CZMQPublishFluxNodeListNotifier() : nLastDeltaHeight(0), fInitialized(false), pindexReorgFrom(nullptr) {}
+    bool NotifyBlock(const CBlockIndex *pindex);
+    bool NotifyChainReorg(const CBlockIndex *pindexOldTip, const CBlockIndex *pindexNewTip, const CBlockIndex *pindexFork);
+};
+
+class CZMQPublishFluxNodeStatusNotifier : public CZMQAbstractPublishNotifier
+{
+private:
+    int nLastLocation;
+    int nLastPaidHeight;
+    int nLastConfirmedHeight;
+    int nLastLastConfirmedHeight;
+    std::string strLastIP;
+    int8_t nLastTier;
+
+public:
+    CZMQPublishFluxNodeStatusNotifier()
+        : nLastLocation(-1), nLastPaidHeight(0), nLastConfirmedHeight(0),
+          nLastLastConfirmedHeight(0), nLastTier(0) {}
+    bool NotifyBlock(const CBlockIndex *pindex);
+};
+
 #endif // BITCOIN_ZMQ_ZMQPUBLISHNOTIFIER_H

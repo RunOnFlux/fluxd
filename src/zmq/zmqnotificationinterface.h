@@ -29,6 +29,7 @@ protected:
     void SyncTransaction(const CTransaction &tx, const CBlock *pblock);
     void UpdatedBlockTip(const CBlockIndex *pindex);
     void BlockChecked(const CBlock& block, const CValidationState& state);
+    void ChainReorg(const CBlockIndex *pindexOldTip, const CBlockIndex *pindexNewTip, const CBlockIndex *pindexFork);
 
 private:
     CZMQNotificationInterface();

@@ -4393,6 +4393,20 @@ void PruneAndFlush() {
     FlushStateToDisk(state, FLUSH_STATE_NONE);
 }
 
+/**
+ * Notify subscribers of a chain reorganization.
+ * Should be called whenever blocks are disconnected from the active chain.
+ */
+void static NotifyChainReorg(const CBlockIndex* pindexOldTip, const CBlockIndex* pindexNewTip, const CBlockIndex* pindexFork) {
+    if (!pindexOldTip || !pindexNewTip || !pindexFork) {
+        LogPrint("zmq", "Chain reorg notification skipped (null pointer)\n");
+        return;
+    }
+    LogPrint("zmq", "Chain reorg: old_height=%d new_height=%d fork_height=%d\n",
+             pindexOldTip->nHeight, pindexNewTip->nHeight, pindexFork->nHeight);
+    GetMainSignals().ChainReorg(pindexOldTip, pindexNewTip, pindexFork);
+}
+
 /** Update chainActive and related internal data structures. */
 void static UpdateTip(CBlockIndex *pindexNew, const CChainParams& chainParams) {
     chainActive.SetTip(pindexNew);
@@ -4798,6 +4812,9 @@ static bool ActivateBestChainStep(CValidationState& state, const CChainParams& c
     }
 
     if (fBlocksDisconnected) {
+        // Fire reorg notification
+        NotifyChainReorg(pindexOldTip, chainActive.Tip(), pindexFork);
+
         mempool.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
     }
     mempool.removeWithoutBranchId(
@@ -4913,6 +4930,10 @@ bool InvalidateBlock(CValidationState& state, const CChainParams& chainparams, C
     setDirtyBlockIndex.insert(pindex);
     setBlockIndexCandidates.erase(pindex);
 
+    // Save old tip for reorg notification
+    const CBlockIndex *pindexOldTip = chainActive.Tip();
+    bool fBlocksDisconnected = false;
+
     while (chainActive.Contains(pindex)) {
         CBlockIndex *pindexWalk = chainActive.Tip();
         pindexWalk->nStatus |= BLOCK_FAILED_CHILD;
@@ -4926,6 +4947,12 @@ bool InvalidateBlock(CValidationState& state, const CChainParams& chainparams, C
                 CurrentEpochBranchId(chainActive.Tip()->nHeight + 1, chainparams.GetConsensus()));
             return false;
         }
+        fBlocksDisconnected = true;
+    }
+
+    // Notify subscribers of the reorg (manual invalidation)
+    if (fBlocksDisconnected) {
+        NotifyChainReorg(pindexOldTip, chainActive.Tip(), pindex->pprev);
     }
 
     // The resulting new best tip may not be in setBlockIndexCandidates anymore, so
