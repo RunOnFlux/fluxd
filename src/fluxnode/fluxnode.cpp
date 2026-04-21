@@ -1638,9 +1638,13 @@ void FluxnodeCache::PersistToDisk(const CBlockIndex* pTip, bool fForce)
         pFluxnodeDB->EraseBatchDelegates(batch, outpoint);
     }
 
-    if (pTip) {
-        FluxnodeSyncState syncState(pTip->GetBlockHash(), pTip->nHeight);
-        pFluxnodeDB->WriteBatchSyncState(batch, syncState);
+    if (!hashLastBlockIndexWrite.IsNull()) {
+        LOCK(cs_main);
+        BlockMap::iterator mi = mapBlockIndex.find(hashLastBlockIndexWrite);
+        if (mi != mapBlockIndex.end()) {
+            FluxnodeSyncState syncState(hashLastBlockIndexWrite, mi->second->nHeight);
+            pFluxnodeDB->WriteBatchSyncState(batch, syncState);
+        }
     }
 
     if (pFluxnodeDB->WriteBatch(batch, true)) {
