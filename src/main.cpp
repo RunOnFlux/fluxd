@@ -69,7 +69,6 @@ using namespace std;
 CCriticalSection cs_main;
 
 BlockMap mapBlockIndex;
-uint256 hashLastBlockIndexWrite;
 CBlockIndexPool* g_blockIndexPool = nullptr;
 CChain chainActive;
 CBlockIndex *pindexBestHeader = NULL;
@@ -4380,8 +4379,7 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
             if (!pblocktree->WriteBatchSync(vFiles, nLastBlockFile, vBlocks)) {
                 return AbortNode(state, "Files to write to block index database");
             }
-            if (chainActive.Tip())
-                hashLastBlockIndexWrite = chainActive.Tip()->GetBlockHash();
+            g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
         }
         // Finally remove any pruned files
         if (fFlushForPrune)
@@ -4403,11 +4401,6 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
         // Flush the chainstate (which may refer to block index entries).
         if (!pcoinsTip->Flush())
             return AbortNode(state, "Failed to write to coin database");
-
-        // Flush any remaining dirty fluxnode entries on shutdown
-        if (mode == FLUSH_STATE_ALWAYS) {
-            g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
-        }
         nLastFlush = nNow;
     }
     if ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) && nNow > nLastSetChain + nNextWriteInterval * 1000000) {
@@ -4491,7 +4484,6 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
         assert(view.Flush());
         assert(fluxnodeCache.Flush());
         CRPCFluxnodeCache::ClearFluxnodeListCache();
-        g_fluxnodeCache.PersistToDisk(pindexDelete->pprev);
     }
     LogPrint("bench", "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
     uint256 sproutAnchorAfterDisconnect = pcoinsTip->GetBestAnchor(SPROUT);
@@ -4616,7 +4608,6 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
         assert(fluxnodeCache.Flush());
         CRPCFluxnodeCache::ClearFluxnodeListCache();
-        g_fluxnodeCache.PersistToDisk(pindexNew);
 
         LogPrint("dfluxnode", "%s : Size of global fluxnodeCache mapStartTxTracker : %u\n", __func__, g_fluxnodeCache.mapStartTxTracker.size());
         LogPrint("dfluxnode", "%s : Size of global fluxnodeCache mapStartTxDOSTrackerTxTracker : %u\n", __func__, g_fluxnodeCache.mapStartTxDOSTracker.size());
@@ -6245,8 +6236,6 @@ bool static LoadBlockIndexDB()
         DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
         Checkpoints::GuessVerificationProgress(chainparams.Checkpoints(), chainActive.Tip()));
 
-    hashLastBlockIndexWrite = chainActive.Tip()->GetBlockHash();
-
     // Remove deprecation requirement
     // EnforceNodeDeprecation(chainActive.Height(), true);
 
@@ -6388,7 +6377,6 @@ bool RecoverFluxnodeCache(const CChainParams& chainparams)
         BlockMap::iterator mi = mapBlockIndex.find(syncState.bestBlockHash);
         if (mi == mapBlockIndex.end()) {
             LogPrintf("RecoverFluxnodeCache: sync state block not in block index (stale marker), writing fresh sync state\n");
-            hashLastBlockIndexWrite = chainActive.Tip()->GetBlockHash();
             g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
             return true;
         }
