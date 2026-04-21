@@ -69,6 +69,7 @@ using namespace std;
 CCriticalSection cs_main;
 
 BlockMap mapBlockIndex;
+uint256 hashLastBlockIndexWrite;
 CBlockIndexPool* g_blockIndexPool = nullptr;
 CChain chainActive;
 CBlockIndex *pindexBestHeader = NULL;
@@ -4387,6 +4388,8 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
             if (!pblocktree->WriteBatchSync(vFiles, nLastBlockFile, vBlocks)) {
                 return AbortNode(state, "Files to write to block index database");
             }
+            if (chainActive.Tip())
+                hashLastBlockIndexWrite = chainActive.Tip()->GetBlockHash();
         }
         // Finally remove any pruned files
         if (fFlushForPrune)
@@ -6250,6 +6253,8 @@ bool static LoadBlockIndexDB()
         DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
         Checkpoints::GuessVerificationProgress(chainparams.Checkpoints(), chainActive.Tip()));
 
+    hashLastBlockIndexWrite = chainActive.Tip()->GetBlockHash();
+
     // Remove deprecation requirement
     // EnforceNodeDeprecation(chainActive.Height(), true);
 
@@ -6390,7 +6395,9 @@ bool RecoverFluxnodeCache(const CChainParams& chainparams)
 
         BlockMap::iterator mi = mapBlockIndex.find(syncState.bestBlockHash);
         if (mi == mapBlockIndex.end()) {
-            LogPrintf("RecoverFluxnodeCache: sync state block not in block index, cannot recover — need -reindex\n");
+            LogPrintf("RecoverFluxnodeCache: sync state block not in block index (stale marker), writing fresh sync state\n");
+            hashLastBlockIndexWrite = chainActive.Tip()->GetBlockHash();
+            g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
             return true;
         }
 
