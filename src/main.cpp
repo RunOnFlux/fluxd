@@ -6876,6 +6876,7 @@ bool static AlreadyHave(const CInv& inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
                    pcoinsTip->HaveCoins(inv.hash);
         }
     case MSG_BLOCK:
+    case MSG_CMPCT_BLOCK:
         return mapBlockIndex.count(inv.hash);
     }
     // Don't know what it is, just say we already got one
@@ -6902,7 +6903,7 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
             boost::this_thread::interruption_point();
             it++;
 
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
             {
                 bool send = false;
                 BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
@@ -6934,6 +6935,20 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
                         assert(!"cannot load block from disk");
                     if (inv.type == MSG_BLOCK)
                         pfrom->PushMessage("block", block);
+                    else if (inv.type == MSG_CMPCT_BLOCK)
+                    {
+                        // BIP 152 low-bandwidth mode: peer-initiated compact block request.
+                        // If the block is too old (more than MAX_CMPCTBLOCK_DEPTH deep),
+                        // fall back to sending the full block because the peer is unlikely
+                        // to have the mempool state needed to reconstruct it.
+                        static const int MAX_CMPCTBLOCK_DEPTH = 5;
+                        if (mi->second->nHeight >= chainActive.Height() - MAX_CMPCTBLOCK_DEPTH) {
+                            CBlockHeaderAndShortTxIDs cmpctblock(block, false);
+                            pfrom->PushMessage("cmpctblock", cmpctblock);
+                        } else {
+                            pfrom->PushMessage("block", block);
+                        }
+                    }
                     else // MSG_FILTERED_BLOCK)
                     {
                         LOCK(pfrom->cs_filter);

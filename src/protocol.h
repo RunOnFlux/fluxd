@@ -160,7 +160,13 @@ enum {
     MSG_BLOCK,
     // Nodes may always request a MSG_FILTERED_BLOCK in a getdata, however,
     // MSG_FILTERED_BLOCK should not appear in any invs except as a part of getdata.
-    MSG_FILTERED_BLOCK
+    MSG_FILTERED_BLOCK,
+    // Reserved inv types 4-10 are used for fluxnode-specific invs (see
+    // ppszTypeName in protocol.cpp).
+    // BIP 152 low-bandwidth mode: peer-initiated compact block request.
+    // Diverges from Bitcoin Core's MSG_CMPCT_BLOCK=4 because type 4 is
+    // already used as "spork" on the Flux network.
+    MSG_CMPCT_BLOCK = 11,
 };
 
 #endif // BITCOIN_PROTOCOL_H
