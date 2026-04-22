@@ -25,7 +25,8 @@ static const char* ppszTypeName[] =
     "zn quorum",
     "zn announce",
     "zn ping",
-    "dstx"
+    "dstx",
+    "cmpct block"
 };
 
 CMessageHeader::CMessageHeader(const MessageStartChars& pchMessageStartIn)
@@ -139,7 +140,9 @@ bool CInv::IsKnownType() const
 
 bool CInv::IsFluxnodeType() const
 {
-    return (type >= 4);
+    // Types 4-10 are Flux-network-specific invs (spork, zn winner, etc).
+    // MSG_CMPCT_BLOCK (type 11) is not a fluxnode type.
+    return (type >= 4 && type <= 10);
 }
 
 const char* CInv::GetCommand() const

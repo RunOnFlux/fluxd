@@ -634,11 +634,35 @@ void FinalizeNode(NodeId nodeid) {
     // Remove from high-bandwidth compact block peer list
     lNodesAnnouncingHeaderAndIDs.remove(nodeid);
 
-    // Clean up any partial compact blocks from this peer
-    for (auto it = mapPartialBlocks.begin(); it != mapPartialBlocks.end(); ) {
-        // Note: PartiallyDownloadedBlock doesn't track which peer it came from in current implementation
-        // This is something we should improve in future iterations
-        ++it;
+    // Clean up any compact-block in-flight state tied to this peer.
+    // listCompactBlocksInFlight is the source of truth; mapCompactBlocksInFlight
+    // is the hash->iterator index. Collect affected block hashes so we can drop
+    // their partial-block entries once no other peer is still working on them.
+    std::set<uint256> affectedHashes;
+    for (auto it = listCompactBlocksInFlight.begin(); it != listCompactBlocksInFlight.end(); ) {
+        if (it->nodeid == nodeid) {
+            affectedHashes.insert(it->hash);
+            auto mapIt = mapCompactBlocksInFlight.find(it->hash);
+            if (mapIt != mapCompactBlocksInFlight.end() && mapIt->second.first == nodeid) {
+                mapCompactBlocksInFlight.erase(mapIt);
+            }
+            it = listCompactBlocksInFlight.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    for (const uint256& hash : affectedHashes) {
+        bool stillInFlight = false;
+        for (const auto& marker : listCompactBlocksInFlight) {
+            if (marker.hash == hash) {
+                stillInFlight = true;
+                break;
+            }
+        }
+        if (!stillInFlight) {
+            mapPartialBlocks.erase(hash);
+            mapPartialBlocksTime.erase(hash);
+        }
     }
 
     mapNodeState.erase(nodeid);
@@ -6876,6 +6900,7 @@ bool static AlreadyHave(const CInv& inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
                    pcoinsTip->HaveCoins(inv.hash);
         }
     case MSG_BLOCK:
+    case MSG_CMPCT_BLOCK:
         return mapBlockIndex.count(inv.hash);
     }
     // Don't know what it is, just say we already got one
@@ -6902,7 +6927,7 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
             boost::this_thread::interruption_point();
             it++;
 
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
             {
                 bool send = false;
                 BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
@@ -6934,6 +6959,18 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
                         assert(!"cannot load block from disk");
                     if (inv.type == MSG_BLOCK)
                         pfrom->PushMessage("block", block);
+                    else if (inv.type == MSG_CMPCT_BLOCK)
+                    {
+                        // BIP 152 low-bandwidth mode: peer-initiated compact block request.
+                        // For older blocks fall back to sending the full block because the
+                        // peer is unlikely to have the mempool state needed to reconstruct.
+                        if (mi->second->nHeight >= chainActive.Height() - MAX_CMPCTBLOCK_DEPTH) {
+                            CBlockHeaderAndShortTxIDs cmpctblock(block, false);
+                            pfrom->PushMessage("cmpctblock", cmpctblock);
+                        } else {
+                            pfrom->PushMessage("block", block);
+                        }
+                    }
                     else // MSG_FILTERED_BLOCK)
                     {
                         LOCK(pfrom->cs_filter);
@@ -7981,7 +8018,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         // DoS protection: only accept compact blocks that are close to the tip
         // This prevents attackers from wasting our CPU/bandwidth with old blocks
-        if (pindex->nHeight < chainActive.Height() - MAX_BLOCKTXN_DEPTH) {
+        if (pindex->nHeight < chainActive.Height() - MAX_CMPCTBLOCK_DEPTH) {
             LogPrint("cmpctblock", "Ignoring compact block from peer %d at height %d (tip is %d)\n",
                      pfrom->id, pindex->nHeight, chainActive.Height());
             return true;

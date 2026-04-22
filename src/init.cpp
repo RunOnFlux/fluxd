@@ -1224,8 +1224,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 #ifndef WIN32
     CreatePidFile(GetPidFile(), getpid());
 #endif
-    // Shrink debug.log on startup if it's too large (configurable, default 500MB) - keeps last 50MB
-    if (GetBoolArg("-shrinkdebugfile", !fDebug))
+    // Shrink debug.log on startup if it's too large (configurable, default
+    // 500 MB, capped at 10 GB). Runs regardless of -debug so the file can't
+    // grow without bound when debug logging is enabled.
+    if (GetBoolArg("-shrinkdebugfile", true))
         ShrinkDebugFile();
 
     if (fPrintToDebugLog)
@@ -1474,24 +1476,24 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
     }
 
-    // cache size calculations
+    // https://github.com/bitpay/bitcoin/commit/c91d78b578a8700a45be936cb5bb0931df8f4b87#diff-c865a8939105e6350a50af02766291b7R1233
+    if (GetBoolArg("-insightexplorer", false) && !GetBoolArg("-txindex", false)) {
+        return InitError(_("-insightexplorer requires -txindex."));
+    }
+
+    // cache size calculations (matches Bitcoin Core's allocation so most of
+    // -dbcache goes to the in-memory UTXO set during IBD instead of the
+    // block tree DB)
+    const bool fHaveBlockTreeIndexes = GetBoolArg("-txindex", false) ||
+                                        GetBoolArg("-insightexplorer", false);
     int64_t nTotalCache = (GetArg("-dbcache", nDefaultDbCache) << 20);
     nTotalCache = std::max(nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
-    nTotalCache = std::min(nTotalCache, nMaxDbCache << 20); // total cache cannot be greated than nMaxDbcache
-    int64_t nBlockTreeDBCache = nTotalCache / 8;
-    if (nBlockTreeDBCache > (1 << 21) && !GetBoolArg("-txindex", false))
-        nBlockTreeDBCache = (1 << 21); // block tree db cache shouldn't be larger than 2 MiB
-
-    // https://github.com/bitpay/bitcoin/commit/c91d78b578a8700a45be936cb5bb0931df8f4b87#diff-c865a8939105e6350a50af02766291b7R1233
-    if (GetBoolArg("-insightexplorer", false)) {
-        if (!GetBoolArg("-txindex", false)) {
-            return InitError(_("-insightexplorer requires -txindex."));
-        }
-        // increase cache if additional indices are needed
-        nBlockTreeDBCache = nTotalCache * 3 / 4;
-    }
+    nTotalCache = std::min(nTotalCache, nMaxDbCache << 20); // total cache cannot be greater than nMaxDbcache
+    int64_t nBlockTreeDBCache = std::min(nTotalCache / 8,
+        (fHaveBlockTreeIndexes ? nMaxBlockDBAndTxIndexCache : nMaxBlockDBCache) << 20);
     nTotalCache -= nBlockTreeDBCache;
     int64_t nCoinDBCache = std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23)); // use 25%-50% of the remainder for disk cache
+    nCoinDBCache = std::min(nCoinDBCache, nMaxCoinsDBCache << 20);
     nTotalCache -= nCoinDBCache;
     nCoinCacheUsage = nTotalCache; // the rest goes to in-memory cache
     LogPrintf("Cache configuration:\n");
@@ -2068,6 +2070,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     CScheduler::Function f = boost::bind(&PartitionCheck, &IsInitialBlockDownload,
                                          boost::ref(cs_main), boost::cref(pindexBestHeader), nPowTargetSpacing);
     scheduler.scheduleEvery(f, nPowTargetSpacing);
+
+    // Periodically cap debug.log size. Runs even when -debug is enabled so a
+    // firehose of debug output can't fill the disk. Interval: 5 minutes.
+    scheduler.scheduleEvery(&ShrinkDebugFile, 300);
 
 #ifdef ENABLE_MINING
     // Generate coins in the background

@@ -125,8 +125,15 @@ static const int64_t DEFAULT_MAX_TIP_AGE = 4 * 60 * 60;
 static const int MAX_UNCONNECTING_HEADERS = 10;
 /** Maximum number of compact blocks in flight per block */
 static const unsigned int MAX_CMPCTBLOCKS_INFLIGHT_PER_BLOCK = 3;
-/** Maximum depth for responding to GETBLOCKTXN requests */
-static const int MAX_BLOCKTXN_DEPTH = 10;
+/** Maximum depth at which we accept inbound cmpctblock messages or serve
+ *  outbound ones in response to MSG_CMPCT_BLOCK getdata requests.
+ *  Older blocks fall back to a full block because the requester's mempool
+ *  is unlikely to have the transactions needed to reconstruct.
+ *
+ *  Sized to roughly match Bitcoin Core's ~50-minute wall-clock window.
+ *  Bitcoin Core uses 5 at 10-minute block times; fluxd runs 30-second
+ *  PON blocks, so 100 blocks ≈ 50 minutes. */
+static const int MAX_CMPCTBLOCK_DEPTH = 100;
 /** Size of extra transaction pool for compact block reconstruction */
 static const unsigned int EXTRA_TXNS_FOR_COMPACT_BLOCKS = 100;
 

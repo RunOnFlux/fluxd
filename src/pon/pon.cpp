@@ -137,7 +137,7 @@ unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
     // Target timespan = (window - 1) * target spacing (because we're measuring intervals)
     int64_t targetTimespan = (lookbackWindow - 1) * params.nPonTargetSpacing;
 
-    LogPrintf("PON: Adjustment at height %d: first=%d, last=%d, actualTimespan=%d, targetTimespan=%d\n",
+    LogPrint("pon", "PON: Adjustment at height %d: first=%d, last=%d, actualTimespan=%d, targetTimespan=%d\n",
               nextHeight, pindexFirst->nHeight, pindexLast->nHeight, actualTimespan, targetTimespan);
 
     // Sanity check
@@ -187,7 +187,7 @@ unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
         newTarget = ponLimit;  // Use easiest difficulty as failsafe
     }
 
-    LogPrintf("PON difficulty adjustment: height=%d, actualTimespan=%d, targetTimespan=%d, before=%08x, after=%08x\n",
+    LogPrint("pon", "PON difficulty adjustment: height=%d, actualTimespan=%d, targetTimespan=%d, before=%08x, after=%08x\n",
               pindexLast->nHeight + 1, actualTimespan, targetTimespan,
               pindexLast->nBits, newTarget.GetCompact());
 
