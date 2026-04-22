@@ -707,7 +707,7 @@ public:
 class CAnchorDB
 {
 private:
-    boost::filesystem::path pathAnchor;
+    std::filesystem::path pathAnchor;
 public:
     CAnchorDB();
     bool Write(const std::vector<CAddress>& anchors);

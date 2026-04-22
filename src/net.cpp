@@ -1383,7 +1383,7 @@ static void CheckStaleTip()
         int nProbed = 0;
         {
             LOCK(cs_vNodes);
-            BOOST_FOREACH(CNode* pnode, vNodes) {
+            for (CNode* pnode : vNodes) {
                 if (pnode->fInbound || pnode->fOneShot || pnode->fDisconnect)
                     continue;
                 pnode->fPingQueued = true;
@@ -1404,7 +1404,7 @@ static void CheckStaleTip()
         int nOutbound = 0;
         {
             LOCK(cs_vNodes);
-            BOOST_FOREACH(CNode* pnode, vNodes) {
+            for (CNode* pnode : vNodes) {
                 if (pnode->fInbound || pnode->fOneShot || pnode->fDisconnect)
                     continue;
                 nOutbound++;
@@ -2017,7 +2017,7 @@ bool StopNode()
         {
             std::vector<CAddress> anchors;
             LOCK(cs_vNodes);
-            BOOST_FOREACH(CNode* pnode, vNodes) {
+            for (CNode* pnode : vNodes) {
                 if (!pnode->fInbound && !pnode->fOneShot && !pnode->fDisconnect &&
                     pnode->fSuccessfullyConnected) {
                     anchors.push_back(pnode->addr);
@@ -2329,7 +2329,7 @@ bool CAnchorDB::Write(const std::vector<CAddress>& anchors)
     ss << hash;
 
     // open temp output file, and associate with CAutoFile
-    boost::filesystem::path pathTmp = GetDataDir() / tmpfn;
+    std::filesystem::path pathTmp = GetDataDir() / tmpfn;
     FILE *file = fopen(pathTmp.string().c_str(), "wb");
     CAutoFile fileout(file, SER_DISK, CLIENT_VERSION);
     if (fileout.IsNull())
@@ -2361,7 +2361,7 @@ bool CAnchorDB::Read(std::vector<CAddress>& anchors)
         return error("%s: Failed to open file %s", __func__, pathAnchor.string());
 
     // use file size to size memory buffer
-    int fileSize = boost::filesystem::file_size(pathAnchor);
+    int fileSize = std::filesystem::file_size(pathAnchor);
     int dataSize = fileSize - sizeof(uint256);
     if (dataSize < 0)
         dataSize = 0;
@@ -2403,7 +2403,7 @@ bool CAnchorDB::Read(std::vector<CAddress>& anchors)
     }
 
     // Delete file after reading (one-shot, prevents stale anchors after crash)
-    boost::filesystem::remove(pathAnchor);
+    std::filesystem::remove(pathAnchor);
 
     return true;
 }

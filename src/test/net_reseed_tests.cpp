@@ -6,7 +6,7 @@
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 BOOST_FIXTURE_TEST_SUITE(net_reseed_tests, BasicTestingSetup)
 
@@ -35,15 +35,15 @@ BOOST_AUTO_TEST_CASE(anchor_db_write_read)
     BOOST_CHECK(anchorsRead[1].ToStringIPPort() == addr2.ToStringIPPort());
 
     // File should be deleted after read (one-shot behavior)
-    boost::filesystem::path pathAnchor = GetDataDir() / "anchors.dat";
-    BOOST_CHECK(!boost::filesystem::exists(pathAnchor));
+    std::filesystem::path pathAnchor = GetDataDir() / "anchors.dat";
+    BOOST_CHECK(!std::filesystem::exists(pathAnchor));
 }
 
 BOOST_AUTO_TEST_CASE(anchor_db_empty)
 {
     // Ensure no anchors.dat exists
-    boost::filesystem::path pathAnchor = GetDataDir() / "anchors.dat";
-    boost::filesystem::remove(pathAnchor);
+    std::filesystem::path pathAnchor = GetDataDir() / "anchors.dat";
+    std::filesystem::remove(pathAnchor);
 
     // Attempt to read non-existent anchors.dat
     std::vector<CAddress> anchors;
@@ -59,7 +59,7 @@ BOOST_AUTO_TEST_CASE(anchor_db_max_limit)
     // Write 5 addresses
     std::vector<CAddress> anchorsWrite;
     for (int i = 1; i <= 5; i++) {
-        CAddress addr(CService("1.2.3." + boost::to_string(i), 16125));
+        CAddress addr(CService("1.2.3." + std::to_string(i), 16125));
         addr.nTime = i * 1000;
         anchorsWrite.push_back(addr);
     }

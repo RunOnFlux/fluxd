@@ -7900,7 +7900,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         int latestCheckpoint = Checkpoints::GetTotalBlocksEstimate(chainparams.Checkpoints());
 
         int processedCount = 0;
-        BOOST_FOREACH(CCompactBlockHeader& compactHeader, compactHeaders) {
+        for (CCompactBlockHeader& compactHeader : compactHeaders) {
             // For POW blocks, we cannot compute the hash without nSolution,
             // but the sender included it in compactHeader.hashBlock
             uint256 hash = compactHeader.IsPOW() ? compactHeader.hashBlock : compactHeader.GetHash();
