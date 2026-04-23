@@ -10,7 +10,6 @@
 #include <set>
 #include <vector>
 
-#include "boost/optional.hpp"
 #include "primitives/transaction.h"
 #include "uint256.h"
 

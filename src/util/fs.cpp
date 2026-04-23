@@ -103,7 +103,7 @@ bool FileLock::TryLock()
     if (m_hFile == INVALID_HANDLE_VALUE) {
         return false;
     }
-    _OVERLAPPED overlapped = {};
+    OVERLAPPED overlapped = {};
     if (!LockFileEx(m_hFile, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0,
         std::numeric_limits<DWORD>::max(), std::numeric_limits<DWORD>::max(), &overlapped)) {
         m_reason = GetErrorReason();
