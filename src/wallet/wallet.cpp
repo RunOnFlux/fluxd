@@ -4063,7 +4063,7 @@ std::map<CTxDestination, CAmount> CWallet::GetAddressBalances()
                 if(!ExtractDestination(pcoin->vout[i].scriptPubKey, addr))
                     continue;
 
-                CAmount n = IsSpent(walletEntry.first, i) ? 0 : pcoin->vout[i].nValue;
+                CAmount n = IsSpent(txid, i) ? 0 : pcoin->vout[i].nValue;
 
                 if (!balances.count(addr))
                     balances[addr] = 0;
