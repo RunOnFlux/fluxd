@@ -4399,14 +4399,8 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
         if (!pcoinsTip->Flush())
             return AbortNode(state, "Failed to write to coin database");
 
-        // Dump Fluxnode cache to database with sync state marker
-        // This uses atomic batch writes to ensure consistency between
-        // fluxnode data and the sync state marker
-        if (chainActive.Tip()) {
-            g_fluxnodeCache.DumpFluxnodeCache(chainActive.Tip()->GetBlockHash(), chainActive.Height());
-        } else {
-            g_fluxnodeCache.DumpFluxnodeCache();
-        }
+        // Dump Fluxnode cache to database
+        g_fluxnodeCache.DumpFluxnodeCache();
         nLastFlush = nNow;
     }
     if ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) && nNow > nLastSetChain + nNextWriteInterval * 1000000) {
