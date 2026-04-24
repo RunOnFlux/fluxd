@@ -485,12 +485,12 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
     UniValue localAddresses(UniValue::VARR);
     {
         LOCK(cs_mapLocalHost);
-        for (const PAIRTYPE(CNetAddr, LocalServiceInfo) &item : mapLocalHost)
+        for (const auto& [addr, serviceInfo] : mapLocalHost)
         {
             UniValue rec(UniValue::VOBJ);
-            rec.pushKV("address", item.first.ToString());
-            rec.pushKV("port", item.second.nPort);
-            rec.pushKV("score", item.second.nScore);
+            rec.pushKV("address", addr.ToString());
+            rec.pushKV("port", serviceInfo.nPort);
+            rec.pushKV("score", serviceInfo.nScore);
             localAddresses.push_back(rec);
         }
     }

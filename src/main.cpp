@@ -6051,15 +6051,13 @@ bool static LoadBlockIndexDB()
     // Calculate nChainWork
     vector<pair<int, CBlockIndex*> > vSortedByHeight;
     vSortedByHeight.reserve(mapBlockIndex.size());
-    for (const PAIRTYPE(uint256, CBlockIndex*)& item : mapBlockIndex)
+    for (const auto& [hash, pindex] : mapBlockIndex)
     {
-        CBlockIndex* pindex = item.second;
         vSortedByHeight.push_back(make_pair(pindex->nHeight, pindex));
     }
     sort(vSortedByHeight.begin(), vSortedByHeight.end());
-    for (const PAIRTYPE(int, CBlockIndex*)& item : vSortedByHeight)
+    for (const auto& [height, pindex] : vSortedByHeight)
     {
-        CBlockIndex* pindex = item.second;
         pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) + GetBlockProof(*pindex);
         // We can link the chain of blocks for which we've received transactions at some point.
         // Pruned nodes may have deleted the block.
@@ -6143,9 +6141,8 @@ bool static LoadBlockIndexDB()
     // Check presence of blk files
     LogPrintf("Checking all blk files are present...\n");
     set<int> setBlkDataFiles;
-    for (const PAIRTYPE(uint256, CBlockIndex*)& item : mapBlockIndex)
+    for (const auto& [hash, pindex] : mapBlockIndex)
     {
-        CBlockIndex* pindex = item.second;
         if (pindex->nStatus & BLOCK_HAVE_DATA) {
             setBlkDataFiles.insert(pindex->nFile);
         }
@@ -6181,9 +6178,8 @@ bool static LoadBlockIndexDB()
     fTimestampIndex = fInsightExplorer;
 
     // Fill in-memory data
-    for (const PAIRTYPE(uint256, CBlockIndex*)& item : mapBlockIndex)
+    for (const auto& [hash, pindex] : mapBlockIndex)
     {
-        CBlockIndex* pindex = item.second;
         // - This relationship will always be true even if pprev has multiple
         //   children, because hashSproutAnchor is technically a property of pprev,
         //   not its children.
@@ -6873,9 +6869,8 @@ std::string GetWarnings(const std::string& strFor)
     // Alerts
     {
         LOCK(cs_mapAlerts);
-        for (PAIRTYPE(const uint256, CAlert)& item : mapAlerts)
+        for (auto& [alertHash, alert] : mapAlerts)
         {
-            const CAlert& alert = item.second;
             if (alert.AppliesToMe() && alert.nPriority > nPriority)
             {
                 nPriority = alert.nPriority;
@@ -7228,8 +7223,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         // Relay alerts
         {
             LOCK(cs_mapAlerts);
-            for (PAIRTYPE(const uint256, CAlert)& item : mapAlerts)
-                item.second.RelayTo(pfrom);
+            for (auto& [alertHash, alert] : mapAlerts)
+                alert.RelayTo(pfrom);
         }
 
         pfrom->fSuccessfullyConnected = true;

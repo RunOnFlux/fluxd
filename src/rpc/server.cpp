@@ -90,16 +90,16 @@ void RPCTypeCheckObj(const UniValue& o,
                   const map<string, UniValue::VType>& typesExpected,
                   bool fAllowNull)
 {
-    for (const PAIRTYPE(string, UniValue::VType)& t : typesExpected)
+    for (const auto& [fieldName, expectedType] : typesExpected)
     {
-        const UniValue& v = find_value(o, t.first);
+        const UniValue& v = find_value(o, fieldName);
         if (!fAllowNull && v.isNull())
-            throw JSONRPCError(RPC_TYPE_ERROR, strprintf("Missing %s", t.first));
+            throw JSONRPCError(RPC_TYPE_ERROR, strprintf("Missing %s", fieldName));
 
-        if (!((v.type() == t.second) || (fAllowNull && (v.isNull()))))
+        if (!((v.type() == expectedType) || (fAllowNull && (v.isNull()))))
         {
             string err = strprintf("Expected type %s for %s, got %s",
-                                   uvTypeName(t.second), t.first, uvTypeName(v.type()));
+                                   uvTypeName(expectedType), fieldName, uvTypeName(v.type()));
             throw JSONRPCError(RPC_TYPE_ERROR, err);
         }
     }
@@ -171,9 +171,8 @@ std::string CRPCTable::help(const std::string& strCommand) const
         vCommands.push_back(make_pair(mi->second->category + mi->first, mi->second));
     sort(vCommands.begin(), vCommands.end());
 
-    for (const PAIRTYPE(string, const CRPCCommand*)& command : vCommands)
+    for (const auto& [sortKey, pcmd] : vCommands)
     {
-        const CRPCCommand *pcmd = command.second;
         string strMethod = pcmd->name;
         // We already filter duplicates, but these deprecated screw up the sort order
         if (strMethod.find("label") != string::npos)
