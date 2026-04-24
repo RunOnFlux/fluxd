@@ -613,6 +613,9 @@ void TorController::auth_cb(TorControlConnection& conn, const TorControlReply& r
             torKey, GetListenPort(), GetListenPort()),
             [this](TorControlConnection& conn, const TorControlReply& reply) { add_onion_cb(conn, reply); });
 
+        // Erase key material now that ADD_ONION has been dispatched.
+        // The libsodium keypair is cached in the global torEd25519SK/PK;
+        // we no longer need the seed in private_key.
         if (!private_key.empty()) {
             sodium_memzero(private_key.data(), private_key.size());
             private_key.clear();

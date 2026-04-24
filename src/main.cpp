@@ -7570,7 +7570,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             // duplicate detection misses them.  Now that we have a cryptographic
             // identity (the verified outpoint), check whether another peer already
             // authenticated with the same outpoint and disconnect the duplicate.
-            BOOST_FOREACH(CNode* pnode, vNodes) {
+            for (CNode* pnode : vNodes) {
                 if (pnode == pfrom)
                     continue;
                 if (pnode->fTorAuthenticated && pnode->torAuthOutpoint == peerOutpoint) {
