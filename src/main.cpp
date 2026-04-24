@@ -5136,14 +5136,15 @@ bool ReceivedBlockTransactions(
     // This is important for blocks that were initially created from compact headers
     // (which don't have nSolution for POW blocks)
     pindexNew->nVersion = block.nVersion;
-    pindexNew->hashMerkleRoot = block.hashMerkleRoot;
-    pindexNew->hashFinalSaplingRoot = block.hashFinalSaplingRoot;
     pindexNew->nTime = block.nTime;
     pindexNew->nBits = block.nBits;
-    pindexNew->nNonce = block.nNonce;
-    pindexNew->nSolution = block.nSolution;
-    pindexNew->nodesCollateral = block.nodesCollateral;
-    pindexNew->vchBlockSig = block.vchBlockSig;
+    pindexNew->AllocateHeaderData();
+    pindexNew->pHeaderData->hashMerkleRoot = block.hashMerkleRoot;
+    pindexNew->pHeaderData->hashFinalSaplingRoot = block.hashFinalSaplingRoot;
+    pindexNew->pHeaderData->nNonce = block.nNonce;
+    pindexNew->pHeaderData->nSolution = block.nSolution;
+    pindexNew->pHeaderData->nodesCollateral = block.nodesCollateral;
+    pindexNew->pHeaderData->vchBlockSig = block.vchBlockSig;
 
     pindexNew->nTx = block.vtx.size();
     pindexNew->nChainTx = 0;
@@ -5761,8 +5762,8 @@ static bool AcceptBlock(const CBlock& block, CValidationState& state, const CCha
     // The header may have arrived earlier with a different (possibly invalid) signature,
     // since vchBlockSig is not committed to the block hash. Now that we've validated
     // the full block with a valid signature, update the index to store the correct one.
-    if (block.IsPON() && pindex->vchBlockSig != block.vchBlockSig) {
-        pindex->vchBlockSig = block.vchBlockSig;
+    if (block.IsPON() && pindex->pHeaderData && pindex->pHeaderData->vchBlockSig != block.vchBlockSig) {
+        pindex->pHeaderData->vchBlockSig = block.vchBlockSig;
         setDirtyBlockIndex.insert(pindex);
     }
 
