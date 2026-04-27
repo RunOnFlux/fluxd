@@ -1,13 +1,4 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-#include <vector>
-#include <condition_variable>
-#include <mutex>
-#include <condition_variable>
-#include <thread>
-#include <condition_variable>
-#include <chrono>
-#include <mutex>
-#include <condition_variable>
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying

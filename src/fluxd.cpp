@@ -1,6 +1,4 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-#include <vector>
-#include <thread>
 // Copyright (c) 2009-2013 The Bitcoin Core developers
 // Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying

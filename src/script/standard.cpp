@@ -70,9 +70,8 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
 
     // Scan templates
     const CScript& script1 = scriptPubKey;
-    for (const PAIRTYPE(txnouttype, CScript)& tplate : mTemplates)
+    for (const auto& [txType, script2] : mTemplates)
     {
-        const CScript& script2 = tplate.second;
         vSolutionsRet.clear();
 
         opcodetype opcode1, opcode2;
@@ -86,7 +85,7 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
             if (pc1 == script1.end() && pc2 == script2.end())
             {
                 // Found a match
-                typeRet = tplate.first;
+                typeRet = txType;
                 if (typeRet == TX_MULTISIG)
                 {
                     // Additional checks for TX_MULTISIG:
