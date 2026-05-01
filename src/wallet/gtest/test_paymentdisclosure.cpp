@@ -13,11 +13,12 @@
 #include "amount.h"
 
 #include <array>
+#include <chrono>
 #include <memory>
 #include <string>
 #include <set>
 #include <vector>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <iostream>
 #include "util.h"
 
@@ -25,10 +26,7 @@
 #include "wallet/paymentdisclosuredb.h"
 
 #include "sodium.h"
-
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
+#include "util.h"
 
 using namespace std;
 
@@ -45,8 +43,6 @@ using namespace std;
 
 #define DUMP_DATABASE_TO_STDOUT false
 
-static boost::uuids::random_generator uuidgen;
-
 static uint256 random_uint256()
 {
     uint256 ret;
@@ -57,7 +53,7 @@ static uint256 random_uint256()
 // Subclass of PaymentDisclosureDB to add debugging methods
 class PaymentDisclosureDBTest : public PaymentDisclosureDB {
 public:
-    PaymentDisclosureDBTest(const boost::filesystem::path& dbPath) : PaymentDisclosureDB(dbPath) {}
+    PaymentDisclosureDBTest(const std::filesystem::path& dbPath) : PaymentDisclosureDB(dbPath) {}
 
     void DebugDumpAllStdout() {
         ASSERT_NE(db, nullptr);
@@ -99,8 +95,9 @@ public:
 TEST(paymentdisclosure, mainnet) {
     SelectParams(CBaseChainParams::MAIN);
 
-    boost::filesystem::path pathTemp = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-    boost::filesystem::create_directories(pathTemp);
+    std::filesystem::path pathTemp = std::filesystem::temp_directory_path() /
+        ("test_paymentdisclosure_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(pathTemp);
     mapArgs["-datadir"] = pathTemp.string();
 
     std::cout << "Test payment disclosure database created in folder: " << pathTemp.string() << std::endl;
@@ -147,7 +144,7 @@ TEST(paymentdisclosure, mainnet) {
         payload.txid = key.hash;
         payload.js = key.js;
         payload.n = key.n;
-        payload.message = "random-" + boost::uuids::to_string(uuidgen());   // random message
+        payload.message = "random-" + GenerateUUID();   // random message (replaces boost::uuids)
         payload.zaddr = info.zaddr;
 
         // Serialize and hash the payload to generate a signature

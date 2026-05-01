@@ -11,8 +11,9 @@
 #include "utiltime.h"
 
 #include <chrono>
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/thread.hpp>
+#include <thread>
+#include <iomanip>
+#include <sstream>
 
 using namespace std;
 
@@ -50,15 +51,17 @@ int64_t GetTimeMicros()
 
 void MilliSleep(int64_t n)
 {
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(n));
+    std::this_thread::sleep_for(std::chrono::milliseconds(n));
 }
 
 std::string DateTimeStrFormat(const char* pszFormat, int64_t nTime)
 {
-    // std::locale takes ownership of the pointer
-    std::locale loc(std::locale::classic(), new boost::posix_time::time_facet(pszFormat));
+    // Using C++20 chrono instead of boost::posix_time
+    std::time_t time = static_cast<std::time_t>(nTime);
+    std::tm* tm = std::gmtime(&time);
+
     std::stringstream ss;
-    ss.imbue(loc);
-    ss << boost::posix_time::from_time_t(nTime);
+    ss.imbue(std::locale::classic());
+    ss << std::put_time(tm, pszFormat);
     return ss.str();
 }

@@ -41,8 +41,11 @@ bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPre
 // This additionally validates:
 // 1. Signature matches collateral owner
 // 2. Fluxnode is active in the network
+// fSignatureFailure: set to true when failure is due to signature validation
+//                    (signature is not committed to block hash, so signature failures
+//                    should not permanently invalidate by hash)
 bool ContextualCheckPONBlockHeader(const CBlockHeader& pblock, const CBlockIndex* pindexPrev,
-                     const Consensus::Params& params, bool fCheckSignature = true);
+                     const Consensus::Params& params, bool fCheckSignature, bool& fSignatureFailure);
 
 // Log PON eligibility for all confirmed fluxnodes at a given slot offset
 // This is called automatically after each block connection for monitoring

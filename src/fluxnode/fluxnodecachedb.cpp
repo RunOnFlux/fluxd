@@ -9,8 +9,7 @@
 #include "fluxnode/fluxnodecachedb.h"
 #include "fluxnode.h"
 #include "undo.h"
-#include <boost/filesystem.hpp>
-#include <boost/thread.hpp>
+#include <filesystem>
 
 static const char DB_FLUXNODE_CACHE_DATA = 'd';
 static const char BLOCK_FLUXNODE_UNDO_DATA = 'u';
@@ -49,14 +48,13 @@ bool CDeterministicFluxnodeDB::FluxnodeCacheDataExists(const COutPoint& outpoint
 
 bool CDeterministicFluxnodeDB::LoadFluxnodeCacheData()
 {
-    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
 
     pcursor->Seek(std::make_pair(DB_FLUXNODE_CACHE_DATA, COutPoint()));
 
     LOCK(g_fluxnodeCache.cs);
     // Load mapBlockIndex
     while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
         std::pair<char, uint256> key;
         if (pcursor->GetKey(key) && key.first == DB_FLUXNODE_CACHE_DATA) {
             FluxnodeCacheData data;

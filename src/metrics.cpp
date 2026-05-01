@@ -10,13 +10,15 @@
 #include "main.h"
 #include "ui_interface.h"
 #include "util.h"
+#include "util/threadinterrupt.h"
 #include "utiltime.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
+#include "sync_wrapper.h"
 
-#include <boost/thread.hpp>
-#include <boost/thread/synchronized_value.hpp>
 #include <string>
+#include <thread>
+#include <mutex>
 #ifdef WIN32
 #include <io.h>
 #else
@@ -78,18 +80,18 @@ double AtomicTimer::rate(const AtomicCounter& count)
 
 static CCriticalSection cs_metrics;
 
-static boost::synchronized_value<int64_t> nNodeStartTime;
-static boost::synchronized_value<int64_t> nNextRefresh;
+static synchronized_value<int64_t> nNodeStartTime;
+static synchronized_value<int64_t> nNextRefresh;
 AtomicCounter transactionsValidated;
 AtomicCounter ehSolverRuns;
 AtomicCounter solutionTargetChecks;
 static AtomicCounter minedBlocks;
 AtomicTimer miningTimer;
 
-static boost::synchronized_value<std::list<uint256>> trackedBlocks;
+static synchronized_value<std::list<uint256>> trackedBlocks;
 
-static boost::synchronized_value<std::list<std::string>> messageBox;
-static boost::synchronized_value<std::string> initMessage;
+static synchronized_value<std::list<std::string>> messageBox;
+static synchronized_value<std::string> initMessage;
 static bool loaded = false;
 
 extern int64_t GetNetworkHashPS(int lookup, int height);
@@ -98,17 +100,18 @@ void TrackMinedBlock(uint256 hash)
 {
     LOCK(cs_metrics);
     minedBlocks.increment();
-    trackedBlocks->push_back(hash);
+    auto blocks = trackedBlocks.synchronize();
+    blocks->push_back(hash);
 }
 
 void MarkStartTime()
 {
-    *nNodeStartTime = GetTime();
+    nNodeStartTime = GetTime();
 }
 
 int64_t GetUptime()
 {
-    return GetTime() - *nNodeStartTime;
+    return GetTime() - nNodeStartTime.get();
 }
 
 double GetLocalSolPS()
@@ -148,7 +151,7 @@ int EstimateNetHeight(int height, int64_t tipmediantime, CChainParams chainParam
 
 void TriggerRefresh()
 {
-    *nNextRefresh = GetTime();
+    nNextRefresh = GetTime();
     // Ensure that the refresh has started before we return
     MilliSleep(200);
 }
@@ -176,7 +179,7 @@ static bool metrics_ThreadSafeMessageBox(const std::string& message,
         strCaption += caption; // Use supplied caption (can be empty)
     }
 
-    boost::strict_lock_ptr<std::list<std::string>> u = messageBox.synchronize();
+    auto u = messageBox.synchronize();
     u->push_back(strCaption + ": " + message);
     if (u->size() > 5) {
         u->pop_back();
@@ -193,7 +196,7 @@ static bool metrics_ThreadSafeQuestion(const std::string& /* ignored interactive
 
 static void metrics_InitMessage(const std::string& message)
 {
-    *initMessage = message;
+    initMessage = message;
 }
 
 void ConnectMetricsScreen()
@@ -346,7 +349,7 @@ int printMetrics(size_t cols, bool mining)
         CAmount mature {0};
         {
             LOCK2(cs_main, cs_metrics);
-            boost::strict_lock_ptr<std::list<uint256>> u = trackedBlocks.synchronize();
+            auto u = trackedBlocks.synchronize();
             auto consensusParams = Params().GetConsensus();
             auto tipHeight = chainActive.Height();
 
@@ -392,7 +395,7 @@ int printMetrics(size_t cols, bool mining)
 
 int printMessageBox(size_t cols)
 {
-    boost::strict_lock_ptr<std::list<std::string>> u = messageBox.synchronize();
+    auto u = messageBox.synchronize();
 
     if (u->size() == 0) {
         return 0;
@@ -427,7 +430,7 @@ int printInitMessage()
         return 0;
     }
 
-    std::string msg = *initMessage;
+    std::string msg = initMessage.get();
     std::cout << _("Init message:") << " " << msg << std::endl;
     std::cout << std::endl;
 
@@ -439,7 +442,9 @@ int printInitMessage()
 }
 
 #ifdef WIN32
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
 
 bool enableVTMode()
 {
@@ -462,7 +467,7 @@ bool enableVTMode()
 }
 #endif
 
-void ThreadShowMetricsScreen()
+void ThreadShowMetricsScreen(CThreadInterrupt& interrupt)
 {
     // Make this thread recognisable as the metrics screen thread
     RenameThread("flux-metrics-screen");
@@ -494,7 +499,7 @@ void ThreadShowMetricsScreen()
         std::cout << std::endl;
     }
 
-    while (true) {
+    while (!interrupt) {
         // Number of lines that are always displayed
         int lines = 1;
         int cols = 80;
@@ -550,15 +555,22 @@ void ThreadShowMetricsScreen()
             std::cout << "----------------------------------------" << std::endl;
         }
 
-        *nNextRefresh = GetTime() + nRefresh;
-        while (GetTime() < *nNextRefresh) {
-            boost::this_thread::interruption_point();
-            MilliSleep(200);
+        nNextRefresh = GetTime() + nRefresh;
+        while (GetTime() < nNextRefresh.get() && !interrupt) {
+            interrupt.sleep_for(std::chrono::milliseconds(200));
         }
 
         if (isScreen) {
             // Return to the top of the updating section
             std::cout << "\e[" << lines << "A";
         }
+    }
+
+    // Clean up terminal on exit
+    if (isScreen) {
+        // Move cursor down past all content and clear to end of screen
+        std::cout << "\e[9999B\e[J";
+        std::cout << std::endl;
+        std::cout.flush();
     }
 }

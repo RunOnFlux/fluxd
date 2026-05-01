@@ -9,10 +9,8 @@
 
 #include "threadsafety.h"
 
-#include <boost/thread/condition_variable.hpp>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/recursive_mutex.hpp>
+#include <condition_variable>
+#include <mutex>
 
 
 ////////////////////////////////////////////////
@@ -23,17 +21,17 @@
 
 /*
 CCriticalSection mutex;
-    boost::recursive_mutex mutex;
+    std::recursive_mutex mutex;
 
 LOCK(mutex);
-    boost::unique_lock<boost::recursive_mutex> criticalblock(mutex);
+    std::unique_lock<std::recursive_mutex> criticalblock(mutex);
 
 LOCK2(mutex1, mutex2);
-    boost::unique_lock<boost::recursive_mutex> criticalblock1(mutex1);
-    boost::unique_lock<boost::recursive_mutex> criticalblock2(mutex2);
+    std::unique_lock<std::recursive_mutex> criticalblock1(mutex1);
+    std::unique_lock<std::recursive_mutex> criticalblock2(mutex2);
 
 TRY_LOCK(mutex, name);
-    boost::unique_lock<boost::recursive_mutex> name(mutex, boost::try_to_lock_t);
+    std::unique_lock<std::recursive_mutex> name(mutex, std::try_to_lock_t);
 
 ENTER_CRITICAL_SECTION(mutex); // no RAII
     mutex.lock();
@@ -76,13 +74,13 @@ public:
  * Wrapped boost mutex: supports recursive locking, but no waiting
  * TODO: We should move away from using the recursive lock by default.
  */
-typedef AnnotatedMixin<boost::recursive_mutex> CCriticalSection;
+typedef AnnotatedMixin<std::recursive_mutex> CCriticalSection;
 
-/** Wrapped boost mutex: supports waiting but not recursive locking */
-typedef AnnotatedMixin<boost::mutex> CWaitableCriticalSection;
+/** Wrapped std mutex: supports waiting but not recursive locking */
+typedef AnnotatedMixin<std::mutex> CWaitableCriticalSection;
 
-/** Just a typedef for boost::condition_variable, can be wrapped later if desired */
-typedef boost::condition_variable CConditionVariable;
+/** Just a typedef for std::condition_variable, can be wrapped later if desired */
+typedef std::condition_variable CConditionVariable;
 
 #ifdef DEBUG_LOCKORDER
 void EnterCritical(const char* pszName, const char* pszFile, int nLine, void* cs, bool fTry = false);
@@ -100,12 +98,12 @@ void static inline AssertLockHeldInternal(const char* pszName, const char* pszFi
 void PrintLockContention(const char* pszName, const char* pszFile, int nLine);
 #endif
 
-/** Wrapper around boost::unique_lock<Mutex> */
+/** Wrapper around std::unique_lock<Mutex> */
 template <typename Mutex>
 class SCOPED_LOCKABLE CMutexLock
 {
 private:
-    boost::unique_lock<Mutex> lock;
+    std::unique_lock<Mutex> lock;
 
     void Enter(const char* pszName, const char* pszFile, int nLine)
     {
@@ -123,14 +121,13 @@ private:
     bool TryEnter(const char* pszName, const char* pszFile, int nLine)
     {
         EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()), true);
-        lock.try_lock();
-        if (!lock.owns_lock())
+        if (!lock.try_lock())
             LeaveCritical();
         return lock.owns_lock();
     }
 
 public:
-    CMutexLock(Mutex& mutexIn, const char* pszName, const char* pszFile, int nLine, bool fTry = false) EXCLUSIVE_LOCK_FUNCTION(mutexIn) : lock(mutexIn, boost::defer_lock)
+    CMutexLock(Mutex& mutexIn, const char* pszName, const char* pszFile, int nLine, bool fTry = false) EXCLUSIVE_LOCK_FUNCTION(mutexIn) : lock(mutexIn, std::defer_lock)
     {
         if (fTry)
             TryEnter(pszName, pszFile, nLine);
@@ -142,7 +139,7 @@ public:
     {
         if (!pmutexIn) return;
 
-        lock = boost::unique_lock<Mutex>(*pmutexIn, boost::defer_lock);
+        lock = std::unique_lock<Mutex>(*pmutexIn, std::defer_lock);
         if (fTry)
             TryEnter(pszName, pszFile, nLine);
         else
@@ -182,8 +179,8 @@ typedef CMutexLock<CCriticalSection> CCriticalBlock;
 class CSemaphore
 {
 private:
-    boost::condition_variable condition;
-    boost::mutex mutex;
+    std::condition_variable condition;
+    std::mutex mutex;
     int value;
 
 public:
@@ -191,7 +188,7 @@ public:
 
     void wait()
     {
-        boost::unique_lock<boost::mutex> lock(mutex);
+        std::unique_lock<std::mutex> lock(mutex);
         while (value < 1) {
             condition.wait(lock);
         }
@@ -200,7 +197,7 @@ public:
 
     bool try_wait()
     {
-        boost::unique_lock<boost::mutex> lock(mutex);
+        std::unique_lock<std::mutex> lock(mutex);
         if (value < 1)
             return false;
         value--;
@@ -210,7 +207,7 @@ public:
     void post()
     {
         {
-            boost::unique_lock<boost::mutex> lock(mutex);
+            std::unique_lock<std::mutex> lock(mutex);
             value++;
         }
         condition.notify_one();

@@ -5,7 +5,6 @@
 #include "NoteEncryption.hpp"
 #include <stdexcept>
 #include "sodium.h"
-#include <boost/static_assert.hpp>
 #include "prf.h"
 #include "librustzcash.h"
 
@@ -105,7 +104,7 @@ void KDF(unsigned char K[NOTEENCRYPTION_CIPHER_KEYSIZE],
 
 namespace libflux {
 
-boost::optional<SaplingNoteEncryption> SaplingNoteEncryption::FromDiversifier(diversifier_t d) {
+std::optional<SaplingNoteEncryption> SaplingNoteEncryption::FromDiversifier(diversifier_t d) {
     uint256 epk;
     uint256 esk;
 
@@ -114,13 +113,13 @@ boost::optional<SaplingNoteEncryption> SaplingNoteEncryption::FromDiversifier(di
 
     // Compute epk given the diversifier
     if (!librustzcash_sapling_ka_derivepublic(d.begin(), esk.begin(), epk.begin())) {
-        return boost::none;
+        return std::nullopt;
     }
 
     return SaplingNoteEncryption(epk, esk);
 }
 
-boost::optional<SaplingEncCiphertext> SaplingNoteEncryption::encrypt_to_recipient(
+std::optional<SaplingEncCiphertext> SaplingNoteEncryption::encrypt_to_recipient(
     const uint256 &pk_d,
     const SaplingEncPlaintext &message
 )
@@ -132,7 +131,7 @@ boost::optional<SaplingEncCiphertext> SaplingNoteEncryption::encrypt_to_recipien
     uint256 dhsecret;
 
     if (!librustzcash_sapling_ka_agree(pk_d.begin(), esk.begin(), dhsecret.begin())) {
-        return boost::none;
+        return std::nullopt;
     }
 
     // Construct the symmetric key
@@ -156,7 +155,7 @@ boost::optional<SaplingEncCiphertext> SaplingNoteEncryption::encrypt_to_recipien
     return ciphertext;
 }
 
-boost::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption(
+std::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption(
     const SaplingEncCiphertext &ciphertext,
     const uint256 &ivk,
     const uint256 &epk
@@ -165,7 +164,7 @@ boost::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption(
     uint256 dhsecret;
 
     if (!librustzcash_sapling_ka_agree(epk.begin(), ivk.begin(), dhsecret.begin())) {
-        return boost::none;
+        return std::nullopt;
     }
 
     // Construct the symmetric key
@@ -185,13 +184,13 @@ boost::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption(
         0,
         cipher_nonce, K) != 0)
     {
-        return boost::none;
+        return std::nullopt;
     }
 
     return plaintext;
 }
 
-boost::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption (
+std::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption (
     const SaplingEncCiphertext &ciphertext,
     const uint256 &epk,
     const uint256 &esk,
@@ -201,7 +200,7 @@ boost::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption (
     uint256 dhsecret;
 
     if (!librustzcash_sapling_ka_agree(pk_d.begin(), esk.begin(), dhsecret.begin())) {
-        return boost::none;
+        return std::nullopt;
     }
 
     // Construct the symmetric key
@@ -221,7 +220,7 @@ boost::optional<SaplingEncPlaintext> AttemptSaplingEncDecryption (
         0,
         cipher_nonce, K) != 0)
     {
-        return boost::none;
+        return std::nullopt;
     }
 
     return plaintext;
@@ -260,7 +259,7 @@ SaplingOutCiphertext SaplingNoteEncryption::encrypt_to_ourselves(
     return ciphertext;
 }
 
-boost::optional<SaplingOutPlaintext> AttemptSaplingOutDecryption(
+std::optional<SaplingOutPlaintext> AttemptSaplingOutDecryption(
     const SaplingOutCiphertext &ciphertext,
     const uint256 &ovk,
     const uint256 &cv,
@@ -285,7 +284,7 @@ boost::optional<SaplingOutPlaintext> AttemptSaplingOutDecryption(
         0,
         cipher_nonce, K) != 0)
     {
-        return boost::none;
+        return std::nullopt;
     }
 
     return plaintext;
@@ -296,9 +295,9 @@ NoteEncryption<MLEN>::NoteEncryption(uint256 hSig) : nonce(0), hSig(hSig) {
     // All of this code assumes crypto_scalarmult_BYTES is 32
     // There's no reason that will _ever_ change, but for
     // completeness purposes, let's check anyway.
-    BOOST_STATIC_ASSERT(32 == crypto_scalarmult_BYTES);
-    BOOST_STATIC_ASSERT(32 == crypto_scalarmult_SCALARBYTES);
-    BOOST_STATIC_ASSERT(NOTEENCRYPTION_AUTH_BYTES == crypto_aead_chacha20poly1305_ABYTES);
+    static_assert(32 == crypto_scalarmult_BYTES);
+    static_assert(32 == crypto_scalarmult_SCALARBYTES);
+    static_assert(NOTEENCRYPTION_AUTH_BYTES == crypto_aead_chacha20poly1305_ABYTES);
 
     // Create the ephemeral keypair
     esk = random_uint256();

@@ -7,32 +7,20 @@
 #include "random.h"
 
 #include "support/cleanse.h"
-#ifdef WIN32
-#include "compat.h" // for Windows API
-#endif
 #include "serialize.h"        // for begin_ptr(vec)
 #include "util.h"             // for LogPrint()
 #include "utilstrencodings.h" // for GetTime()
 
+#include <chrono>
 #include <limits>
-
-#ifndef WIN32
-#include <sys/time.h>
-#endif
 
 #include "sodium.h"
 
 static inline int64_t GetPerformanceCounter()
 {
-    int64_t nCounter = 0;
-#ifdef WIN32
-    QueryPerformanceCounter((LARGE_INTEGER*)&nCounter);
-#else
-    timeval t;
-    gettimeofday(&t, NULL);
-    nCounter = (int64_t)(t.tv_sec * 1000000 + t.tv_usec);
-#endif
-    return nCounter;
+    auto now = std::chrono::high_resolution_clock::now();
+    auto duration = now.time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
 }
 
 void GetRandBytes(unsigned char* buf, size_t num)

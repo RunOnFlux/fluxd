@@ -21,7 +21,6 @@
 
 #include <stdint.h>
 
-#include <boost/assign/list_of.hpp>
 
 #include <univalue.h>
 
@@ -111,7 +110,7 @@ UniValue getinfo(const UniValue& params, bool fHelp)
 }
 
 #ifdef ENABLE_WALLET
-class DescribeAddressVisitor : public boost::static_visitor<UniValue>
+class DescribeAddressVisitor 
 {
 public:
     UniValue operator()(const CNoDestination &dest) const { return UniValue(UniValue::VOBJ); }
@@ -198,7 +197,7 @@ UniValue validateaddress(const UniValue& params, bool fHelp)
         isminetype mine = pwalletMain ? IsMine(*pwalletMain, dest) : ISMINE_NO;
         ret.pushKV("ismine", (mine & ISMINE_SPENDABLE) ? true : false);
         ret.pushKV("iswatchonly", (mine & ISMINE_WATCH_ONLY) ? true: false);
-        UniValue detail = boost::apply_visitor(DescribeAddressVisitor(), dest);
+        UniValue detail = std::visit(DescribeAddressVisitor(), dest);
         ret.pushKVs(detail);
         if (pwalletMain && pwalletMain->mapAddressBook.count(dest))
             ret.pushKV("account", pwalletMain->mapAddressBook[dest].name);
@@ -208,7 +207,7 @@ UniValue validateaddress(const UniValue& params, bool fHelp)
 }
 
 
-class DescribePaymentAddressVisitor : public boost::static_visitor<UniValue>
+class DescribePaymentAddressVisitor 
 {
 public:
     UniValue operator()(const libflux::InvalidEncoding &zaddr) const { return UniValue(UniValue::VOBJ); }
@@ -286,7 +285,7 @@ UniValue z_validateaddress(const UniValue& params, bool fHelp)
     if (isValid)
     {
         ret.pushKV("address", strAddress);
-        UniValue detail = boost::apply_visitor(DescribePaymentAddressVisitor(), address);
+        UniValue detail = std::visit(DescribePaymentAddressVisitor(), address);
         ret.pushKVs(detail);
     }
     return ret;
@@ -319,7 +318,7 @@ CScript _createmultisig_redeemScript(const UniValue& params)
         // Case 1: Bitcoin address and we have full public key:
         CTxDestination dest = DecodeDestination(ks);
         if (pwalletMain && IsValidDestination(dest)) {
-            const CKeyID *keyID = boost::get<CKeyID>(&dest);
+            const CKeyID *keyID = std::get_if<CKeyID>(&dest);
             if (!keyID) {
                 throw std::runtime_error(strprintf("%s does not refer to a key", ks));
             }
@@ -432,7 +431,7 @@ UniValue verifymessage(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid address");
     }
 
-    const CKeyID *keyID = boost::get<CKeyID>(&destination);
+    const CKeyID *keyID = std::get_if<CKeyID>(&destination);
     if (!keyID) {
         throw JSONRPCError(RPC_TYPE_ERROR, "Address does not refer to key");
     }
@@ -496,11 +495,11 @@ UniValue setmocktime(const UniValue& params, bool fHelp)
     // in a long time.
     LOCK2(cs_main, cs_vNodes);
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VNUM));
+    RPCTypeCheck(params, {UniValue::VNUM});
     SetMockTime(params[0].get_int64());
 
     uint64_t t = GetTime();
-    BOOST_FOREACH(CNode* pnode, vNodes) {
+    for (CNode* pnode : vNodes) {
         pnode->nLastSend = pnode->nLastRecv = t;
     }
 
@@ -529,14 +528,14 @@ static bool getIndexKey(
     if (!IsValidDestination(dest)) {
         return false;
     }
-    if (dest.type() == typeid(CKeyID)) {
-        auto x = boost::get<CKeyID>(&dest);
+    if (std::holds_alternative<CKeyID>(dest)) {
+        auto x = std::get_if<CKeyID>(&dest);
         memcpy(&hashBytes, x->begin(), 20);
         type = CScript::P2PKH;
         return true;
     }
-    if (dest.type() == typeid(CScriptID)) {
-        auto x = boost::get<CScriptID>(&dest);
+    if (std::holds_alternative<CScriptID>(dest)) {
+        auto x = std::get_if<CScriptID>(&dest);
         memcpy(&hashBytes, x->begin(), 20);
         type = CScript::P2SH;
         return true;

@@ -9,7 +9,7 @@
 
 #include "uint256.h"
 
-#include <boost/optional.hpp>
+#include <optional>
 
 namespace Consensus {
 
@@ -78,7 +78,7 @@ struct NetworkUpgrade {
      * scrutiny than regular releases. nMinimumChainWork MUST be set to at least the chain
      * work of this block, otherwise this detection will have false positives.
      */
-    boost::optional<uint256> hashActivationBlock;
+    std::optional<uint256> hashActivationBlock;
 };
 
 /**
@@ -119,7 +119,7 @@ struct Params {
     uint256 ponLimit;  // Separate limit for Proof of Node (minimum difficulty)
     uint256 ponStartLimit;  // Initial easier limit for PON fork transition
 
-    boost::optional<uint32_t> nPowAllowMinDifficultyBlocksAfterHeight;	
+    std::optional<uint32_t> nPowAllowMinDifficultyBlocksAfterHeight;	
     int64_t nDigishieldAveragingWindow;
     int64_t nDigishieldMaxAdjustDown;
     int64_t nDigishieldMaxAdjustUp;

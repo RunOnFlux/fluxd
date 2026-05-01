@@ -1,13 +1,15 @@
 // Copyright (c) 2018-2022 The Flux Developers
+#include <vector>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
+#include <chrono>
 #include <cstdio>
 #include <future>
 #include <map>
 #include <thread>
 #include <unistd.h>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 #include "coins.h"
 #include "util.h"
@@ -72,24 +74,20 @@ void post_wallet_load(){
 }
 
 
-void timer_start(timeval &tv_start)
+void timer_start(std::chrono::steady_clock::time_point &start)
 {
-    gettimeofday(&tv_start, 0);
+    start = std::chrono::steady_clock::now();
 }
 
-double timer_stop(timeval &tv_start)
+double timer_stop(std::chrono::steady_clock::time_point &start)
 {
-    double elapsed;
-    struct timeval tv_end;
-    gettimeofday(&tv_end, 0);
-    elapsed = double(tv_end.tv_sec-tv_start.tv_sec) +
-        (tv_end.tv_usec-tv_start.tv_usec)/double(1000000);
-    return elapsed;
+    auto end = std::chrono::steady_clock::now();
+    return std::chrono::duration<double>(end - start).count();
 }
 
 double benchmark_sleep()
 {
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
     sleep(1);
     return timer_stop(tv_start);
@@ -102,7 +100,7 @@ double benchmark_create_joinsplit()
     /* Get the anchor of an empty commitment tree. */
     uint256 anchor = SproutMerkleTree().root();
 
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
     JSDescription jsdesc(*pfluxParams,
                          joinSplitPubKey,
@@ -141,7 +139,7 @@ std::vector<double> benchmark_create_joinsplit_threaded(int nThreads)
 
 double benchmark_verify_joinsplit(const JSDescription &joinsplit)
 {
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
     uint256 joinSplitPubKey;
     auto verifier = libflux::ProofVerifier::Strict();
@@ -169,7 +167,7 @@ double benchmark_solve_equihash()
                                     nonce.begin(),
                                     nonce.size());
 
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
     std::set<std::vector<unsigned int>> solns;
     EhOptimisedSolveUncancellable(n, k, eh_state,
@@ -204,7 +202,7 @@ double benchmark_verify_equihash()
     CChainParams params = Params(CBaseChainParams::MAIN);
     CBlock genesis = Params(CBaseChainParams::MAIN).GenesisBlock();
     CBlockHeader genesis_header = genesis.GetBlockHeader();
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
     CheckEquihashSolution(&genesis_header, params.GetConsensus());
     return timer_stop(tv_start);
@@ -250,7 +248,7 @@ double benchmark_large_tx(size_t nInputs)
     CTransaction final_spending_tx(spending_tx);
 
     // Benchmark signature verification costs:
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
     PrecomputedTransactionData txdata(final_spending_tx);
     for (size_t i = 0; i < nInputs; i++) {
@@ -281,7 +279,7 @@ double benchmark_try_decrypt_sprout_notes(size_t nKeys)
     auto sk = libflux::SproutSpendingKey::random();
     auto tx = GetValidSproutReceive(*pfluxParams, sk, 10, true);
 
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
     auto noteDataMap = wallet.FindMySproutNotes(tx);
 
@@ -307,7 +305,7 @@ double benchmark_try_decrypt_sapling_notes(size_t nKeys)
     auto sk = masterKey.Derive(nKeys);
     auto tx = GetValidSaplingReceive(consensusParams, wallet, sk, 10);
 
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
     auto noteDataMapAndAddressesToAdd = wallet.FindMySaplingNotes(tx);
     assert(noteDataMapAndAddressesToAdd.first.empty());
@@ -366,7 +364,7 @@ double benchmark_increment_sprout_note_witnesses(size_t nTxs)
     CBlockIndex index2(block2);
     index2.nHeight = 2;
 
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
     wallet.ChainTip(&index2, &block2, sproutTree, saplingTree, true);
     return timer_stop(tv_start);
@@ -378,7 +376,7 @@ CWalletTx CreateSaplingTxWithNoteData(const Consensus::Params& consensusParams,
     auto wtx = GetValidSaplingReceive(consensusParams, keyStore, sk, 10);
     auto testNote = GetTestSaplingNote(sk.DefaultAddress(), 10);
     auto fvk = sk.expsk.full_viewing_key();
-    auto nullifier = testNote.note.nullifier(fvk, testNote.tree.witness().position()).get();
+    auto nullifier = testNote.note.nullifier(fvk, testNote.tree.witness().position()).value();
 
     mapSaplingNoteData_t noteDataMap;
     SaplingOutPoint outPoint {wtx.GetHash(), 0};
@@ -428,7 +426,7 @@ double benchmark_increment_sapling_note_witnesses(size_t nTxs)
     CBlockIndex index2(block2);
     index2.nHeight = 2;
 
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
     wallet.ChainTip(&index2, &block2, sproutTree, saplingTree, true);
     return timer_stop(tv_start);
@@ -542,7 +540,7 @@ double benchmark_connectblock_slow()
     mapBlockIndex.insert(std::make_pair(hashPrev, &indexPrev));
 
     CValidationState state;
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
     assert(ConnectBlock(block, state, &index, view, Params(), true));
     auto duration = timer_stop(tv_start);
@@ -565,7 +563,7 @@ double benchmark_sendtoaddress(CAmount amount)
     params.push_back(addr);
     params.push_back(ValueFromAmount(amount));
 
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
     auto txid = sendtoaddress(params, false);
     return timer_stop(tv_start);
@@ -574,7 +572,7 @@ double benchmark_sendtoaddress(CAmount amount)
 double benchmark_loadwallet()
 {
     pre_wallet_load();
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     bool fFirstRunRet=true;
     timer_start(tv_start);
     pwalletMain = new CWallet("wallet.dat");
@@ -589,7 +587,7 @@ extern UniValue listunspent(const UniValue& params, bool fHelp);
 double benchmark_listunspent()
 {
     UniValue params(UniValue::VARR);
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
     auto unspent = listunspent(params, false);
     return timer_stop(tv_start);
@@ -603,7 +601,7 @@ double benchmark_create_sapling_spend()
     SaplingNote note(address, GetRand(MAX_MONEY));
     SaplingMerkleTree tree;
     auto maybe_cm = note.cm();
-    tree.append(maybe_cm.get());
+    tree.append(maybe_cm.value());
     auto anchor = tree.root();
     auto witness = tree.witness();
     auto maybe_nf = note.nullifier(expsk.full_viewing_key(), witness.position());
@@ -620,7 +618,7 @@ double benchmark_create_sapling_spend()
 
     auto ctx = librustzcash_sapling_proving_ctx_init();
 
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
 
     SpendDescription sdesc;
@@ -660,12 +658,12 @@ double benchmark_create_sapling_output()
         throw JSONRPCError(RPC_INTERNAL_ERROR, "SaplingNotePlaintext::encrypt() failed");
     }
 
-    auto enc = res.get();
+    auto enc = res.value();
     auto encryptor = enc.second;
 
     auto ctx = librustzcash_sapling_proving_ctx_init();
 
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
 
     OutputDescription odesc;
@@ -699,7 +697,7 @@ double benchmark_verify_sapling_spend()
 
     auto ctx = librustzcash_sapling_verification_ctx_init();
 
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
 
     bool result = librustzcash_sapling_check_spend(
@@ -732,7 +730,7 @@ double benchmark_verify_sapling_output()
 
     auto ctx = librustzcash_sapling_verification_ctx_init();
 
-    struct timeval tv_start;
+    std::chrono::steady_clock::time_point tv_start;
     timer_start(tv_start);
 
     bool result = librustzcash_sapling_check_output(

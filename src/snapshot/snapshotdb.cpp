@@ -3,7 +3,7 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "snapshotdb.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include "univalue.h"
 #include "rpc/server.h"
 #include "main.h"

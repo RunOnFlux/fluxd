@@ -15,14 +15,24 @@
 #include "sync.h"
 #include "utilstrencodings.h"
 #include "utiltime.h"
+
+#include <thread>
+#include <mutex>
+#include <sstream>
+#include <algorithm>
+#include <string_view>
 #include "clientversion.h"
 
 #include <stdarg.h>
+#include <mutex>
 #include <stdio.h>
+#include <mutex>
 
 #if (defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
 #include <pthread.h>
+#include <mutex>
 #include <pthread_np.h>
+#include <mutex>
 #endif
 
 #ifndef WIN32
@@ -38,9 +48,13 @@
 #endif // __linux__
 
 #include <algorithm>
+#include <mutex>
 #include <fcntl.h>
+#include <mutex>
 #include <sys/resource.h>
+#include <mutex>
 #include <sys/stat.h>
+#include <mutex>
 
 #else
 
@@ -67,24 +81,23 @@
 #endif
 
 #include <io.h> /* for _commit */
+#include <mutex>
 #include <shlobj.h>
+#include <mutex>
 #endif
 
 #ifdef HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
+#include <mutex>
 #endif
 
-#include <boost/algorithm/string/case_conv.hpp> // for to_lower()
-#include <boost/algorithm/string/join.hpp>
-#include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/foreach.hpp>
-#include <boost/program_options/detail/config_file.hpp>
-#include <boost/program_options/parsers.hpp>
-#include <boost/thread.hpp>
+#include <filesystem>
+#include <mutex>
+#include <fstream>
+#include <sstream>
 #include <openssl/crypto.h>
 #include <openssl/conf.h>
+#include <mutex>
 
 // Work around clang compilation problem in Boost 1.46:
 // /usr/include/boost/program_options/detail/config_file.hpp:163:17: error: call to function 'to_internal' that is neither visible in the template definition nor found by argument-dependent lookup
@@ -172,10 +185,10 @@ instance_of_cinit;
  * the mutex).
  */
 
-static boost::once_flag debugPrintInitFlag = BOOST_ONCE_INIT;
+static std::once_flag debugPrintInitFlag;
 
 /**
- * We use boost::call_once() to make sure mutexDebugLog and
+ * We use std::call_once() to make sure mutexDebugLog and
  * vMsgsBeforeOpenLog are initialized in a thread-safe manner.
  *
  * NOTE: fileout, mutexDebugLog and sometimes vMsgsBeforeOpenLog
@@ -184,7 +197,7 @@ static boost::once_flag debugPrintInitFlag = BOOST_ONCE_INIT;
  * tested, explicit destruction of these objects can be implemented.
  */
 static FILE* fileout = NULL;
-static boost::mutex* mutexDebugLog = NULL;
+static std::mutex* mutexDebugLog = NULL;
 static list<string> *vMsgsBeforeOpenLog;
 
 [[noreturn]] void new_handler_terminate()
@@ -209,18 +222,18 @@ static int FileWriteStr(const std::string &str, FILE *fp)
 static void DebugPrintInit()
 {
     assert(mutexDebugLog == NULL);
-    mutexDebugLog = new boost::mutex();
+    mutexDebugLog = new std::mutex();
     vMsgsBeforeOpenLog = new list<string>;
 }
 
 void OpenDebugLog()
 {
-    boost::call_once(&DebugPrintInit, debugPrintInitFlag);
-    boost::mutex::scoped_lock scoped_lock(*mutexDebugLog);
+    std::call_once(debugPrintInitFlag, &DebugPrintInit);
+    std::lock_guard<std::mutex> scoped_lock(*mutexDebugLog);
 
     assert(fileout == NULL);
     assert(vMsgsBeforeOpenLog);
-    boost::filesystem::path pathDebug = GetDataDir() / "debug.log";
+    std::filesystem::path pathDebug = GetDataDir() / "debug.log";
     fileout = fopen(pathDebug.string().c_str(), "a");
     if (fileout) setbuf(fileout, NULL); // unbuffered
 
@@ -245,7 +258,7 @@ bool LogAcceptCategory(const char* category)
         // This helps prevent issues debugging global destructors,
         // where mapMultiArgs might be deleted before another
         // global destructor calls LogPrint()
-        static boost::thread_specific_ptr<set<string> > ptrCategory;
+        thread_local std::unique_ptr<set<string>> ptrCategory;
         if (ptrCategory.get() == NULL)
         {
             const vector<string>& categories = mapMultiArgs["-debug"];
@@ -300,8 +313,8 @@ int LogPrintStr(const std::string &str)
     }
     else if (fPrintToDebugLog)
     {
-        boost::call_once(&DebugPrintInit, debugPrintInitFlag);
-        boost::mutex::scoped_lock scoped_lock(*mutexDebugLog);
+        std::call_once(debugPrintInitFlag, &DebugPrintInit);
+        std::lock_guard<std::mutex> scoped_lock(*mutexDebugLog);
 
         string strTimestamped = LogTimestampStr(str, &fStartedNewLine);
 
@@ -316,7 +329,7 @@ int LogPrintStr(const std::string &str)
             // reopen the log file, if requested
             if (fReopenDebugLog) {
                 fReopenDebugLog = false;
-                boost::filesystem::path pathDebug = GetDataDir() / "debug.log";
+                std::filesystem::path pathDebug = GetDataDir() / "debug.log";
                 if (freopen(pathDebug.string().c_str(),"a",fileout) != NULL)
                     setbuf(fileout, NULL); // unbuffered
             }
@@ -359,8 +372,8 @@ void ParseParameters(int argc, const char* const argv[])
             str = str.substr(0, is_index);
         }
 #ifdef WIN32
-        boost::to_lower(str);
-        if (boost::algorithm::starts_with(str, "/"))
+        str = ToLower(str);
+        if (StartsWith(str, "/"))
             str = "-" + str.substr(1);
 #endif
 
@@ -377,10 +390,10 @@ void ParseParameters(int argc, const char* const argv[])
     }
 
     // New 0.6 features:
-    BOOST_FOREACH(const PAIRTYPE(string,string)& entry, mapArgs)
+    for (const auto& [key, value] : mapArgs)
     {
         // interpret -nofoo as -foo=0 (and -nofoo=0 as -foo=1) as long as -foo not set
-        InterpretNegativeSetting(entry.first, mapArgs);
+        InterpretNegativeSetting(key, mapArgs);
     }
 }
 
@@ -475,9 +488,9 @@ void PrintExceptionContinue(const std::exception* pex, const char* pszThread)
     strMiscWarning = message;
 }
 
-boost::filesystem::path GetDefaultDataDirForCoinName(const std::string &coinName)
+std::filesystem::path GetDefaultDataDirForCoinName(const std::string &coinName)
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
     // Windows < Vista: C:\Documents and Settings\Username\Application Data\Flux
     // Windows >= Vista: C:\Users\Username\AppData\Roaming\Flux
     // Mac: ~/Library/Application Support/Flux
@@ -509,9 +522,9 @@ boost::filesystem::path GetDefaultDataDirForCoinName(const std::string &coinName
 }
 
 
-boost::filesystem::path GetDefaultDataDir()
+std::filesystem::path GetDefaultDataDir()
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
 
     fs::path fluxDefaultDir = GetDefaultDataDirForCoinName("Flux");
     if (!fs::is_directory(fluxDefaultDir)) {
@@ -524,16 +537,16 @@ boost::filesystem::path GetDefaultDataDir()
     return fluxDefaultDir;
 }
 
-static boost::filesystem::path pathCached;
-static boost::filesystem::path pathCachedNetSpecific;
-static boost::filesystem::path zc_paramsPathCached;
+static std::filesystem::path pathCached;
+static std::filesystem::path pathCachedNetSpecific;
+static std::filesystem::path zc_paramsPathCached;
 static CCriticalSection csPathCached;
 
-static boost::filesystem::path ZC_GetBaseParamsDir()
+static std::filesystem::path ZC_GetBaseParamsDir()
 {
     // Copied from GetDefaultDataDir and adapter for zcash params.
 
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
     // Windows < Vista: C:\Documents and Settings\Username\Application Data\ZcashParams
     // Windows >= Vista: C:\Users\Username\AppData\Roaming\ZcashParams
     // Mac: ~/Library/Application Support/ZcashParams
@@ -560,9 +573,9 @@ static boost::filesystem::path ZC_GetBaseParamsDir()
 #endif
 }
 
-const boost::filesystem::path &ZC_GetParamsDir()
+const std::filesystem::path &ZC_GetParamsDir()
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
 
     LOCK(csPathCached); // Reuse the same lock as upstream.
 
@@ -581,12 +594,12 @@ const boost::filesystem::path &ZC_GetParamsDir()
 // Return the user specified export directory.  Create directory if it doesn't exist.
 // If user did not set option, return an empty path.
 // If there is a filesystem problem, throw an exception.
-const boost::filesystem::path GetExportDir()
+const std::filesystem::path GetExportDir()
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
     fs::path path;
     if (mapArgs.count("-exportdir")) {
-        path = fs::system_complete(mapArgs["-exportdir"]);
+        path = fs::absolute(mapArgs["-exportdir"]);
         if (fs::exists(path) && !fs::is_directory(path)) {
             throw std::runtime_error(strprintf("The -exportdir '%s' already exists and is not a directory", path.string()));
         }
@@ -598,9 +611,9 @@ const boost::filesystem::path GetExportDir()
 }
 
 
-const boost::filesystem::path &GetDataDir(bool fNetSpecific)
+const std::filesystem::path &GetDataDir(bool fNetSpecific)
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
 
     LOCK(csPathCached);
 
@@ -612,7 +625,7 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
         return path;
 
     if (mapArgs.count("-datadir")) {
-        path = fs::system_complete(mapArgs["-datadir"]);
+        path = fs::absolute(mapArgs["-datadir"]);
         if (!fs::is_directory(path)) {
             path = "";
             return path;
@@ -630,7 +643,7 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
 
 bool RenameDirectoriesFromZelcashToFlux()
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
 
     fs::path zelcashPath = GetDefaultDataDirForCoinName("Zelcash");
     fs::path fluxPath = GetDefaultDataDirForCoinName("Flux");
@@ -667,38 +680,38 @@ bool RenameDirectoriesFromZelcashToFlux()
 
 void ClearDatadirCache()
 {
-    pathCached = boost::filesystem::path();
-    pathCachedNetSpecific = boost::filesystem::path();
+    pathCached = std::filesystem::path();
+    pathCachedNetSpecific = std::filesystem::path();
 }
 
-boost::filesystem::path GetConfigFile()
+std::filesystem::path GetConfigFile()
 {
-    boost::filesystem::path pathFluxConfigFile(GetArg("-conf", "flux.conf"));
-    boost::filesystem::path dataDir = GetDataDir(false);
-    if (!pathFluxConfigFile.is_complete()) {
+    std::filesystem::path pathFluxConfigFile(GetArg("-conf", "flux.conf"));
+    std::filesystem::path dataDir = GetDataDir(false);
+    if (!pathFluxConfigFile.is_absolute()) {
         pathFluxConfigFile = dataDir / pathFluxConfigFile;
     }
 
-    boost::filesystem::ifstream streamConfig(pathFluxConfigFile);
+    std::ifstream streamConfig(pathFluxConfigFile);
     if (streamConfig.good()) {
         return pathFluxConfigFile;
     }
 
-    boost::filesystem::path pathZelcashConfigFile(GetArg("-conf", "zelcash.conf"));
-    if (!pathZelcashConfigFile.is_complete()) {
+    std::filesystem::path pathZelcashConfigFile(GetArg("-conf", "zelcash.conf"));
+    if (!pathZelcashConfigFile.is_absolute()) {
         pathZelcashConfigFile = dataDir / pathZelcashConfigFile;
     }
 
     return pathZelcashConfigFile;
 }
 
-boost::filesystem::path GetFluxnodeConfigFile()
+std::filesystem::path GetFluxnodeConfigFile()
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
 
     // If zelnode.conf exists use this file instead of fluxnode.conf
-    boost::filesystem::path pathZelnodeConfigFile(GetArg("-znconf", "zelnode.conf"));
-    if (!pathZelnodeConfigFile.is_complete()) {
+    std::filesystem::path pathZelnodeConfigFile(GetArg("-znconf", "zelnode.conf"));
+    if (!pathZelnodeConfigFile.is_absolute()) {
         pathZelnodeConfigFile = GetDataDir() / pathZelnodeConfigFile;
         if (fs::exists(pathZelnodeConfigFile)) {
             LogPrintf("Using zelnode.conf Config File\n");
@@ -707,8 +720,8 @@ boost::filesystem::path GetFluxnodeConfigFile()
     }
 
     // Use fluxnode.conf as the next option
-    boost::filesystem::path pathFluxnodeConfigFile(GetArg("-znconf", "fluxnode.conf"));
-    if (!pathFluxnodeConfigFile.is_complete()) {
+    std::filesystem::path pathFluxnodeConfigFile(GetArg("-znconf", "fluxnode.conf"));
+    if (!pathFluxnodeConfigFile.is_absolute()) {
         pathFluxnodeConfigFile = GetDataDir() / pathFluxnodeConfigFile;
         if (fs::exists(pathFluxnodeConfigFile)) {
             LogPrintf("Using fluxnode.conf Config File\n");
@@ -724,38 +737,66 @@ boost::filesystem::path GetFluxnodeConfigFile()
 void ReadConfigFile(map<string, string>& mapSettingsRet,
                     map<string, vector<string> >& mapMultiSettingsRet)
 {
-    boost::filesystem::ifstream streamConfig(GetConfigFile());
+    std::ifstream streamConfig(GetConfigFile());
     if (!streamConfig.good())
         throw missing_zelcash_conf();
 
-    set<string> setOptions;
-    setOptions.insert("*");
-
-    for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; it != end; ++it)
+    std::string line;
+    int linenr = 0;
+    while (std::getline(streamConfig, line))
     {
+        linenr++;
+        // Strip leading/trailing whitespace
+        size_t start = line.find_first_not_of(" \t\r\n");
+        size_t end = line.find_last_not_of(" \t\r\n");
+        if (start == std::string::npos) continue; // Empty line
+        line = line.substr(start, end - start + 1);
+
+        // Skip comments
+        if (line.empty() || line[0] == '#') continue;
+
+        // Find the '=' separator
+        size_t eq_pos = line.find('=');
+        if (eq_pos == std::string::npos) continue; // Skip lines without '='
+
+        // Extract key and value
+        std::string key = line.substr(0, eq_pos);
+        std::string value = (eq_pos + 1 < line.length()) ? line.substr(eq_pos + 1) : "";
+
+        // Trim whitespace from key and value
+        size_t key_end = key.find_last_not_of(" \t");
+        if (key_end != std::string::npos)
+            key = key.substr(0, key_end + 1);
+
+        size_t val_start = value.find_first_not_of(" \t");
+        if (val_start != std::string::npos)
+            value = value.substr(val_start);
+
+        if (key.empty()) continue;
+
         // Don't overwrite existing settings so command line settings override flux.conf
-        string strKey = string("-") + it->string_key;
+        string strKey = string("-") + key;
         if (mapSettingsRet.count(strKey) == 0)
         {
-            mapSettingsRet[strKey] = it->value[0];
+            mapSettingsRet[strKey] = value;
             // interpret nofoo=1 as foo=0 (and nofoo=0 as foo=1) as long as foo not set)
             InterpretNegativeSetting(strKey, mapSettingsRet);
         }
-        mapMultiSettingsRet[strKey].push_back(it->value[0]);
+        mapMultiSettingsRet[strKey].push_back(value);
     }
     // If datadir is changed in .conf file:
     ClearDatadirCache();
 }
 
 #ifndef WIN32
-boost::filesystem::path GetPidFile()
+std::filesystem::path GetPidFile()
 {
-    boost::filesystem::path pathPidFile(GetArg("-pid", "zelcashd.pid"));
-    if (!pathPidFile.is_complete()) pathPidFile = GetDataDir() / pathPidFile;
+    std::filesystem::path pathPidFile(GetArg("-pid", "zelcashd.pid"));
+    if (!pathPidFile.is_absolute()) pathPidFile = GetDataDir() / pathPidFile;
     return pathPidFile;
 }
 
-void CreatePidFile(const boost::filesystem::path &path, pid_t pid)
+void CreatePidFile(const std::filesystem::path &path, pid_t pid)
 {
     FILE* file = fopen(path.string().c_str(), "w");
     if (file)
@@ -766,7 +807,7 @@ void CreatePidFile(const boost::filesystem::path &path, pid_t pid)
 }
 #endif
 
-bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest)
+bool RenameOver(std::filesystem::path src, std::filesystem::path dest)
 {
 #ifdef WIN32
     return MoveFileExA(src.string().c_str(), dest.string().c_str(),
@@ -782,13 +823,13 @@ bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest)
  * Specifically handles case where path p exists, but it wasn't possible for the user to
  * write to the parent directory.
  */
-bool TryCreateDirectory(const boost::filesystem::path& p)
+bool TryCreateDirectory(const std::filesystem::path& p)
 {
     try
     {
-        return boost::filesystem::create_directory(p);
-    } catch (const boost::filesystem::filesystem_error&) {
-        if (!boost::filesystem::exists(p) || !boost::filesystem::is_directory(p))
+        return std::filesystem::create_directory(p);
+    } catch (const std::filesystem::filesystem_error&) {
+        if (!std::filesystem::exists(p) || !std::filesystem::is_directory(p))
             throw;
     }
 
@@ -897,7 +938,7 @@ void ShrinkDebugFile()
     // file, and atomically renames over debug.log. Any concurrent LogPrintStr
     // writes land on the unlinked inode; LogPrintStr reopens on next call
     // when fReopenDebugLog is set.
-    boost::filesystem::path pathLog = GetDataDir() / "debug.log";
+    std::filesystem::path pathLog = GetDataDir() / "debug.log";
 
     // Get configurable size threshold. Default 500 MB, min 10 MB. Upper cap
     // depends on whether debug logging is active: 10 GiB with -debug on so a
@@ -908,8 +949,8 @@ void ShrinkDebugFile()
     if (nMaxLogSizeMB > nUpperCapMB) nMaxLogSizeMB = nUpperCapMB;
     int64_t nMaxLogSize = nMaxLogSizeMB * 1000000;
 
-    boost::system::error_code ec;
-    uintmax_t curSize = boost::filesystem::file_size(pathLog, ec);
+    std::error_code ec;
+    uintmax_t curSize = std::filesystem::file_size(pathLog, ec);
     if (ec || (int64_t)curSize <= nMaxLogSize)
         return;
 
@@ -924,16 +965,16 @@ void ShrinkDebugFile()
     size_t nBytes = fread(begin_ptr(vch), 1, vch.size(), src);
     fclose(src);
 
-    boost::filesystem::path pathTmp = pathLog;
+    std::filesystem::path pathTmp = pathLog;
     pathTmp += ".tmp";
     FILE* dst = fopen(pathTmp.string().c_str(), "wb");
     if (!dst) return;
     fwrite(begin_ptr(vch), 1, nBytes, dst);
     fclose(dst);
 
-    boost::filesystem::rename(pathTmp, pathLog, ec);
+    std::filesystem::rename(pathTmp, pathLog, ec);
     if (ec) {
-        boost::filesystem::remove(pathTmp, ec);
+        std::filesystem::remove(pathTmp, ec);
         return;
     }
 
@@ -943,9 +984,9 @@ void ShrinkDebugFile()
 }
 
 #ifdef WIN32
-boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate)
+std::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate)
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
 
     char pszPath[MAX_PATH] = "";
 
@@ -959,23 +1000,23 @@ boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate)
 }
 #endif
 
-boost::filesystem::path GetTempPath() {
+std::filesystem::path GetTempPath() {
 #if BOOST_FILESYSTEM_VERSION == 3
-    return boost::filesystem::temp_directory_path();
+    return std::filesystem::temp_directory_path();
 #else
     // TODO: remove when we don't support filesystem v2 anymore
-    boost::filesystem::path path;
+    std::filesystem::path path;
 #ifdef WIN32
     char pszPath[MAX_PATH] = "";
 
     if (GetTempPathA(MAX_PATH, pszPath))
-        path = boost::filesystem::path(pszPath);
+        path = std::filesystem::path(pszPath);
 #else
-    path = boost::filesystem::path("/tmp");
+    path = std::filesystem::path("/tmp");
 #endif
-    if (path.empty() || !boost::filesystem::is_directory(path)) {
+    if (path.empty() || !std::filesystem::is_directory(path)) {
         LogPrintf("GetTempPath(): failed to find temp path\n");
-        return boost::filesystem::path("");
+        return std::filesystem::path("");
     }
     return path;
 #endif
@@ -1015,12 +1056,8 @@ void SetupEnvironment()
         setenv("LC_ALL", "C", 1);
     }
 #endif
-    // The path locale is lazy initialized and to avoid deinitialization errors
-    // in multithreading environments, it is set explicitly by the main thread.
-    // A dummy locale is used to extract the internal default locale, used by
-    // boost::filesystem::path, which is then used to explicitly imbue the path.
-    std::locale loc = boost::filesystem::path::imbue(std::locale::classic());
-    boost::filesystem::path::imbue(loc);
+    // Note: std::filesystem (unlike boost::filesystem) does not require explicit
+    // locale initialization as it handles locales internally in a thread-safe manner.
 }
 
 bool SetupNetworking()
@@ -1077,6 +1114,148 @@ std::string LicenseInfo()
 
 int GetNumCores()
 {
-    return boost::thread::physical_concurrency();
+    return std::thread::hardware_concurrency();
+}
+
+// String utility functions to replace boost::algorithm
+void ReplaceAll(std::string& str, const std::string& from, const std::string& to)
+{
+    if (from.empty()) return;
+    size_t pos = 0;
+    while ((pos = str.find(from, pos)) != std::string::npos) {
+        str.replace(pos, from.length(), to);
+        pos += to.length();
+    }
+}
+
+void ReplaceFirst(std::string& str, const std::string& from, const std::string& to)
+{
+    if (from.empty()) return;
+    size_t pos = str.find(from);
+    if (pos != std::string::npos) {
+        str.replace(pos, from.length(), to);
+    }
+}
+
+std::vector<std::string> SplitString(const std::string& str, char delimiter)
+{
+    std::vector<std::string> result;
+    std::string token;
+    std::istringstream tokenStream(str);
+    while (std::getline(tokenStream, token, delimiter)) {
+        result.push_back(token);
+    }
+    return result;
+}
+
+std::vector<std::string> SplitStringMulti(const std::string& str, const std::string& delimiters)
+{
+    std::vector<std::string> result;
+    size_t start = 0;
+    size_t end = str.find_first_of(delimiters);
+
+    while (end != std::string::npos) {
+        // Add token (even if empty, matching Bitcoin Core behavior)
+        result.push_back(str.substr(start, end - start));
+        start = end + 1;
+        end = str.find_first_of(delimiters, start);
+    }
+
+    // Add remaining token
+    result.push_back(str.substr(start));
+
+    return result;
+}
+
+void Trim(std::string& str)
+{
+    // Trim from start
+    size_t start = str.find_first_not_of(" \t\n\r\f\v");
+    if (start == std::string::npos) {
+        str.clear();
+        return;
+    }
+
+    // Trim from end
+    size_t end = str.find_last_not_of(" \t\n\r\f\v");
+    str = str.substr(start, end - start + 1);
+}
+
+void TrimRight(std::string& str)
+{
+    size_t end = str.find_last_not_of(" \t\n\r\f\v");
+    if (end == std::string::npos) {
+        str.clear();
+        return;
+    }
+    str.erase(end + 1);
+}
+
+std::string ToLower(const std::string& str)
+{
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char c){ return std::tolower(c); });
+    return result;
+}
+
+std::string ToUpper(const std::string& str)
+{
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char c){ return std::toupper(c); });
+    return result;
+}
+
+std::string GenerateUUID()
+{
+    // Generate a random UUID v4 (replaces boost::uuids::random_generator)
+    // Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    // where x is any hexadecimal digit and y is one of 8, 9, A, or B
+
+    static const char* hex_chars = "0123456789abcdef";
+    std::string uuid;
+    uuid.reserve(36);
+
+    // Use GetRandBytes from random.h for cryptographically secure randomness
+    unsigned char random_bytes[16];
+    GetRandBytes(random_bytes, 16);
+
+    // Set version (4) and variant bits as per RFC 4122
+    random_bytes[6] = (random_bytes[6] & 0x0f) | 0x40;  // Version 4
+    random_bytes[8] = (random_bytes[8] & 0x3f) | 0x80;  // Variant is 10
+
+    // Format as UUID string
+    for (int i = 0; i < 16; i++) {
+        if (i == 4 || i == 6 || i == 8 || i == 10) {
+            uuid += '-';
+        }
+        uuid += hex_chars[(random_bytes[i] >> 4) & 0x0f];
+        uuid += hex_chars[random_bytes[i] & 0x0f];
+    }
+
+    return uuid;
+}
+
+bool StartsWith(const std::string& str, const std::string& prefix)
+{
+    // C++20: Use std::string_view::starts_with() (matching Bitcoin Core)
+    return std::string_view(str).starts_with(std::string_view(prefix));
+}
+
+bool EndsWith(const std::string& str, const std::string& suffix)
+{
+    // C++20: Use std::string_view::ends_with() (matching Bitcoin Core)
+    return std::string_view(str).ends_with(std::string_view(suffix));
+}
+
+bool IStartsWith(const std::string& str, const std::string& prefix)
+{
+    if (str.size() < prefix.size()) return false;
+    return std::equal(prefix.begin(), prefix.end(), str.begin(),
+                      [](char a, char b) {
+                          return std::tolower(static_cast<unsigned char>(a)) ==
+                                 std::tolower(static_cast<unsigned char>(b));
+                      });
 }
 

@@ -20,9 +20,6 @@
 
 #include <stdio.h>
 
-#include <boost/algorithm/string.hpp>
-#include <boost/assign/list_of.hpp>
-
 static bool fCreateBlank;
 static std::map<std::string,UniValue> registers;
 static const int CONTINUE_EXECUTION=-1;
@@ -193,7 +190,7 @@ static void MutateTxLocktime(CMutableTransaction& tx, const std::string& cmdVal)
 static void MutateTxAddInput(CMutableTransaction& tx, const std::string& strInput)
 {
     std::vector<std::string> vStrInputParts;
-    boost::split(vStrInputParts, strInput, boost::is_any_of(":"));
+    vStrInputParts = SplitString(strInput, ':');
 
     // separate TXID:VOUT in string
     if (vStrInputParts.size()<2)
@@ -418,7 +415,7 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& strInput)
             if (!prevOut.isObject())
                 throw std::runtime_error("expected prevtxs internal object");
 
-            std::map<std::string,UniValue::VType> types = boost::assign::map_list_of("txid", UniValue::VSTR)("vout",UniValue::VNUM)("scriptPubKey",UniValue::VSTR);
+            std::map<std::string,UniValue::VType> types = {{"txid", UniValue::VSTR}, {"vout",UniValue::VNUM}, {"scriptPubKey",UniValue::VSTR}};
             if (!prevOut.checkObject(types))
                 throw std::runtime_error("prevtxs internal object typecheck fail");
 
@@ -484,7 +481,7 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& strInput)
             ProduceSignature(MutableTransactionSignatureCreator(&keystore, &mergedTx, i, amount, nHashType), prevPubKey, sigdata, consensusBranchId);
 
         // ... and merge in other signatures:
-        BOOST_FOREACH(const CTransaction& txv, txVariants)
+        for (const CTransaction& txv : txVariants)
             sigdata = CombineSignatures(prevPubKey, MutableTransactionSignatureChecker(&mergedTx, i, amount), sigdata, DataFromTransaction(txv, i), consensusBranchId);
         UpdateTransaction(mergedTx, i, sigdata);
 
@@ -516,7 +513,7 @@ public:
 static void MutateTx(CMutableTransaction& tx, const std::string& command,
                      const std::string& commandVal)
 {
-    boost::scoped_ptr<Secp256k1Init> ecc;
+    std::unique_ptr<Secp256k1Init> ecc;
 
     if (command == "nversion")
         MutateTxVersion(tx, commandVal);
@@ -600,7 +597,7 @@ static std::string readStdin()
     if (ferror(stdin))
         throw std::runtime_error("error reading stdin");
 
-    boost::algorithm::trim_right(ret);
+    TrimRight(ret);
 
     return ret;
 }
@@ -656,9 +653,6 @@ static int CommandLineRawTx(int argc, char* argv[])
         OutputTx(tx);
     }
 
-    catch (const boost::thread_interrupted&) {
-        throw;
-    }
     catch (const std::exception& e) {
         strPrint = std::string("error: ") + e.what();
         nRet = EXIT_FAILURE;

@@ -9,8 +9,9 @@
 #include "pubkey.h"
 #include "txdb.h"
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/thread.hpp>
+#include <thread>
 
 /** Basic testing setup.
  * This just configures logging and chain parameters.
@@ -34,9 +35,9 @@ struct JoinSplitTestingSetup: public BasicTestingSetup {
  */
 struct TestingSetup: public JoinSplitTestingSetup {
     CCoinsViewDB *pcoinsdbview;
-    boost::filesystem::path orig_current_path;
-    boost::filesystem::path pathTemp;
-    boost::thread_group threadGroup;
+    std::filesystem::path orig_current_path;
+    std::filesystem::path pathTemp;
+    std::vector<std::thread> threadGroup;
 
     TestingSetup();
     ~TestingSetup();

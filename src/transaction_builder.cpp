@@ -11,7 +11,6 @@
 #include "script/sign.h"
 #include "utilmoneystr.h"
 
-#include <boost/variant.hpp>
 #include <librustzcash.h>
 
 SpendDescriptionInfo::SpendDescriptionInfo(
@@ -27,13 +26,13 @@ TransactionBuilderResult::TransactionBuilderResult(const CTransaction& tx) : may
 
 TransactionBuilderResult::TransactionBuilderResult(const std::string& error) : maybeError(error) {}
 
-bool TransactionBuilderResult::IsTx() { return maybeTx != boost::none; }
+bool TransactionBuilderResult::IsTx() { return maybeTx != std::nullopt; }
 
-bool TransactionBuilderResult::IsError() { return maybeError != boost::none; }
+bool TransactionBuilderResult::IsError() { return maybeError != std::nullopt; }
 
 CTransaction TransactionBuilderResult::GetTxOrThrow() {
     if (maybeTx) {
-        return maybeTx.get();
+        return maybeTx.value();
     } else {
         throw JSONRPCError(RPC_WALLET_ERROR, "Failed to build transaction: " + GetError());
     }
@@ -41,7 +40,7 @@ CTransaction TransactionBuilderResult::GetTxOrThrow() {
 
 std::string TransactionBuilderResult::GetError() {
     if (maybeError) {
-        return maybeError.get();
+        return maybeError.value();
     } else {
         // This can only happen if isTx() is true in which case we should not call getError()
         throw std::runtime_error("getError() was called in TransactionBuilderResult, but the result was not initialized as an error.");
@@ -175,15 +174,15 @@ void TransactionBuilder::SetFee(CAmount fee)
 void TransactionBuilder::SendChangeTo(libflux::SaplingPaymentAddress changeAddr, uint256 ovk)
 {
     saplingChangeAddr = std::make_pair(ovk, changeAddr);
-    sproutChangeAddr = boost::none;
-    tChangeAddr = boost::none;
+    sproutChangeAddr = std::nullopt;
+    tChangeAddr = std::nullopt;
 }
 
 void TransactionBuilder::SendChangeTo(libflux::SproutPaymentAddress changeAddr)
 {
     sproutChangeAddr = changeAddr;
-    saplingChangeAddr = boost::none;
-    tChangeAddr = boost::none;
+    saplingChangeAddr = std::nullopt;
+    tChangeAddr = std::nullopt;
 }
 
 void TransactionBuilder::SendChangeTo(CTxDestination& changeAddr)
@@ -193,8 +192,8 @@ void TransactionBuilder::SendChangeTo(CTxDestination& changeAddr)
     }
 
     tChangeAddr = changeAddr;
-    saplingChangeAddr = boost::none;
-    sproutChangeAddr = boost::none;
+    saplingChangeAddr = std::nullopt;
+    sproutChangeAddr = std::nullopt;
 }
 
 TransactionBuilderResult TransactionBuilder::Build()
@@ -233,7 +232,7 @@ TransactionBuilderResult TransactionBuilder::Build()
         if (saplingChangeAddr) {
             AddSaplingOutput(saplingChangeAddr->first, saplingChangeAddr->second, change);
         } else if (sproutChangeAddr) {
-            AddSproutOutput(sproutChangeAddr.get(), change);
+            AddSproutOutput(sproutChangeAddr.value(), change);
         } else if (tChangeAddr) {
             // tChangeAddr has already been validated.
             AddTransparentOutput(tChangeAddr.value(), change);
@@ -308,7 +307,7 @@ TransactionBuilderResult TransactionBuilder::Build()
             librustzcash_sapling_proving_ctx_free(ctx);
             return TransactionBuilderResult("Failed to encrypt note");
         }
-        auto enc = res.get();
+        auto enc = res.value();
         auto encryptor = enc.second;
 
         OutputDescription odesc;
@@ -487,7 +486,7 @@ void TransactionBuilder::CreateJSDescriptions()
     CAmount vpubNewTarget = valueOut > 0 ? valueOut : 0;
 
     // Keep track of treestate within this transaction
-    boost::unordered_map<uint256, SproutMerkleTree, CCoinsKeyHasher> intermediates;
+    std::unordered_map<uint256, SproutMerkleTree, CCoinsKeyHasher> intermediates;
     std::vector<uint256> previousCommitments;
 
     while (!vpubNewProcessed) {
@@ -541,7 +540,7 @@ void TransactionBuilder::CreateJSDescriptions()
 
             assert(changeOutputIndex != -1);
             assert(changeOutputIndex < prevJoinSplit.commitments.size());
-            boost::optional<SproutWitness> changeWitness;
+            std::optional<SproutWitness> changeWitness;
             int n = 0;
             for (const uint256& commitment : prevJoinSplit.commitments) {
                 tree.append(commitment);
@@ -549,7 +548,7 @@ void TransactionBuilder::CreateJSDescriptions()
                 if (!changeWitness && changeOutputIndex == n++) {
                     changeWitness = tree.witness();
                 } else if (changeWitness) {
-                    changeWitness.get().append(commitment);
+                    changeWitness.value().append(commitment);
                 }
             }
             assert(changeWitness.has_value());
@@ -568,7 +567,7 @@ void TransactionBuilder::CreateJSDescriptions()
                     (unsigned char)changeOutputIndex);
 
                 auto note = plaintext.note(changeAddress);
-                vjsin[0] = libflux::JSInput(changeWitness.get(), note, changeKey);
+                vjsin[0] = libflux::JSInput(changeWitness.value(), note, changeKey);
 
                 jsInputValue += plaintext.value();
 

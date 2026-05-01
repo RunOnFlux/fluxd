@@ -4,18 +4,13 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "asyncrpcoperation.h"
-
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
+#include "util.h"
 
 #include <string>
 #include <ctime>
 #include <chrono>
 
 using namespace std;
-
-static boost::uuids::random_generator uuidgen;
 
 static std::map<OperationStatus, std::string> OperationStatusMap = {
     {OperationStatus::READY, "queued"},
@@ -30,8 +25,8 @@ static std::map<OperationStatus, std::string> OperationStatusMap = {
  */
 AsyncRPCOperation::AsyncRPCOperation() : error_code_(0), error_message_() {
     // Set a unique reference for each operation
-    boost::uuids::uuid uuid = uuidgen();
-    id_ = "opid-" + boost::uuids::to_string(uuid);
+    // Using custom UUID generator (replaces boost::uuids)
+    id_ = "opid-" + GenerateUUID();
     creation_time_ = (int64_t)time(NULL);
     set_state(OperationStatus::READY);
 }

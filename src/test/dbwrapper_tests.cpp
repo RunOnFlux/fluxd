@@ -9,13 +9,14 @@
 #include "random.h"
 #include "test/test_bitcoin.h"
 
+#include <chrono>
 #include <boost/assign/std/vector.hpp> // for 'operator+=()'
 #include <boost/assert.hpp>
 #include <boost/test/unit_test.hpp>
                     
 using namespace std;
 using namespace boost::assign; // bring 'operator+=()' into scope
-using namespace boost::filesystem;
+namespace fs = std::filesystem;
          
 // Test if a string consists entirely of null characters
 bool is_null_key(const vector<unsigned char>& key) {
@@ -32,7 +33,7 @@ BOOST_FIXTURE_TEST_SUITE(dbwrapper_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(dbwrapper)
 {
     {
-        path ph = temp_directory_path() / unique_path();
+        fs::path ph = fs::temp_directory_path() / ("dbwrapper-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         CDBWrapper dbw(ph, (1 << 20), true, false);
         char key = 'k';
         uint256 in = GetRandHash();
@@ -48,7 +49,7 @@ BOOST_AUTO_TEST_CASE(dbwrapper)
 BOOST_AUTO_TEST_CASE(dbwrapper_batch)
 {
     {
-        path ph = temp_directory_path() / unique_path();
+        fs::path ph = fs::temp_directory_path() / ("dbwrapper-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         CDBWrapper dbw(ph, (1 << 20), true, false);
 
         char key = 'i';
@@ -83,7 +84,7 @@ BOOST_AUTO_TEST_CASE(dbwrapper_batch)
 BOOST_AUTO_TEST_CASE(dbwrapper_iterator)
 {
     {
-        path ph = temp_directory_path() / unique_path();
+        fs::path ph = fs::temp_directory_path() / ("dbwrapper-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         CDBWrapper dbw(ph, (1 << 20), true, false);
 
         // The two keys are intentionally chosen for ordering
@@ -121,7 +122,7 @@ BOOST_AUTO_TEST_CASE(dbwrapper_iterator)
 
 BOOST_AUTO_TEST_CASE(iterator_ordering)
 {
-    path ph = temp_directory_path() / unique_path();
+    fs::path ph = fs::temp_directory_path() / ("dbwrapper-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     CDBWrapper dbw(ph, (1 << 20), true, false);
     for (int x=0x00; x<256; ++x) {
         uint8_t key = x;
@@ -187,7 +188,7 @@ BOOST_AUTO_TEST_CASE(iterator_string_ordering)
 {
     char buf[10];
 
-    path ph = temp_directory_path() / unique_path();
+    fs::path ph = fs::temp_directory_path() / ("dbwrapper-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     CDBWrapper dbw(ph, (1 << 20), true, false);
     for (int x=0x00; x<10; ++x) {
         for (int y = 0; y < 10; y++) {

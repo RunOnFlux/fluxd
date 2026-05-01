@@ -1,4 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
+#include <vector>
+#include <thread>
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
@@ -37,14 +39,16 @@
 
 #include "sodium.h"
 
-#include <boost/thread.hpp>
-#include <boost/tuple/tuple.hpp>
+#include <tuple>
 #ifdef ENABLE_MINING
 #include <functional>
 #endif
 #include <mutex>
 
 using namespace std;
+
+// Shutdown check from init.cpp
+extern bool ShutdownRequested();
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -76,7 +80,7 @@ uint64_t nLastBlockTx = 0;
 uint64_t nLastBlockSize = 0;
 
 // We want to sort transactions by priority and fee rate, so:
-typedef boost::tuple<double, CFeeRate, const CTransaction*> TxPriority;
+typedef std::tuple<double, CFeeRate, const CTransaction*> TxPriority;
 class TxPriorityCompare
 {
     bool byFee;
@@ -88,15 +92,15 @@ public:
     {
         if (byFee)
         {
-            if (a.get<1>() == b.get<1>())
-                return a.get<0>() < b.get<0>();
-            return a.get<1>() < b.get<1>();
+            if (std::get<1>(a) == std::get<1>(b))
+                return std::get<0>(a) < std::get<0>(b);
+            return std::get<1>(a) < std::get<1>(b);
         }
         else
         {
-            if (a.get<0>() == b.get<0>())
-                return a.get<1>() < b.get<1>();
-            return a.get<0>() < b.get<0>();
+            if (std::get<0>(a) == std::get<0>(b))
+                return std::get<1>(a) < std::get<1>(b);
+            return std::get<0>(a) < std::get<0>(b);
         }
     }
 };
@@ -106,7 +110,7 @@ void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, 
     pblock->nTime = std::max(pindexPrev->GetMedianTimePast()+1, GetAdjustedTime());
 
     // Updating time can change work required on testnet:
-    if (consensusParams.nPowAllowMinDifficultyBlocksAfterHeight != boost::none) {
+    if (consensusParams.nPowAllowMinDifficultyBlocksAfterHeight != std::nullopt) {
         pblock->nBits = GetNextWorkRequiredByFork(pindexPrev, pblock, consensusParams);
     }
 }
@@ -190,7 +194,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             double dPriority = 0;
             CAmount nTotalIn = 0;
             bool fMissingInputs = false;
-            BOOST_FOREACH(const CTxIn& txin, tx.vin)
+            for (const CTxIn& txin : tx.vin)
             {
                 // Read prev transaction
                 if (!view.HaveCoins(txin.prevout.hash))
@@ -340,9 +344,9 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         while (!vecPriority.empty())
         {
             // Take highest priority transaction off the priority queue:
-            double dPriority = vecPriority.front().get<0>();
-            CFeeRate feeRate = vecPriority.front().get<1>();
-            const CTransaction& tx = *(vecPriority.front().get<2>());
+            double dPriority = std::get<0>(vecPriority.front());
+            CFeeRate feeRate = std::get<1>(vecPriority.front());
+            const CTransaction& tx = *(std::get<2>(vecPriority.front()));
 
             std::pop_heap(vecPriority.begin(), vecPriority.end(), comparer);
             vecPriority.pop_back();
@@ -428,7 +432,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
             UpdateCoins(tx, view, nHeight);
 
-            BOOST_FOREACH(const OutputDescription &outDescription, tx.vShieldedOutput) {
+            for (const OutputDescription &outDescription : tx.vShieldedOutput) {
                 sapling_tree.append(outDescription.cm);
             }
 
@@ -450,7 +454,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             // Add transactions that depend on this one to the priority queue
             if (mapDependers.count(hash))
             {
-                BOOST_FOREACH(COrphan* porphan, mapDependers[hash])
+                for (COrphan* porphan : mapDependers[hash])
                 {
                     if (!porphan->setDependsOn.empty())
                     {
@@ -597,15 +601,15 @@ class MinerAddressScript : public CReserveScript
     void KeepScript() {}
 };
 
-void GetScriptForMinerAddress(boost::shared_ptr<CReserveScript> &script)
+void GetScriptForMinerAddress(std::shared_ptr<CReserveScript> &script)
 {
     CTxDestination addr = DecodeDestination(GetArg("-mineraddress", ""));
     if (!IsValidDestination(addr)) {
         return;
     }
 
-    boost::shared_ptr<MinerAddressScript> mAddr(new MinerAddressScript());
-    CKeyID keyID = boost::get<CKeyID>(addr);
+    std::shared_ptr<MinerAddressScript> mAddr(new MinerAddressScript());
+    CKeyID keyID = std::get<CKeyID>(addr);
 
     script = mAddr;
     script->reserveScript = CScript() << OP_DUP << OP_HASH160 << ToByteVector(keyID) << OP_EQUALVERIFY << OP_CHECKSIG;
@@ -664,7 +668,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
     // Each thread has its own counter
     unsigned int nExtraNonce = 0;
 
-    boost::shared_ptr<CReserveScript> coinbaseScript;
+    std::shared_ptr<CReserveScript> coinbaseScript;
     GetMainSignals().ScriptForMining(coinbaseScript);
 
     std::string solver = GetArg("-equihashsolver", "default");
@@ -685,7 +689,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
         if (!coinbaseScript->reserveScript.size())
             throw std::runtime_error("No coinbase script available (mining requires a wallet or -mineraddress)");
 
-        while (true) {
+        while (!ShutdownRequested()) {
             if (chainparams.MiningRequiresPeers()) {
                 // Busy-wait for the network to come online so we don't waste time mining
                 // on an obsolete chain. In regtest mode we expect to fly solo.
@@ -698,6 +702,8 @@ void static BitcoinMiner(const CChainParams& chainparams)
                     }
                     if (!fvNodesEmpty && !IsInitialBlockDownload(chainparams))
                         break;
+                    if (ShutdownRequested())
+                        return;
                     MilliSleep(1000);
                 } while (true);
                 miningTimer.start();
@@ -747,8 +753,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
             int64_t nStart = GetTime();
             arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
 
-            while (true) {
-                boost::this_thread::interruption_point();
+            while (!ShutdownRequested()) {
                 // Hash state
                 crypto_generichash_blake2b_state state;
                 EhInitialiseState(n, k, state);
@@ -775,7 +780,6 @@ void static BitcoinMiner(const CChainParams& chainparams)
                 std::function<bool(std::vector<unsigned char>)> validBlock =
                         [&pblock, &hashTarget, &chainparams, &m_cs, &cancelSolver, &coinbaseScript]
                         (std::vector<unsigned char> soln) {
-                    boost::this_thread::interruption_point();
                     // Write the solution to the hash and compute the result.
                     LogPrint("pow", "- Checking solution against target\n");
                     pblock->nSolution = soln;
@@ -801,7 +805,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
                     if (chainparams.MineBlocksOnDemand()) {
                         // Increment here because throwing skips the call below
                         ehSolverRuns.increment();
-                        throw boost::thread_interrupted();
+                        return true;
                     }
 
                     return true;
@@ -831,7 +835,6 @@ void static BitcoinMiner(const CChainParams& chainparams)
 
                     // Convert solution indices to byte array (decompress) and pass it to validBlock method.
                     for (size_t s = 0; s < eq.nsols; s++) {
-                        boost::this_thread::interruption_point();
                         LogPrint("pow", "Checking solution %d\n", s+1);
                         std::vector<eh_index> index_vector(PROOFSIZE);
                         for (size_t i = 0; i < PROOFSIZE; i++) {
@@ -861,7 +864,6 @@ void static BitcoinMiner(const CChainParams& chainparams)
                 }
 
                 // Check for stop or if block needs to be rebuilt
-                boost::this_thread::interruption_point();
                 // Regtest mode doesn't require peers
                 if (vNodes.empty() && chainparams.MiningRequiresPeers())
                     break;
@@ -875,20 +877,13 @@ void static BitcoinMiner(const CChainParams& chainparams)
                 // Update nNonce and nTime
                 pblock->nNonce = ArithToUint256(UintToArith256(pblock->nNonce) + 1);
                 UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
-                if (chainparams.GetConsensus().nPowAllowMinDifficultyBlocksAfterHeight != boost::none)
+                if (chainparams.GetConsensus().nPowAllowMinDifficultyBlocksAfterHeight != std::nullopt)
                 {
                     // Changing pblock->nTime can change work required on testnet:
                     hashTarget.SetCompact(pblock->nBits);
                 }
             }
         }
-    }
-    catch (const boost::thread_interrupted&)
-    {
-        miningTimer.stop();
-        c.disconnect();
-        LogPrintf("FluxMiner terminated\n");
-        throw;
     }
     catch (const std::runtime_error &e)
     {
@@ -903,15 +898,19 @@ void static BitcoinMiner(const CChainParams& chainparams)
 
 void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams& chainparams)
 {
-    static boost::thread_group* minerThreads = NULL;
+    static std::vector<std::thread>* minerThreads = NULL;
 
     if (nThreads < 0)
         nThreads = GetNumCores();
 
     if (minerThreads != NULL)
     {
-        minerThreads->interrupt_all();
-        minerThreads->join_all();
+        // std::thread doesn't support interrupt, just join all threads
+        for (auto& thread : *minerThreads) {
+            if (thread.joinable()) {
+                thread.join();
+            }
+        }
         delete minerThreads;
         minerThreads = NULL;
     }
@@ -919,9 +918,9 @@ void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams& chainpar
     if (nThreads == 0 || !fGenerate)
         return;
 
-    minerThreads = new boost::thread_group();
+    minerThreads = new std::vector<std::thread>();
     for (int i = 0; i < nThreads; i++) {
-        minerThreads->create_thread(boost::bind(&BitcoinMiner, boost::cref(chainparams)));
+        minerThreads->emplace_back([&chainparams]() { BitcoinMiner(chainparams); });
     }
 }
 

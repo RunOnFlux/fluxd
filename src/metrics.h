@@ -70,8 +70,10 @@ int EstimateNetHeightInner(int height, int64_t tipmediantime,
 
 void TriggerRefresh();
 
+class CThreadInterrupt;
+
 void ConnectMetricsScreen();
-void ThreadShowMetricsScreen();
+void ThreadShowMetricsScreen(CThreadInterrupt& interrupt);
 
 /**
  * Heart image: https://commons.wikimedia.org/wiki/File:Heart_coraz%C3%B3n.svg

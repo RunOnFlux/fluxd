@@ -6,7 +6,7 @@
 #define ZELCASH_CSNAPSHOTDB_H
 
 #include "dbwrapper.h"
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 #include <amount.h>
 
 class UniValue;

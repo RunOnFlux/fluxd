@@ -18,9 +18,7 @@
 #include <sys/stat.h>
 #endif
 
-#include <boost/filesystem.hpp>
-#include <boost/thread.hpp>
-#include <boost/version.hpp>
+#include <filesystem>
 
 using namespace std;
 
@@ -72,17 +70,16 @@ void CDBEnv::Close()
     EnvShutdown();
 }
 
-bool CDBEnv::Open(const boost::filesystem::path& pathIn)
+bool CDBEnv::Open(const std::filesystem::path& pathIn)
 {
     if (fDbEnvInit)
         return true;
 
-    boost::this_thread::interruption_point();
 
     strPath = pathIn.string();
-    boost::filesystem::path pathLogDir = pathIn / "database";
+    std::filesystem::path pathLogDir = pathIn / "database";
     TryCreateDirectory(pathLogDir);
-    boost::filesystem::path pathErrorFile = pathIn / "db.log";
+    std::filesystem::path pathErrorFile = pathIn / "db.log";
     LogPrintf("CDBEnv::Open: LogDir=%s ErrorFile=%s\n", pathLogDir.string(), pathErrorFile.string());
 
     unsigned int nEnvFlags = 0;
@@ -122,7 +119,6 @@ void CDBEnv::MakeMock()
     if (fDbEnvInit)
         throw runtime_error("CDBEnv::MakeMock: Already initialized");
 
-    boost::this_thread::interruption_point();
 
     LogPrint("db", "CDBEnv::MakeMock\n");
 
@@ -456,7 +452,7 @@ void CDBEnv::Flush(bool fShutdown)
                 dbenv->log_archive(&listp, DB_ARCH_REMOVE);
                 Close();
                 if (!fMockDb)
-                    boost::filesystem::remove_all(boost::filesystem::path(strPath) / "database");
+                    std::filesystem::remove_all(std::filesystem::path(strPath) / "database");
             }
         }
     }

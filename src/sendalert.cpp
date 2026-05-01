@@ -50,6 +50,7 @@ the bad alert.
 #include "init.h"
 
 #include "util.h"
+#include "util/threadinterrupt.h"
 #include "utiltime.h"
 #include "key.h"
 #include "clientversion.h"
@@ -60,12 +61,12 @@ the bad alert.
 
 static const int64_t DAYS = 24 * 60 * 60;
 
-void ThreadSendAlert()
+void ThreadSendAlert(CThreadInterrupt& interrupt)
 {
     if (!mapArgs.count("-sendalert") && !mapArgs.count("-printalert"))
         return;
 
-    MilliSleep(60*1000); // Wait a minute so we get connected
+    interrupt.sleep_for(std::chrono::seconds(60)); // Wait a minute so we get connected
 
     //
     // Alerts are relayed around the network until nRelayUntil, flood
@@ -110,7 +111,7 @@ void ThreadSendAlert()
     // alert.setSubVer.insert(std::string("/MagicBean:0.7.2/"));
     const std::vector<std::string> useragents = {}; //"MagicBean", "BeanStalk", "AppleSeed", "EleosZelcash"};
 
-    BOOST_FOREACH(const std::string& useragent, useragents) {
+    for (const std::string& useragent : useragents) {
     }
 
     // Sanity check
@@ -162,9 +163,9 @@ void ThreadSendAlert()
     // Confirm
     if (!mapArgs.count("-sendalert"))
         return;
-    while (vNodes.size() < 1 && !ShutdownRequested())
-        MilliSleep(500);
-    if (ShutdownRequested())
+    while (vNodes.size() < 1 && !interrupt)
+        interrupt.sleep_for(std::chrono::milliseconds(500));
+    if (interrupt)
         return;
 
     // Send
@@ -172,7 +173,7 @@ void ThreadSendAlert()
     int nSent = 0;
     {
         LOCK(cs_vNodes);
-        BOOST_FOREACH(CNode* pnode, vNodes)
+        for (CNode* pnode : vNodes)
         {
             if (alert2.RelayTo(pnode))
             {

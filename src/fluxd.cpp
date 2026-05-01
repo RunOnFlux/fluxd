@@ -15,9 +15,7 @@
 #include "httprpc.h"
 #include "fluxnode/fluxnodeconfig.h"
 
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/thread.hpp>
+#include <filesystem>
 
 #include <stdio.h>
 
@@ -39,7 +37,7 @@
 
 static bool fDaemon;
 
-void WaitForShutdown(boost::thread_group* threadGroup)
+void WaitForShutdown(std::vector<std::thread>* threadGroup)
 {
     bool fShutdown = ShutdownRequested();
     // Tell the main threads to shutdown.
@@ -51,7 +49,16 @@ void WaitForShutdown(boost::thread_group* threadGroup)
     if (threadGroup)
     {
         Interrupt(*threadGroup);
-        threadGroup->join_all();
+        size_t threadNum = 0;
+        for (auto& thread : *threadGroup) {
+            if (thread.joinable()) {
+                LogPrintf("Waiting for thread %d to join...\n", threadNum);
+                thread.join();
+                LogPrintf("Thread %d joined\n", threadNum);
+            }
+            threadNum++;
+        }
+        LogPrintf("All threads joined\n");
     }
 }
 
@@ -61,7 +68,7 @@ void WaitForShutdown(boost::thread_group* threadGroup)
 //
 bool AppInit(int argc, char* argv[])
 {
-    boost::thread_group threadGroup;
+    std::vector<std::thread> threadGroup;
     CScheduler scheduler;
 
     bool fRet = false;
@@ -99,7 +106,7 @@ bool AppInit(int argc, char* argv[])
             RenameDirectoriesFromZelcashToFlux();
         }
 
-        if (!boost::filesystem::is_directory(GetDataDir(false)))
+        if (!std::filesystem::is_directory(GetDataDir(false)))
         {
             fprintf(stderr, "Error: Specified data directory \"%s\" does not exist.\n", mapArgs["-datadir"].c_str());
             return false;
@@ -145,7 +152,7 @@ bool AppInit(int argc, char* argv[])
         // Command-line RPC
         bool fCommandLine = false;
         for (int i = 1; i < argc; i++)
-            if (!IsSwitchChar(argv[i][0]) && !boost::algorithm::istarts_with(argv[i], "zelcash:"))
+            if (!IsSwitchChar(argv[i][0]) && !IStartsWith(argv[i], "zelcash:"))
                 fCommandLine = true;
 
         if (fCommandLine)
@@ -190,7 +197,7 @@ bool AppInit(int argc, char* argv[])
     if (!fRet)
     {
         Interrupt(threadGroup);
-        // threadGroup.join_all(); was left out intentionally here, because we didn't re-test all of
+        // for (auto& t : threadGroup) { if (t.joinable()) t.join(); }; was left out intentionally here, because we didn't re-test all of
         // the startup-failure cases to make sure they don't result in a hang due to some
         // thread-blocking-waiting-for-another-thread-during-startup case
     } else {

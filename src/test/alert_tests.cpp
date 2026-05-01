@@ -23,10 +23,10 @@
 
 #include "test/test_bitcoin.h"
 
+#include <chrono>
+#include <filesystem>
 #include <fstream>
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/foreach.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include "key.h"
@@ -263,7 +263,7 @@ struct ReadAlerts : public TestingSetup
     }
     ~ReadAlerts() { }
 
-    static std::vector<std::string> read_lines(boost::filesystem::path filepath)
+    static std::vector<std::string> read_lines(std::filesystem::path filepath)
     {
         std::vector<std::string> result;
 
@@ -286,7 +286,7 @@ BOOST_AUTO_TEST_CASE(AlertApplies)
     SetMockTime(11);
     const std::vector<unsigned char>& alertKey = Params(CBaseChainParams::MAIN).AlertKey();
 
-    BOOST_FOREACH(const CAlert& alert, alerts)
+    for (const CAlert& alert : alerts)
     {
         BOOST_CHECK(alert.CheckSignature(alertKey));
     }
@@ -327,12 +327,12 @@ BOOST_AUTO_TEST_CASE(AlertNotify)
     SetMockTime(11);
     const std::vector<unsigned char>& alertKey = Params(CBaseChainParams::MAIN).AlertKey();
 
-    boost::filesystem::path temp = GetTempPath() /
-        boost::filesystem::unique_path("alertnotify-%%%%.txt");
+    std::filesystem::path temp = GetTempPath() /
+        ("alertnotify-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".txt");
 
     mapArgs["-alertnotify"] = std::string("echo %s >> ") + temp.string();
 
-    BOOST_FOREACH(CAlert alert, alerts)
+    for (CAlert alert : alerts)
         alert.ProcessAlert(alertKey, false);
 
     std::vector<std::string> r = read_lines(temp);
@@ -356,7 +356,7 @@ BOOST_AUTO_TEST_CASE(AlertNotify)
     BOOST_CHECK_EQUAL(r[4], "'Alert 4, reenables RPC' "); // dashes should be removed
     BOOST_CHECK_EQUAL(r[5], "'Evil Alert; /bin/ls; echo ' ");
 #endif
-    boost::filesystem::remove(temp);
+    std::filesystem::remove(temp);
 
     SetMockTime(0);
     mapAlerts.clear();

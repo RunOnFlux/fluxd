@@ -1,4 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
+#include <vector>
+#include <thread>
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
@@ -27,8 +29,7 @@
 #include <arpa/inet.h>
 #endif
 
-#include <boost/filesystem/path.hpp>
-#include <boost/foreach.hpp>
+#include <filesystem>
 #include <boost/signals2/signal.hpp>
 
 class CAddrMan;
@@ -78,7 +79,7 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest = NULL,  bool obfuS
 bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
-void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler);
+void StartNode(std::vector<std::thread>& threadGroup, CScheduler& scheduler);
 bool StopNode();
 void SocketSendData(CNode *pnode);
 
@@ -388,7 +389,7 @@ public:
     unsigned int GetTotalRecvSize()
     {
         unsigned int total = 0;
-        BOOST_FOREACH(const CNetMessage &msg, vRecvMsg)
+        for (const CNetMessage &msg : vRecvMsg)
             total += msg.vRecv.size() + 24;
         return total;
     }
@@ -400,7 +401,7 @@ public:
     void SetRecvVersion(int nVersionIn)
     {
         nRecvVersion = nVersionIn;
-        BOOST_FOREACH(CNetMessage &msg, vRecvMsg)
+        for (CNetMessage &msg : vRecvMsg)
             msg.SetVersion(nVersionIn);
     }
 
@@ -695,7 +696,7 @@ void RelayInv(const CInv& inv);
 class CAddrDB
 {
 private:
-    boost::filesystem::path pathAddr;
+    std::filesystem::path pathAddr;
 public:
     CAddrDB();
     bool Write(const CAddrMan& addr);
@@ -706,7 +707,7 @@ public:
 class CAnchorDB
 {
 private:
-    boost::filesystem::path pathAnchor;
+    std::filesystem::path pathAnchor;
 public:
     CAnchorDB();
     bool Write(const std::vector<CAddress>& anchors);

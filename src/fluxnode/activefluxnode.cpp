@@ -62,7 +62,7 @@ void ActiveFluxnode::ManageDeterministricFluxnode()
         CTransaction signedTx;
         if (GetBenchmarkSignedTransaction(tx, signedTx, errorMessage)) {
             CWalletTx walletTx(pwalletMain, signedTx);
-            pwalletMain->CommitTransaction(walletTx, reservekey);
+            pwalletMain->CommitTransaction(walletTx, std::ref(reservekey));
             nLastTriedToConfirm = nHeight;
         } else {
             error("Failed to sign benchmarking for fluxnode confirm transaction for outpoint %s, Error message: %s", activeFluxnode.deterministicOutPoint.ToString(), errorMessage);
@@ -164,7 +164,7 @@ bool ActiveFluxnode::GetVinFromOutput(COutput out, CTxIn& vin, CPubKey& pubkey, 
     }
 
     CKeyID* keyid;
-    keyid = boost::get<CKeyID>(&address1);
+    keyid = std::get_if<CKeyID>(&address1);
 
     if (!keyid) {
         LogPrintf("%s - Address does not refer to a key\n", __func__);

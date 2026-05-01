@@ -28,10 +28,6 @@
 #include <fcntl.h>
 #endif
 
-#include <boost/algorithm/string/case_conv.hpp> // for to_lower()
-#include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
-#include <boost/thread.hpp>
-
 #if !defined(HAVE_MSG_NOSIGNAL) && !defined(MSG_NOSIGNAL)
 #define MSG_NOSIGNAL 0
 #endif
@@ -49,7 +45,7 @@ static const unsigned char pchIPv4[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0
 static const int SOCKS5_RECV_TIMEOUT = 20 * 1000;
 
 enum Network ParseNetwork(std::string net) {
-    boost::to_lower(net);
+    net = ToLower(net);
     if (net == "ipv4") return NET_IPV4;
     if (net == "ipv6") return NET_IPV6;
     if (net == "tor" || net == "onion")  return NET_TOR;
@@ -147,7 +143,6 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
         // 2 seconds looks fine in our situation.
         struct timespec ts = { 2, 0 };
         gai_suspend(&query, 1, &ts);
-        boost::this_thread::interruption_point();
 
         nErr = gai_error(query);
         if (0 == nErr)
@@ -187,7 +182,7 @@ bool LookupHost(const char *pszName, std::vector<CNetAddr>& vIP, unsigned int nM
     std::string strHost(pszName);
     if (strHost.empty())
         return false;
-    if (boost::algorithm::starts_with(strHost, "[") && boost::algorithm::ends_with(strHost, "]"))
+    if (StartsWith(strHost, "[") && EndsWith(strHost, "]"))
     {
         strHost = strHost.substr(1, strHost.size() - 2);
     }
@@ -285,7 +280,6 @@ bool static InterruptibleRecv(uint8_t* data, size_t len, int timeout, SOCKET& hS
                 return false;
             }
         }
-        boost::this_thread::interruption_point();
         curTime = GetTimeMillis();
     }
     return len == 0;

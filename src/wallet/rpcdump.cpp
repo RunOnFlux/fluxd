@@ -17,9 +17,8 @@
 
 #include <fstream>
 #include <stdint.h>
-
-#include <boost/algorithm/string.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
+#include <iomanip>
+#include <sstream>
 
 #include <univalue.h>
 
@@ -37,21 +36,26 @@ std::string static EncodeDumpTime(int64_t nTime) {
 }
 
 int64_t static DecodeDumpTime(const std::string &str) {
-    static const boost::posix_time::ptime epoch = boost::posix_time::from_time_t(0);
-    static const std::locale loc(std::locale::classic(),
-        new boost::posix_time::time_input_facet("%Y-%m-%dT%H:%M:%SZ"));
+    // Using C++20 chrono instead of boost::posix_time
     std::istringstream iss(str);
-    iss.imbue(loc);
-    boost::posix_time::ptime ptime(boost::date_time::not_a_date_time);
-    iss >> ptime;
-    if (ptime.is_not_a_date_time())
+    iss.imbue(std::locale::classic());
+    std::tm tm = {};
+    iss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+    if (iss.fail())
         return 0;
-    return (ptime - epoch).total_seconds();
+
+    // Convert to time_t (assumes UTC)
+#ifdef WIN32
+    std::time_t time = _mkgmtime(&tm);
+#else
+    std::time_t time = timegm(&tm);
+#endif
+    return static_cast<int64_t>(time);
 }
 
 std::string static EncodeDumpString(const std::string &str) {
     std::stringstream ret;
-    BOOST_FOREACH(unsigned char c, str) {
+    for (unsigned char c : str) {
         if (c <= 32 || c >= 128 || c == '%') {
             ret << '%' << HexStr(&c, &c + 1);
         } else {
@@ -336,7 +340,7 @@ UniValue importwallet_impl(const UniValue& params, bool fHelp, bool fImportZKeys
             continue;
 
         std::vector<std::string> vstr;
-        boost::split(vstr, line, boost::is_any_of(" "));
+        vstr = SplitString(line, ' ');
         if (vstr.size() < 2)
             continue;
 
@@ -345,10 +349,10 @@ UniValue importwallet_impl(const UniValue& params, bool fHelp, bool fImportZKeys
             auto spendingkey = DecodeSpendingKey(vstr[0]);
             int64_t nTime = DecodeDumpTime(vstr[1]);
             // Only include hdKeypath and seedFpStr if we have both
-            boost::optional<std::string> hdKeypath = (vstr.size() > 3) ? boost::optional<std::string>(vstr[2]) : boost::none;
-            boost::optional<std::string> seedFpStr = (vstr.size() > 3) ? boost::optional<std::string>(vstr[3]) : boost::none;
+            std::optional<std::string> hdKeypath = (vstr.size() > 3) ? std::optional<std::string>(vstr[2]) : std::nullopt;
+            std::optional<std::string> seedFpStr = (vstr.size() > 3) ? std::optional<std::string>(vstr[3]) : std::nullopt;
             if (IsValidSpendingKey(spendingkey)) {
-                auto addResult = boost::apply_visitor(
+                auto addResult = std::visit(
                     AddSpendingKeyToWallet(pwalletMain, Params().GetConsensus(), nTime, hdKeypath, seedFpStr, true), spendingkey);
                 if (addResult == KeyAlreadyExists){
                     LogPrint("zrpc", "Skipping import of zaddr (key already present)\n");
@@ -377,13 +381,13 @@ UniValue importwallet_impl(const UniValue& params, bool fHelp, bool fImportZKeys
         std::string strLabel;
         bool fLabel = true;
         for (unsigned int nStr = 2; nStr < vstr.size(); nStr++) {
-            if (boost::algorithm::starts_with(vstr[nStr], "#"))
+            if (StartsWith(vstr[nStr], "#"))
                 break;
             if (vstr[nStr] == "change=1")
                 fLabel = false;
             if (vstr[nStr] == "reserve=1")
                 fLabel = false;
-            if (boost::algorithm::starts_with(vstr[nStr], "label=")) {
+            if (StartsWith(vstr[nStr], "label=")) {
                 strLabel = DecodeDumpString(vstr[nStr].substr(6));
                 fLabel = true;
             }
@@ -447,7 +451,7 @@ UniValue dumpprivkey(const UniValue& params, bool fHelp)
     if (!IsValidDestination(dest)) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Flux address");
     }
-    const CKeyID *keyID = boost::get<CKeyID>(&dest);
+    const CKeyID *keyID = std::get_if<CKeyID>(&dest);
     if (!keyID) {
         throw JSONRPCError(RPC_TYPE_ERROR, "Address does not refer to a key");
     }
@@ -508,15 +512,15 @@ UniValue dumpwallet_impl(const UniValue& params, bool fHelp, bool fDumpZKeys)
 
     EnsureWalletIsUnlocked();
 
-    boost::filesystem::path exportdir;
+    std::filesystem::path exportdir;
     try {
         exportdir = GetExportDir();
     } catch (const std::runtime_error& e) {
         throw JSONRPCError(RPC_INTERNAL_ERROR, e.what());
     }
-    boost::filesystem::path exportfilepath = exportdir / params[0].get_str();
+    std::filesystem::path exportfilepath = exportdir / params[0].get_str();
 
-    if (boost::filesystem::exists(exportfilepath)) {
+    if (std::filesystem::exists(exportfilepath)) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot overwrite existing file " + exportfilepath.string());
     }
 
@@ -681,7 +685,7 @@ UniValue z_importkey(const UniValue& params, bool fHelp)
     }
 
     // Sapling support
-    auto addResult = boost::apply_visitor(AddSpendingKeyToWallet(pwalletMain, Params().GetConsensus()), spendingkey);
+    auto addResult = std::visit(AddSpendingKeyToWallet(pwalletMain, Params().GetConsensus()), spendingkey);
     if (addResult == KeyAlreadyExists && fIgnoreExistingKey) {
         return NullUniValue;
     }
@@ -764,10 +768,10 @@ UniValue z_importviewingkey(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid viewing key");
     }
     // TODO: Add Sapling support. For now, return an error to the user.
-    if (boost::get<libflux::SproutViewingKey>(&viewingkey) == nullptr) {
+    if (std::get_if<libflux::SproutViewingKey>(&viewingkey) == nullptr) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Currently, only Sprout viewing keys are supported");
     }
-    auto vkey = boost::get<libflux::SproutViewingKey>(viewingkey);
+    auto vkey = std::get<libflux::SproutViewingKey>(viewingkey);
     auto addr = vkey.address();
 
     {
@@ -829,11 +833,11 @@ UniValue z_exportkey(const UniValue& params, bool fHelp)
     }
 
     // Sapling support
-    auto sk = boost::apply_visitor(GetSpendingKeyForPaymentAddress(pwalletMain), address);
+    auto sk = std::visit(GetSpendingKeyForPaymentAddress(pwalletMain), address);
     if (!sk) {
         throw JSONRPCError(RPC_WALLET_ERROR, "Wallet does not hold private zkey for this zaddr");
     }
-    return EncodeSpendingKey(sk.get());
+    return EncodeSpendingKey(sk.value());
 }
 
 UniValue z_exportviewingkey(const UniValue& params, bool fHelp)
@@ -866,10 +870,10 @@ UniValue z_exportviewingkey(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid zaddr");
     }
     // TODO: Add Sapling support. For now, return an error to the user.
-    if (boost::get<libflux::SproutPaymentAddress>(&address) == nullptr) {
+    if (std::get_if<libflux::SproutPaymentAddress>(&address) == nullptr) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Currently, only Sprout zaddrs are supported");
     }
-    auto addr = boost::get<libflux::SproutPaymentAddress>(address);
+    auto addr = std::get<libflux::SproutPaymentAddress>(address);
 
     libflux::SproutViewingKey vk;
     if (!pwalletMain->GetSproutViewingKey(addr, vk)) {

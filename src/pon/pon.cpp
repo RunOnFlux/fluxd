@@ -221,8 +221,10 @@ bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPre
 }
 
 bool ContextualCheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPrev,
-                     const Consensus::Params& params, bool fCheckSignature)
+                     const Consensus::Params& params, bool fCheckSignature, bool& fSignatureFailure)
 {
+    fSignatureFailure = false;
+
     // First do all header validations
     if (!CheckPONBlockHeader(block, pindexPrev, params)) {
         return false;
@@ -233,6 +235,8 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex*
     // Check if this is an emergency block first
     if (IsEmergencyBlock(block)) {
         if (!ValidateEmergencyBlockSignatures(block)) {
+            // Signature failure - not committed to hash, should not permanently invalidate
+            fSignatureFailure = true;
             return error("ContextualCheckPONBlockHeader: Emergency block signature validation failed");
         }
 
@@ -307,6 +311,8 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex*
 
         // Verify the block signature matches the fluxnode's public key
         if (!data.pubKey.Verify(hashToSign, block.vchBlockSig)) {
+            // Signature failure - not committed to hash, should not permanently invalidate
+            fSignatureFailure = true;
             return error("ContextualCheckPONBlockHeader: Block signature verification failed for fluxnode %s (block=%s, pubkey=%s)",
                         block.nodesCollateral.ToString(), block.GetHash().GetHex(),
                         HexStr(data.pubKey.begin(), data.pubKey.end()));

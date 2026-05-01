@@ -44,32 +44,14 @@
 /* define if the Boost library is available */
 #define HAVE_BOOST /**/
 
-/* define if the Boost::Chrono library is available */
-#define HAVE_BOOST_CHRONO /**/
-
-/* define if the Boost::Filesystem library is available */
-#define HAVE_BOOST_FILESYSTEM /**/
-
-/* define if the Boost::PROGRAM_OPTIONS library is available */
-#define HAVE_BOOST_PROGRAM_OPTIONS /**/
-
-/* define if the Boost::System library is available */
-#define HAVE_BOOST_SYSTEM /**/
-
-/* define if the Boost::Thread library is available */
-#define HAVE_BOOST_THREAD /**/
-
-/* define if the Boost::Unit_Test_Framework library is available */
-#define HAVE_BOOST_UNIT_TEST_FRAMEWORK /**/
-
 /* Define to 1 if you have the <byteswap.h> header file. */
 #define HAVE_BYTESWAP_H 1
 
 /* Define this symbol if the consensus lib has been built */
 /* #undef HAVE_CONSENSUS_LIB */
 
-/* define if the compiler supports basic C++11 syntax */
-#define HAVE_CXX11 1
+/* define if the compiler supports basic C++20 syntax */
+#define HAVE_CXX20 1
 
 /* Define to 1 if you have the declaration of `be16toh', and to 0 if you
    don't. */

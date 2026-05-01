@@ -21,7 +21,6 @@
 #include <univalue.h>
 #include "rpc/cache.h"
 
-#include <boost/tokenizer.hpp>
 #include <fstream>
 #include <consensus/validation.h>
 #include <consensus/params.h>
@@ -451,7 +450,7 @@ UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
     bool fSent = false;
     if (GetBenchmarkSignedTransaction(tx, signedTx, errorMessage)) {
         CWalletTx walletTx(pwalletMain, signedTx);
-        fSent = pwalletMain->CommitTransaction(walletTx, reservekey);
+        fSent = pwalletMain->CommitTransaction(walletTx, std::ref(reservekey));
     } else {
         throw JSONRPCError(RPC_VERIFY_ERROR, strprintf("Benchmark failed to sign new confirmation transaction: %s\n", errorMessage));
     }
@@ -589,7 +588,7 @@ UniValue startfluxnode(const UniValue& params, bool fHelp, string cmdname)
 
                     CWalletTx walletTx(pwalletMain, tx);
                     CValidationState state;
-                    bool fCommited = pwalletMain->CommitTransaction(walletTx, reservekey, &state);
+                    bool fCommited = pwalletMain->CommitTransaction(walletTx, std::ref(reservekey), &state);
                     fluxnodeEntry.pushKV("transaction_commited", fCommited ? "successful" : "failed");
                     if (fCommited) {
                         successful++;
@@ -737,7 +736,7 @@ UniValue startdeterministicfluxnode(const UniValue& params, bool fHelp, string c
                     CTransaction tx(mutTransaction);
 
                     CWalletTx walletTx(pwalletMain, tx);
-                    pwalletMain->CommitTransaction(walletTx, reservekey);
+                    pwalletMain->CommitTransaction(walletTx, std::ref(reservekey));
                     successful++;
                 } else {
                     failed++;
@@ -920,7 +919,7 @@ UniValue startfluxnodewithdelegates(const UniValue& params, bool fHelp)
             CReserveKey reservekey(pwalletMain);
             CWalletTx walletTx(pwalletMain, tx);
 
-            if (!pwalletMain->CommitTransaction(walletTx, reservekey)) {
+            if (!pwalletMain->CommitTransaction(walletTx, std::ref(reservekey))) {
                 returnObj.pushKV("result", "failed");
                 returnObj.pushKV("error", "Failed to commit transaction");
                 return returnObj;
@@ -1164,7 +1163,7 @@ UniValue startfluxnodeasdelegate(const UniValue& params, bool fHelp)
     CReserveKey reservekey(pwalletMain);
     CWalletTx walletTx(pwalletMain, tx);
 
-    if (!pwalletMain->CommitTransaction(walletTx, reservekey)) {
+    if (!pwalletMain->CommitTransaction(walletTx, std::ref(reservekey))) {
         returnObj.pushKV("result", "failed");
         returnObj.pushKV("error", "Failed to commit transaction");
         return returnObj;
@@ -1390,7 +1389,7 @@ UniValue startp2shasdelegate(const UniValue& params, bool fHelp)
     CReserveKey reservekey(pwalletMain);
     CWalletTx walletTx(pwalletMain, tx);
 
-    if (!pwalletMain->CommitTransaction(walletTx, reservekey)) {
+    if (!pwalletMain->CommitTransaction(walletTx, std::ref(reservekey))) {
         returnObj.pushKV("result", "failed");
         returnObj.pushKV("error", "Failed to commit transaction");
         return returnObj;
@@ -2081,9 +2080,9 @@ UniValue createp2shstarttx(const UniValue& params, bool fHelp)
 
 
     if (params.size() == 4) {
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR)(UniValue::VSTR)(UniValue::VNUM), false);
+        RPCTypeCheck(params, {UniValue::VSTR, UniValue::VSTR, UniValue::VSTR, UniValue::VNUM}, false);
     } else {
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR)(UniValue::VSTR)(UniValue::VNUM)(UniValue::VARR), false);
+        RPCTypeCheck(params, {UniValue::VSTR, UniValue::VSTR, UniValue::VSTR, UniValue::VNUM, UniValue::VARR}, false);
     }
 
 
@@ -2231,9 +2230,9 @@ UniValue signp2shstarttx(const UniValue& params, bool fHelp)
     LOCK(cs_main);
 #endif
     if (params.size() == 1) {
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR), false);
+        RPCTypeCheck(params, {UniValue::VSTR}, false);
     } else {
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR), false);
+        RPCTypeCheck(params, {UniValue::VSTR, UniValue::VSTR}, false);
     }
 
     std::string strRawTx = params[0].get_str();
@@ -2338,7 +2337,7 @@ UniValue sendp2shstarttx(const UniValue& params, bool fHelp)
                 "\nExamples:\n" +
                 HelpExampleCli("sendp2shstarttx", "\"rawtransactionhex\"") + HelpExampleRpc("sendp2shstarttx", "\"rawtransactionhex\""));
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR), false);
+    RPCTypeCheck(params, {UniValue::VSTR}, false);
 
     std::string strRawTx = params[0].get_str();
 

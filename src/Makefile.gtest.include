@@ -1,6 +1,46 @@
 TESTS += flux-gtest
 noinst_PROGRAMS += flux-gtest
 
+# JSON test data generation rules
+JSON_TEST_FILES = \
+  test/data/script_valid.json \
+  test/data/base58_keys_valid.json \
+  test/data/base58_encode_decode.json \
+  test/data/base58_keys_invalid.json \
+  test/data/script_invalid.json \
+  test/data/tx_invalid.json \
+  test/data/tx_valid.json \
+  test/data/sighash.json \
+  test/data/merkle_roots.json \
+  test/data/merkle_serialization.json \
+  test/data/merkle_witness_serialization.json \
+  test/data/merkle_path.json \
+  test/data/merkle_commitments.json \
+  test/data/merkle_roots_sapling.json \
+  test/data/merkle_serialization_sapling.json \
+  test/data/merkle_witness_serialization_sapling.json \
+  test/data/merkle_path_sapling.json \
+  test/data/merkle_commitments_sapling.json \
+  test/data/sapling_key_components.json
+
+RAW_TEST_FILES = test/data/alertTests.raw
+
+GENERATED_TEST_FILES = $(JSON_TEST_FILES:.json=.json.h) $(RAW_TEST_FILES:.raw=.raw.h)
+
+%.json.h: %.json
+	@$(MKDIR_P) $(@D)
+	@echo "namespace json_tests{" > $@
+	@echo "static unsigned const char $(*F)[] = {" >> $@
+	@$(HEXDUMP) -v -e '8/1 "0x%02x, "' -e '"\n"' $< | $(SED) -e 's/0x  ,//g' >> $@
+	@echo "};};" >> $@
+
+%.raw.h: %.raw
+	@$(MKDIR_P) $(@D)
+	@echo "namespace alert_tests{" > $@
+	@echo "static unsigned const char $(*F)[] = {" >> $@
+	@$(HEXDUMP) -v -e '8/1 "0x%02x, "' -e '"\n"' $< | $(SED) -e 's/0x  ,//g' >> $@
+	@echo "};};" >> $@
+
 # tool for generating our public parameters.
 # test_checktransaction.cpp MUST be before
 # any test that calls SelectParams().
@@ -53,11 +93,14 @@ flux_gtest_SOURCES += \
 	wallet/gtest/test_wallet.cpp
 endif
 
+# Ensure generated test files are built before compiling gtest sources
+$(flux_gtest_SOURCES): $(GENERATED_TEST_FILES)
+
 flux_gtest_CPPFLAGS = $(AM_CPPFLAGS) -DBINARY_OUTPUT -DCURVE_ALT_BN128 -DSTATIC $(BITCOIN_INCLUDES)
 flux_gtest_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
 flux_gtest_LDADD = -lgtest -lgmock $(LIBBITCOIN_SERVER) $(LIBBITCOIN_CLI) $(LIBBITCOIN_COMMON) $(LIBBITCOIN_UTIL) $(LIBBITCOIN_CRYPTO) $(LIBUNIVALUE) $(LIBLEVELDB) $(LIBMEMENV) \
-  $(BOOST_LIBS) $(BOOST_UNIT_TEST_FRAMEWORK_LIB) $(LIBSECP256K1)
+  $(LIBSECP256K1)
 if ENABLE_ZMQ
 flux_gtest_LDADD += $(LIBBITCOIN_ZMQ) $(ZMQ_LIBS)
 endif
@@ -79,3 +122,14 @@ flux-gtest_check: flux-gtest FORCE
 
 flux-gtest-expected-failures: flux-gtest FORCE
 	./flux-gtest --gtest_filter=*DISABLED_* --gtest_also_run_disabled_tests
+
+# Clean generated test files
+CLEAN_BITCOIN_GTEST = gtest/*.gcda gtest/*.gcno $(GENERATED_TEST_FILES)
+
+clean-local: clean-bitcoin-gtest
+
+.PHONY: clean-bitcoin-gtest
+clean-bitcoin-gtest:
+	-$(MAKE) -C secp256k1 clean
+	-$(MAKE) -C univalue clean
+	-rm -f $(CLEAN_BITCOIN_GTEST)

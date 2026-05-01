@@ -26,9 +26,8 @@
 #include <string>
 #include <vector>
 
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 #include <boost/signals2/signal.hpp>
-#include <boost/thread/exceptions.hpp>
 
 static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS        = false;
@@ -63,12 +62,12 @@ extern CTranslationInterface translationInterface;
 [[noreturn]] extern void new_handler_terminate();
 
 /**
- * Translation function: Call Translate signal on UI interface, which returns a boost::optional result.
+ * Translation function: Call Translate signal on UI interface, which returns a std::optional result.
  * If no translation slot is registered, nothing is returned, and simply return the input.
  */
 inline std::string _(const char* psz)
 {
-    boost::optional<std::string> rv = translationInterface.Translate(psz);
+    auto rv = translationInterface.Translate(psz);  // boost::signals2 returns std::optional
     return rv ? (*rv) : psz;
 }
 
@@ -119,7 +118,7 @@ static inline bool error(const char* format)
     return false;
 }
 
-const boost::filesystem::path &ZC_GetParamsDir();
+const std::filesystem::path &ZC_GetParamsDir();
 
 void PrintExceptionContinue(const std::exception *pex, const char* pszThread);
 void ParseParameters(int argc, const char*const argv[]);
@@ -127,18 +126,18 @@ void FileCommit(FILE *fileout);
 bool TruncateFile(FILE *file, unsigned int length);
 int RaiseFileDescriptorLimit(int nMinFD);
 void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length);
-bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest);
-bool TryCreateDirectory(const boost::filesystem::path& p);
-boost::filesystem::path GetDefaultDataDirForCoinName(const std::string &coinName);
-boost::filesystem::path GetDefaultDataDir();
-const boost::filesystem::path &GetDataDir(bool fNetSpecific = true);
+bool RenameOver(std::filesystem::path src, std::filesystem::path dest);
+bool TryCreateDirectory(const std::filesystem::path& p);
+std::filesystem::path GetDefaultDataDirForCoinName(const std::string &coinName);
+std::filesystem::path GetDefaultDataDir();
+const std::filesystem::path &GetDataDir(bool fNetSpecific = true);
 bool RenameDirectoriesFromZelcashToFlux();
 void ClearDatadirCache();
-boost::filesystem::path GetConfigFile();
-boost::filesystem::path GetFluxnodeConfigFile();
+std::filesystem::path GetConfigFile();
+std::filesystem::path GetFluxnodeConfigFile();
 #ifndef WIN32
-boost::filesystem::path GetPidFile();
-void CreatePidFile(const boost::filesystem::path &path, pid_t pid);
+std::filesystem::path GetPidFile();
+void CreatePidFile(const std::filesystem::path &path, pid_t pid);
 #endif
 class missing_zelcash_conf : public std::runtime_error {
 public:
@@ -146,13 +145,13 @@ public:
 };
 void ReadConfigFile(std::map<std::string, std::string>& mapSettingsRet, std::map<std::string, std::vector<std::string> >& mapMultiSettingsRet);
 #ifdef WIN32
-boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
+std::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
 #endif
-boost::filesystem::path GetTempPath();
+std::filesystem::path GetTempPath();
 void OpenDebugLog();
 void ShrinkDebugFile();
 void runCommand(const std::string& strCommand);
-const boost::filesystem::path GetExportDir();
+const std::filesystem::path GetExportDir();
 
 /** Returns privacy notice (for -version, -help and metrics screen) */
 std::string PrivacyInfo();
@@ -252,6 +251,32 @@ int GetNumCores();
 void SetThreadPriority(int nPriority);
 void RenameThread(const char* name);
 
+// String utility functions to replace boost::algorithm
+// Locale-independent digit check (matching Bitcoin Core)
+constexpr bool IsDigit(char c)
+{
+    return c >= '0' && c <= '9';
+}
+
+void ReplaceAll(std::string& str, const std::string& from, const std::string& to);
+void ReplaceFirst(std::string& str, const std::string& from, const std::string& to);
+std::vector<std::string> SplitString(const std::string& str, char delimiter);
+std::vector<std::string> SplitStringMulti(const std::string& str, const std::string& delimiters);
+void Trim(std::string& str);
+void TrimRight(std::string& str);
+std::string ToLower(const std::string& str);
+std::string ToUpper(const std::string& str);
+bool StartsWith(const std::string& str, const std::string& prefix);
+bool EndsWith(const std::string& str, const std::string& suffix);
+bool IStartsWith(const std::string& str, const std::string& prefix);  // Case-insensitive
+
+/**
+ * Generate a random UUID v4 string (replaces boost::uuids)
+ * Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+ * where x is any hexadecimal digit and y is one of 8, 9, A, or B
+ */
+std::string GenerateUUID();
+
 /**
  * .. and a wrapper that just calls func once
  */
@@ -264,11 +289,6 @@ template <typename Callable> void TraceThread(const char* name,  Callable func)
         LogPrintf("%s thread start\n", name);
         func();
         LogPrintf("%s thread exit\n", name);
-    }
-    catch (const boost::thread_interrupted&)
-    {
-        LogPrintf("%s thread interrupt\n", name);
-        throw;
     }
     catch (const std::exception& e) {
         PrintExceptionContinue(&e, name);

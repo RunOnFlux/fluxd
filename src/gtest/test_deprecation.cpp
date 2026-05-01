@@ -13,10 +13,12 @@
 #include "util.h"
 #include "utilstrencodings.h"
 
-#include <boost/filesystem/operations.hpp>
+#include <chrono>
+#include <filesystem>
 #include <fstream>
 
 using ::testing::StrictMock;
+using namespace boost::placeholders;
 
 static const std::string CLIENT_VERSION_STR = FormatVersion(CLIENT_VERSION);
 extern std::atomic<bool> fRequestShutdown;
@@ -52,7 +54,7 @@ protected:
 
     StrictMock<MockUIInterface> mock_;
 
-    static std::vector<std::string> read_lines(boost::filesystem::path filepath) {
+    static std::vector<std::string> read_lines(std::filesystem::path filepath) {
         std::vector<std::string> result;
 
         std::ifstream f(filepath.string().c_str());
@@ -126,8 +128,8 @@ TEST_F(DeprecationTest, DeprecatedNodeIgnoredOnTestnet) {
 }
 
 TEST_F(DeprecationTest, AlertNotify) {
-    boost::filesystem::path temp = GetTempPath() /
-        boost::filesystem::unique_path("alertnotify-%%%%.txt");
+    std::filesystem::path temp = GetTempPath() /
+        ("alertnotify-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".txt");
 
     mapArgs["-alertnotify"] = std::string("echo %s >> ") + temp.string();
 
@@ -149,5 +151,5 @@ TEST_F(DeprecationTest, AlertNotify) {
 #else
     EXPECT_EQ(r[0], strprintf("'%s' ", expectedMsg));
 #endif
-    boost::filesystem::remove(temp);
+    std::filesystem::remove(temp);
 }

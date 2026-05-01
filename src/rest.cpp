@@ -16,9 +16,6 @@
 #include "utilstrencodings.h"
 #include "version.h"
 
-#include <boost/algorithm/string.hpp>
-#include <boost/dynamic_bitset.hpp>
-
 #include <univalue.h>
 
 using namespace std;
@@ -74,7 +71,7 @@ static bool RESTERR(HTTPRequest* req, enum HTTPStatusCode status, string message
 
 static enum RetFormat ParseDataFormat(vector<string>& params, const string& strReq)
 {
-    boost::split(params, strReq, boost::is_any_of("."));
+    params = SplitString(strReq, '.');
     if (params.size() > 1) {
         for (unsigned int i = 0; i < ARRAYLEN(rf_names); i++)
             if (params[1] == rf_names[i].name)
@@ -125,7 +122,7 @@ static bool rest_headers(HTTPRequest* req,
     vector<string> params;
     const RetFormat rf = ParseDataFormat(params, strURIPart);
     vector<string> path;
-    boost::split(path, params[0], boost::is_any_of("/"));
+    path = SplitString(params[0], '/');
 
     if (path.size() != 2)
         return RESTERR(req, HTTP_BAD_REQUEST, "No header count specified. Use /rest/headers/<count>/<hash>.<ext>.");
@@ -154,7 +151,7 @@ static bool rest_headers(HTTPRequest* req,
     }
 
     CDataStream ssHeader(SER_NETWORK, PROTOCOL_VERSION);
-    BOOST_FOREACH(const CBlockIndex *pindex, headers) {
+    for (const CBlockIndex *pindex : headers) {
         ssHeader << pindex->GetBlockHeader();
     }
 
@@ -174,7 +171,7 @@ static bool rest_headers(HTTPRequest* req,
     }
     case RF_JSON: {
         UniValue jsonHeaders(UniValue::VARR);
-        BOOST_FOREACH(const CBlockIndex *pindex, headers) {
+        for (const CBlockIndex *pindex : headers) {
             jsonHeaders.push_back(blockheaderToJSON(pindex));
         }
         string strJSON = jsonHeaders.write() + "\n";
@@ -192,8 +189,7 @@ static bool rest_headers(HTTPRequest* req,
 }
 
 static bool rest_block(HTTPRequest* req,
-                       const std::string& strURIPart,
-                       bool showTxDetails)
+                       const std::string& strURIPart, bool showTxDetails)
 {
     if (!CheckWarmup(req))
         return false;
@@ -407,7 +403,7 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
     if (params.size() > 0 && params[0].length() > 1)
     {
         std::string strUriParams = params[0].substr(1);
-        boost::split(uriParts, strUriParams, boost::is_any_of("/"));
+        uriParts = SplitString(strUriParams, '/');
     }
 
     // throw exception in case of an empty request
@@ -494,7 +490,7 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
     vector<unsigned char> bitmap;
     vector<CCoin> outs;
     std::string bitmapStringRepresentation;
-    boost::dynamic_bitset<unsigned char> hits(vOutPoints.size());
+    std::vector<bool> hits(vOutPoints.size(), false);
     {
         LOCK2(cs_main, mempool.cs);
 
@@ -528,7 +524,17 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
             bitmapStringRepresentation.append(hits[i] ? "1" : "0"); // form a binary string representation (human-readable for json output)
         }
     }
-    boost::to_block_range(hits, std::back_inserter(bitmap));
+
+    // Convert vector<bool> to bitmap bytes
+    for (size_t i = 0; i < hits.size(); i += 8) {
+        unsigned char byte = 0;
+        for (size_t j = 0; j < 8 && (i + j) < hits.size(); ++j) {
+            if (hits[i + j]) {
+                byte |= (1 << j);
+            }
+        }
+        bitmap.push_back(byte);
+    }
 
     switch (rf) {
     case RF_BINARY: {
@@ -563,7 +569,7 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
         objGetUTXOResponse.pushKV("bitmap", bitmapStringRepresentation);
 
         UniValue utxos(UniValue::VARR);
-        BOOST_FOREACH (const CCoin& coin, outs) {
+        for (const CCoin& coin : outs) {
             UniValue utxo(UniValue::VOBJ);
             utxo.pushKV("txvers", (int32_t)coin.nTxVer);
             utxo.pushKV("height", (int32_t)coin.nHeight);

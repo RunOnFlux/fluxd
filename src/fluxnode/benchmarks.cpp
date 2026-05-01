@@ -9,7 +9,7 @@
 #include <univalue/include/univalue.h>
 #include <rpc/protocol.h>
 #include <core_io.h>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 #include "fluxnode/fluxnode.h"
 #include "benchmarks.h"
@@ -28,7 +28,7 @@
 #endif
 
 
-namespace filesys = boost::filesystem;
+namespace filesys = std::filesystem;
 
 
 #define SYSTEM_BENCH_MIN_MAJOR_VERSION 0

@@ -24,8 +24,8 @@ void FluxnodeConfig::add(std::string alias, std::string ip, std::string privKey,
 bool FluxnodeConfig::read(std::string& strErr)
 {
     int linenumber = 1;
-    boost::filesystem::path pathFluxnodeConfigFile = GetFluxnodeConfigFile();
-    boost::filesystem::ifstream streamConfig(pathFluxnodeConfigFile);
+    std::filesystem::path pathFluxnodeConfigFile = GetFluxnodeConfigFile();
+    std::ifstream streamConfig(pathFluxnodeConfigFile);
 
     if (!streamConfig.good()) {
         FILE* configFile = fopen(pathFluxnodeConfigFile.string().c_str(), "a");

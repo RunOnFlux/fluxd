@@ -62,8 +62,8 @@ case $host in
      lt_cv_deplibs_check_method="pass_all"
   ;;
 esac
-dnl Require C++11 compiler (no GNU extensions)
-AX_CXX_COMPILE_STDCXX([11], [noext], [mandatory], [nodefault])
+dnl Require C++20 compiler (no GNU extensions)
+AX_CXX_COMPILE_STDCXX([20], [noext], [mandatory], [nodefault])
 dnl Check if -latomic is required for <std::atomic>
 CHECK_ATOMIC
 
@@ -277,7 +277,7 @@ case $host in
        AC_MSG_ERROR("windres not found")
      fi
 
-     CPPFLAGS="$CPPFLAGS -D_MT -DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB"
+     CPPFLAGS="$CPPFLAGS -D_MT -DWIN32 -D_WINDOWS"
      LEVELDB_TARGET_FLAGS="TARGET_OS=OS_WINDOWS_CROSSCOMPILE"
      if test "x$CXXFLAGS_overridden" = "xno"; then
        CXXFLAGS="$CXXFLAGS -w"
@@ -608,22 +608,22 @@ else
     AC_DEFINE(ENABLE_PROTON, 0, [Define to 1 to enable Proton functions])
 fi
 
-if test x$build_flux_utils$build_fluxd$use_tests = xnonono; then
-    use_boost=no
-else
-    use_boost=yes
-fi
+dnl Boost is used for header-only libraries (Signals2)
+dnl Compiled Boost libraries removed in C++20 upgrade - only headers needed
+use_boost=yes
 
 if test x$use_boost = xyes; then
 
-dnl Check for boost libs
+dnl Check for boost headers (needed for header-only libraries like Signals2)
 dnl We need Boost >= 1.62 to fix a potential security bug (https://github.com/zcash/zcash/issues/1241)
 AX_BOOST_BASE([1.62])
-AX_BOOST_SYSTEM
-AX_BOOST_FILESYSTEM
-AX_BOOST_PROGRAM_OPTIONS
-AX_BOOST_THREAD
-AX_BOOST_CHRONO
+
+dnl Compiled library checks removed - no longer needed with C++20
+dnl AX_BOOST_SYSTEM
+dnl AX_BOOST_FILESYSTEM
+dnl AX_BOOST_PROGRAM_OPTIONS
+dnl AX_BOOST_THREAD
+dnl AX_BOOST_CHRONO
 
 fi
 
@@ -639,34 +639,34 @@ if test x$use_tests = xyes; then
   fi
 
 
-  if test x$use_boost = xyes; then
+  dnl if test x$use_boost = xyes; then
 
-  AX_BOOST_UNIT_TEST_FRAMEWORK
+  dnl AX_BOOST_UNIT_TEST_FRAMEWORK - DISABLED: Boost removed
 
   dnl Determine if -DBOOST_TEST_DYN_LINK is needed
-  AC_MSG_CHECKING([for dynamic linked boost test])
-  TEMP_LIBS="$LIBS"
-  LIBS="$LIBS $BOOST_LDFLAGS $BOOST_UNIT_TEST_FRAMEWORK_LIB"
-  TEMP_CPPFLAGS="$CPPFLAGS"
-  CPPFLAGS="$CPPFLAGS $BOOST_CPPFLAGS"
-  AC_LINK_IFELSE([AC_LANG_SOURCE([
-       #define BOOST_TEST_DYN_LINK
-       #define BOOST_TEST_MAIN
-        #include <boost/test/unit_test.hpp>
+  dnl AC_MSG_CHECKING([for dynamic linked boost test])
+  dnl TEMP_LIBS="$LIBS"
+  dnl LIBS="$LIBS $BOOST_LDFLAGS $BOOST_UNIT_TEST_FRAMEWORK_LIB"
+  dnl TEMP_CPPFLAGS="$CPPFLAGS"
+  dnl CPPFLAGS="$CPPFLAGS $BOOST_CPPFLAGS"
+  dnl AC_LINK_IFELSE([AC_LANG_SOURCE([
+  dnl      #define BOOST_TEST_DYN_LINK
+  dnl      #define BOOST_TEST_MAIN
+  dnl       #include <boost/test/unit_test.hpp>
+  dnl
+  dnl      ])],
+  dnl   [AC_MSG_RESULT(yes)]
+  dnl   [TESTDEFS="$TESTDEFS -DBOOST_TEST_DYN_LINK"],
+  dnl   [AC_MSG_RESULT(no)])
+  dnl LIBS="$TEMP_LIBS"
+  dnl CPPFLAGS="$TEMP_CPPFLAGS"
 
-       ])],
-    [AC_MSG_RESULT(yes)]
-    [TESTDEFS="$TESTDEFS -DBOOST_TEST_DYN_LINK"],
-    [AC_MSG_RESULT(no)])
-  LIBS="$TEMP_LIBS"
-  CPPFLAGS="$TEMP_CPPFLAGS"
-
-  fi
+  dnl fi
 fi
 
-if test x$use_boost = xyes; then
-BOOST_LIBS="$BOOST_LDFLAGS $BOOST_SYSTEM_LIB $BOOST_FILESYSTEM_LIB $BOOST_PROGRAM_OPTIONS_LIB $BOOST_THREAD_LIB $BOOST_CHRONO_LIB"
-fi
+dnl Boost compiled libraries not needed - only using header-only libraries (Signals2)
+dnl Set BOOST_LIBS to empty (no linking required)
+BOOST_LIBS=""
 
 if test x$use_pkgconfig = xyes; then
   : dnl
@@ -749,7 +749,8 @@ AX_CHECK_COMPILE_FLAG([-fwrapv],[CXXFLAGS="$CXXFLAGS -fwrapv"])
 AX_CHECK_COMPILE_FLAG([-fno-strict-aliasing],[CXXFLAGS="$CXXFLAGS -fno-strict-aliasing"])
 AX_CHECK_COMPILE_FLAG([-Wno-builtin-declaration-mismatch],[CXXFLAGS="$CXXFLAGS -Wno-builtin-declaration-mismatch"],,[[$CXXFLAG_WERROR]])
 
-LIBFLUX_LIBS="$BOOST_SYSTEM_LIB -lcrypto -lsodium $RUST_LIBS"
+dnl No Boost libraries linked - only header-only Signals2 used
+LIBFLUX_LIBS="-lcrypto -lsodium $RUST_LIBS"
 
 AC_MSG_CHECKING([whether to build bitcoind])
 AM_CONDITIONAL([BUILD_BITCOIND], [test x$build_fluxd = xyes])
@@ -871,7 +872,6 @@ AC_SUBST(HARDENED_LDFLAGS)
 AC_SUBST(PIC_FLAGS)
 AC_SUBST(PIE_FLAGS)
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
-AC_SUBST(BOOST_LIBS)
 AC_SUBST(TESTDEFS)
 AC_SUBST(LEVELDB_TARGET_FLAGS)
 AC_SUBST(CRYPTO_LIBS)

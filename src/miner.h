@@ -9,7 +9,6 @@
 
 #include "primitives/block.h"
 
-#include <boost/optional.hpp>
 #include <stdint.h>
 
 class CBlockIndex;
@@ -32,7 +31,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
 #ifdef ENABLE_MINING
 /** Get script for -mineraddress */
-void GetScriptForMinerAddress(boost::shared_ptr<CReserveScript> &script);
+void GetScriptForMinerAddress(std::shared_ptr<CReserveScript> &script);
 /** Modify the extranonce in a block */
 void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
 /** Run the miner threads */

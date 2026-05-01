@@ -7,7 +7,7 @@
 
 #include "util.h"
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 #include <leveldb/cache.h>
 #include <leveldb/env.h>
@@ -31,7 +31,7 @@ static leveldb::Options GetOptions(size_t nCacheSize)
     return options;
 }
 
-CDBWrapper::CDBWrapper(const boost::filesystem::path& path, size_t nCacheSize, bool fMemory, bool fWipe)
+CDBWrapper::CDBWrapper(const std::filesystem::path& path, size_t nCacheSize, bool fMemory, bool fWipe)
 {
     penv = NULL;
     readoptions.verify_checksums = true;
@@ -78,7 +78,7 @@ bool CDBWrapper::WriteBatch(CDBBatch& batch, bool fSync)
 
 bool CDBWrapper::IsEmpty()
 {
-    boost::scoped_ptr<CDBIterator> it(NewIterator());
+    std::unique_ptr<CDBIterator> it(NewIterator());
     it->SeekToFirst();
     return !(it->Valid());
 }

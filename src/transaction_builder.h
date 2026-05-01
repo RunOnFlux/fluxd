@@ -19,7 +19,7 @@
 #include "flux/Note.hpp"
 #include "flux/NoteEncryption.hpp"
 
-#include <boost/optional.hpp>
+#include <optional>
 
 struct SpendDescriptionInfo {
     libflux::SaplingExpandedSpendingKey expsk;
@@ -57,8 +57,8 @@ struct TransparentInputInfo {
 
 class TransactionBuilderResult {
 private:
-    boost::optional<CTransaction> maybeTx;
-    boost::optional<std::string> maybeError;
+    std::optional<CTransaction> maybeTx;
+    std::optional<std::string> maybeError;
 public:
     TransactionBuilderResult() = delete;
     TransactionBuilderResult(const CTransaction& tx);
@@ -87,9 +87,9 @@ private:
     std::vector<libflux::JSOutput> jsOutputs;
     std::vector<TransparentInputInfo> tIns;
 
-    boost::optional<std::pair<uint256, libflux::SaplingPaymentAddress>> saplingChangeAddr;
-    boost::optional<libflux::SproutPaymentAddress> sproutChangeAddr;
-    boost::optional<CTxDestination> tChangeAddr;
+    std::optional<std::pair<uint256, libflux::SaplingPaymentAddress>> saplingChangeAddr;
+    std::optional<libflux::SproutPaymentAddress> sproutChangeAddr;
+    std::optional<CTxDestination> tChangeAddr;
 
 public:
     TransactionBuilder() {}

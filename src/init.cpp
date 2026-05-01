@@ -1,4 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
+#include <vector>
+#include <thread>
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
@@ -29,6 +31,7 @@
 #include "miner.h"
 #include "pon/pon-minter.h"
 #include "net.h"
+#include "checkqueue.h"
 #include "rpc/server.h"
 #include "rpc/register.h"
 #include "script/standard.h"
@@ -38,6 +41,7 @@
 #include "torcontrol.h"
 #include "ui_interface.h"
 #include "util.h"
+#include "util/threadinterrupt.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
 #include "fluxnode/fluxnodeconfig.h"
@@ -48,7 +52,6 @@
 #include "snapshot/snapshotdb.h"
 
 #ifdef ENABLE_WALLET
-#include "key_io.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
@@ -57,17 +60,12 @@
 
 #ifndef WIN32
 #include <signal.h>
+#include <sys/stat.h>
 #endif
 
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/bind.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/function.hpp>
-#include <boost/interprocess/sync/file_lock.hpp>
-#include <boost/thread.hpp>
+#include <chrono>
+#include <filesystem>
+#include "util/fs.h"
 #include <openssl/crypto.h>
 #include <stdlib.h>
 
@@ -83,7 +81,8 @@
 
 using namespace std;
 
-extern void ThreadSendAlert();
+class CThreadInterrupt;
+extern void ThreadSendAlert(CThreadInterrupt& interrupt);
 
 ZCJoinSplit* pfluxParams = NULL;
 
@@ -179,16 +178,43 @@ public:
 
 static CCoinsViewDB *pcoinsdbview = NULL;
 static CCoinsViewErrorCatcher *pcoinscatcher = NULL;
-static boost::scoped_ptr<ECCVerifyHandle> globalVerifyHandle;
+static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
-void Interrupt(boost::thread_group& threadGroup)
+// Global scheduler pointer
+static CScheduler* g_scheduler = nullptr;
+
+// Global thread interrupts
+static CThreadInterrupt g_scheduler_interrupt;
+static CThreadInterrupt g_metrics_interrupt;
+static CThreadInterrupt g_txnotify_interrupt;
+static CThreadInterrupt g_sendalert_interrupt;
+
+void Interrupt(std::vector<std::thread>& threadGroup)
 {
     InterruptHTTPServer();
     InterruptHTTPRPC();
     InterruptRPC();
     InterruptREST();
     InterruptTorControl();
-    threadGroup.interrupt_all();
+
+    // Stop script verification threads (16 threads waiting on scriptcheckqueue)
+    StopScriptCheckQueue();
+
+    // Stop the scheduler first, before interrupting other threads
+    // This must happen before WaitForShutdown() joins threads
+    if (g_scheduler) {
+        g_scheduler->stop();
+    }
+
+    // Interrupt all background threads
+    g_scheduler_interrupt();
+    g_metrics_interrupt();
+    g_txnotify_interrupt();
+    g_sendalert_interrupt();
+
+    // Release network semaphores so threads can exit
+    // This MUST be called before joining threads to prevent deadlock
+    StopNode();
 }
 
 void Shutdown()
@@ -218,14 +244,14 @@ void Shutdown()
     GenerateBitcoins(false, 0, Params());
 #endif
     StopPONMinter();
-    StopNode();
+    // StopNode() is now called in Interrupt() before joining threads to release semaphores
     StopTorControl();
 
     UnregisterNodeSignals(GetNodeSignals());
 
     if (fFeeEstimatesInitialized)
     {
-        boost::filesystem::path est_path = GetDataDir() / FEE_ESTIMATES_FILENAME;
+        std::filesystem::path est_path = GetDataDir() / FEE_ESTIMATES_FILENAME;
         CAutoFile est_fileout(fopen(est_path.string().c_str(), "wb"), SER_DISK, CLIENT_VERSION);
         if (!est_fileout.IsNull())
             mempool.WriteFeeEstimates(est_fileout);
@@ -275,8 +301,8 @@ void Shutdown()
 
 #ifndef WIN32
     try {
-        boost::filesystem::remove(GetPidFile());
-    } catch (const boost::filesystem::filesystem_error& e) {
+        std::filesystem::remove(GetPidFile());
+    } catch (const std::filesystem::filesystem_error& e) {
         LogPrintf("%s: Unable to remove pidfile: %s\n", __func__, e.what());
     }
 #endif
@@ -572,8 +598,9 @@ static void BlockNotifyCallback(const uint256& hashNewTip)
 {
     std::string strCmd = GetArg("-blocknotify", "");
 
-    boost::replace_all(strCmd, "%s", hashNewTip.GetHex());
-    boost::thread t(runCommand, strCmd); // thread runs free
+    ReplaceAll(strCmd, "%s", hashNewTip.GetHex());
+    std::thread t(runCommand, strCmd); // thread runs free
+    t.detach();
 }
 
 struct CImportingNow
@@ -598,7 +625,7 @@ struct CImportingNow
 // works correctly.
 void CleanupBlockRevFiles()
 {
-    using namespace boost::filesystem;
+    using namespace std::filesystem;
     map<string, path> mapBlockFiles;
 
     // Glob all blk?????.dat and rev?????.dat files from the blocks directory.
@@ -623,16 +650,16 @@ void CleanupBlockRevFiles()
     // keeping a separate counter.  Once we hit a gap (or if 0 doesn't exist)
     // start removing block files.
     int nContigCounter = 0;
-    BOOST_FOREACH(const PAIRTYPE(string, path)& item, mapBlockFiles) {
-        if (atoi(item.first) == nContigCounter) {
+    for (const auto& [fileIndex, filePath] : mapBlockFiles) {
+        if (atoi(fileIndex) == nContigCounter) {
             nContigCounter++;
             continue;
         }
-        remove(item.second);
+        remove(filePath);
     }
 }
 
-void ThreadImport(std::vector<boost::filesystem::path> vImportFiles)
+void ThreadImport(std::vector<std::filesystem::path> vImportFiles)
 {
     const CChainParams& chainparams = Params();
     RenameThread("flux-loadblk");
@@ -642,7 +669,7 @@ void ThreadImport(std::vector<boost::filesystem::path> vImportFiles)
         int nFile = 0;
         while (true) {
             CDiskBlockPos pos(nFile, 0);
-            if (!boost::filesystem::exists(GetBlockPosFilename(pos, "blk")))
+            if (!std::filesystem::exists(GetBlockPosFilename(pos, "blk")))
                 break; // No block files left to reindex
             FILE *file = OpenBlockFile(pos, true);
             if (!file)
@@ -659,12 +686,12 @@ void ThreadImport(std::vector<boost::filesystem::path> vImportFiles)
     }
 
     // hardcoded $DATADIR/bootstrap.dat
-    boost::filesystem::path pathBootstrap = GetDataDir() / "bootstrap.dat";
-    if (boost::filesystem::exists(pathBootstrap)) {
+    std::filesystem::path pathBootstrap = GetDataDir() / "bootstrap.dat";
+    if (std::filesystem::exists(pathBootstrap)) {
         FILE *file = fopen(pathBootstrap.string().c_str(), "rb");
         if (file) {
             CImportingNow imp;
-            boost::filesystem::path pathBootstrapOld = GetDataDir() / "bootstrap.dat.old";
+            std::filesystem::path pathBootstrapOld = GetDataDir() / "bootstrap.dat.old";
             LogPrintf("Importing bootstrap.dat...\n");
             LoadExternalBlockFile(chainparams, file);
             RenameOver(pathBootstrap, pathBootstrapOld);
@@ -674,7 +701,7 @@ void ThreadImport(std::vector<boost::filesystem::path> vImportFiles)
     }
 
     // -loadblock=
-    BOOST_FOREACH(const boost::filesystem::path& path, vImportFiles) {
+    for (const std::filesystem::path& path : vImportFiles) {
         FILE *file = fopen(path.string().c_str(), "rb");
         if (file) {
             CImportingNow imp;
@@ -691,17 +718,17 @@ void ThreadImport(std::vector<boost::filesystem::path> vImportFiles)
     }
 }
 
-void ThreadNotifyRecentlyAdded()
+void ThreadNotifyRecentlyAdded(CThreadInterrupt& interrupt)
 {
-    while (true) {
+    while (!interrupt) {
         // Run the notifier on an integer second in the steady clock.
         auto now = std::chrono::steady_clock::now().time_since_epoch();
         auto nextFire = std::chrono::duration_cast<std::chrono::seconds>(
             now + std::chrono::seconds(1));
-        std::this_thread::sleep_until(
-            std::chrono::time_point<std::chrono::steady_clock>(nextFire));
+        auto wait_time = nextFire - std::chrono::duration_cast<std::chrono::seconds>(now);
 
-        boost::this_thread::interruption_point();
+        if (!interrupt.sleep_for(wait_time))
+            break;
 
         mempool.NotifyRecentlyAdded();
     }
@@ -728,17 +755,14 @@ static void ZC_LoadParams(
     const CChainParams& chainparams
 )
 {
-    struct timeval tv_start, tv_end;
-    float elapsed;
-
-    boost::filesystem::path sapling_spend = ZC_GetParamsDir() / "sapling-spend.params";
-    boost::filesystem::path sapling_output = ZC_GetParamsDir() / "sapling-output.params";
-    boost::filesystem::path sprout_groth16 = ZC_GetParamsDir() / "sprout-groth16.params";
+    std::filesystem::path sapling_spend = ZC_GetParamsDir() / "sapling-spend.params";
+    std::filesystem::path sapling_output = ZC_GetParamsDir() / "sapling-output.params";
+    std::filesystem::path sprout_groth16 = ZC_GetParamsDir() / "sprout-groth16.params";
 
     if (!(
-        boost::filesystem::exists(sapling_spend) &&
-        boost::filesystem::exists(sapling_output) &&
-        boost::filesystem::exists(sprout_groth16)
+        std::filesystem::exists(sapling_spend) &&
+        std::filesystem::exists(sapling_output) &&
+        std::filesystem::exists(sprout_groth16)
     )) {
         uiInterface.ThreadSafeMessageBox(strprintf(
             _("Cannot find the Zelcash network parameters in the following directory:\n"
@@ -753,7 +777,7 @@ static void ZC_LoadParams(
     pfluxParams = ZCJoinSplit::Prepared();
 
     static_assert(
-        sizeof(boost::filesystem::path::value_type) == sizeof(codeunit),
+        sizeof(std::filesystem::path::value_type) == sizeof(codeunit),
         "librustzcash not configured correctly");
     auto sapling_spend_str = sapling_spend.native();
     auto sapling_output_str = sapling_output.native();
@@ -762,7 +786,7 @@ static void ZC_LoadParams(
     LogPrintf("Loading Sapling (Spend) parameters from %s\n", sapling_spend.string().c_str());
     LogPrintf("Loading Sapling (Output) parameters from %s\n", sapling_output.string().c_str());
     LogPrintf("Loading Sapling (Sprout Groth16) parameters from %s\n", sprout_groth16.string().c_str());
-    gettimeofday(&tv_start, 0);
+    auto start = std::chrono::steady_clock::now();
 
     librustzcash_init_zksnark_params(
         reinterpret_cast<const codeunit*>(sapling_spend_str.c_str()),
@@ -776,12 +800,12 @@ static void ZC_LoadParams(
         "e9b238411bd6c0ec4791e9d04245ec350c9c5744f5610dfcce4365d5ca49dfefd5054e371842b3f88fa1b9d7e8e075249b3ebabd167fa8b0f3161292d36c180a"
     );
 
-    gettimeofday(&tv_end, 0);
-    elapsed = float(tv_end.tv_sec-tv_start.tv_sec) + (tv_end.tv_usec-tv_start.tv_usec)/float(1000000);
+    auto end = std::chrono::steady_clock::now();
+    float elapsed = std::chrono::duration<float>(end - start).count();
     LogPrintf("Loaded Sapling parameters in %fs seconds.\n", elapsed);
 }
 
-bool AppInitServers(boost::thread_group& threadGroup)
+bool AppInitServers(std::vector<std::thread>& threadGroup)
 {
     RPCServer::OnStopped(&OnRPCStopped);
     RPCServer::OnPreCommand(&OnRPCPreCommand);
@@ -801,8 +825,11 @@ bool AppInitServers(boost::thread_group& threadGroup)
 /** Initialize bitcoin.
  *  @pre Parameters should be parsed and config file should be read.
  */
-bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
+bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 {
+    // Set global scheduler pointer for interrupt handling
+    g_scheduler = &scheduler;
+
     // ********************************************************* Step 1: setup
 #ifdef _MSC_VER
     // Turn off Microsoft heap dump noise
@@ -1113,8 +1140,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Check Sapling migration address if set and is a valid Sapling address
     if (mapArgs.count("-migrationdestaddress")) {
         std::string migrationDestAddress = mapArgs["-migrationdestaddress"];
-        libflux::PaymentAddress address = DecodePaymentAddress(migrationDestAddress);
-        if (boost::get<libflux::SaplingPaymentAddress>(&address) == nullptr) {
+        auto address = DecodePaymentAddress(migrationDestAddress);
+        if (std::get_if<libflux::SaplingPaymentAddress>(&address) == nullptr) {
             return InitError(_("-migrationdestaddress must be a valid Sapling address."));
         }
     }
@@ -1162,7 +1189,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         const vector<string>& deployments = mapMultiArgs["-nuparams"];
         for (auto i : deployments) {
             std::vector<std::string> vDeploymentParams;
-            boost::split(vDeploymentParams, i, boost::is_any_of(":"));
+            vDeploymentParams = SplitString(i, ':');
             if (vDeploymentParams.size() != 2) {
                 return InitError("Network upgrade parameters malformed, expecting hexBranchId:activationHeight");
             }
@@ -1205,20 +1232,19 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     std::string strDataDir = GetDataDir().string();
 #ifdef ENABLE_WALLET
     // Wallet file must be a plain filename without a directory
-    if (strWalletFile != boost::filesystem::basename(strWalletFile) + boost::filesystem::extension(strWalletFile))
+    std::filesystem::path walletPath(strWalletFile);
+    if (strWalletFile != walletPath.filename().string())
         return InitError(strprintf(_("Wallet %s resides outside data directory %s"), strWalletFile, strDataDir));
 #endif
     // Make sure only a single Bitcoin process is using the data directory.
-    boost::filesystem::path pathLockFile = GetDataDir() / ".lock";
+    std::filesystem::path pathLockFile = GetDataDir() / ".lock";
     FILE* file = fopen(pathLockFile.string().c_str(), "a"); // empty lock file; created if it doesn't exist.
     if (file) fclose(file);
 
-    try {
-        static boost::interprocess::file_lock lock(pathLockFile.string().c_str());
-        if (!lock.try_lock())
-            return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zelcash is probably already running."), strDataDir));
-    } catch(const boost::interprocess::interprocess_exception& e) {
-        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zelcash is probably already running.") + " %s.", strDataDir, e.what()));
+    // Use native OS file locking (replaces boost::interprocess::file_lock)
+    static FileLock lock(pathLockFile);
+    if (!lock.TryLock()) {
+        return InitError(strprintf(_("Cannot obtain a lock on data directory %s. Zelcash is probably already running. %s"), strDataDir, lock.GetReason()));
     }
 
 #ifndef WIN32
@@ -1247,13 +1273,16 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     LogPrintf("Using %u threads for script verification\n", nScriptCheckThreads);
     if (nScriptCheckThreads) {
-        for (int i=0; i<nScriptCheckThreads-1; i++)
-            threadGroup.create_thread(&ThreadScriptCheck);
+        for (int i=0; i<nScriptCheckThreads-1; i++) {
+            LogPrintf("Creating thread #%d: scriptcheck\n", threadGroup.size());
+            threadGroup.emplace_back(ThreadScriptCheck);
+        }
     }
 
     // Start the lightweight task scheduler thread
-    CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
-    threadGroup.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
+    LogPrintf("Creating thread #%d: scheduler\n", threadGroup.size());
+    CScheduler::Function serviceLoop = [&scheduler]() { scheduler.serviceQueue(); };
+    threadGroup.emplace_back([serviceLoop]() { TraceThread("scheduler", serviceLoop); });
 
     // Count uptime
     MarkStartTime();
@@ -1263,7 +1292,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             !fPrintToConsole && !GetBoolArg("-daemon", false)) {
         // Start the persistent metrics interface
         ConnectMetricsScreen();
-        threadGroup.create_thread(&ThreadShowMetricsScreen);
+        LogPrintf("Creating thread #%d: metrics\n", threadGroup.size());
+        threadGroup.emplace_back([&]() { ThreadShowMetricsScreen(g_metrics_interrupt); });
     }
 
     // Initialize Flux circuit parameters ("ZC" in function name refers to Zelcash)
@@ -1308,7 +1338,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // sanitize comments per BIP-0014, format user agent and check total size
     std::vector<string> uacomments;
-    BOOST_FOREACH(string cmt, mapMultiArgs["-uacomment"])
+    for (string cmt : mapMultiArgs["-uacomment"])
     {
         if (cmt != SanitizeString(cmt, SAFE_CHARS_UA_COMMENT))
             return InitError(strprintf("User Agent comment (%s) contains unsafe characters.", cmt));
@@ -1322,7 +1352,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     if (mapArgs.count("-onlynet")) {
         std::set<enum Network> nets;
-        BOOST_FOREACH(const std::string& snet, mapMultiArgs["-onlynet"]) {
+        for (const std::string& snet : mapMultiArgs["-onlynet"]) {
             enum Network net = ParseNetwork(snet);
             if (net == NET_UNROUTABLE)
                 return InitError(strprintf(_("Unknown network specified in -onlynet: '%s'"), snet));
@@ -1336,7 +1366,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     if (mapArgs.count("-whitelist")) {
-        BOOST_FOREACH(const std::string& net, mapMultiArgs["-whitelist"]) {
+        for (const std::string& net : mapMultiArgs["-whitelist"]) {
             CSubNet subnet(net);
             if (!subnet.IsValid())
                 return InitError(strprintf(_("Invalid netmask specified in -whitelist: '%s'"), net));
@@ -1385,13 +1415,13 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     bool fBound = false;
     if (fListen) {
         if (mapArgs.count("-bind") || mapArgs.count("-whitebind")) {
-            BOOST_FOREACH(const std::string& strBind, mapMultiArgs["-bind"]) {
+            for (const std::string& strBind : mapMultiArgs["-bind"]) {
                 CService addrBind;
                 if (!Lookup(strBind.c_str(), addrBind, GetListenPort(), false))
                     return InitError(strprintf(_("Cannot resolve -bind address: '%s'"), strBind));
                 fBound |= Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR));
             }
-            BOOST_FOREACH(const std::string& strBind, mapMultiArgs["-whitebind"]) {
+            for (const std::string& strBind : mapMultiArgs["-whitebind"]) {
                 CService addrBind;
                 if (!Lookup(strBind.c_str(), addrBind, 0, false))
                     return InitError(strprintf(_("Cannot resolve -whitebind address: '%s'"), strBind));
@@ -1411,7 +1441,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     if (mapArgs.count("-externalip")) {
-        BOOST_FOREACH(const std::string& strAddr, mapMultiArgs["-externalip"]) {
+        for (const std::string& strAddr : mapMultiArgs["-externalip"]) {
             CService addrLocal(strAddr, GetListenPort(), fNameLookup);
             if (!addrLocal.IsValid())
                 return InitError(strprintf(_("Cannot resolve -externalip address: '%s'"), strAddr));
@@ -1419,7 +1449,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
     }
 
-    BOOST_FOREACH(const std::string& strDest, mapMultiArgs["-seednode"])
+    for (const std::string& strDest : mapMultiArgs["-seednode"])
         AddOneShot(strDest);
 
 #if ENABLE_ZMQ
@@ -1450,20 +1480,20 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     fReindex = GetBoolArg("-reindex", false);
 
     // Upgrading to 0.8; hard-link the old blknnnn.dat files into /blocks/
-    boost::filesystem::path blocksDir = GetDataDir() / "blocks";
-    if (!boost::filesystem::exists(blocksDir))
+    std::filesystem::path blocksDir = GetDataDir() / "blocks";
+    if (!std::filesystem::exists(blocksDir))
     {
-        boost::filesystem::create_directories(blocksDir);
+        std::filesystem::create_directories(blocksDir);
         bool linked = false;
         for (unsigned int i = 1; i < 10000; i++) {
-            boost::filesystem::path source = GetDataDir() / strprintf("blk%04u.dat", i);
-            if (!boost::filesystem::exists(source)) break;
-            boost::filesystem::path dest = blocksDir / strprintf("blk%05u.dat", i-1);
+            std::filesystem::path source = GetDataDir() / strprintf("blk%04u.dat", i);
+            if (!std::filesystem::exists(source)) break;
+            std::filesystem::path dest = blocksDir / strprintf("blk%05u.dat", i-1);
             try {
-                boost::filesystem::create_hard_link(source, dest);
+                std::filesystem::create_hard_link(source, dest);
                 LogPrintf("Hardlinked %s -> %s\n", source.string(), dest.string());
                 linked = true;
-            } catch (const boost::filesystem::filesystem_error& e) {
+            } catch (const std::filesystem::filesystem_error& e) {
                 // Note: hardlink creation failing is not a disaster, it just means
                 // blocks will get re-downloaded from peers.
                 LogPrintf("Error hardlinking blk%04u.dat: %s\n", i, e.what());
@@ -1672,7 +1702,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
 
-    boost::filesystem::path est_path = GetDataDir() / FEE_ESTIMATES_FILENAME;
+    std::filesystem::path est_path = GetDataDir() / FEE_ESTIMATES_FILENAME;
     CAutoFile est_filein(fopen(est_path.string().c_str(), "rb"), SER_DISK, CLIENT_VERSION);
     // Allowed to fail as this file IS missing on first startup.
     if (!est_filein.IsNull())
@@ -1814,7 +1844,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             {
                 CWalletDB walletdb(strWalletFile);
 
-                BOOST_FOREACH(const CWalletTx& wtxOld, vWtx)
+                for (const CWalletTx& wtxOld : vWtx)
                 {
                     uint256 hash = wtxOld.GetHash();
                     std::map<uint256, CWalletTx>::iterator mi = pwalletMain->mapWallet.find(hash);
@@ -1856,7 +1886,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         if (pwalletMain) {
             // Address has already been validated
             CTxDestination addr = DecodeDestination(mapArgs["-mineraddress"]);
-            CKeyID keyID = boost::get<CKeyID>(addr);
+            CKeyID keyID = std::get<CKeyID>(addr);
             minerAddressInLocalWallet = pwalletMain->HaveKey(keyID);
         }
         if (GetBoolArg("-minetolocalwallet", true) && !minerAddressInLocalWallet) {
@@ -1878,7 +1908,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         // - If the wallet is disabled and -mineraddress is not set, the CScript
         //   argument is not modified; in practice this means it is empty, and
         //   GenerateBitcoins() returns an error.
-        GetMainSignals().ScriptForMining.connect(GetScriptForMinerAddress);
+        // NOTE: GetScriptForMinerAddress is now handled by wallet's GetScriptForMining implementation
     }
 #endif // ENABLE_MINING
 
@@ -1906,13 +1936,14 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (!ActivateBestChain(state, chainparams))
         strErrors << "Failed to connect best block";
 
-    std::vector<boost::filesystem::path> vImportFiles;
+    std::vector<std::filesystem::path> vImportFiles;
     if (mapArgs.count("-loadblock"))
     {
-        BOOST_FOREACH(const std::string& strFile, mapMultiArgs["-loadblock"])
+        for (const std::string& strFile : mapMultiArgs["-loadblock"])
             vImportFiles.push_back(strFile);
     }
-    threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
+    LogPrintf("Creating thread #%d: import\n", threadGroup.size());
+    threadGroup.emplace_back([vImportFiles]() { ThreadImport(vImportFiles); });
     if (chainActive.Tip() == NULL) {
         LogPrintf("Waiting for genesis block to be imported...\n");
         while (!fRequestShutdown && chainActive.Tip() == NULL)
@@ -2058,7 +2089,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Start the thread that notifies listeners of transactions that have been
     // recently added to the mempool.
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "txnotify", &ThreadNotifyRecentlyAdded));
+    LogPrintf("Creating thread #%d: txnotify\n", threadGroup.size());
+    threadGroup.emplace_back([&]() { ThreadNotifyRecentlyAdded(g_txnotify_interrupt); });
 
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
         StartTorControl(threadGroup, scheduler);
@@ -2067,8 +2099,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected
     int64_t nPowTargetSpacing = Params().GetConsensus().nPowTargetSpacing;
-    CScheduler::Function f = boost::bind(&PartitionCheck, &IsInitialBlockDownload,
-                                         boost::ref(cs_main), boost::cref(pindexBestHeader), nPowTargetSpacing);
+    CScheduler::Function f = [nPowTargetSpacing]() {
+        PartitionCheck(&IsInitialBlockDownload, cs_main, pindexBestHeader, nPowTargetSpacing);
+    };
     scheduler.scheduleEvery(f, nPowTargetSpacing);
 
     // Periodically cap debug.log size. Runs even when -debug is enabled so a
@@ -2108,12 +2141,14 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         pwalletMain->ReacceptWalletTransactions();
 
         // Run a thread to flush wallet periodically
-        threadGroup.create_thread(boost::bind(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile)));
+        LogPrintf("Creating thread #%d: walletflush\n", threadGroup.size());
+        threadGroup.emplace_back([&walletFile = pwalletMain->strWalletFile]() { ThreadFlushWalletDB(walletFile); });
     }
 #endif
 
     // SENDALERT
-    threadGroup.create_thread(boost::bind(ThreadSendAlert));
+    LogPrintf("Creating thread #%d: sendalert\n", threadGroup.size());
+    threadGroup.emplace_back([&]() { ThreadSendAlert(g_sendalert_interrupt); });
 
     return !fRequestShutdown;
 }

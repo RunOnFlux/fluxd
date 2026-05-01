@@ -1,4 +1,5 @@
 // Copyright (c) 2010 Satoshi Nakamoto
+#include <thread>
 // Copyright (c) 2009-2014 The Bitcoin Core developers
 // Copyright (c) 2018-2022 The Flux Developers
 // Distributed under the MIT software license, see the accompanying
@@ -17,10 +18,7 @@
 #include <algorithm>
 #include <map>
 
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/foreach.hpp>
-#include <boost/thread.hpp>
+// boost::algorithm removed - using custom string utilities
 
 using namespace std;
 
@@ -48,10 +46,10 @@ void CUnsignedAlert::SetNull()
 std::string CUnsignedAlert::ToString() const
 {
     std::string strSetCancel;
-    BOOST_FOREACH(int n, setCancel)
+    for (int n : setCancel)
         strSetCancel += strprintf("%d ", n);
     std::string strSetSubVer;
-    BOOST_FOREACH(const std::string& str, setSubVer)
+    for (const std::string& str : setSubVer)
         strSetSubVer += "\"" + str + "\" ";
     return strprintf(
         "CAlert(\n"
@@ -223,9 +221,8 @@ bool CAlert::ProcessAlert(const std::vector<unsigned char>& alertKey, bool fThre
         }
 
         // Check if this alert has been cancelled
-        BOOST_FOREACH(PAIRTYPE(const uint256, CAlert)& item, mapAlerts)
+        for (auto& [hash, alert] : mapAlerts)
         {
-            const CAlert& alert = item.second;
             if (alert.Cancels(*this))
             {
                 LogPrint("alert", "alert already cancelled by %d\n", alert.nID);
@@ -259,10 +256,11 @@ CAlert::Notify(const std::string& strMessage, bool fThread)
     std::string singleQuote("'");
     std::string safeStatus = SanitizeString(strMessage);
     safeStatus = singleQuote+safeStatus+singleQuote;
-    boost::replace_all(strCmd, "%s", safeStatus);
+    ReplaceAll(strCmd, "%s", safeStatus);
 
-    if (fThread)
-        boost::thread t(runCommand, strCmd); // thread runs free
-    else
+    if (fThread) {
+        std::thread t(runCommand, strCmd); // thread runs free
+        t.detach();
+    } else
         runCommand(strCmd);
 }
