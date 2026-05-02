@@ -62,8 +62,11 @@ jobs:
             fi
           else
             # Ubuntu 20.04 - install GCC-11 from toolchain PPA for C++20 support
-            apt-get install -y software-properties-common
-            add-apt-repository -y ppa:ubuntu-toolchain-r/test
+            # Add the PPA's apt source directly to avoid add-apt-repository's
+            # Launchpad API lookup, which is unreliable on 20.04.
+            apt-get install -y software-properties-common gnupg
+            apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1E9377A2BA9EF27F
+            echo "deb https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu focal main" > /etc/apt/sources.list.d/ubuntu-toolchain-r.list
             apt-get update
 
             if [[ "${{ matrix.arch }}" == "amd64" ]]; then
