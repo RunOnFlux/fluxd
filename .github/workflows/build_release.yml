@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           - arch: amd64
-            runs-on: runonflux
+            runs-on: ubuntu-24.04
             ubuntu-version: "20.04"
             container: ubuntu:20.04
           - arch: arm64
