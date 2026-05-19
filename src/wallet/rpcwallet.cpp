@@ -2104,7 +2104,7 @@ UniValue walletpassphrase(const UniValue& params, bool fHelp)
     int64_t nSleepTime = params[1].get_int64();
     LOCK(cs_nWalletUnlockTime);
     nWalletUnlockTime = GetTime() + nSleepTime;
-    RPCRunLater("lockwallet", [pwalletMain]() { LockWallet(pwalletMain); }, nSleepTime);
+    RPCRunLater("lockwallet", []() { LockWallet(pwalletMain); }, nSleepTime);
 
     return NullUniValue;
 }
