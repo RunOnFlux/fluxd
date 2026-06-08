@@ -13,6 +13,11 @@
 #include "chain.h"
 #include "uint256.h"
 #include "amount.h"
+#include "crypto/ecvrf.h"
+#include "key.h"
+#include "pubkey.h"
+#include "streams.h"
+#include "version.h"
 
 // Define node tiers for testing (from fluxnode/fluxnode.h)
 #ifndef CUMULUS
@@ -550,4 +555,94 @@ TEST_F(PONTest, VrfForkChoiceEqualOutputUndecided) {
     CBlockIndex b = MakeVrfIndex(100, same);
     // Identical VRF output -> no decision; caller falls back to first-seen.
     EXPECT_EQ(ComparePonForkChoice(&a, &b), 0);
+}
+
+// --- PON-VRF block-header serialization + hash-commitment -----------------------------
+
+static CBlockHeader MakeVrfHeader() {
+    CBlockHeader h;
+    h.nVersion = CBlockHeader::PON_VRF_VERSION;
+    h.hashPrevBlock = uint256S("0x01");
+    h.hashMerkleRoot = uint256S("0x02");
+    h.hashFinalSaplingRoot = uint256S("0x03");
+    h.nTime = 1700000000;
+    h.nBits = 0x1d00ffff;
+    h.nodesCollateral = COutPoint(uint256S("0x04"), 1);
+    h.nodesVrfOutput = uint256S("0x0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a");
+    h.nodesVrfProof = std::vector<unsigned char>(81, 0x77);
+    h.vchBlockSig = std::vector<unsigned char>(64, 0x99);
+    return h;
+}
+
+TEST_F(PONTest, VrfBlockHeaderSerializationRoundTrip) {
+    CBlockHeader h = MakeVrfHeader();
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    ss << h;
+    CBlockHeader h2;
+    ss >> h2;
+    EXPECT_EQ(h2.nVersion, h.nVersion);
+    EXPECT_EQ(h2.nodesCollateral, h.nodesCollateral);
+    EXPECT_EQ(h2.nodesVrfOutput, h.nodesVrfOutput);
+    EXPECT_EQ(h2.nodesVrfProof, h.nodesVrfProof);
+    EXPECT_EQ(h2.vchBlockSig, h.vchBlockSig);
+    EXPECT_EQ(h2.GetHash(), h.GetHash());
+}
+
+TEST_F(PONTest, VrfOutputCommittedProofExcludedFromHash) {
+    CBlockHeader base = MakeVrfHeader();
+    uint256 h0 = base.GetHash();
+
+    // The proof is excluded from the block hash (like the signature): changing it must NOT
+    // change the hash — required so CBlockIndex (which omits the proof) recomputes correctly.
+    CBlockHeader p = base;
+    p.nodesVrfProof = std::vector<unsigned char>(81, 0x11);
+    EXPECT_EQ(p.GetHash(), h0);
+
+    // The VRF output IS committed: changing it MUST change the hash (so it is signed/immutable
+    // and usable as the deterministic fork-choice key).
+    CBlockHeader o = base;
+    o.nodesVrfOutput = uint256S("0x0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b");
+    EXPECT_NE(o.GetHash(), h0);
+}
+
+// --- Real ECVRF prove/verify path (the same crypto ContextualCheckPONBlockHeader runs) -
+
+TEST_F(PONTest, EcvrfProveVerifyRoundTrip) {
+    CKey key;
+    key.MakeNewKey(true);
+    CPubKey pub = key.GetPubKey();
+    uint256 seed = uint256S("0x1111111111111111111111111111111111111111111111111111111111111111");
+
+    std::vector<unsigned char> proof;
+    uint256 beta;
+    ASSERT_TRUE(ECVRF_Prove(key, pub, seed, proof, beta));
+    EXPECT_EQ(proof.size(), 81u);
+
+    // Verify against the same key+seed reproduces the output.
+    uint256 beta2;
+    EXPECT_TRUE(ECVRF_Verify(pub, seed, proof, beta2));
+    EXPECT_EQ(beta2, beta);
+
+    // Tampered proof is rejected.
+    std::vector<unsigned char> badProof = proof;
+    badProof[40] ^= 0x01;
+    uint256 bx;
+    EXPECT_FALSE(ECVRF_Verify(pub, seed, badProof, bx));
+
+    // Wrong seed is rejected (binds the output to the epoch seed).
+    uint256 by;
+    EXPECT_FALSE(ECVRF_Verify(pub, uint256S("0x99"), proof, by));
+
+    // Wrong key is rejected (binds the output to the operator key).
+    CKey other;
+    other.MakeNewKey(true);
+    uint256 bz;
+    EXPECT_FALSE(ECVRF_Verify(other.GetPubKey(), seed, proof, bz));
+
+    // Deterministic: proving again yields the identical proof+output (RFC 6979 nonce).
+    std::vector<unsigned char> proof2;
+    uint256 beta3;
+    ASSERT_TRUE(ECVRF_Prove(key, pub, seed, proof2, beta3));
+    EXPECT_EQ(proof2, proof);
+    EXPECT_EQ(beta3, beta);
 }
