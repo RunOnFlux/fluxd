@@ -36,6 +36,8 @@
 #include "validationinterface.h"
 #include "pon/pon-fork.h"
 #include "pon/pon.h"
+#include "crypto/ecvrf.h"
+#include "fluxnode/obfuscation.h"
 
 #include "sodium.h"
 
@@ -544,9 +546,11 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
         // Fill in header
         if (IsPONActive(pindexPrev->nHeight + 1)) {
-            pblock->nVersion = CBlockHeader::PON_VERSION;
+            pblock->nVersion = IsPONVRFActive(pindexPrev->nHeight + 1)
+                                   ? CBlockHeader::PON_VRF_VERSION
+                                   : CBlockHeader::PON_VERSION;
             pblock->nodesCollateral = ponNodeCollateral;
-            
+
             // For PON blocks, use enforced time if provided
             if (enforceTime > 0) {
                 pblock->nTime = enforceTime;
@@ -565,6 +569,32 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         pblock->nBits = GetNextWorkRequiredByFork(pindexPrev, pblock, chainparams.GetConsensus());
         pblock->nSolution.clear();
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
+
+        // PON-VRF: populate the VRF output/proof so the assembled block is a valid v101
+        // block (committed VRF output is in the block hash, so this must happen before
+        // TestBlockValidity below and before the block is signed). The minter computes the
+        // same values from the same operator key + epoch seed (deterministic).
+        if (pblock->nVersion >= CBlockHeader::PON_VRF_VERSION) {
+            uint256 seed = GetEpochSeed(pindexPrev, chainparams.GetConsensus());
+            std::vector<unsigned char> vrfProof;
+            uint256 vrfOut;
+            CKey vk; CPubKey vpub; std::string verr;
+            if (!strFluxnodePrivKey.empty() &&
+                obfuScationSigner.SetKey(strFluxnodePrivKey, verr, vk, vpub) &&
+                ECVRF_Prove(vk, vpub, seed, vrfProof, vrfOut)) {
+                pblock->nodesVrfOutput = vrfOut;
+                pblock->nodesVrfProof = vrfProof;
+            } else {
+                // No operator key available (e.g. regtest generate without -zelnodeprivkey):
+                // deterministic placeholder output + dummy proof. The proof is not verified on
+                // regtest; on mainnet/testnet the minter always has a key so this branch is
+                // unused. Derived from the seed only (caller may set a real proof afterwards).
+                CHashWriter ss(SER_GETHASH, 0);
+                ss << seed << pblock->nodesCollateral;
+                pblock->nodesVrfOutput = ss.GetHash();
+                pblock->nodesVrfProof = std::vector<unsigned char>(81, 0);
+            }
+        }
 
         if (fForEmergency) {
             return pblocktemplate.release();

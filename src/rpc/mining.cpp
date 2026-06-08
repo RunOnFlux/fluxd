@@ -22,6 +22,9 @@
 #include "pon/pon.h"
 #include "pon/pon-fork.h"
 #include "pon/pon-minter.h"
+#include "crypto/ecvrf.h"
+#include "fluxnode/obfuscation.h"
+#include "hash.h"
 #include "net.h"
 #include "pow.h"
 #include "rpc/server.h"
@@ -253,6 +256,9 @@ UniValue generate(const UniValue& params, bool fHelp)
         }
 
         if (isPONActive) {
+            // PON-VRF block fields (v101 + VRF output/proof) are populated inside
+            // CreateNewBlock so the template is already valid; nothing extra needed here.
+
             // This is normally called in IncrementExtraNonce, but because we aren't doing that anymore.
             // We need to make sure we build the merkleroot.
             pblock->hashMerkleRoot = pblock->BuildMerkleTree();
