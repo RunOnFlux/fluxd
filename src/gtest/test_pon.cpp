@@ -7,8 +7,11 @@
 #include "chainparams.h"
 #include "consensus/params.h"
 #include "main.h"
+#include "pon/pon.h"
 #include "pon/pon-fork.h"
 #include "primitives/block.h"
+#include "chain.h"
+#include "uint256.h"
 #include "amount.h"
 
 // Define node tiers for testing (from fluxnode/fluxnode.h)
@@ -504,4 +507,47 @@ TEST_F(PONTest, POWBlockHeaderSerialization) {
     EXPECT_EQ(powBlock2.nBits, powBlock.nBits);
     EXPECT_EQ(powBlock2.nNonce, powBlock.nNonce);
     EXPECT_EQ(powBlock2.nSolution, powBlock.nSolution);
+}
+
+// --- PON-VRF deterministic fork choice (ComparePonForkChoice) -------------------------
+// This is the convergence guarantee: competing same-height VRF blocks must resolve to the
+// same winner on every node (lowest VRF output), regardless of arrival order.
+
+static CBlockIndex MakeVrfIndex(int height, const uint256& vrfOut) {
+    CBlockIndex idx;                       // SetNull() via default ctor
+    idx.nVersion = CBlockHeader::PON_VRF_VERSION;
+    idx.nHeight = height;
+    idx.nodesVrfOutput = vrfOut;
+    return idx;
+}
+
+TEST_F(PONTest, VrfForkChoiceLowestOutputWins) {
+    CBlockIndex a = MakeVrfIndex(100, uint256S("0x1111111111111111111111111111111111111111111111111111111111111111"));
+    CBlockIndex b = MakeVrfIndex(100, uint256S("0x2222222222222222222222222222222222222222222222222222222222222222"));
+
+    // Whichever output is lower by uint256 ordering must be preferred (negative result).
+    // (The exact ordering direction is irrelevant to convergence; determinism is.)
+    bool aLower = (a.nodesVrfOutput < b.nodesVrfOutput);
+    EXPECT_EQ(ComparePonForkChoice(&a, &b) < 0, aLower);
+    EXPECT_EQ(ComparePonForkChoice(&a, &b) > 0, !aLower);
+}
+
+TEST_F(PONTest, VrfForkChoiceAntisymmetricAndDeterministic) {
+    CBlockIndex a = MakeVrfIndex(100, uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa"));
+    CBlockIndex b = MakeVrfIndex(100, uint256S("0x00000000000000000000000000000000000000000000000000000000000000bb"));
+
+    int ab = ComparePonForkChoice(&a, &b);
+    // Antisymmetry: swapping arguments flips the sign — so all nodes agree on the winner.
+    EXPECT_EQ(ab, -ComparePonForkChoice(&b, &a));
+    // Determinism: same inputs always give the same result.
+    EXPECT_EQ(ab, ComparePonForkChoice(&a, &b));
+    EXPECT_NE(ab, 0); // distinct outputs are decided, never a tie
+}
+
+TEST_F(PONTest, VrfForkChoiceEqualOutputUndecided) {
+    uint256 same = uint256S("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+    CBlockIndex a = MakeVrfIndex(100, same);
+    CBlockIndex b = MakeVrfIndex(100, same);
+    // Identical VRF output -> no decision; caller falls back to first-seen.
+    EXPECT_EQ(ComparePonForkChoice(&a, &b), 0);
 }

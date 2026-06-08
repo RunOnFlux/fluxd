@@ -220,6 +220,22 @@ unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
     return newTarget.GetCompact();
 }
 
+int ComparePonForkChoice(const CBlockIndex* a, const CBlockIndex* b)
+{
+    // VRF blocks: compare by the committed VRF output (un-grindable). Legacy PON
+    // blocks: by GetPONHash. A VRF and a legacy block (mixed-version fork around
+    // activation) each use their own score; lower wins in all cases.
+    bool vrfA = (a->nVersion >= CBlockHeader::PON_VRF_VERSION);
+    bool vrfB = (b->nVersion >= CBlockHeader::PON_VRF_VERSION);
+
+    uint256 scoreA = vrfA ? a->nodesVrfOutput : GetPONHash(a->GetBlockHeader());
+    uint256 scoreB = vrfB ? b->nodesVrfOutput : GetPONHash(b->GetBlockHeader());
+
+    if (scoreA < scoreB) return -1;  // a preferred
+    if (scoreA > scoreB) return 1;   // b preferred
+    return 0;                         // undecided -> caller falls back to first-seen
+}
+
 bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPrev,
                             const Consensus::Params& params)
 {

@@ -159,25 +159,18 @@ namespace {
             bool isPONBlockB = (pb->nVersion >= CBlockHeader::PON_VERSION);
 
             if (isPONBlockA && isPONBlockB && pa->nHeight == pb->nHeight) {
-                // PON-VRF blocks: tie-break by VRF output (lowest wins). This is the
-                // consensus-level convergence rule for VRF leader election — the VRF
-                // output is un-grindable, so unlike GetPONHash (which depends on the
-                // proposer-chosen nTime/slot and could be ground to win ties) an attacker
-                // cannot bias which competing block wins. Falls back to GetPONHash when
-                // either block predates PON_VRF (mixed-version fork around activation).
-                bool isVrfA = (pa->nVersion >= CBlockHeader::PON_VRF_VERSION);
-                bool isVrfB = (pb->nVersion >= CBlockHeader::PON_VRF_VERSION);
-
-                uint256 scoreA = isVrfA ? pa->nodesVrfOutput : GetPONHash(pa->GetBlockHeader());
-                uint256 scoreB = isVrfB ? pb->nodesVrfOutput : GetPONHash(pb->GetBlockHeader());
-
-                if (scoreA < scoreB) {
-                    return false; // A has better (lower) score, A wins
+                // Deterministic PON tie-break (see ComparePonForkChoice): PON-VRF blocks
+                // compare by un-grindable VRF output, legacy PON blocks by GetPONHash.
+                // Every node computes the same winner regardless of arrival order, so the
+                // network converges instead of forking back and forth.
+                int cmp = ComparePonForkChoice(pa, pb);
+                if (cmp < 0) {
+                    return false; // A preferred (lower score), A wins
                 }
-                if (scoreA > scoreB) {
-                    return true;  // B has better (lower) score, B wins
+                if (cmp > 0) {
+                    return true;  // B preferred (lower score), B wins
                 }
-                // If scores are equal, fall through to sequence ID
+                // Undecided (equal scores): fall through to sequence ID
             }
 
             // ... then by earliest time received, ...

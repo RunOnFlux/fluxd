@@ -30,6 +30,12 @@ uint32_t GetSlotNumber(int64_t timestamp, int64_t genesisTimestamp, const Consen
 // window the current proposer did not author, so it is not grindable.
 uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& params);
 
+// PON fork-choice tie-break between two competing same-work/same-height PON blocks.
+// Returns <0 if a is preferred (wins the tie), >0 if b is preferred, 0 if undecided
+// (caller falls back to first-seen). PON-VRF blocks compare by VRF output (un-grindable);
+// legacy PON blocks by GetPONHash. Lower value wins in both cases.
+int ComparePonForkChoice(const CBlockIndex* a, const CBlockIndex* b);
+
 // Get next PON work required (difficulty adjustment)
 unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast);
 
