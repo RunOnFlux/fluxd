@@ -166,11 +166,10 @@ namespace {
             if (pa->nChainWork > pb->nChainWork) return false;
             if (pa->nChainWork < pb->nChainWork) return true;
 
-            // For PON blocks at same height (same chain work), use PON hash as deterministic tie-breaker
-            // This prevents network splits when multiple eligible nodes create competing blocks
-            // Lower PON hash wins (same ordering as our rank-based coordination)
-            bool isPONBlockA = (pa->nVersion >= 100);
-            bool isPONBlockB = (pb->nVersion >= 100);
+            // For PON blocks at same height (same chain work), use a deterministic
+            // tie-breaker so all nodes converge on the same block instead of splitting.
+            bool isPONBlockA = (pa->nVersion >= CBlockHeader::PON_VERSION);
+            bool isPONBlockB = (pb->nVersion >= CBlockHeader::PON_VERSION);
 
             if (isPONBlockA && isPONBlockB && pa->nHeight == pb->nHeight) {
                 // Deterministic PON tie-break (see ComparePonForkChoice): PON blocks

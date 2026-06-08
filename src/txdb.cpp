@@ -529,6 +529,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                 pindexNew->nVersion       = diskindex.nVersion;
                 pindexNew->nTime          = diskindex.nTime;
                 pindexNew->nBits          = diskindex.nBits;
+                pindexNew->nodesVrfOutput = diskindex.nodesVrfOutput;
                 pindexNew->nStatus        = diskindex.nStatus;
                 pindexNew->nTx            = diskindex.nTx;
                 // These live directly on CBlockIndex (not in the prunable

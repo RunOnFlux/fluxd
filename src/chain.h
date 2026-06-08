@@ -238,6 +238,11 @@ public:
     //! at load time (before pruning) and when the entry is created.
     uint256 hashPON;
 
+    //! PON-VRF: VRF output (committed to the block hash; fork-choice tie-breaker).
+    //! Kept directly on CBlockIndex (not in HeaderData) so fork choice and
+    //! load-time checks work even after header data is pruned.
+    uint256 nodesVrfOutput;
+
     //! Block-file data: present in the block on disk and therefore rebuildable.
     //! This is what gets pruned from memory for buried blocks. Allocated on
     //! demand; may be nullptr after pruning.
@@ -326,6 +331,7 @@ public:
             hashSproutAnchor = other.hashSproutAnchor;
             hashFinalSproutRoot = other.hashFinalSproutRoot;
             hashPON = other.hashPON;
+            nodesVrfOutput = other.nodesVrfOutput;
             nSequenceId = other.nSequenceId;
             delete pHeaderData;
             if (other.pHeaderData) {
@@ -364,6 +370,7 @@ public:
         hashSproutAnchor   = uint256();
         hashFinalSproutRoot = uint256();
         hashPON            = uint256();
+        nodesVrfOutput.SetNull();
 
         pHeaderData = nullptr;
     }
@@ -380,6 +387,7 @@ public:
         nVersion       = block.nVersion;
         nTime          = block.nTime;
         nBits          = block.nBits;
+        nodesVrfOutput = block.nodesVrfOutput;
         RestoreHeaderData(block);
     }
 
@@ -409,6 +417,7 @@ public:
             block.hashPrevBlock = pprev->GetBlockHash();
         block.nTime          = nTime;
         block.nBits          = nBits;
+        block.nodesVrfOutput = nodesVrfOutput;
         if (pHeaderData) {
             block.hashMerkleRoot = pHeaderData->hashMerkleRoot;
             block.hashFinalSaplingRoot   = pHeaderData->hashFinalSaplingRoot;
@@ -550,6 +559,11 @@ public:
         if (this->nVersion >= CBlockHeader::PON_VERSION) {
             READWRITE(pHeaderData->nodesCollateral);
             READWRITE(pHeaderData->vchBlockSig);
+            // PON-VRF: the VRF output is committed to the block hash, so it must be
+            // persisted to recompute the hash and to serve as the fork-choice tie-breaker.
+            if (this->nVersion >= CBlockHeader::PON_VRF_VERSION) {
+                READWRITE(nodesVrfOutput);
+            }
         }
 
         // Only read/write nSproutValue if the client version used to create
@@ -591,6 +605,7 @@ public:
         block.hashPrevBlock   = hashPrev;
         block.nTime           = nTime;
         block.nBits           = nBits;
+        block.nodesVrfOutput  = nodesVrfOutput;
         if (pHeaderData) {
             block.hashMerkleRoot  = pHeaderData->hashMerkleRoot;
             block.hashFinalSaplingRoot    = pHeaderData->hashFinalSaplingRoot;
