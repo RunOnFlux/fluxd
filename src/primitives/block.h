@@ -29,6 +29,7 @@ public:
     static const int32_t CURRENT_VERSION=4;
     // PON blocks use version 100 - high enough that POW miners won't accidentally use it
     static const int32_t PON_VERSION = 100;
+    static const int32_t PON_VRF_VERSION = 101;   // PON + VRF leader election (anti-grind)
     int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
@@ -43,6 +44,9 @@ public:
     // PON fields (version >= 100)
     COutPoint nodesCollateral;     // The UTXO used as collateral
     std::vector<unsigned char> vchBlockSig;  // Signature proving ownership
+    // PON-VRF fields (version >= PON_VRF_VERSION): ECVRF-SECP256K1-SHA256-TAI
+    uint256 nodesVrfOutput;                   // y: VRF lottery value, compared to target
+    std::vector<unsigned char> nodesVrfProof; // pi: 81-byte VRF proof
 
     CBlockHeader()
     {
@@ -64,7 +68,16 @@ public:
         if (nVersion >= PON_VERSION) {
             // PON block
             READWRITE(nodesCollateral);
-            
+
+            // PON-VRF: the VRF output and proof are committed to the block hash
+            // (included under SER_GETHASH, unlike vchBlockSig). The VRF output is
+            // deterministic given (operator key, epoch seed), so committing it is
+            // not grindable.
+            if (nVersion >= PON_VRF_VERSION) {
+                READWRITE(nodesVrfOutput);
+                READWRITE(nodesVrfProof);
+            }
+
             // Exclude signature when computing hash for signing (SER_GETHASH)
             // This prevents circular dependency when signing the block
             if (!(s.GetType() & SER_GETHASH)) {
@@ -89,6 +102,8 @@ public:
         nSolution.clear();
         nodesCollateral.SetNull();
         vchBlockSig.clear();
+        nodesVrfOutput.SetNull();
+        nodesVrfProof.clear();
     }
     
     // Helper functions for PON

@@ -35,6 +35,7 @@ enum UpgradeIndex {
     UPGRADE_HALVING,
     UPGRADE_P2SHNODES,
     UPGRADE_PON,  // Proof of Node activation
+    UPGRADE_PON_VRF,  // PON VRF leader election (anti-grind)
     // NOTE: Also add new upgrades to NetworkUpgradeInfo in upgrades.cpp
     MAX_NETWORK_UPGRADES
 };

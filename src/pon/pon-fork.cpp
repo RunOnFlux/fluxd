@@ -5,6 +5,7 @@
 #include "pon-fork.h"
 #include "../chain.h"
 #include "../chainparams.h"
+#include "../consensus/upgrades.h"
 #include "../consensus/validation.h"
 #include "../pow.h"
 #include "../util.h"
@@ -21,6 +22,12 @@ bool IsPONActive(int nHeight)
 
     // PON is active once we are at or past the activation height.
     return nHeight >= ponActivationHeight;
+}
+
+bool IsPONVRFActive(int nHeight)
+{
+    // VRF leader election: active at/after the UPGRADE_PON_VRF activation height.
+    return NetworkUpgradeActive(nHeight, Params().GetConsensus(), Consensus::UPGRADE_PON_VRF);
 }
 
 unsigned int GetNextWorkRequiredByFork(const CBlockIndex* pindexLast,

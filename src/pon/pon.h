@@ -26,6 +26,10 @@ uint256 GetPONHash(const COutPoint& collateral, const uint256& prevBlockHash, ui
 // Calculate the slot number for a given timestamp relative to genesis
 uint32_t GetSlotNumber(int64_t timestamp, int64_t genesisTimestamp, const Consensus::Params& params);
 
+// PON-VRF: epoch seed (randomness) for VRF eligibility — derived from a buried block
+// window the current proposer did not author, so it is not grindable.
+uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& params);
+
 // Get next PON work required (difficulty adjustment)
 unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast);
 
