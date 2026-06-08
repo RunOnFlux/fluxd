@@ -69,18 +69,20 @@ public:
             // PON block
             READWRITE(nodesCollateral);
 
-            // PON-VRF: the VRF output and proof are committed to the block hash
-            // (included under SER_GETHASH, unlike vchBlockSig). The VRF output is
-            // deterministic given (operator key, epoch seed), so committing it is
-            // not grindable.
+            // PON-VRF: the VRF OUTPUT (y) is committed to the block hash (and so is
+            // signed and immutable). y is deterministic given (operator key, epoch seed),
+            // so committing it is not grindable. It is also the deterministic fork-choice
+            // tie-breaker (lowest y wins), so CBlockIndex stores it.
             if (nVersion >= PON_VRF_VERSION) {
                 READWRITE(nodesVrfOutput);
-                READWRITE(nodesVrfProof);
             }
 
-            // Exclude signature when computing hash for signing (SER_GETHASH)
-            // This prevents circular dependency when signing the block
+            // Excluded from the block hash (like the signature, below): the VRF proof is
+            // self-validating against the committed output, so it need not be committed.
             if (!(s.GetType() & SER_GETHASH)) {
+                if (nVersion >= PON_VRF_VERSION) {
+                    READWRITE(nodesVrfProof);
+                }
                 READWRITE(vchBlockSig);
             }
         } else {

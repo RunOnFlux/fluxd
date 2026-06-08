@@ -241,6 +241,8 @@ public:
     //! PON fields
     COutPoint nodesCollateral;
     std::vector<unsigned char> vchBlockSig;
+    //! PON-VRF: VRF output (committed to the block hash; fork-choice tie-breaker)
+    uint256 nodesVrfOutput;
 
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
@@ -276,6 +278,7 @@ public:
         nSolution.clear();
         nodesCollateral.SetNull();
         vchBlockSig.clear();
+        nodesVrfOutput.SetNull();
     }
 
     CBlockIndex()
@@ -296,6 +299,7 @@ public:
         nSolution      = block.nSolution;
         nodesCollateral = block.nodesCollateral;
         vchBlockSig    = block.vchBlockSig;
+        nodesVrfOutput = block.nodesVrfOutput;
     }
 
     CDiskBlockPos GetBlockPos() const {
@@ -330,6 +334,7 @@ public:
         block.nSolution      = nSolution;
         block.nodesCollateral = nodesCollateral;
         block.vchBlockSig    = vchBlockSig;
+        block.nodesVrfOutput = nodesVrfOutput;
         return block;
     }
 
@@ -460,6 +465,11 @@ public:
         if (this->nVersion >= CBlockHeader::PON_VERSION) {
             READWRITE(nodesCollateral);
             READWRITE(vchBlockSig);
+            // PON-VRF: the VRF output is committed to the block hash, so it must be
+            // persisted to recompute the hash and to serve as the fork-choice tie-breaker.
+            if (this->nVersion >= CBlockHeader::PON_VRF_VERSION) {
+                READWRITE(nodesVrfOutput);
+            }
         }
 
         // Only read/write nSproutValue if the client version used to create
@@ -507,6 +517,7 @@ public:
         block.nSolution       = nSolution;
         block.nodesCollateral = nodesCollateral;
         block.vchBlockSig     = vchBlockSig;
+        block.nodesVrfOutput  = nodesVrfOutput;
         return block.GetHash();
     }
 

@@ -153,24 +153,31 @@ namespace {
             if (pa->nChainWork > pb->nChainWork) return false;
             if (pa->nChainWork < pb->nChainWork) return true;
 
-            // For PON blocks at same height (same chain work), use PON hash as deterministic tie-breaker
-            // This prevents network splits when multiple eligible nodes create competing blocks
-            // Lower PON hash wins (same ordering as our rank-based coordination)
-            bool isPONBlockA = (pa->nVersion >= 100);
-            bool isPONBlockB = (pb->nVersion >= 100);
+            // For PON blocks at same height (same chain work), use a deterministic
+            // tie-breaker so all nodes converge on the same block instead of splitting.
+            bool isPONBlockA = (pa->nVersion >= CBlockHeader::PON_VERSION);
+            bool isPONBlockB = (pb->nVersion >= CBlockHeader::PON_VERSION);
 
             if (isPONBlockA && isPONBlockB && pa->nHeight == pb->nHeight) {
-                // Both are PON blocks at same height - use PON hash as tie-breaker
-                uint256 ponHashA = GetPONHash(pa->GetBlockHeader());
-                uint256 ponHashB = GetPONHash(pb->GetBlockHeader());
+                // PON-VRF blocks: tie-break by VRF output (lowest wins). This is the
+                // consensus-level convergence rule for VRF leader election — the VRF
+                // output is un-grindable, so unlike GetPONHash (which depends on the
+                // proposer-chosen nTime/slot and could be ground to win ties) an attacker
+                // cannot bias which competing block wins. Falls back to GetPONHash when
+                // either block predates PON_VRF (mixed-version fork around activation).
+                bool isVrfA = (pa->nVersion >= CBlockHeader::PON_VRF_VERSION);
+                bool isVrfB = (pb->nVersion >= CBlockHeader::PON_VRF_VERSION);
 
-                if (ponHashA < ponHashB) {
-                    return false; // A has better (lower) hash, A wins
+                uint256 scoreA = isVrfA ? pa->nodesVrfOutput : GetPONHash(pa->GetBlockHeader());
+                uint256 scoreB = isVrfB ? pb->nodesVrfOutput : GetPONHash(pb->GetBlockHeader());
+
+                if (scoreA < scoreB) {
+                    return false; // A has better (lower) score, A wins
                 }
-                if (ponHashA > ponHashB) {
-                    return true;  // B has better (lower) hash, B wins
+                if (scoreA > scoreB) {
+                    return true;  // B has better (lower) score, B wins
                 }
-                // If hashes are equal, fall through to sequence ID
+                // If scores are equal, fall through to sequence ID
             }
 
             // ... then by earliest time received, ...
