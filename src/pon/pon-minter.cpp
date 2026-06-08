@@ -4,6 +4,7 @@
 
 #include "pon-minter.h"
 #include "../arith_uint256.h"
+#include "../crypto/ecvrf.h"
 #include "../miner.h"
 #include "pon.h"
 #include "pon-fork.h"
@@ -219,39 +220,78 @@ void PONMinter(const CChainParams& chainparams)
             // - Ranking simply helps nodes agree on who should try first
             // - Lower-ranked nodes wait longer, see higher-ranked blocks, and skip
             // - This dramatically reduces orphan blocks and network waste
-            std::vector<EligibleNodeInfo> eligibleNodes = GetEligibleNodes(pindexPrev, currentSlot, nBits);
+            // Eligibility + a self-computable minting-priority delay.
+            // VRF path produces the proof/output that will be committed to the block.
+            std::vector<unsigned char> vrfProof;
+            uint256 vrfOutput;
+            int myRank = 1;  // legacy rank; VRF path encodes priority in the delay instead
+            const bool usingVrf = IsPONVRFActive(pindexPrev->nHeight + 1);
 
-            // Find our rank in the eligible list
-            int myRank = GetNodeRank(eligibleNodes, collateral);
+            if (usingVrf) {
+                // VRF leader election: a node can compute only its OWN eligibility (other
+                // nodes' VRF outputs are unknowable without their secret keys). Coordination
+                // therefore uses a self-computable priority: lower VRF output => shorter delay
+                // (Algorand-style). Lower-priority nodes wait, see the higher-priority block,
+                // and skip — preserving the orphan-reduction property without a global ranking.
+                CKey opKey; CPubKey opPub; std::string keyErr;
+                if (!obfuScationSigner.SetKey(strFluxnodePrivKey, keyErr, opKey, opPub)) {
+                    LogPrintf("PON: No valid fluxnode key for VRF: %s\n", keyErr);
+                    lastAttemptedSlot = currentSlot;
+                    continue;
+                }
+                uint256 seed = GetEpochSeed(pindexPrev, consensusParams);
+                if (!ECVRF_Prove(opKey, opPub, seed, vrfProof, vrfOutput)) {
+                    LogPrintf("PON: VRF prove failed\n");
+                    lastAttemptedSlot = currentSlot;
+                    continue;
+                }
+                arith_uint256 tgt; tgt.SetCompact(nBits);
+                if (UintToArith256(vrfOutput) > tgt) {
+                    LogPrint("pon", "PON: Not VRF-eligible for slot %d (y=%s target=%s)\n",
+                             currentSlot, vrfOutput.GetHex(), tgt.GetHex());
+                    lastAttemptedSlot = currentSlot;
+                    continue;
+                }
+                // Map y in [0, target] to a delay in [0, window]: lowest y mints first.
+                arith_uint256 denom = tgt >> 16;
+                if (denom == 0) denom = arith_uint256(1);
+                uint64_t frac16 = (UintToArith256(vrfOutput) / denom).GetLow64();
+                if (frac16 > 65535) frac16 = 65535;
+                int rankDelayMs = (int)((int64_t)24000 * (int64_t)frac16 / 65536);
+                LogPrintf("PON: VRF-eligible for slot %d (y=%s) - waiting %dms before minting\n",
+                         currentSlot, vrfOutput.GetHex(), rankDelayMs);
+                MilliSleep(rankDelayMs);
+            } else {
+                std::vector<EligibleNodeInfo> eligibleNodes = GetEligibleNodes(pindexPrev, currentSlot, nBits);
 
-            if (myRank == -1) {
-                // Not eligible for this slot
-                arith_uint256 target;
-                target.SetCompact(nBits);
-                uint256 ponHash = GetPONHash(collateral, pindexPrev->GetBlockHash(), currentSlot);
-                LogPrint("pon", "PON: Not eligible for slot %d - hash=%s target=%s (nBits=%08x)\n",
-                         currentSlot, ponHash.GetHex(), target.GetHex(), nBits);
-                lastAttemptedSlot = currentSlot;
-                continue;
+                // Find our rank in the eligible list
+                myRank = GetNodeRank(eligibleNodes, collateral);
+
+                if (myRank == -1) {
+                    // Not eligible for this slot
+                    arith_uint256 target;
+                    target.SetCompact(nBits);
+                    uint256 ponHash = GetPONHash(collateral, pindexPrev->GetBlockHash(), currentSlot);
+                    LogPrint("pon", "PON: Not eligible for slot %d - hash=%s target=%s (nBits=%08x)\n",
+                             currentSlot, ponHash.GetHex(), target.GetHex(), nBits);
+                    lastAttemptedSlot = currentSlot;
+                    continue;
+                }
+
+                // Log eligibility with rank information
+                int totalEligible = eligibleNodes.size();
+                uint256 myHash = eligibleNodes[myRank - 1].ponHash;
+                LogPrintf("PON: Eligible for slot %d - Rank %d of %d eligible nodes (hash: %s)\n",
+                         currentSlot, myRank, totalEligible, myHash.GetHex());
+
+                // Rank-based delay to coordinate block production across 30-second slot window
+                // Rank 1 = 4s, Rank 2 = 8s, ... With 4s intervals, we fit 7 ranks in a 30s slot window
+                int rankDelayMs = myRank * 4000; // 4 second intervals
+
+                LogPrintf("PON: Rank %d of %d eligible - waiting %dms (%.1fs) before minting\n",
+                         myRank, totalEligible, rankDelayMs, rankDelayMs / 1000.0);
+                MilliSleep(rankDelayMs);
             }
-
-            // Log eligibility with rank information
-            int totalEligible = eligibleNodes.size();
-            uint256 myHash = eligibleNodes[myRank - 1].ponHash;
-            LogPrintf("PON: Eligible for slot %d - Rank %d of %d eligible nodes (hash: %s)\n",
-                     currentSlot, myRank, totalEligible, myHash.GetHex());
-
-            // Rank-based delay to coordinate block production across 30-second slot window
-            // Account for block propagation time (typically 2-5 seconds)
-            // Rank 1 waits 4s to allow any late blocks from previous slot to propagate
-            // Each subsequent rank waits 4 more seconds, giving time for higher-ranked blocks to propagate
-            // Example: Rank 1 = 4s, Rank 2 = 8s, Rank 3 = 12s, Rank 4 = 16s, Rank 5 = 20s, Rank 6 = 24s, Rank 7 = 28s
-            // With 4s intervals, we fit 7 ranks in a 30s slot window
-            int rankDelayMs = myRank * 4000; // 4 second intervals
-
-            LogPrintf("PON: Rank %d of %d eligible - waiting %dms (%.1fs) before minting\n",
-                     myRank, totalEligible, rankDelayMs, rankDelayMs / 1000.0);
-            MilliSleep(rankDelayMs);
 
             // Get fresh timestamp after rank delay completes
             // This ensures block timestamps reflect when they were actually created,
@@ -320,6 +360,15 @@ void PONMinter(const CChainParams& chainparams)
             }
 
             CBlock* pblock = &pblocktemplate->block;
+
+            // PON-VRF: commit the VRF output + proof to the block before signing. These are
+            // included under SER_GETHASH, so the signature covers them. The eligibility proof
+            // was computed above over the (un-grindable) epoch seed.
+            if (usingVrf) {
+                pblock->nVersion = CBlockHeader::PON_VRF_VERSION;
+                pblock->nodesVrfOutput = vrfOutput;
+                pblock->nodesVrfProof = vrfProof;
+            }
 
             // Sign the block with our fluxnode private key
             // Block signature proves we control the collateral used for PON eligibility

@@ -5,6 +5,7 @@
 #include "pon.h"
 #include "pon-fork.h"
 #include "../arith_uint256.h"
+#include "../crypto/ecvrf.h"
 #include "../chain.h"
 #include "../chainparams.h"
 #include "../emergencyblock.h"
@@ -90,6 +91,31 @@ uint32_t GetSlotNumber(int64_t timestamp, int64_t genesisTimestamp, const Consen
     // Calculate slot number based on time elapsed since genesis
     int64_t timeSinceGenesis = timestamp - genesisTimestamp;
     return static_cast<uint32_t>(timeSinceGenesis / params.nPonTargetSpacing);
+}
+
+// PON-VRF epoch seed. The randomness for a block's VRF eligibility is derived from a
+// window of blocks buried beyond the reorg horizon, so the proposer of the current block
+// cannot have authored (and therefore cannot grind) the seed. Constant for an entire epoch.
+static const int PON_VRF_EPOCH_LEN = 60;   // blocks per epoch (~30 min at 30s spacing)
+static const int PON_VRF_SEED_BURY = 60;   // window end is buried this many blocks (> MAX_REORG_LENGTH=40)
+
+uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& params)
+{
+    int nHeight = pindexPrev ? pindexPrev->nHeight + 1 : 0;
+    int epoch = nHeight / PON_VRF_EPOCH_LEN;
+    int windowEnd = epoch * PON_VRF_EPOCH_LEN - PON_VRF_SEED_BURY;
+
+    // Genesis warmup: before a buried window exists, use a fixed bootstrap seed.
+    if (windowEnd < PON_VRF_EPOCH_LEN || pindexPrev == NULL) {
+        return Params().GenesisBlock().GetHash();
+    }
+
+    CHashWriter ss(SER_GETHASH, 0);
+    const CBlockIndex* p = pindexPrev->GetAncestor(windowEnd);
+    for (int i = 0; i < PON_VRF_EPOCH_LEN && p != NULL; ++i, p = p->pprev) {
+        ss << p->GetBlockHash();
+    }
+    return ss.GetHash();
 }
 
 unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
@@ -208,7 +234,21 @@ bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPre
 
     int nHeight = pindexPrev ? pindexPrev->nHeight + 1 : 0;
 
-    if (!CheckProofOfNode(GetPONHash(block), block.nBits, Params().GetConsensus(), nHeight)) {
+    if (IsPONVRFActive(nHeight)) {
+        // VRF leader election: eligibility is y <= target, where y = nodesVrfOutput.
+        // The proof that y is genuinely VRF(operator_key, epoch_seed) is verified
+        // contextually (ContextualCheckPONBlockHeader), where the operator pubkey is
+        // available; here we enforce the cheap, context-free preconditions.
+        if (block.nVersion < CBlockHeader::PON_VRF_VERSION) {
+            return error("CheckPONBlockHeader: block version %d below PON_VRF_VERSION", block.nVersion);
+        }
+        if (block.nodesVrfProof.size() != 81) {
+            return error("CheckPONBlockHeader: bad VRF proof size %d", (int)block.nodesVrfProof.size());
+        }
+        if (!CheckProofOfNode(block.nodesVrfOutput, block.nBits, Params().GetConsensus(), nHeight)) {
+            return error("CheckPONBlockHeader: VRF output doesn't meet target");
+        }
+    } else if (!CheckProofOfNode(GetPONHash(block), block.nBits, Params().GetConsensus(), nHeight)) {
         int64_t genesisTimestamp = Params().GenesisBlock().nTime;
         uint32_t slot = GetSlotNumber(block.nTime, genesisTimestamp, Params().GetConsensus());
         return error("CheckPONBlockHeader: stake hash doesn't meet target for slot %d", slot);
@@ -320,6 +360,28 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex*
 
         LogPrint("pon", "ContextualCheckPONBlockHeader: Signature verified for fluxnode %s (tier=%d)\n",
              block.nodesCollateral.ToString(), data.nTier);
+
+        // VRF leader election: verify the proof binds nodesVrfOutput to this fluxnode's
+        // operator key and the (un-grindable) epoch seed. Shares the deferral logic above:
+        // we only reach here when the cache state is correct for this block.
+        if (IsPONVRFActive(currentHeight)) {
+            uint256 seed = GetEpochSeed(pindexPrev, params);
+            uint256 betaComputed;
+            if (!ECVRF_Verify(data.pubKey, seed, block.nodesVrfProof, betaComputed)) {
+                // Proof depends on chain-state (seed) and the cache; treat like a signature
+                // failure (not permanently invalidating) to be safe under competing-chain validation.
+                fSignatureFailure = true;
+                return error("ContextualCheckPONBlockHeader: VRF proof verification failed for fluxnode %s (block=%s)",
+                            block.nodesCollateral.ToString(), block.GetHash().GetHex());
+            }
+            if (betaComputed != block.nodesVrfOutput) {
+                fSignatureFailure = true;
+                return error("ContextualCheckPONBlockHeader: VRF output mismatch for fluxnode %s (block=%s)",
+                            block.nodesCollateral.ToString(), block.GetHash().GetHex());
+            }
+            LogPrint("pon", "ContextualCheckPONBlockHeader: VRF proof verified for fluxnode %s\n",
+                 block.nodesCollateral.ToString());
+        }
     }
 
     LogPrint("pon", "ContextualCheckPONBlockHeader: Full validation passed for block %s\n", block.GetHash().GetHex());
