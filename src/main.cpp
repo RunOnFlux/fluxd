@@ -172,13 +172,14 @@ namespace {
             bool isPONBlockB = (pb->nVersion >= CBlockHeader::PON_VERSION);
 
             if (isPONBlockA && isPONBlockB && pa->nHeight == pb->nHeight) {
-                // Deterministic PON tie-break (see ComparePonForkChoice): PON blocks
-                // compare by the resident cached PON hash. Every node computes the same
-                // winner regardless of arrival order, so the network converges instead
-                // of forking. The score must come from a resident field: recomputing
-                // from GetBlockHeader() would hash a zeroed nodesCollateral for pruned
-                // entries (wrong tie-break vs the network), and the result would change
-                // when connect/disconnect restores header data on an entry already in
+                // Deterministic PON tie-break (see ComparePonForkChoice): PON-VRF blocks
+                // compare by un-grindable VRF output, legacy PON blocks by the resident
+                // cached PON hash. Every node computes the same winner regardless of
+                // arrival order, so the network converges instead of forking. The scores
+                // must come from resident fields: recomputing from GetBlockHeader()
+                // would hash a zeroed nodesCollateral for pruned entries (wrong
+                // tie-break vs the network), and the result would change when
+                // connect/disconnect restores header data on an entry already in
                 // setBlockIndexCandidates — an in-place comparator-key mutation
                 // that breaks set ordering and makes erase-by-key silently fail.
                 int cmp = ComparePonForkChoice(pa, pb);
