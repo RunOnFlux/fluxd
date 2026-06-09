@@ -397,7 +397,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight = 800;
         consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nProtocolVersion = 170020;
         consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight =
-                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;  // TBD: set at scheduled network upgrade
+                9999999;  // PLACEHOLDER — REPLACE with the scheduled testnet activation height (well above the current tip) before tagging the release
         
         // PON subsidy parameters (testnet)
         consensus.nPONInitialSubsidy = 14;  // 14 FLUX per block initially
