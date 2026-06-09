@@ -565,7 +565,11 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                     // resident: the fork-choice tie-breaker needs it after
                     // the prune below.
                     pindexNew->hashPON = GetPONHash(header);
-                    if (!CheckProofOfNode(pindexNew->hashPON, pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight) && !IsEmergencyBlock(header))
+                    // For PON-VRF blocks the eligibility value is the committed VRF output, not GetPONHash.
+                    const uint256& ponEligibilityValue = (header.nVersion >= CBlockHeader::PON_VRF_VERSION)
+                                                      ? pindexNew->nodesVrfOutput
+                                                      : pindexNew->hashPON;
+                    if (!CheckProofOfNode(ponEligibilityValue, pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight) && !IsEmergencyBlock(header))
                         return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
                 } else if (!isCheckpointed) {
                     // Only verify PoW for non-checkpointed POW blocks
