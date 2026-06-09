@@ -2775,7 +2775,11 @@ bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus:
               CheckProofOfWork(block.GetHash(), block.nBits, consensusParams)))
             return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
     } else {
-        if (!CheckProofOfNode(GetPONHash(block), block.nBits, consensusParams) && !IsEmergencyBlock(block)) {
+        // For PON-VRF blocks the eligibility value is the committed VRF output, not GetPONHash.
+        uint256 ponEligibilityValue = (block.nVersion >= CBlockHeader::PON_VRF_VERSION)
+                                          ? block.nodesVrfOutput
+                                          : GetPONHash(block);
+        if (!CheckProofOfNode(ponEligibilityValue, block.nBits, consensusParams) && !IsEmergencyBlock(block)) {
             return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
         }
     }
