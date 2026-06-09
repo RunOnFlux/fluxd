@@ -5337,8 +5337,13 @@ bool CheckBlockHeader(
                              REJECT_INVALID, "bad-pon-sig-size");
 
         if (!IsEmergencyBlock((block))) {
-            // Check proof of work matches claimed amount
-            if (fCheckPOW && !CheckProofOfNode(GetPONHash(block), block.nBits, chainparams.GetConsensus()))
+            // Check proof of node matches claimed amount. For PON-VRF blocks the eligibility
+            // value is the committed VRF output (the full proof is verified contextually in
+            // ContextualCheckPONBlockHeader); for legacy PON blocks it is GetPONHash.
+            uint256 ponEligibilityValue = (block.nVersion >= CBlockHeader::PON_VRF_VERSION)
+                                              ? block.nodesVrfOutput
+                                              : GetPONHash(block);
+            if (fCheckPOW && !CheckProofOfNode(ponEligibilityValue, block.nBits, chainparams.GetConsensus()))
                 return state.DoS(50, error("CheckBlockHeader(): proof of node failed"),
                                  REJECT_INVALID, "high-hash");
         }

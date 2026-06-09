@@ -118,6 +118,20 @@ uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& par
     return ss.GetHash();
 }
 
+// PON-VRF per-slot eligibility input. The epoch seed (un-grindable) provides the base
+// randomness; mixing in the slot makes eligibility a FRESH draw each slot, so leadership
+// rotates and the chain stays live (without this, a node is eligible for either every slot
+// or no slot in an epoch). The slot (from nTime) carries only the minor ~10-slot future-time
+// grind already acknowledged in the design — the large prevBlockHash/coinbase grind is gone.
+uint256 GetPonVrfMessage(const CBlockIndex* pindexPrev, uint32_t slot, const Consensus::Params& params)
+{
+    uint256 epochSeed = GetEpochSeed(pindexPrev, params);
+    CHashWriter ss(SER_GETHASH, 0);
+    ss << epochSeed;
+    ss << slot;
+    return ss.GetHash();
+}
+
 unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
 {
     const Consensus::Params& params = Params().GetConsensus();
@@ -381,7 +395,9 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex*
         // operator key and the (un-grindable) epoch seed. Shares the deferral logic above:
         // we only reach here when the cache state is correct for this block.
         if (IsPONVRFActive(currentHeight)) {
-            uint256 seed = GetEpochSeed(pindexPrev, params);
+            int64_t genesisTimestamp = Params().GenesisBlock().nTime;
+            uint32_t slot = GetSlotNumber(block.nTime, genesisTimestamp, Params().GetConsensus());
+            uint256 seed = GetPonVrfMessage(pindexPrev, slot, params);
             uint256 betaComputed;
             if (!ECVRF_Verify(data.pubKey, seed, block.nodesVrfProof, betaComputed)) {
                 // Proof depends on chain-state (seed) and the cache; treat like a signature

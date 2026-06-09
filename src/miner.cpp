@@ -575,7 +575,9 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         // TestBlockValidity below and before the block is signed). The minter computes the
         // same values from the same operator key + epoch seed (deterministic).
         if (pblock->nVersion >= CBlockHeader::PON_VRF_VERSION) {
-            uint256 seed = GetEpochSeed(pindexPrev, chainparams.GetConsensus());
+            int64_t genesisTimestamp = chainparams.GenesisBlock().nTime;
+            uint32_t vrfSlot = GetSlotNumber(pblock->nTime, genesisTimestamp, chainparams.GetConsensus());
+            uint256 seed = GetPonVrfMessage(pindexPrev, vrfSlot, chainparams.GetConsensus());
             std::vector<unsigned char> vrfProof;
             uint256 vrfOut;
             CKey vk; CPubKey vpub; std::string verr;
