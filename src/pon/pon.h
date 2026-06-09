@@ -30,6 +30,11 @@ uint32_t GetSlotNumber(int64_t timestamp, int64_t genesisTimestamp, const Consen
 // window the current proposer did not author, so it is not grindable.
 uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& params);
 
+// PON-VRF: per-slot VRF input = H(epoch_seed || slot). Mixing the slot gives a fresh
+// eligibility draw each slot (leader rotation / liveness). Used by both the minter and
+// ContextualCheckPONBlockHeader so prover and verifier agree.
+uint256 GetPonVrfMessage(const CBlockIndex* pindexPrev, uint32_t slot, const Consensus::Params& params);
+
 // PON fork-choice tie-break between two competing same-work/same-height PON blocks.
 // Returns <0 if a is preferred (wins the tie), >0 if b is preferred, 0 if undecided
 // (caller falls back to first-seen). PON-VRF blocks compare by VRF output (un-grindable);

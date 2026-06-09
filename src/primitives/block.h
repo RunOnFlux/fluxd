@@ -255,6 +255,13 @@ public:
             // PON block - include all data (already compact)
             READWRITE(nodesCollateral);
             READWRITE(vchBlockSig);
+            // PON-VRF: the VRF output is committed to the block hash, so it MUST be carried
+            // here or the receiver recomputes the wrong hash (-> "non-continuous cmpheaders").
+            // The proof is included too, mirroring vchBlockSig (full header data).
+            if (nVersion >= PON_VRF_VERSION) {
+                READWRITE(nodesVrfOutput);
+                READWRITE(nodesVrfProof);
+            }
         } else {
             // POW block - include nNonce but OMIT nSolution
             // The large Equihash solution is not needed for checkpointed blocks

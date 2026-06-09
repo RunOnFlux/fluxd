@@ -238,7 +238,7 @@ void PONMinter(const CChainParams& chainparams)
                     lastAttemptedSlot = currentSlot;
                     continue;
                 }
-                uint256 seed = GetEpochSeed(pindexPrev, consensusParams);
+                uint256 seed = GetPonVrfMessage(pindexPrev, currentSlot, consensusParams);
                 if (!ECVRF_Prove(opKey, opPub, seed, vrfProof, vrfOutput)) {
                     LogPrintf("PON: VRF prove failed\n");
                     lastAttemptedSlot = currentSlot;
