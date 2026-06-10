@@ -47,41 +47,41 @@ CBlockHeader MakePopulatedHeader()
 
 // ---- arena -----------------------------------------------------------------
 
-TEST(BlockIndexPool, AllocateContainsExhaustDestroy)
+TEST(BlockIndexPool, AllocateAcrossChunksContainsDestroy)
 {
     CBlockIndexPool pool;
-    // Tiny capacity so we can hit exhaustion deterministically.
-    ASSERT_TRUE(pool.Initialize(sizeof(CBlockIndex), sizeof(uint256), 3, "/tmp"));
-    EXPECT_EQ(pool.Capacity(), (size_t)3);
+    // Tiny chunk (2 entries) so a handful of allocations spans several chunks.
+    ASSERT_TRUE(pool.Initialize(sizeof(CBlockIndex), sizeof(uint256), 2, "/tmp"));
+    EXPECT_EQ(pool.Capacity(), (size_t)2);    // first chunk mapped at init
     EXPECT_EQ(pool.Size(), (size_t)0);
 
-    void* a = pool.AllocateEntry();
-    ASSERT_NE(a, nullptr);
-    EXPECT_EQ(pool.Size(), (size_t)1);
-    EXPECT_TRUE(pool.Contains(a));
-    EXPECT_NE(pool.HashAt(0), nullptr);
+    std::vector<void*> ptrs;
+    for (int i = 0; i < 5; i++) {
+        void* p = pool.AllocateEntry();       // segmented: adds a chunk when full
+        ASSERT_NE(p, nullptr);
+        ptrs.push_back(p);
+    }
+    EXPECT_EQ(pool.Size(), (size_t)5);
+    EXPECT_EQ(pool.Capacity(), (size_t)6);    // grew to 3 chunks of 2
 
+    // Every handed-out pointer (across all chunks) is recognized; hashes too.
+    for (int i = 0; i < 5; i++) {
+        EXPECT_TRUE(pool.Contains(ptrs[i]));
+        EXPECT_NE(pool.HashAt(i), nullptr);
+    }
     int onStack = 0;
-    EXPECT_FALSE(pool.Contains(&onStack));   // heap/stack pointers are not "in" the pool
+    EXPECT_FALSE(pool.Contains(&onStack));
     EXPECT_FALSE(pool.Contains(nullptr));
 
-    ASSERT_NE(pool.AllocateEntry(), nullptr);
-    ASSERT_NE(pool.AllocateEntry(), nullptr);
-    EXPECT_EQ(pool.Size(), (size_t)3);
-
-    // Exhausted: returns nullptr, which is what makes InsertBlockIndex fall
-    // back to heap allocation instead of aborting.
-    EXPECT_EQ(pool.AllocateEntry(), nullptr);
-
-    pool.DestroyAll([](void*) {});           // no objects constructed; just reset
+    pool.DestroyAll([](void*) {});            // no objects constructed; just reset
     EXPECT_EQ(pool.Size(), (size_t)0);
 }
 
 TEST(BlockIndexPool, InitializeFailsGracefullyOnBadDir)
 {
     CBlockIndexPool pool;
-    // O_TMPFILE on a nonexistent directory fails -> Initialize returns false
-    // -> caller uses plain heap allocation (master behavior).
+    // Creating the backing file in a nonexistent directory fails -> Initialize
+    // returns false -> caller uses plain heap allocation (master behavior).
     EXPECT_FALSE(pool.Initialize(sizeof(CBlockIndex), sizeof(uint256), 4,
                                  "/nonexistent/flux/arena/path"));
 }
