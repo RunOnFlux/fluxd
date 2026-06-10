@@ -2,33 +2,42 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE   // expose O_TMPFILE
+#endif
+
 #include "blockindexpool.h"
 
 #include <cstring>
 #include <fcntl.h>
 
-// Map a sparse file of `bytes` and return the mapping, or MAP_FAILED.
-// Creates (truncating any stale file) `path`, sparse-sizes it via ftruncate
-// so untouched pages cost no disk, and maps it MAP_SHARED so the kernel can
-// evict dirty cold pages back to the file instead of swap.
-static void* MapBackingFile(const std::string& path, size_t bytes)
+#ifndef O_TMPFILE
+// Fallback for libc headers that don't expose the constant (Linux value).
+#define O_TMPFILE (020000000 | O_DIRECTORY)
+#endif
+
+// Map a sparse, anonymous (nameless) disk-backed region of `bytes` under
+// directory `dir`, or return MAP_FAILED. We use O_TMPFILE: the backing inode
+// has no directory entry, so it is invisible to ls/du/backup tooling and is
+// reclaimed automatically by the kernel when the process exits (clean OR
+// crashed) — no scratch file to manage and nothing to exclude from backups.
+// ftruncate sparse-sizes it (untouched pages cost no disk), and MAP_SHARED
+// lets the kernel evict dirty cold pages back to this inode instead of swap.
+// If O_TMPFILE is unsupported (old kernel/exotic FS), open() fails and the
+// caller falls through to plain heap allocation.
+static void* MapBackingFile(const std::string& dir, size_t bytes)
 {
-    int fd = open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
+    int fd = open(dir.c_str(), O_TMPFILE | O_RDWR, 0600);
     if (fd < 0)
         return MAP_FAILED;
 
     if (ftruncate(fd, (off_t)bytes) != 0) {
         close(fd);
-        unlink(path.c_str());
         return MAP_FAILED;
     }
 
     void* p = mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    close(fd); // mapping keeps the file alive; fd no longer needed
-    if (p == MAP_FAILED) {
-        unlink(path.c_str());
-        return MAP_FAILED;
-    }
+    close(fd); // mapping keeps the unnamed inode alive; reclaimed on munmap/exit
     return p;
 }
 
@@ -40,15 +49,12 @@ CBlockIndexPool::CBlockIndexPool()
 
 CBlockIndexPool::~CBlockIndexPool()
 {
+    // The backing inodes are nameless (O_TMPFILE); munmap drops the last
+    // reference and the kernel reclaims their disk blocks. Nothing to unlink.
     if (pPoolMem)
         munmap(pPoolMem, nCapacity * nEntrySize);
     if (pHashMem)
         munmap(pHashMem, nCapacity * nHashSize);
-    // Scratch files: never reused across runs, so drop them on shutdown.
-    if (!poolPath.empty())
-        unlink(poolPath.c_str());
-    if (!hashPath.empty())
-        unlink(hashPath.c_str());
 }
 
 bool CBlockIndexPool::Initialize(size_t entrySize, size_t hashSize, size_t capacity,
@@ -58,25 +64,19 @@ bool CBlockIndexPool::Initialize(size_t entrySize, size_t hashSize, size_t capac
     nHashSize = hashSize;
     nCapacity = capacity;
     nAllocated = 0;
-    poolPath = backingDir + "/blockindex.arena";
-    hashPath = backingDir + "/blockindex.hashes";
 
-    pPoolMem = MapBackingFile(poolPath, nCapacity * nEntrySize);
+    // Two separate nameless inodes under the datadir's filesystem.
+    pPoolMem = MapBackingFile(backingDir, nCapacity * nEntrySize);
     if (pPoolMem == MAP_FAILED) {
         pPoolMem = nullptr;
-        poolPath.clear();
-        hashPath.clear();
         return false;
     }
 
-    pHashMem = MapBackingFile(hashPath, nCapacity * nHashSize);
+    pHashMem = MapBackingFile(backingDir, nCapacity * nHashSize);
     if (pHashMem == MAP_FAILED) {
         munmap(pPoolMem, nCapacity * nEntrySize);
-        unlink(poolPath.c_str());
         pPoolMem = nullptr;
         pHashMem = nullptr;
-        poolPath.clear();
-        hashPath.clear();
         return false;
     }
 
