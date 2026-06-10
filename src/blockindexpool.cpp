@@ -2,93 +2,94 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE   // expose O_TMPFILE
-#endif
-
 #include "blockindexpool.h"
 
 #include <cstring>
 #include <fcntl.h>
 
-#ifndef O_TMPFILE
-// Fallback for libc headers that don't expose the constant (Linux value).
-#define O_TMPFILE (020000000 | O_DIRECTORY)
+#ifndef MADV_COLD
+#define MADV_COLD 20
 #endif
 
-// Map a sparse, anonymous (nameless) disk-backed region of `bytes` under
-// directory `dir`, or return MAP_FAILED. We use O_TMPFILE: the backing inode
-// has no directory entry, so it is invisible to ls/du/backup tooling and is
-// reclaimed automatically by the kernel when the process exits (clean OR
-// crashed) — no scratch file to manage and nothing to exclude from backups.
-// ftruncate sparse-sizes it (untouched pages cost no disk), and MAP_SHARED
-// lets the kernel evict dirty cold pages back to this inode instead of swap.
-// If O_TMPFILE is unsupported (old kernel/exotic FS), open() fails and the
-// caller falls through to plain heap allocation.
-static void* MapBackingFile(const std::string& dir, size_t bytes)
+namespace {
+size_t PageAlignUp(size_t n)
 {
-    int fd = open(dir.c_str(), O_TMPFILE | O_RDWR, 0600);
-    if (fd < 0)
-        return MAP_FAILED;
-
-    if (ftruncate(fd, (off_t)bytes) != 0) {
-        close(fd);
-        return MAP_FAILED;
-    }
-
-    void* p = mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    close(fd); // mapping keeps the unnamed inode alive; reclaimed on munmap/exit
-    return p;
+    long ps = sysconf(_SC_PAGESIZE);
+    if (ps <= 0) ps = 4096;
+    size_t p = (size_t)ps;
+    return ((n + p - 1) / p) * p;
 }
+} // namespace
 
 CBlockIndexPool::CBlockIndexPool()
-    : pPoolMem(nullptr), pHashMem(nullptr),
-      nEntrySize(0), nHashSize(0), nCapacity(0), nAllocated(0)
+    : nEntrySize(0), nHashSize(0), nSlotSize(0), nEntriesPerChunk(0),
+      nAllocated(0), nChunkBytes(0), arenaFd(-1)
 {
 }
 
 CBlockIndexPool::~CBlockIndexPool()
 {
-    // The backing inodes are nameless (O_TMPFILE); munmap drops the last
-    // reference and the kernel reclaims their disk blocks. Nothing to unlink.
-    if (pPoolMem)
-        munmap(pPoolMem, nCapacity * nEntrySize);
-    if (pHashMem)
-        munmap(pHashMem, nCapacity * nHashSize);
+    for (void* w : chunks)
+        if (w) munmap(w, nChunkBytes);
+    chunks.clear();
+    if (arenaFd >= 0) close(arenaFd);
+    // Scratch file: drop it on clean shutdown. (A crash leaves it; the next
+    // startup opens O_TRUNC, discarding the stale content.)
+    if (!arenaPath.empty()) unlink(arenaPath.c_str());
 }
 
-bool CBlockIndexPool::Initialize(size_t entrySize, size_t hashSize, size_t capacity,
-                                 const std::string& backingDir)
+bool CBlockIndexPool::AddChunk()
+{
+    const size_t n = chunks.size();
+    // Grow the file to cover the new window, then map it at its offset.
+    // ftruncate only extends the logical size (sparse); blocks are allocated
+    // lazily as pages are written.
+    if (ftruncate(arenaFd, (off_t)((n + 1) * nChunkBytes)) != 0)
+        return false;
+    void* w = mmap(nullptr, nChunkBytes, PROT_READ | PROT_WRITE,
+                   MAP_SHARED, arenaFd, (off_t)(n * nChunkBytes));
+    if (w == MAP_FAILED)
+        return false;
+    chunks.push_back(w);
+    return true;
+}
+
+bool CBlockIndexPool::Initialize(size_t entrySize, size_t hashSize,
+                                 size_t entriesPerChunk, const std::string& backingDir)
 {
     nEntrySize = entrySize;
     nHashSize = hashSize;
-    nCapacity = capacity;
+    // Each slot is a CBlockIndex followed by its hash. Round the slot up to
+    // 8 bytes so successive CBlockIndex objects stay aligned.
+    nSlotSize = ((entrySize + hashSize + 7) / 8) * 8;
+    nEntriesPerChunk = entriesPerChunk;
     nAllocated = 0;
+    nChunkBytes = PageAlignUp(entriesPerChunk * nSlotSize);
+    arenaPath = backingDir + "/blockindex.arena";
 
-    // Two separate nameless inodes under the datadir's filesystem.
-    pPoolMem = MapBackingFile(backingDir, nCapacity * nEntrySize);
-    if (pPoolMem == MAP_FAILED) {
-        pPoolMem = nullptr;
+    if (nEntriesPerChunk == 0)
         return false;
-    }
 
-    pHashMem = MapBackingFile(backingDir, nCapacity * nHashSize);
-    if (pHashMem == MAP_FAILED) {
-        munmap(pPoolMem, nCapacity * nEntrySize);
-        pPoolMem = nullptr;
-        pHashMem = nullptr;
+    // O_TRUNC discards any file left by a previous crash. The arena is scratch
+    // (always rebuilt from leveldb at startup), so this is always safe.
+    arenaFd = open(arenaPath.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
+    if (arenaFd < 0)
         return false;
-    }
 
-    return true;
+    // Map the first chunk now so an unsupported/full FS fails here and the
+    // caller can fall back to heap allocation.
+    return AddChunk();
 }
 
 void* CBlockIndexPool::AllocateEntry()
 {
-    if (nAllocated >= nCapacity)
-        return nullptr;
-
-    void* p = static_cast<char*>(pPoolMem) + (nAllocated * nEntrySize);
+    const size_t chunkIdx = nAllocated / nEntriesPerChunk;
+    if (chunkIdx >= chunks.size()) {
+        if (!AddChunk())
+            return nullptr;   // couldn't grow (disk/mmap) -> caller uses heap
+    }
+    const size_t off = nAllocated % nEntriesPerChunk;
+    void* p = static_cast<char*>(chunks[chunkIdx]) + (off * nSlotSize);
     nAllocated++;
     return p;
 }
@@ -97,58 +98,49 @@ void* CBlockIndexPool::HashAt(size_t index)
 {
     if (index >= nAllocated)
         return nullptr;
-    return static_cast<char*>(pHashMem) + (index * nHashSize);
+    const size_t chunkIdx = index / nEntriesPerChunk;
+    const size_t off = index % nEntriesPerChunk;
+    // The hash lives immediately after the CBlockIndex within the slot.
+    return static_cast<char*>(chunks[chunkIdx]) + (off * nSlotSize) + nEntrySize;
 }
 
 bool CBlockIndexPool::Contains(const void* p) const
 {
-    if (!pPoolMem || !p)
+    if (!p)
         return false;
-    return p >= pPoolMem &&
-           p < static_cast<const char*>(pPoolMem) + (nAllocated * nEntrySize);
+    const size_t usedBytes = nEntriesPerChunk * nSlotSize;
+    for (void* w : chunks) {
+        if (p >= w && p < static_cast<const char*>(w) + usedBytes)
+            return true;
+    }
+    return false;
 }
 
 void CBlockIndexPool::AdviseOldBlocksCold(size_t nKeepRecent)
 {
-    if (!pPoolMem || nAllocated == 0)
+    if (nAllocated == 0)
         return;
 
-    size_t nColdCount = (nAllocated > nKeepRecent) ? nAllocated - nKeepRecent : 0;
-    if (nColdCount == 0)
+    // Recent entries live in the last chunk(s); advise every chunk that holds
+    // only buried entries (below nAllocated - nKeepRecent) as cold, leaving the
+    // chunk(s) covering the recent tail resident.
+    const size_t coldBelow = (nAllocated > nKeepRecent) ? (nAllocated - nKeepRecent) : 0;
+    if (coldBelow == 0)
         return;
+    const size_t lastColdChunk = coldBelow / nEntriesPerChunk; // [0, lastColdChunk) fully cold
 
-    long pageSize = sysconf(_SC_PAGESIZE);
-
-    size_t coldPoolBytes = nColdCount * nEntrySize;
-    coldPoolBytes = (coldPoolBytes / pageSize) * pageSize;
-
-    size_t coldHashBytes = nColdCount * nHashSize;
-    coldHashBytes = (coldHashBytes / pageSize) * pageSize;
-
-    // MADV_COLD (Linux 5.4+) tells the kernel these pages are cold.
-    // Fall back to MADV_DONTNEED on older kernels (discards pages entirely).
-#ifndef MADV_COLD
-#define MADV_COLD 20
-#endif
-    int advice = MADV_COLD;
-    if (coldPoolBytes > 0) {
-        if (madvise(pPoolMem, coldPoolBytes, advice) != 0)
-            madvise(pPoolMem, coldPoolBytes, MADV_DONTNEED);
-    }
-    if (coldHashBytes > 0) {
-        if (madvise(pHashMem, coldHashBytes, advice) != 0)
-            madvise(pHashMem, coldHashBytes, MADV_DONTNEED);
+    for (size_t i = 0; i < lastColdChunk && i < chunks.size(); i++) {
+        if (madvise(chunks[i], nChunkBytes, MADV_COLD) != 0)
+            madvise(chunks[i], nChunkBytes, MADV_DONTNEED);
     }
 }
 
 void CBlockIndexPool::DestroyAll(void (*destructor)(void*))
 {
-    if (!pPoolMem)
-        return;
-
     for (size_t i = 0; i < nAllocated; i++) {
-        void* p = static_cast<char*>(pPoolMem) + (i * nEntrySize);
-        destructor(p);
+        const size_t chunkIdx = i / nEntriesPerChunk;
+        const size_t off = i % nEntriesPerChunk;
+        destructor(static_cast<char*>(chunks[chunkIdx]) + (off * nSlotSize));
     }
     nAllocated = 0;
 }
