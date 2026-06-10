@@ -528,10 +528,13 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                 pindexNew->nBits          = diskindex.nBits;
                 pindexNew->nStatus        = diskindex.nStatus;
                 pindexNew->nTx            = diskindex.nTx;
-                // Value-pool deltas live directly on CBlockIndex (not in the
-                // prunable HeaderData); copy them from the deserialized record.
-                pindexNew->nSproutValue   = diskindex.nSproutValue;
-                pindexNew->nSaplingValue  = diskindex.nSaplingValue;
+                // These live directly on CBlockIndex (not in the prunable
+                // HeaderData) because init-time checks read them before the chain
+                // is reconnected; copy them from the deserialized record.
+                pindexNew->nSproutValue     = diskindex.nSproutValue;
+                pindexNew->nSaplingValue    = diskindex.nSaplingValue;
+                pindexNew->nCachedBranchId  = diskindex.nCachedBranchId;
+                pindexNew->hashSproutAnchor = diskindex.hashSproutAnchor;
 
                 if (diskindex.pHeaderData) {
                     pindexNew->AllocateHeaderData();

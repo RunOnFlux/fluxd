@@ -3889,9 +3889,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             view.SetBestBlock(pindex->GetBlockHash());
             // Before the genesis block, there was an empty tree
             SproutMerkleTree tree;
-            pindex->pHeaderData->hashSproutAnchor = tree.root();
+            pindex->hashSproutAnchor = tree.root();
             // The genesis block contained no JoinSplits
-            pindex->pHeaderData->hashFinalSproutRoot = pindex->pHeaderData->hashSproutAnchor;
+            pindex->hashFinalSproutRoot = pindex->hashSproutAnchor;
         }
         return true;
     }
@@ -3973,7 +3973,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     auto old_sprout_tree_root = view.GetBestAnchor(SPROUT);
     // saving the top anchor in the block index as we go.
     if (!fJustCheck) {
-        pindex->pHeaderData->hashSproutAnchor = old_sprout_tree_root;
+        pindex->hashSproutAnchor = old_sprout_tree_root;
     }
     SproutMerkleTree sprout_tree;
     // This should never fail: we should always be able to get the root
@@ -4191,7 +4191,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     view.PushAnchor(sprout_tree);
     view.PushAnchor(sapling_tree);
     if (!fJustCheck) {
-        pindex->pHeaderData->hashFinalSproutRoot = sprout_tree.root();
+        pindex->hashFinalSproutRoot = sprout_tree.root();
     }
     blockundo.old_sprout_tree_root = old_sprout_tree_root;
 
@@ -4247,9 +4247,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             "nCachedBranchId must be set after all consensus rules have been validated.");
         if (IsActivationHeightForAnyUpgrade(pindex->nHeight, chainparams.GetConsensus())) {
             pindex->nStatus |= BLOCK_ACTIVATES_UPGRADE;
-            pindex->pHeaderData->nCachedBranchId = CurrentEpochBranchId(pindex->nHeight, chainparams.GetConsensus());
+            pindex->nCachedBranchId = CurrentEpochBranchId(pindex->nHeight, chainparams.GetConsensus());
         } else if (pindex->pprev) {
-            pindex->pHeaderData->nCachedBranchId = pindex->pprev->pHeaderData ? pindex->pprev->pHeaderData->nCachedBranchId : std::nullopt;
+            pindex->nCachedBranchId = pindex->pprev->nCachedBranchId;
         }
 
         pindex->RaiseValidity(BLOCK_VALID_SCRIPTS);
@@ -6229,11 +6229,11 @@ bool static LoadBlockIndexDB()
         // validity status because it is side-loaded into a fresh chain.
         // Activation blocks will have branch IDs set (read from disk).
         if (pindex->pprev) {
-            if (pindex->IsValid(BLOCK_VALID_CONSENSUS) && pindex->pHeaderData && !pindex->pHeaderData->nCachedBranchId) {
-                pindex->pHeaderData->nCachedBranchId = (pindex->pprev->pHeaderData ? pindex->pprev->pHeaderData->nCachedBranchId : std::optional<uint32_t>(SPROUT_BRANCH_ID));
+            if (pindex->IsValid(BLOCK_VALID_CONSENSUS) && !pindex->nCachedBranchId) {
+                pindex->nCachedBranchId = pindex->pprev->nCachedBranchId;
             }
         } else {
-            if (pindex->pHeaderData) pindex->pHeaderData->nCachedBranchId = SPROUT_BRANCH_ID;
+            pindex->nCachedBranchId = SPROUT_BRANCH_ID;
         }
         if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->pprev == NULL))
             setBlockIndexCandidates.insert(pindex);
@@ -6310,9 +6310,7 @@ bool static LoadBlockIndexDB()
         // - This will miss chain tips; we handle the best tip below, and other
         //   tips will be handled by ConnectTip during a re-org.
         if (pindex->pprev) {
-            if (pindex->pprev->pHeaderData && pindex->pHeaderData) {
-                pindex->pprev->pHeaderData->hashFinalSproutRoot = pindex->pHeaderData->hashSproutAnchor;
-            }
+            pindex->pprev->hashFinalSproutRoot = pindex->hashSproutAnchor;
         }
     }
 
@@ -6322,8 +6320,7 @@ bool static LoadBlockIndexDB()
         return true;
     chainActive.SetTip(it->second);
     // Set hashFinalSproutRoot for the end of best chain
-    if (it->second->pHeaderData)
-        it->second->pHeaderData->hashFinalSproutRoot = pcoinsTip->GetBestAnchor(SPROUT);
+    it->second->hashFinalSproutRoot = pcoinsTip->GetBestAnchor(SPROUT);
 
     PruneBlockIndexCandidates();
 
@@ -6532,9 +6529,8 @@ bool RewindBlockIndex(const CChainParams& chainparams, bool& clearWitnessCaches)
         bool fFlagSet = pindex->nStatus & BLOCK_ACTIVATES_UPGRADE;
         bool fFlagExpected = IsActivationHeightForAnyUpgrade(pindex->nHeight, consensus);
         return fFlagSet == fFlagExpected &&
-            pindex->pHeaderData &&
-            pindex->pHeaderData->nCachedBranchId &&
-            *pindex->pHeaderData->nCachedBranchId == CurrentEpochBranchId(pindex->nHeight, consensus);
+            pindex->nCachedBranchId &&
+            *pindex->nCachedBranchId == CurrentEpochBranchId(pindex->nHeight, consensus);
     };
 
     int nHeight = 1;
