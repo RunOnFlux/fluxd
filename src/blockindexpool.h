@@ -27,19 +27,23 @@ class uint256;
  * - MADV_COLD hint proactively tells the kernel which pages are cold
  * - No heap fragmentation from 2.5M+ allocations
  *
- * The arena is backed by sparse files (MAP_SHARED) in the datadir rather
- * than anonymous memory. Two consequences:
+ * The arena is backed by sparse, nameless disk inodes (O_TMPFILE + MAP_SHARED)
+ * on the datadir's filesystem rather than anonymous memory. Consequences:
  *
  * - The capacity reservation is a sparse ftruncate: it costs no disk and no
  *   RAM until pages are actually touched, so we reserve far more than the
  *   chain will need in our lifetime and never hit a hard ceiling.
- * - Cold pages are evicted to the backing FILE, not to swap. A node with
+ * - Cold pages are evicted to the backing inode, not to swap. A node with
  *   little RAM (and no swap) keeps resident memory bounded to the working
  *   set; disk used grows only with the amount actually evicted.
+ * - The inodes have no directory entry (O_TMPFILE), so they are invisible to
+ *   ls/du/backup tooling and the kernel reclaims their disk blocks
+ *   automatically when the process exits, clean or crashed. Nothing to clean
+ *   up, nothing to exclude from backups. Durability is irrelevant: the bytes
+ *   hold process-lifetime pointers and are never reused across runs.
  *
- * The files are scratch: recreated (O_TRUNC) at startup and unlinked on
- * clean shutdown. The on-disk bytes are never reused across runs (they hold
- * process-lifetime pointers), so durability is irrelevant.
+ * If O_TMPFILE is unsupported (old kernel/exotic FS), Initialize() returns
+ * false and the caller falls back to plain heap allocation.
  */
 class CBlockIndexPool {
 private:
@@ -49,8 +53,6 @@ private:
     size_t nHashSize;
     size_t nCapacity;
     size_t nAllocated;
-    std::string poolPath;
-    std::string hashPath;
 
     CBlockIndexPool(const CBlockIndexPool&) = delete;
     CBlockIndexPool& operator=(const CBlockIndexPool&) = delete;

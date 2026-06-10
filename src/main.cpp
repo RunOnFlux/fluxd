@@ -6156,11 +6156,12 @@ bool static LoadBlockIndexDB()
     // and never create the backing files.
     //
     // Capacity is a sparse reservation: ftruncate costs no disk/RAM until
-    // pages are touched, so we reserve far beyond any realistic chain length
-    // (100M entries ≈ many decades) and never hit a hard ceiling. If the
-    // reservation is somehow exhausted, InsertBlockIndex falls back to heap
-    // per-entry rather than aborting.
-    static const size_t POOL_CAPACITY = 100000000;
+    // pages are touched. 30M entries is ~25+ years of headroom at current
+    // block cadence (incl. orphans/side-chain tips) — enough to never be a
+    // practical ceiling, while keeping the virtual reservation modest. If it
+    // is somehow exhausted, InsertBlockIndex falls back to heap per-entry
+    // rather than aborting.
+    static const size_t POOL_CAPACITY = 30000000;
     if (fFluxnode) {
         g_blockIndexPool = new CBlockIndexPool();
         if (!g_blockIndexPool->Initialize(sizeof(CBlockIndex), sizeof(uint256),
