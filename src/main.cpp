@@ -49,6 +49,7 @@
 #include <filesystem>
 #include <fstream>
 #include <cmath>
+#include <sys/statvfs.h>
 
 #include "emergencyblock.h"
 
@@ -6153,7 +6154,30 @@ bool static LoadBlockIndexDB()
     // is somehow exhausted, InsertBlockIndex falls back to heap per-entry
     // rather than aborting.
     static const size_t POOL_CAPACITY = 30000000;
+    // The arena's backing inode is sparse — ftruncate allocates no blocks, so
+    // low disk can't be detected at allocation time; blocks are allocated
+    // lazily as entries are written, and a genuinely full datadir would later
+    // SIGBUS on write (a clean crash; the arena is scratch and rebuilds from
+    // leveldb). Guard the *startup* case here: if the datadir filesystem is
+    // already low on space, skip the arena and use heap allocation instead.
+    // (Runtime disk-fill remains a benign residual, equivalent to any node
+    // being unable to write its chainstate on a full disk.)
+    static const uint64_t ARENA_MIN_FREE_BYTES = 2ULL * 1024 * 1024 * 1024; // 2 GiB
+    bool fEnoughDisk = true;
     if (fFluxnode) {
+        struct statvfs vfs;
+        if (statvfs(GetDataDir().string().c_str(), &vfs) == 0) {
+            uint64_t freeBytes = (uint64_t)vfs.f_bavail * vfs.f_frsize;
+            if (freeBytes < ARENA_MIN_FREE_BYTES) {
+                fEnoughDisk = false;
+                LogPrintf("Block index arena: datadir has only %lu MiB free (< %lu MiB); "
+                          "using heap allocation instead\n",
+                          (unsigned long)(freeBytes >> 20),
+                          (unsigned long)(ARENA_MIN_FREE_BYTES >> 20));
+            }
+        } // statvfs failure: proceed and let Initialize/heap fallback handle it
+    }
+    if (fFluxnode && fEnoughDisk) {
         g_blockIndexPool = new CBlockIndexPool();
         if (!g_blockIndexPool->Initialize(sizeof(CBlockIndex), sizeof(uint256),
                                           POOL_CAPACITY, GetDataDir().string())) {
@@ -6164,8 +6188,9 @@ bool static LoadBlockIndexDB()
             LogPrintf("Block index arena: sparse file-backed, capacity %lu entries\n",
                       (unsigned long)POOL_CAPACITY);
         }
-        mapBlockIndex.reserve(4000000);
     }
+    if (fFluxnode)
+        mapBlockIndex.reserve(4000000);
 
     if (!pblocktree->LoadBlockIndexGuts(InsertBlockIndex))
         return false;
