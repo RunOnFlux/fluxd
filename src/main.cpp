@@ -2803,6 +2803,56 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus
     return true;
 }
 
+// On a fluxnode the header data of buried blocks is pruned from memory
+// (pHeaderData == nullptr) to save RAM. Connect/disconnect/serving paths that
+// run on such a block must restore the header fields first. These helpers
+// allocate pHeaderData if missing and repopulate the *header* fields (the only
+// ones reconstructable from the block); cumulative value-pool fields are left
+// at their defaults and recomputed by the connect logic that needs them.
+static void EnsureHeaderDataFromBlock(CBlockIndex* pindex, const CBlock& block)
+{
+    if (!pindex || pindex->pHeaderData)
+        return;
+    pindex->AllocateHeaderData();
+    CBlockIndex::HeaderData* h = pindex->pHeaderData;
+    h->hashMerkleRoot       = block.hashMerkleRoot;
+    h->hashFinalSaplingRoot = block.hashFinalSaplingRoot;
+    h->nNonce               = block.nNonce;
+    h->nSolution            = block.nSolution;
+    h->nodesCollateral      = block.nodesCollateral;
+    h->vchBlockSig          = block.vchBlockSig;
+}
+
+static void EnsureHeaderDataFromDisk(CBlockIndex* pindex, const Consensus::Params& consensusParams)
+{
+    if (!pindex || pindex->pHeaderData)
+        return;
+    CBlock block;
+    if (ReadBlockFromDisk(block, pindex, consensusParams))
+        EnsureHeaderDataFromBlock(pindex, block);
+    else
+        pindex->AllocateHeaderData(); // last resort: empty struct beats a null deref
+}
+
+// Return a complete block header for serving over P2P/RPC, transparently
+// re-reading from disk when the in-memory header data was pruned (or when only
+// nSolution was omitted for a compact-stored block). Without this a fluxnode
+// would serve zeroed merkle roots / nonces for buried blocks.
+static CBlockHeader GetFullBlockHeader(const CBlockIndex* pindex, const Consensus::Params& consensusParams)
+{
+    CBlockHeader header = pindex->GetBlockHeader();
+    if (!pindex->pHeaderData) {
+        CBlock block;
+        if (ReadBlockFromDisk(block, pindex, consensusParams))
+            header = block.GetBlockHeader();
+    } else if (header.IsPOW() && header.nSolution.empty()) {
+        CBlock block;
+        if (ReadBlockFromDisk(block, pindex, consensusParams))
+            header.nSolution = block.nSolution;
+    }
+    return header;
+}
+
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
 {
     // Once Proof of Node goes active.
@@ -3627,6 +3677,9 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
     // the Sapling activation height. Otherwise, the last anchor was the
     // empty root.
     if (NetworkUpgradeActive(pindex->pprev->nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA)) {
+        // pprev may be buried and have had its header data pruned; restore it
+        // from disk so hashFinalSaplingRoot is the real value, not a zeroed one.
+        EnsureHeaderDataFromDisk(pindex->pprev, chainparams.GetConsensus());
         view.PopAnchor(pindex->pprev->pHeaderData->hashFinalSaplingRoot, SAPLING);
     } else {
         view.PopAnchor(SaplingMerkleTree::empty_root(), SAPLING);
@@ -3802,6 +3855,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                   CCoinsViewCache& view, const CChainParams& chainparams, bool fJustCheck, FluxnodeCache* p_fluxnodeCache)
 {
     AssertLockHeld(cs_main);
+
+    // If this block's header data was pruned (buried block being reconnected
+    // during a deep reorg/invalidateblock), restore it from the block in hand
+    // before the value-pool/anchor bookkeeping below dereferences pHeaderData.
+    EnsureHeaderDataFromBlock(pindex, block);
 
     bool fExpensiveChecks = true;
     if (fCheckpointsEnabled) {
@@ -5186,6 +5244,10 @@ bool ReceivedBlockTransactions(
         while (!queue.empty()) {
             CBlockIndex *pindex = queue.front();
             queue.pop_front();
+            // A descendant pulled from mapBlocksUnlinked could be a buried block
+            // whose header data was pruned; ensure the struct exists before the
+            // value-pool bookkeeping below dereferences it (fields stay nullopt).
+            pindex->AllocateHeaderData();
             pindex->nChainTx = (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
             if (pindex->pprev) {
                 if (pindex->pprev->pHeaderData && pindex->pprev->pHeaderData->nChainSproutValue && pindex->pHeaderData->nSproutValue) {
@@ -6034,22 +6096,45 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
     if (mi != mapBlockIndex.end())
         return (*mi).second;
 
-    // Allocate from pool if available, otherwise fall back to heap
-    CBlockIndex* pindexNew;
-    if (g_blockIndexPool) {
-        void* mem = g_blockIndexPool->AllocateEntry();
-        if (!mem)
-            throw runtime_error("InsertBlockIndex(): pool exhausted");
+    // Allocate from the arena if available, otherwise (non-fluxnode, arena
+    // init failed, or arena exhausted) fall back to plain heap allocation.
+    // The arena and heap entries coexist: cleanup distinguishes them by
+    // CBlockIndexPool::Contains(), so heap fallbacks are deleted while arena
+    // entries are only destructed. Exhaustion therefore degrades gracefully
+    // instead of aborting the node.
+    CBlockIndex* pindexNew = nullptr;
+    void* mem = g_blockIndexPool ? g_blockIndexPool->AllocateEntry() : nullptr;
+    if (mem) {
         pindexNew = new (mem) CBlockIndex();
 
-        // Store hash in pool's parallel array and point phashBlock there
+        // Store hash in arena's parallel array and point phashBlock there
         size_t index = g_blockIndexPool->Size() - 1;
         uint256* pHash = static_cast<uint256*>(g_blockIndexPool->HashAt(index));
         *pHash = hash;
         pindexNew->phashBlock = pHash;
 
         mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+
+        // Warn once when the (huge) sparse reservation is 90% consumed, so a
+        // capacity bump can be scheduled long before it could ever matter.
+        static bool fWarnedNearCapacity = false;
+        if (!fWarnedNearCapacity &&
+            g_blockIndexPool->Size() * 10 >= g_blockIndexPool->Capacity() * 9) {
+            fWarnedNearCapacity = true;
+            LogPrintf("WARNING: block index arena is over 90%% full (%lu/%lu); "
+                      "bump POOL_CAPACITY before it is exhausted\n",
+                      (unsigned long)g_blockIndexPool->Size(),
+                      (unsigned long)g_blockIndexPool->Capacity());
+        }
     } else {
+        if (g_blockIndexPool) {
+            static bool fWarnedExhausted = false;
+            if (!fWarnedExhausted) {
+                fWarnedExhausted = true;
+                LogPrintf("WARNING: block index arena exhausted; allocating remaining "
+                          "entries on the heap (bounded-memory benefit reduced)\n");
+            }
+        }
         pindexNew = new CBlockIndex();
         if (!pindexNew)
             throw runtime_error("InsertBlockIndex(): new CBlockIndex failed");
@@ -6064,18 +6149,32 @@ bool static LoadBlockIndexDB()
 {
     const CChainParams& chainparams = Params();
 
-    // Initialize the block index pool. 5M capacity supports ~5 years of
-    // growth at 30-second blocks. MAP_NORESERVE means only touched pages
-    // consume physical memory.
-    static const size_t POOL_CAPACITY = 5000000;
-    g_blockIndexPool = new CBlockIndexPool();
-    if (!g_blockIndexPool->Initialize(sizeof(CBlockIndex), sizeof(uint256), POOL_CAPACITY)) {
-        delete g_blockIndexPool;
-        g_blockIndexPool = nullptr;
-        LogPrintf("WARNING: Failed to initialize block index pool, falling back to heap allocation\n");
+    // Initialize the block index arena — fluxnodes only. The arena is the
+    // memory-optimization path (sparse file-backed storage so cold block
+    // index pages evict to disk, keeping RSS bounded on low-RAM nodes); it
+    // is paired with header-data pruning, which is also fluxnode-gated.
+    // Non-fluxnodes fall through to plain heap allocation (master behavior)
+    // and never create the backing files.
+    //
+    // Capacity is a sparse reservation: ftruncate costs no disk/RAM until
+    // pages are touched, so we reserve far beyond any realistic chain length
+    // (100M entries ≈ many decades) and never hit a hard ceiling. If the
+    // reservation is somehow exhausted, InsertBlockIndex falls back to heap
+    // per-entry rather than aborting.
+    static const size_t POOL_CAPACITY = 100000000;
+    if (fFluxnode) {
+        g_blockIndexPool = new CBlockIndexPool();
+        if (!g_blockIndexPool->Initialize(sizeof(CBlockIndex), sizeof(uint256),
+                                          POOL_CAPACITY, GetDataDir().string())) {
+            delete g_blockIndexPool;
+            g_blockIndexPool = nullptr;
+            LogPrintf("WARNING: Failed to initialize block index arena, falling back to heap allocation\n");
+        } else {
+            LogPrintf("Block index arena: sparse file-backed, capacity %lu entries\n",
+                      (unsigned long)POOL_CAPACITY);
+        }
+        mapBlockIndex.reserve(4000000);
     }
-
-    mapBlockIndex.reserve(POOL_CAPACITY);
 
     if (!pblocktree->LoadBlockIndexGuts(InsertBlockIndex))
         return false;
@@ -7758,7 +7857,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
             for (; pindex; pindex = chainActive.Next(pindex))
             {
-                vCompactHeaders.push_back(CCompactBlockHeader(pindex->GetBlockHeader()));
+                vCompactHeaders.push_back(CCompactBlockHeader(GetFullBlockHeader(pindex, chainparams.GetConsensus())));
                 if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
                     break;
             }
@@ -7774,13 +7873,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
             for (; pindex; pindex = chainActive.Next(pindex))
             {
-                CBlockHeader header = pindex->GetBlockHeader();
-                if (header.IsPOW() && header.nSolution.empty()) {
-                    CBlock block;
-                    if (ReadBlockFromDisk(block, pindex, chainparams.GetConsensus())) {
-                        header.nSolution = block.nSolution;
-                    }
-                }
+                // GetFullBlockHeader re-reads from disk when the header data was
+                // pruned (buried block on a fluxnode) or when only nSolution was
+                // omitted, so we never serve zeroed merkle roots / nonces.
+                CBlockHeader header = GetFullBlockHeader(pindex, chainparams.GetConsensus());
                 vHeaders.push_back(header);
                 if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
                     break;
