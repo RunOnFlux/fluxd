@@ -168,6 +168,10 @@ TEST(BlockIndex, CopyDeepCopiesHeaderDataAndResidentFields)
 TEST(BlockIndex, DiskBlockIndexSerializationRoundTrip)
 {
     CBlockHeader h = MakePopulatedHeader();
+    // No predecessor in this fixture (idx.pprev stays null), and CBlockIndex
+    // carries the prev via pprev rather than storing hashPrevBlock — so keep
+    // the header's prev null to match, otherwise the reconstructed hash differs.
+    h.hashPrevBlock = uint256();
     CBlockIndex idx(h);
     idx.nHeight   = 2654321;
     idx.nFile     = 4;
@@ -180,6 +184,12 @@ TEST(BlockIndex, DiskBlockIndexSerializationRoundTrip)
     idx.hashSproutAnchor = uint256S("aa");
     idx.nSproutValue  = 111;               // serialized when client ver >= SPROUT_VALUE_VERSION
     idx.nSaplingValue = 333;
+
+    // CBlockIndex::GetBlockHash() returns *phashBlock; real code points this at
+    // the arena hash array / map key. Give the hand-built index a valid hash so
+    // the CDiskBlockIndex ctor (which reads pindex->GetBlockHash()) is safe.
+    uint256 blockHash = h.GetHash();
+    idx.phashBlock = &blockHash;
 
     CDiskBlockIndex disk(&idx);
     CDataStream ss(SER_DISK, CLIENT_VERSION);
@@ -209,6 +219,6 @@ TEST(BlockIndex, DiskBlockIndexSerializationRoundTrip)
     EXPECT_EQ(disk2.pHeaderData->nodesCollateral, h.nodesCollateral);
     EXPECT_EQ(disk2.pHeaderData->vchBlockSig, h.vchBlockSig);
 
-    // The reconstructed block hash must match the original block.
-    EXPECT_EQ(disk2.GetBlockHash(), idx.GetBlockHash());
+    // The hash reconstructed from the round-tripped header matches the original.
+    EXPECT_EQ(disk2.GetBlockHash(), h.GetHash());
 }
