@@ -5,6 +5,32 @@
 #include "blockindexpool.h"
 
 #include <cstring>
+#include <fcntl.h>
+
+// Map a sparse file of `bytes` and return the mapping, or MAP_FAILED.
+// Creates (truncating any stale file) `path`, sparse-sizes it via ftruncate
+// so untouched pages cost no disk, and maps it MAP_SHARED so the kernel can
+// evict dirty cold pages back to the file instead of swap.
+static void* MapBackingFile(const std::string& path, size_t bytes)
+{
+    int fd = open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0)
+        return MAP_FAILED;
+
+    if (ftruncate(fd, (off_t)bytes) != 0) {
+        close(fd);
+        unlink(path.c_str());
+        return MAP_FAILED;
+    }
+
+    void* p = mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd); // mapping keeps the file alive; fd no longer needed
+    if (p == MAP_FAILED) {
+        unlink(path.c_str());
+        return MAP_FAILED;
+    }
+    return p;
+}
 
 CBlockIndexPool::CBlockIndexPool()
     : pPoolMem(nullptr), pHashMem(nullptr),
@@ -18,32 +44,39 @@ CBlockIndexPool::~CBlockIndexPool()
         munmap(pPoolMem, nCapacity * nEntrySize);
     if (pHashMem)
         munmap(pHashMem, nCapacity * nHashSize);
+    // Scratch files: never reused across runs, so drop them on shutdown.
+    if (!poolPath.empty())
+        unlink(poolPath.c_str());
+    if (!hashPath.empty())
+        unlink(hashPath.c_str());
 }
 
-bool CBlockIndexPool::Initialize(size_t entrySize, size_t hashSize, size_t capacity)
+bool CBlockIndexPool::Initialize(size_t entrySize, size_t hashSize, size_t capacity,
+                                 const std::string& backingDir)
 {
     nEntrySize = entrySize;
     nHashSize = hashSize;
     nCapacity = capacity;
     nAllocated = 0;
+    poolPath = backingDir + "/blockindex.arena";
+    hashPath = backingDir + "/blockindex.hashes";
 
-    pPoolMem = mmap(nullptr, nCapacity * nEntrySize,
-                    PROT_READ | PROT_WRITE,
-                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE,
-                    -1, 0);
+    pPoolMem = MapBackingFile(poolPath, nCapacity * nEntrySize);
     if (pPoolMem == MAP_FAILED) {
         pPoolMem = nullptr;
+        poolPath.clear();
+        hashPath.clear();
         return false;
     }
 
-    pHashMem = mmap(nullptr, nCapacity * nHashSize,
-                    PROT_READ | PROT_WRITE,
-                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE,
-                    -1, 0);
+    pHashMem = MapBackingFile(hashPath, nCapacity * nHashSize);
     if (pHashMem == MAP_FAILED) {
         munmap(pPoolMem, nCapacity * nEntrySize);
+        unlink(poolPath.c_str());
         pPoolMem = nullptr;
         pHashMem = nullptr;
+        poolPath.clear();
+        hashPath.clear();
         return false;
     }
 
