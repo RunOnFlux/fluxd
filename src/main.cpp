@@ -3907,8 +3907,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         // We can expect nChainSproutValue to be valid after the hardcoded
         // height, and this will be enforced on all descendant blocks. If
         // the node was reindexed then this will be enforced for all blocks.
-        if (pindex->pHeaderData->nChainSproutValue) {
-            if (*pindex->pHeaderData->nChainSproutValue < 0) {
+        if (pindex->nChainSproutValue) {
+            if (*pindex->nChainSproutValue < 0) {
                 return state.DoS(100, error("ConnectBlock(): turnstile violation in Sprout shielded value pool"),
                              REJECT_INVALID, "turnstile-violation-sprout-shielded-pool");
             }
@@ -3921,8 +3921,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         // However, the miner and mining RPCs may not have populated this
         // value and will call `TestBlockValidity`. So, we act
         // conditionally.
-        if (pindex->pHeaderData->nChainSaplingValue) {
-            if (*pindex->pHeaderData->nChainSaplingValue < 0) {
+        if (pindex->nChainSaplingValue) {
+            if (*pindex->nChainSaplingValue < 0) {
                 return state.DoS(100, error("ConnectBlock(): turnstile violation in Sapling shielded value pool"),
                              REJECT_INVALID, "turnstile-violation-sapling-shielded-pool");
             }
@@ -5161,17 +5161,17 @@ void FallbackSproutValuePoolBalance(
     if (pindex->nHeight == chainparams.SproutValuePoolCheckpointHeight()) {
         if (pindex->GetBlockHash() == chainparams.SproutValuePoolCheckpointBlockHash()) {
             // Are we monitoring the Sprout pool?
-            if (!pindex->pHeaderData->nChainSproutValue) {
+            if (!pindex->nChainSproutValue) {
                 // Apparently not. Introduce the hardcoded value so we monitor for
                 // this point onwards (assuming the checkpoint is late enough)
-                pindex->pHeaderData->nChainSproutValue = chainparams.SproutValuePoolCheckpointBalance();
+                pindex->nChainSproutValue = chainparams.SproutValuePoolCheckpointBalance();
             } else {
                 // Apparently we have been. So, we should expect the current
                 // value to match the hardcoded one.
-                assert(*pindex->pHeaderData->nChainSproutValue == chainparams.SproutValuePoolCheckpointBalance());
+                assert(*pindex->nChainSproutValue == chainparams.SproutValuePoolCheckpointBalance());
                 // And we should expect non-none for the delta stored in the block index here,
                 // or the checkpoint is too early.
-                assert(pindex->pHeaderData->nSproutValue != std::nullopt);
+                assert(pindex->nSproutValue != std::nullopt);
             }
         } else {
             LogPrintf(
@@ -5220,10 +5220,10 @@ bool ReceivedBlockTransactions(
             sproutValue -= js.vpub_new;
         }
     }
-    pindexNew->pHeaderData->nSproutValue = sproutValue;
-    pindexNew->pHeaderData->nChainSproutValue = std::nullopt;
-    pindexNew->pHeaderData->nSaplingValue = saplingValue;
-    pindexNew->pHeaderData->nChainSaplingValue = std::nullopt;
+    pindexNew->nSproutValue = sproutValue;
+    pindexNew->nChainSproutValue = std::nullopt;
+    pindexNew->nSaplingValue = saplingValue;
+    pindexNew->nChainSaplingValue = std::nullopt;
     pindexNew->nFile = pos.nFile;
     pindexNew->nDataPos = pos.nPos;
     pindexNew->nUndoPos = 0;
@@ -5240,25 +5240,23 @@ bool ReceivedBlockTransactions(
         while (!queue.empty()) {
             CBlockIndex *pindex = queue.front();
             queue.pop_front();
-            // A descendant pulled from mapBlocksUnlinked could be a buried block
-            // whose header data was pruned; ensure the struct exists before the
-            // value-pool bookkeeping below dereferences it (fields stay nullopt).
-            pindex->AllocateHeaderData();
             pindex->nChainTx = (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
+            // Value-pool fields live directly on CBlockIndex (always resident),
+            // so propagation is correct even when header data has been pruned.
             if (pindex->pprev) {
-                if (pindex->pprev->pHeaderData && pindex->pprev->pHeaderData->nChainSproutValue && pindex->pHeaderData->nSproutValue) {
-                    pindex->pHeaderData->nChainSproutValue = *pindex->pprev->pHeaderData->nChainSproutValue + *pindex->pHeaderData->nSproutValue;
+                if (pindex->pprev->nChainSproutValue && pindex->nSproutValue) {
+                    pindex->nChainSproutValue = *pindex->pprev->nChainSproutValue + *pindex->nSproutValue;
                 } else {
-                    pindex->pHeaderData->nChainSproutValue = std::nullopt;
+                    pindex->nChainSproutValue = std::nullopt;
                 }
-                if (pindex->pprev->pHeaderData && pindex->pprev->pHeaderData->nChainSaplingValue) {
-                    pindex->pHeaderData->nChainSaplingValue = *pindex->pprev->pHeaderData->nChainSaplingValue + pindex->pHeaderData->nSaplingValue;
+                if (pindex->pprev->nChainSaplingValue) {
+                    pindex->nChainSaplingValue = *pindex->pprev->nChainSaplingValue + pindex->nSaplingValue;
                 } else {
-                    pindex->pHeaderData->nChainSaplingValue = std::nullopt;
+                    pindex->nChainSaplingValue = std::nullopt;
                 }
             } else {
-                pindex->pHeaderData->nChainSproutValue = pindex->pHeaderData->nSproutValue;
-                pindex->pHeaderData->nChainSaplingValue = pindex->pHeaderData->nSaplingValue;
+                pindex->nChainSproutValue = pindex->nSproutValue;
+                pindex->nChainSaplingValue = pindex->nSaplingValue;
             }
 
             // Fall back to hardcoded Sprout value pool balance
@@ -6198,28 +6196,26 @@ bool static LoadBlockIndexDB()
             if (pindex->pprev) {
                 if (pindex->pprev->nChainTx) {
                     pindex->nChainTx = pindex->pprev->nChainTx + pindex->nTx;
-                    if (pindex->pprev->pHeaderData && pindex->pprev->pHeaderData->nChainSproutValue && pindex->pHeaderData && pindex->pHeaderData->nSproutValue) {
-                        pindex->pHeaderData->nChainSproutValue = *pindex->pprev->pHeaderData->nChainSproutValue + *pindex->pHeaderData->nSproutValue;
+                    if (pindex->pprev->nChainSproutValue && pindex->nSproutValue) {
+                        pindex->nChainSproutValue = *pindex->pprev->nChainSproutValue + *pindex->nSproutValue;
                     } else {
-                        if (pindex->pHeaderData) pindex->pHeaderData->nChainSproutValue = std::nullopt;
+                        pindex->nChainSproutValue = std::nullopt;
                     }
-                    if (pindex->pprev->pHeaderData && pindex->pprev->pHeaderData->nChainSaplingValue) {
-                        pindex->pHeaderData->nChainSaplingValue = *pindex->pprev->pHeaderData->nChainSaplingValue + (pindex->pHeaderData ? pindex->pHeaderData->nSaplingValue : 0);
+                    if (pindex->pprev->nChainSaplingValue) {
+                        pindex->nChainSaplingValue = *pindex->pprev->nChainSaplingValue + pindex->nSaplingValue;
                     } else {
-                        if (pindex->pHeaderData) pindex->pHeaderData->nChainSaplingValue = std::nullopt;
+                        pindex->nChainSaplingValue = std::nullopt;
                     }
                 } else {
                     pindex->nChainTx = 0;
-                    if (pindex->pHeaderData) pindex->pHeaderData->nChainSproutValue = std::nullopt;
-                    if (pindex->pHeaderData) pindex->pHeaderData->nChainSaplingValue = std::nullopt;
+                    pindex->nChainSproutValue = std::nullopt;
+                    pindex->nChainSaplingValue = std::nullopt;
                     mapBlocksUnlinked.insert(std::make_pair(pindex->pprev, pindex));
                 }
             } else {
                 pindex->nChainTx = pindex->nTx;
-                if (pindex->pHeaderData) {
-                    pindex->pHeaderData->nChainSproutValue = pindex->pHeaderData->nSproutValue;
-                    pindex->pHeaderData->nChainSaplingValue = pindex->pHeaderData->nSaplingValue;
-                }
+                pindex->nChainSproutValue = pindex->nSproutValue;
+                pindex->nChainSaplingValue = pindex->nSaplingValue;
             }
 
             // Fall back to hardcoded Sprout value pool balance
@@ -6229,9 +6225,9 @@ bool static LoadBlockIndexDB()
             // override and set the in-memory size of shielded pools to zero.  An unshielding transaction
             // can then be used to trigger and test the handling of turnstile violations.
             if (fExperimentalMode && mapArgs.count("-developersetpoolsizezero")) {
-                if (pindex->pHeaderData) {
-                    pindex->pHeaderData->nChainSproutValue = 0;
-                    pindex->pHeaderData->nChainSaplingValue = 0;
+                {
+                    pindex->nChainSproutValue = 0;
+                    pindex->nChainSaplingValue = 0;
                 }
             }
         }

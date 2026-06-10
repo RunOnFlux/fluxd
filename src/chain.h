@@ -205,23 +205,31 @@ public:
     unsigned int nTime;
     unsigned int nBits;
 
-    //! Header data that can be pruned from memory for buried blocks.
-    //! Allocated on demand; may be nullptr for old blocks after pruning.
+    //! Shielded value-pool tracking. These live directly on CBlockIndex (not in
+    //! the prunable HeaderData) because they cannot be rebuilt from the block on
+    //! disk — the cumulative fields are accumulated across the whole chain and
+    //! feed turnstile enforcement (ZIP209) when enabled. Keeping them resident
+    //! means header-data pruning is correct regardless of whether ZIP209 is on.
+    //! They are small and, like the rest of CBlockIndex, live in the arena so
+    //! cold entries still page out. nSproutValue/nSaplingValue are the per-block
+    //! deltas (serialized to disk); nChain* are the running totals (memory-only).
+    std::optional<CAmount> nSproutValue;
+    std::optional<CAmount> nChainSproutValue;
+    CAmount nSaplingValue;
+    std::optional<CAmount> nChainSaplingValue;
+
+    //! Header data that can be pruned from memory for buried blocks and rebuilt
+    //! from the block on disk. Allocated on demand; may be nullptr after pruning.
     struct HeaderData {
         uint256 hashMerkleRoot;
         uint256 hashFinalSaplingRoot;
         std::optional<uint32_t> nCachedBranchId;
         uint256 hashSproutAnchor;
         uint256 hashFinalSproutRoot;
-        std::optional<CAmount> nSproutValue;
-        std::optional<CAmount> nChainSproutValue;
-        CAmount nSaplingValue;
-        std::optional<CAmount> nChainSaplingValue;
         uint256 nNonce;
         std::vector<unsigned char> nSolution;
         COutPoint nodesCollateral;
         std::vector<unsigned char> vchBlockSig;
-        HeaderData() : nSaplingValue(0) {}
     };
     HeaderData* pHeaderData;
 
@@ -262,6 +270,8 @@ public:
           nUndoPos(other.nUndoPos), nChainWork(other.nChainWork), nTx(other.nTx),
           nChainTx(other.nChainTx), nStatus(other.nStatus),
           nVersion(other.nVersion), nTime(other.nTime), nBits(other.nBits),
+          nSproutValue(other.nSproutValue), nChainSproutValue(other.nChainSproutValue),
+          nSaplingValue(other.nSaplingValue), nChainSaplingValue(other.nChainSaplingValue),
           pHeaderData(nullptr), nSequenceId(other.nSequenceId)
     {
         if (other.pHeaderData) {
@@ -287,6 +297,10 @@ public:
             nVersion = other.nVersion;
             nTime = other.nTime;
             nBits = other.nBits;
+            nSproutValue = other.nSproutValue;
+            nChainSproutValue = other.nChainSproutValue;
+            nSaplingValue = other.nSaplingValue;
+            nChainSaplingValue = other.nChainSaplingValue;
             nSequenceId = other.nSequenceId;
             delete pHeaderData;
             if (other.pHeaderData) {
@@ -317,6 +331,11 @@ public:
         nTime          = 0;
         nBits          = 0;
         nodesVrfOutput.SetNull();
+
+        nSproutValue       = std::nullopt;
+        nChainSproutValue  = std::nullopt;
+        nSaplingValue      = 0;
+        nChainSaplingValue = std::nullopt;
 
         pHeaderData = nullptr;
     }
@@ -522,13 +541,13 @@ public:
         // Only read/write nSproutValue if the client version used to create
         // this index was storing them.
         if ((s.GetType() & SER_DISK) && (nVersion >= SPROUT_VALUE_VERSION)) {
-            READWRITE(pHeaderData->nSproutValue);
+            READWRITE(nSproutValue);
         }
 
         // Only read/write nSaplingValue if the client version used to create
         // this index was storing them.
         if ((s.GetType() & SER_DISK) && (nVersion >= SAPLING_VALUE_VERSION)) {
-            READWRITE(pHeaderData->nSaplingValue);
+            READWRITE(nSaplingValue);
         }
 
         // For POW blocks without full data (compact headers), we need to store the hash

@@ -12,6 +12,7 @@
 #include "main.h"
 #include "pow.h"
 #include "uint256.h"
+#include "util.h"
 #include "key_io.h"
 
 #include <stdint.h>
@@ -529,6 +530,11 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                 pindexNew->nTx            = diskindex.nTx;
                 pindexNew->nodesVrfOutput = diskindex.nodesVrfOutput;
 
+                // Value-pool deltas live directly on CBlockIndex (not in the
+                // prunable HeaderData); copy them from the deserialized record.
+                pindexNew->nSproutValue   = diskindex.nSproutValue;
+                pindexNew->nSaplingValue  = diskindex.nSaplingValue;
+
                 if (diskindex.pHeaderData) {
                     pindexNew->AllocateHeaderData();
                     *pindexNew->pHeaderData = *diskindex.pHeaderData;
@@ -561,6 +567,17 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                     if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, Params().GetConsensus()))
                         return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
                 }
+
+                // Fluxnode memory optimization: header data was only needed for the
+                // consistency checks above. Free it now, during load, instead of
+                // holding every entry's header data resident until the post-
+                // ActivateBestChain prune — that accumulation is the multi-GB init
+                // memory transient. It is rebuilt from disk on demand when a block
+                // is connected, disconnected, or served. nChainWork/skiplist build
+                // need only the skeleton, and the shielded value-pool fields now
+                // live directly on CBlockIndex, so this is safe regardless of ZIP209.
+                if (fFluxnode)
+                    pindexNew->FreeHeaderData();
 
                 pcursor->Next();
             } else {
