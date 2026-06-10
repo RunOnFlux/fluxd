@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include <sys/mman.h>
 #include <unistd.h>
@@ -26,8 +27,19 @@ class uint256;
  * - MADV_COLD hint proactively tells the kernel which pages are cold
  * - No heap fragmentation from 2.5M+ allocations
  *
- * Uses MAP_NORESERVE so virtual address space is reserved upfront but
- * physical pages are only allocated on first touch (demand paging).
+ * The arena is backed by sparse files (MAP_SHARED) in the datadir rather
+ * than anonymous memory. Two consequences:
+ *
+ * - The capacity reservation is a sparse ftruncate: it costs no disk and no
+ *   RAM until pages are actually touched, so we reserve far more than the
+ *   chain will need in our lifetime and never hit a hard ceiling.
+ * - Cold pages are evicted to the backing FILE, not to swap. A node with
+ *   little RAM (and no swap) keeps resident memory bounded to the working
+ *   set; disk used grows only with the amount actually evicted.
+ *
+ * The files are scratch: recreated (O_TRUNC) at startup and unlinked on
+ * clean shutdown. The on-disk bytes are never reused across runs (they hold
+ * process-lifetime pointers), so durability is irrelevant.
  */
 class CBlockIndexPool {
 private:
@@ -37,6 +49,8 @@ private:
     size_t nHashSize;
     size_t nCapacity;
     size_t nAllocated;
+    std::string poolPath;
+    std::string hashPath;
 
     CBlockIndexPool(const CBlockIndexPool&) = delete;
     CBlockIndexPool& operator=(const CBlockIndexPool&) = delete;
@@ -45,7 +59,11 @@ public:
     CBlockIndexPool();
     ~CBlockIndexPool();
 
-    bool Initialize(size_t entrySize, size_t hashSize, size_t capacity);
+    // Reserve a sparse file-backed arena for `capacity` entries under
+    // `backingDir` (typically the datadir). Returns false on any failure;
+    // the caller must then fall back to heap allocation.
+    bool Initialize(size_t entrySize, size_t hashSize, size_t capacity,
+                    const std::string& backingDir);
 
     // Allocate the next CBlockIndex slot. Returns raw memory; caller
     // must placement-new the CBlockIndex.
