@@ -218,14 +218,22 @@ public:
     CAmount nSaplingValue;
     std::optional<CAmount> nChainSaplingValue;
 
-    //! Header data that can be pruned from memory for buried blocks and rebuilt
-    //! from the block on disk. Allocated on demand; may be nullptr after pruning.
+    //! Consensus state the node computes/validates about a block: the branch ID
+    //! it was validated under, and the Sprout commitment-tree anchors. Resident
+    //! like the value pools — init-time checks (RewindBlockIndex, sprout-anchor
+    //! setup) read these before the chain is reconnected, so they cannot be
+    //! rebuilt from the block on disk. nCachedBranchId and hashSproutAnchor are
+    //! serialized; hashFinalSproutRoot is memory-only.
+    std::optional<uint32_t> nCachedBranchId;
+    uint256 hashSproutAnchor;
+    uint256 hashFinalSproutRoot;
+
+    //! Block-file data: present in the block on disk and therefore rebuildable.
+    //! This is what gets pruned from memory for buried blocks. Allocated on
+    //! demand; may be nullptr after pruning.
     struct HeaderData {
         uint256 hashMerkleRoot;
         uint256 hashFinalSaplingRoot;
-        std::optional<uint32_t> nCachedBranchId;
-        uint256 hashSproutAnchor;
-        uint256 hashFinalSproutRoot;
         uint256 nNonce;
         std::vector<unsigned char> nSolution;
         COutPoint nodesCollateral;
@@ -267,6 +275,8 @@ public:
           nVersion(other.nVersion), nTime(other.nTime), nBits(other.nBits),
           nSproutValue(other.nSproutValue), nChainSproutValue(other.nChainSproutValue),
           nSaplingValue(other.nSaplingValue), nChainSaplingValue(other.nChainSaplingValue),
+          nCachedBranchId(other.nCachedBranchId), hashSproutAnchor(other.hashSproutAnchor),
+          hashFinalSproutRoot(other.hashFinalSproutRoot),
           pHeaderData(nullptr), nSequenceId(other.nSequenceId)
     {
         if (other.pHeaderData) {
@@ -296,6 +306,9 @@ public:
             nChainSproutValue = other.nChainSproutValue;
             nSaplingValue = other.nSaplingValue;
             nChainSaplingValue = other.nChainSaplingValue;
+            nCachedBranchId = other.nCachedBranchId;
+            hashSproutAnchor = other.hashSproutAnchor;
+            hashFinalSproutRoot = other.hashFinalSproutRoot;
             nSequenceId = other.nSequenceId;
             delete pHeaderData;
             if (other.pHeaderData) {
@@ -329,6 +342,10 @@ public:
         nChainSproutValue  = std::nullopt;
         nSaplingValue      = 0;
         nChainSaplingValue = std::nullopt;
+
+        nCachedBranchId    = std::nullopt;
+        hashSproutAnchor   = uint256();
+        hashFinalSproutRoot = uint256();
 
         pHeaderData = nullptr;
     }
@@ -497,15 +514,15 @@ public:
             if (ser_action.ForRead()) {
                 uint32_t branchId;
                 READWRITE(branchId);
-                pHeaderData->nCachedBranchId = branchId;
+                nCachedBranchId = branchId;
             } else {
                 // nCachedBranchId must always be set if BLOCK_ACTIVATES_UPGRADE is set.
-                assert(pHeaderData->nCachedBranchId);
-                uint32_t branchId = *pHeaderData->nCachedBranchId;
+                assert(nCachedBranchId);
+                uint32_t branchId = *nCachedBranchId;
                 READWRITE(branchId);
             }
         }
-        READWRITE(pHeaderData->hashSproutAnchor);
+        READWRITE(hashSproutAnchor);
 
         // block header
         READWRITE(this->nVersion);

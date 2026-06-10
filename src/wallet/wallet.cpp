@@ -2527,10 +2527,20 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
             SaplingMerkleTree saplingTree;
             // This should never fail: we should always be able to get the tree
             // state on the path to the tip of our chain
-            assert(pcoinsTip->GetSproutAnchorAt(pindex->pHeaderData->hashSproutAnchor, sproutTree));
+            assert(pcoinsTip->GetSproutAnchorAt(pindex->hashSproutAnchor, sproutTree));
             if (pindex->pprev) {
                 if (NetworkUpgradeActive(pindex->pprev->nHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
-                    assert(pcoinsTip->GetSaplingAnchorAt(pindex->pprev->pHeaderData->hashFinalSaplingRoot, saplingTree));
+                    // hashFinalSaplingRoot is a block-header field that may have
+                    // been pruned from memory; read it from disk if so.
+                    uint256 saplingAnchor;
+                    if (pindex->pprev->pHeaderData) {
+                        saplingAnchor = pindex->pprev->pHeaderData->hashFinalSaplingRoot;
+                    } else {
+                        CBlock prevBlock;
+                        assert(ReadBlockFromDisk(prevBlock, pindex->pprev, Params().GetConsensus()));
+                        saplingAnchor = prevBlock.hashFinalSaplingRoot;
+                    }
+                    assert(pcoinsTip->GetSaplingAnchorAt(saplingAnchor, saplingTree));
                 }
             }
             // Increment note witness caches
