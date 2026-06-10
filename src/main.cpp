@@ -6141,27 +6141,27 @@ bool static LoadBlockIndexDB()
     const CChainParams& chainparams = Params();
 
     // Initialize the block index arena — fluxnodes only. The arena is the
-    // memory-optimization path (sparse file-backed storage so cold block
+    // memory-optimization path (segmented file-backed storage so cold block
     // index pages evict to disk, keeping RSS bounded on low-RAM nodes); it
     // is paired with header-data pruning, which is also fluxnode-gated.
     // Non-fluxnodes fall through to plain heap allocation (master behavior)
-    // and never create the backing files.
+    // and never create the backing file.
     //
-    // Capacity is a sparse reservation: ftruncate costs no disk/RAM until
-    // pages are touched. 30M entries is ~25+ years of headroom at current
-    // block cadence (incl. orphans/side-chain tips) — enough to never be a
-    // practical ceiling, while keeping the virtual reservation modest. If it
-    // is somehow exhausted, InsertBlockIndex falls back to heap per-entry
-    // rather than aborting.
-    static const size_t POOL_CAPACITY = 30000000;
-    // The arena's backing inode is sparse — ftruncate allocates no blocks, so
-    // low disk can't be detected at allocation time; blocks are allocated
-    // lazily as entries are written, and a genuinely full datadir would later
-    // SIGBUS on write (a clean crash; the arena is scratch and rebuilds from
-    // leveldb). Guard the *startup* case here: if the datadir filesystem is
-    // already low on space, skip the arena and use heap allocation instead.
-    // (Runtime disk-fill remains a benign residual, equivalent to any node
-    // being unable to write its chainstate on a full disk.)
+    // Storage is segmented: blockindex.arena grows ~128 MiB at a time as the
+    // chain grows (each slot is a CBlockIndex + its hash), so file size and
+    // virtual size track actual usage with no fixed reservation and no hard
+    // ceiling. If a chunk can't be mapped, InsertBlockIndex falls back to heap
+    // per-entry rather than aborting.
+    static const size_t CHUNK_BYTES = 128ULL * 1024 * 1024;
+    const size_t slotBytes = sizeof(CBlockIndex) + sizeof(uint256);
+    const size_t entriesPerChunk = CHUNK_BYTES / slotBytes;
+    // Cold index pages evict to blockindex.arena, not swap. ftruncate grows it
+    // sparsely (no blocks until written), so low disk can't be detected at
+    // allocation time; a genuinely full datadir would later SIGBUS on write (a
+    // clean crash — the arena is scratch and rebuilds from leveldb). Guard the
+    // *startup* case: if the datadir is already low on space, skip the arena
+    // and use heap allocation. (Runtime disk-fill is a benign residual,
+    // equivalent to any node being unable to write its chainstate.)
     static const uint64_t ARENA_MIN_FREE_BYTES = 2ULL * 1024 * 1024 * 1024; // 2 GiB
     bool fEnoughDisk = true;
     if (fFluxnode) {
@@ -6180,13 +6180,13 @@ bool static LoadBlockIndexDB()
     if (fFluxnode && fEnoughDisk) {
         g_blockIndexPool = new CBlockIndexPool();
         if (!g_blockIndexPool->Initialize(sizeof(CBlockIndex), sizeof(uint256),
-                                          POOL_CAPACITY, GetDataDir().string())) {
+                                          entriesPerChunk, GetDataDir().string())) {
             delete g_blockIndexPool;
             g_blockIndexPool = nullptr;
             LogPrintf("WARNING: Failed to initialize block index arena, falling back to heap allocation\n");
         } else {
-            LogPrintf("Block index arena: sparse file-backed, capacity %lu entries\n",
-                      (unsigned long)POOL_CAPACITY);
+            LogPrintf("Block index arena: segmented file-backed, %lu entries per ~128 MiB chunk\n",
+                      (unsigned long)entriesPerChunk);
         }
     }
     if (fFluxnode)
