@@ -321,11 +321,11 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool tx
 
     UniValue valuePools(UniValue::VARR);
     valuePools.push_back(ValuePoolDesc("sprout",
-        blockindex->pHeaderData ? blockindex->pHeaderData->nChainSproutValue : std::nullopt,
-        blockindex->pHeaderData ? blockindex->pHeaderData->nSproutValue : std::nullopt));
+        blockindex->nChainSproutValue,
+        blockindex->nSproutValue));
     valuePools.push_back(ValuePoolDesc("sapling",
-        blockindex->pHeaderData ? blockindex->pHeaderData->nChainSaplingValue : std::nullopt,
-        blockindex->pHeaderData ? std::optional<CAmount>(blockindex->pHeaderData->nSaplingValue) : std::nullopt));
+        blockindex->nChainSaplingValue,
+        std::optional<CAmount>(blockindex->nSaplingValue)));
     result.pushKV("valuePools", valuePools);
 
     if (blockindex->pprev)
@@ -1131,8 +1131,8 @@ UniValue getblockchaininfo(const UniValue& params, bool fHelp)
 
     CBlockIndex* tip = chainActive.Tip();
     UniValue valuePools(UniValue::VARR);
-    valuePools.push_back(ValuePoolDesc("sprout", tip->pHeaderData ? tip->pHeaderData->nChainSproutValue : std::nullopt, std::nullopt));
-    valuePools.push_back(ValuePoolDesc("sapling", tip->pHeaderData ? tip->pHeaderData->nChainSaplingValue : std::nullopt, std::nullopt));
+    valuePools.push_back(ValuePoolDesc("sprout", tip->nChainSproutValue, std::nullopt));
+    valuePools.push_back(ValuePoolDesc("sapling", tip->nChainSaplingValue, std::nullopt));
     obj.pushKV("valuePools",            valuePools);
 
     const Consensus::Params& consensusParams = Params().GetConsensus();
