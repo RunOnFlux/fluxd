@@ -2344,6 +2344,9 @@ bool CAddrDB::Read(CAddrMan& addr)
 // CAnchorDB
 //
 
+//! anchors.dat format: 2 = BIP155 type-tagged entries (matches ADDRMAN_FORMAT_VERSION semantics)
+static const unsigned char ANCHORS_FORMAT_VERSION = 2;
+
 CAnchorDB::CAnchorDB()
 {
     pathAnchor = GetDataDir() / "anchors.dat";
@@ -2359,7 +2362,12 @@ bool CAnchorDB::Write(const std::vector<CAddress>& anchors)
     // serialize addresses, checksum data up to that point, then append csum
     CDataStream ss(SER_DISK, CLIENT_VERSION);
     ss << FLATDATA(Params().MessageStart());
-    ss << anchors;
+    // BIP155: anchors must use the type-tagged V2 encoding — the legacy
+    // CAddress path cannot represent v3 onions and collapses them to ::.
+    // The format byte distinguishes this from pre-BIP155 anchors.dat, which
+    // starts with the vector CompactSize directly.
+    ss << ANCHORS_FORMAT_VERSION;
+    ss << CAddrVecV2(anchors);
     uint256 hash = Hash(ss.begin(), ss.end());
     ss << hash;
 
@@ -2430,8 +2438,17 @@ bool CAnchorDB::Read(std::vector<CAddress>& anchors)
         if (memcmp(pchMsgTmp, Params().MessageStart(), sizeof(pchMsgTmp)))
             return error("%s: Invalid network magic number", __func__);
 
-        // de-serialize anchor addresses
-        ss >> anchors;
+        // de-serialize format byte + anchor addresses (BIP155 V2 encoding)
+        unsigned char nFormat;
+        ss >> nFormat;
+        if (nFormat != ANCHORS_FORMAT_VERSION) {
+            // Unknown or legacy format: drop the file so it does not error on
+            // every startup (anchors are a best-effort reconnection hint).
+            std::filesystem::remove(pathAnchor);
+            return error("%s: Unknown anchors.dat format (%u); ignoring", __func__, nFormat);
+        }
+        CAddrVecV2 wrapper(anchors);
+        ss >> wrapper;
     }
     catch (const std::exception& e) {
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
