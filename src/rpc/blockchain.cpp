@@ -317,7 +317,7 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool tx
     result.pushKV("bits", strprintf("%08x", block.nBits));
     result.pushKV("difficulty", GetDifficulty(blockindex));
     result.pushKV("chainwork", blockindex->nChainWork.GetHex());
-    result.pushKV("anchor", blockindex->pHeaderData ? blockindex->pHeaderData->hashFinalSproutRoot.GetHex() : "");
+    result.pushKV("anchor", blockindex->hashFinalSproutRoot.GetHex());
 
     UniValue valuePools(UniValue::VARR);
     valuePools.push_back(ValuePoolDesc("sprout",
