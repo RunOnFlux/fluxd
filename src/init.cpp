@@ -1913,6 +1913,8 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     // good on-disk undo records with ones rebuilt from the corrupt state.
     if (!RecoverFluxnodeCache(chainparams))
         return InitError(_("Failed to recover the fluxnode cache. Restart with -reindex to rebuild it."));
+    // From here on, flushes may force-write the fluxnode sync marker.
+    fFluxnodeCacheRecovered = true;
 
     uiInterface.InitMessage(_("Activating best chain..."));
     // scan for better chains in the block chain database, that are not yet connected in the active best chain
