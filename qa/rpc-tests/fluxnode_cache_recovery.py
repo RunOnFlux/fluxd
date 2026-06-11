@@ -218,6 +218,14 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
         node.setmocktime(int(time.time()) + 3600)
         node.generate(2)                               # chain B, height 51
         node.setmocktime(0)
+        # Clear the invalidation: a real crash-during-reorg leaves the losing
+        # fork's blocks fully VALID in the index. A block still marked failed
+        # would not survive the restart (load skips nCachedBranchId
+        # reconstruction for invalid blocks, so RewindBlockIndex erases them)
+        # and recovery would take the stale-marker path instead of the
+        # marker-chain rewind this scenario exercises. Chain B has more work,
+        # so reconsidering A does not reorg back.
+        node.reconsiderblock(fork_hash)
         new_tip_hash = node.getbestblockhash()
         assert_equal(node.getblockcount(), 51)
         self.stop0()
