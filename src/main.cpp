@@ -163,12 +163,18 @@ namespace {
             bool isPONBlockB = (pb->nVersion >= 100);
 
             if (isPONBlockA && isPONBlockB && pa->nHeight == pb->nHeight) {
-                // Both are PON blocks at same height - use PON hash as tie-breaker
-                uint256 ponHashA = GetPONHash(pa->GetBlockHeader());
-                uint256 ponHashB = GetPONHash(pb->GetBlockHeader());
-
-                if (ponHashA < ponHashB) {
-                    return false; // A has better (lower) hash, A wins
+                // Deterministic PON tie-break (see ComparePonForkChoice): PON blocks
+                // compare by the resident cached PON hash. Every node computes the same
+                // winner regardless of arrival order, so the network converges instead
+                // of forking. The score must come from a resident field: recomputing
+                // from GetBlockHeader() would hash a zeroed nodesCollateral for pruned
+                // entries (wrong tie-break vs the network), and the result would change
+                // when connect/disconnect restores header data on an entry already in
+                // setBlockIndexCandidates — an in-place comparator-key mutation
+                // that breaks set ordering and makes erase-by-key silently fail.
+                int cmp = ComparePonForkChoice(pa, pb);
+                if (cmp < 0) {
+                    return false; // A preferred (lower score), A wins
                 }
                 if (ponHashA > ponHashB) {
                     return true;  // B has better (lower) hash, B wins
@@ -5172,6 +5178,10 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     // Construct new block index object
     CBlockIndex* pindexNew = new CBlockIndex(block);
     assert(pindexNew);
+    // Cache the PON hash for the fork-choice tie-breaker; it must stay
+    // available after the header data is pruned.
+    if (block.IsPON())
+        pindexNew->hashPON = GetPONHash(block);
     // We assign the sequence id to blocks only when the full data is available,
     // to avoid miners withholding blocks but broadcasting headers, to get a
     // competitive advantage.
@@ -8284,6 +8294,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             // since the checkpoint validates the chain
             CBlockIndex* pindexNew = new CBlockIndex(compactHeader);
             assert(pindexNew);
+            if (compactHeader.IsPON())
+                pindexNew->hashPON = GetPONHash(compactHeader);
             pindexNew->nSequenceId = 0;
 
             // Insert using the provided/computed hash

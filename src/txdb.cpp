@@ -557,7 +557,11 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                 }
 
                 if (header.IsPON()) {
-                    if (!CheckProofOfNode(GetPONHash(header), pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight) && !IsEmergencyBlock(header))
+                    // Cache the PON hash while the header data is still
+                    // resident: the fork-choice tie-breaker needs it after
+                    // the prune below.
+                    pindexNew->hashPON = GetPONHash(header);
+                    if (!CheckProofOfNode(pindexNew->hashPON, pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight) && !IsEmergencyBlock(header))
                         return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
                 } else if (!isCheckpointed) {
                     // Only verify PoW for non-checkpointed POW blocks
