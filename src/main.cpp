@@ -2806,25 +2806,22 @@ static void EnsureHeaderDataFromBlock(CBlockIndex* pindex, const CBlock& block)
 {
     if (!pindex || pindex->pHeaderData)
         return;
-    pindex->AllocateHeaderData();
-    CBlockIndex::HeaderData* h = pindex->pHeaderData;
-    h->hashMerkleRoot       = block.hashMerkleRoot;
-    h->hashFinalSaplingRoot = block.hashFinalSaplingRoot;
-    h->nNonce               = block.nNonce;
-    h->nSolution            = block.nSolution;
-    h->nodesCollateral      = block.nodesCollateral;
-    h->vchBlockSig          = block.vchBlockSig;
+    pindex->RestoreHeaderData(block);
 }
 
-static void EnsureHeaderDataFromDisk(CBlockIndex* pindex, const Consensus::Params& consensusParams)
+// Returns false if the block could not be read back from disk. Callers must
+// treat that as block-file corruption and fail hard — continuing with zeroed
+// header fields would pop a wrong (empty) Sapling anchor and, once the entry
+// is dirtied, overwrite the good on-disk block index record with zeroes.
+static bool EnsureHeaderDataFromDisk(CBlockIndex* pindex, const Consensus::Params& consensusParams)
 {
     if (!pindex || pindex->pHeaderData)
-        return;
+        return true;
     CBlock block;
-    if (ReadBlockFromDisk(block, pindex, consensusParams))
-        EnsureHeaderDataFromBlock(pindex, block);
-    else
-        pindex->AllocateHeaderData(); // last resort: empty struct beats a null deref
+    if (!ReadBlockFromDisk(block, pindex, consensusParams))
+        return false;
+    EnsureHeaderDataFromBlock(pindex, block);
+    return true;
 }
 
 // Return a complete block header for serving over P2P/RPC, transparently
@@ -3672,7 +3669,10 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
     if (NetworkUpgradeActive(pindex->pprev->nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA)) {
         // pprev may be buried and have had its header data pruned; restore it
         // from disk so hashFinalSaplingRoot is the real value, not a zeroed one.
-        EnsureHeaderDataFromDisk(pindex->pprev, chainparams.GetConsensus());
+        if (!EnsureHeaderDataFromDisk(pindex->pprev, chainparams.GetConsensus())) {
+            AbortNode(state, "Failed to read block from disk to restore pruned header data");
+            return DISCONNECT_FAILED;
+        }
         view.PopAnchor(pindex->pprev->pHeaderData->hashFinalSaplingRoot, SAPLING);
     } else {
         view.PopAnchor(SaplingMerkleTree::empty_root(), SAPLING);
@@ -4430,14 +4430,32 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
             }
 
             std::vector<const CBlockIndex*> vBlocks;
+            std::vector<CBlockIndex*> vRestoredHeaderData;
             vBlocks.reserve(setDirtyBlockIndex.size());
             for (set<CBlockIndex*>::iterator it = setDirtyBlockIndex.begin(); it != setDirtyBlockIndex.end(); ) {
+                // A dirty entry may have had its header data pruned (e.g.
+                // invalidateblock dirtying buried entries on a fluxnode), but
+                // CDiskBlockIndex serializes through pHeaderData. Restore it
+                // from disk before the write; an unreadable block means
+                // corrupt block files, and aborting beats overwriting a good
+                // leveldb record with zeroed header fields.
+                if (!(*it)->HasHeaderData()) {
+                    if (!EnsureHeaderDataFromDisk(*it, chainparams.GetConsensus()))
+                        return AbortNode(state, strprintf("Failed to restore pruned header data for block index write (block %s)",
+                                                          (*it)->GetBlockHash().ToString()));
+                    vRestoredHeaderData.push_back(*it);
+                }
                 vBlocks.push_back(*it);
                 setDirtyBlockIndex.erase(it++);
             }
             if (!pblocktree->WriteBatchSync(vFiles, nLastBlockFile, vBlocks)) {
                 return AbortNode(state, "Files to write to block index database");
             }
+            // Entries restored only for this write were buried-and-pruned
+            // before the flush; re-prune them so a deep invalidateblock can't
+            // re-accumulate header data in memory.
+            for (CBlockIndex* pindexRestored : vRestoredHeaderData)
+                pindexRestored->FreeHeaderData();
             g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
         }
         // Finally remove any pruned files
