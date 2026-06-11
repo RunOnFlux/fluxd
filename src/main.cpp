@@ -96,6 +96,7 @@ uint64_t nPruneTarget = 0;
 bool fAlerts = DEFAULT_ALERTS;
 bool fIsVerifying = false;
 bool fJustDisconnectedTip = false;
+std::atomic<bool> fFluxnodeCacheRecovered{false};
 /* If the tip is older than this (in seconds), the node is considered to be in initial block download.
  */
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
@@ -4503,13 +4504,15 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
             // re-accumulate header data in memory.
             for (CBlockIndex* pindexRestored : vRestoredHeaderData)
                 pindexRestored->FreeHeaderData();
-            // Unforced: when the fluxnode cache is clean this must not touch
-            // the sync marker. This flush also runs during init, before
-            // RecoverFluxnodeCache (e.g. from RewindBlockIndex) — forcing a
-            // marker write there would overwrite the marker with the current
-            // in-memory tip and destroy the divergence that tells recovery a
-            // crash happened.
-            g_fluxnodeCache.PersistToDisk(chainActive.Tip(), false);
+            // The marker write is forced only after crash recovery has run.
+            // This flush also executes during init, before
+            // RecoverFluxnodeCache (e.g. RewindBlockIndex ends with an
+            // unconditional flush) — forcing a marker write there would
+            // overwrite the on-disk marker with the current in-memory tip and
+            // destroy the divergence that tells recovery a crash happened.
+            // After recovery, forcing keeps the marker at the tip even when
+            // no fluxnode data is dirty.
+            g_fluxnodeCache.PersistToDisk(chainActive.Tip(), fFluxnodeCacheRecovered.load());
         }
         // Finally remove any pruned files
         if (fFlushForPrune)
