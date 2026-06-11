@@ -2865,19 +2865,16 @@ static bool EnsureHeaderDataFromDisk(CBlockIndex* pindex, const Consensus::Param
     return true;
 }
 
-// Return a complete block header for serving over P2P/RPC, transparently
-// re-reading from disk when the in-memory header data was pruned (or when only
-// nSolution was omitted for a compact-stored block). Without this a fluxnode
-// would serve zeroed merkle roots / nonces for buried blocks.
-static CBlockHeader GetFullBlockHeader(const CBlockIndex* pindex, const Consensus::Params& consensusParams)
+bool GetFullBlockHeader(CBlockHeader& header, const CBlockIndex* pindex, const Consensus::Params& consensusParams)
 {
-    CBlockHeader header = pindex->GetBlockHeader();
+    header = pindex->GetBlockHeader();
     if (!pindex->pHeaderData || (header.IsPOW() && header.nSolution.empty())) {
         CBlockHeader diskHeader;
-        if (ReadBlockHeaderFromDisk(diskHeader, pindex, consensusParams))
-            header = diskHeader;
+        if (!ReadBlockHeaderFromDisk(diskHeader, pindex, consensusParams))
+            return false;
+        header = diskHeader;
     }
-    return header;
+    return true;
 }
 
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
@@ -6179,18 +6176,6 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
         pindexNew->phashBlock = pHash;
 
         mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
-
-        // Warn once when the (huge) sparse reservation is 90% consumed, so a
-        // capacity bump can be scheduled long before it could ever matter.
-        static bool fWarnedNearCapacity = false;
-        if (!fWarnedNearCapacity &&
-            g_blockIndexPool->Size() * 10 >= g_blockIndexPool->Capacity() * 9) {
-            fWarnedNearCapacity = true;
-            LogPrintf("WARNING: block index arena is over 90%% full (%lu/%lu); "
-                      "bump POOL_CAPACITY before it is exhausted\n",
-                      (unsigned long)g_blockIndexPool->Size(),
-                      (unsigned long)g_blockIndexPool->Capacity());
-        }
     } else {
         if (g_blockIndexPool) {
             static bool fWarnedExhausted = false;
@@ -7991,7 +7976,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
             for (; pindex; pindex = chainActive.Next(pindex))
             {
-                vCompactHeaders.push_back(CCompactBlockHeader(GetFullBlockHeader(pindex, chainparams.GetConsensus())));
+                // Serving is best-effort: a failed read pushes the partial view.
+                CBlockHeader fullHeader;
+                GetFullBlockHeader(fullHeader, pindex, chainparams.GetConsensus());
+                vCompactHeaders.push_back(CCompactBlockHeader(fullHeader));
                 if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
                     break;
             }
@@ -8010,7 +7998,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 // GetFullBlockHeader re-reads from disk when the header data was
                 // pruned (buried block on a fluxnode) or when only nSolution was
                 // omitted, so we never serve zeroed merkle roots / nonces.
-                CBlockHeader header = GetFullBlockHeader(pindex, chainparams.GetConsensus());
+                // Serving is best-effort: a failed read pushes the partial view.
+                CBlockHeader header;
+                GetFullBlockHeader(header, pindex, chainparams.GetConsensus());
                 vHeaders.push_back(header);
                 if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
                     break;
