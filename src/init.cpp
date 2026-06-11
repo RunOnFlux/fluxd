@@ -1925,13 +1925,16 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
                   (unsigned long)g_blockIndexPool->Size());
     }
 
-    // Prune header data from buried block index entries to save memory
+    // Prune header data from buried block index entries to save memory.
+    // Header-only entries (no block data on disk) are skipped: their header
+    // fields cannot be rebuilt from disk, so they must stay resident.
     if (fFluxnode && chainActive.Tip()) {
         int nPruneBelow = chainActive.Height() - 100;
         int64_t nPruned = 0;
         for (auto& [hash, pindex] : mapBlockIndex)
         {
-            if (pindex->nHeight < nPruneBelow && pindex->HasHeaderData()) {
+            if (pindex->nHeight < nPruneBelow && pindex->HasHeaderData() &&
+                (pindex->nStatus & BLOCK_HAVE_DATA)) {
                 pindex->FreeHeaderData();
                 nPruned++;
             }
