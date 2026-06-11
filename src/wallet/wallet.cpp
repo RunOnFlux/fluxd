@@ -4558,7 +4558,21 @@ int CMerkleTx::GetDepthInMainChainINTERNAL(const CBlockIndex* &pindexRet) const
     // Make sure the merkle branch connects to this block
     if (!fMerkleVerified)
     {
-        if (CBlock::CheckMerkleBranch(GetHash(), vMerkleBranch, nIndex) != (pindex->pHeaderData ? pindex->pHeaderData->hashMerkleRoot : uint256()))
+        // hashMerkleRoot is a block-header field that may have been pruned
+        // from memory on a fluxnode; read it from disk if so. CheckMerkleBranch
+        // never returns zero for a real tx, so comparing against a zeroed
+        // root would mis-report every confirmed tx in a pruned block as
+        // conflicted (depth -1) after each restart.
+        uint256 hashMerkleRoot;
+        if (pindex->pHeaderData) {
+            hashMerkleRoot = pindex->pHeaderData->hashMerkleRoot;
+        } else {
+            CBlock block;
+            if (!ReadBlockFromDisk(block, pindex, Params().GetConsensus()))
+                return 0;
+            hashMerkleRoot = block.hashMerkleRoot;
+        }
+        if (CBlock::CheckMerkleBranch(GetHash(), vMerkleBranch, nIndex) != hashMerkleRoot)
             return 0;
         fMerkleVerified = true;
     }
