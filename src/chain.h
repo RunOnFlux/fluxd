@@ -261,6 +261,21 @@ public:
         return pHeaderData != nullptr;
     }
 
+    //! Repopulate the prunable block-file fields from a header (typically one
+    //! re-read from disk after the entry was pruned). Only touches HeaderData;
+    //! the resident consensus/value-pool fields cannot be rebuilt from the
+    //! block and are never written here.
+    void RestoreHeaderData(const CBlockHeader& block)
+    {
+        AllocateHeaderData();
+        pHeaderData->hashMerkleRoot       = block.hashMerkleRoot;
+        pHeaderData->hashFinalSaplingRoot = block.hashFinalSaplingRoot;
+        pHeaderData->nNonce               = block.nNonce;
+        pHeaderData->nSolution            = block.nSolution;
+        pHeaderData->nodesCollateral      = block.nodesCollateral;
+        pHeaderData->vchBlockSig          = block.vchBlockSig;
+    }
+
     ~CBlockIndex()
     {
         delete pHeaderData;
@@ -364,13 +379,7 @@ public:
         nTime          = block.nTime;
         nBits          = block.nBits;
 
-        AllocateHeaderData();
-        pHeaderData->hashMerkleRoot = block.hashMerkleRoot;
-        pHeaderData->hashFinalSaplingRoot   = block.hashFinalSaplingRoot;
-        pHeaderData->nNonce         = block.nNonce;
-        pHeaderData->nSolution      = block.nSolution;
-        pHeaderData->nodesCollateral = block.nodesCollateral;
-        pHeaderData->vchBlockSig    = block.vchBlockSig;
+        RestoreHeaderData(block);
     }
 
     CDiskBlockPos GetBlockPos() const {

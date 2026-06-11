@@ -574,7 +574,9 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                 // is connected, disconnected, or served. nChainWork/skiplist build
                 // need only the skeleton, and the shielded value-pool fields now
                 // live directly on CBlockIndex, so this is safe regardless of ZIP209.
-                if (fFluxnode)
+                // Header-only entries (no block data on disk) are skipped: their
+                // header fields cannot be rebuilt, so they must stay resident.
+                if (fFluxnode && (pindexNew->nStatus & BLOCK_HAVE_DATA))
                     pindexNew->FreeHeaderData();
 
                 pcursor->Next();
