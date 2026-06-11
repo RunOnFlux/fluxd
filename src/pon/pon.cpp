@@ -434,6 +434,13 @@ void LogPONEligibility(const CBlockIndex* pindexPrev, int slotOffset)
         return; // PON not active yet
     }
 
+    // Under VRF leader election the legacy GetPONHash formula below is dead, and other
+    // nodes' eligibility cannot be computed at all (each draw needs that node's secret
+    // key) — anything this function printed would be meaningless for operators.
+    if (IsPONVRFActive(pindexPrev->nHeight + 1)) {
+        return;
+    }
+
     // Start timing
     int64_t nTimeStart = GetTimeMicros();
 
