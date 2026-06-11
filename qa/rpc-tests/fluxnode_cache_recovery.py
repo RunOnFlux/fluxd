@@ -6,18 +6,20 @@
 """
 Test fluxnode cache crash-recovery (RecoverFluxnodeCache).
 
-Covers the M1/M7 fixes from the 2026-06 memory-branch review:
+The fluxnode DB persists a sync-state marker naming the block its data
+reflects; at startup, recovery compares the marker against the active chain
+and rewinds/replays as needed. Scenarios:
 
 - clean restart: recovery must NOT run ("sync state matches chain tip")
 - stale marker (hash unknown to the block index): repaired ONCE — the forced
   PersistToDisk must actually write the fresh marker even though the cache is
-  clean (M7); the next restart must skip recovery (pre-M7 the repair was a
-  silent no-op and recovery re-ran on every restart)
+  clean — and the next restart must skip recovery (if the repair silently
+  skipped the write, recovery would re-run on every restart)
 - marker behind the tip on the active chain: chainstate disconnect + replay,
   node converges back to the same tip
 - marker on a stale fork (the crash-during-reorg shape): fluxnode-only rewind
-  along the marker's chain (M1 phase 1) followed by the chainstate
-  disconnect; node converges to the best tip
+  along the marker's chain followed by the chainstate disconnect; node
+  converges to the best tip
 
 Marker divergence is manufactured with directory snapshots of
 <datadir>/regtest/determ_zelnodes taken between restarts — i.e. only fluxd's
@@ -155,7 +157,7 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
         assert "RecoverFluxnodeCache: disconnecting" not in log
         self.stop0()
 
-        print("Stale marker (foreign DB): repaired once, then skipped (M7)...")
+        print("Stale marker (foreign DB): repaired once, then skipped...")
         self.snapshot_db("clean50")
         self.restore_db("", from_node=1)   # node1's DB: marker unknown to node0
         offset = self.restart_node0()
@@ -163,7 +165,7 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
         assert "stale marker" in log, "expected stale-marker repair path"
         self.stop0()
         # The forced persist must have actually written the fresh marker even
-        # though the cache was clean — this is the M7 regression assertion.
+        # though the cache was clean.
         marker_hash, marker_height = self.read_marker()
         assert_equal(marker_hash, tip_hash)
         assert_equal(marker_height, tip_height)
@@ -185,7 +187,7 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
         self.stop0()
         self.snapshot_db("forkA")          # marker = tip A (height 50)
 
-        print("Marker on a stale fork: fluxnode-only rewind along the marker's chain (M1)...")
+        print("Marker on a stale fork: fluxnode-only rewind along the marker's chain...")
         # Manufacture a fork: invalidate tip A and mine a longer chain B,
         # leaving A as a stale fork block in the index. Then restore the
         # snapshot whose marker points at A.
@@ -204,7 +206,7 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
         offset = self.restart_node0()
         log = self.log_since(offset)
         assert "rewinding 1 blocks of fluxnode state along the marker's chain" in log, \
-            "expected the marker-chain fluxnode-only rewind (M1 phase 1)"
+            "expected the marker-chain fluxnode-only rewind"
         assert "RecoverFluxnodeCache: disconnecting 2 blocks" in log, \
             "expected the 2-block chainstate disconnect to the common ancestor"
         node = self.nodes[0]
