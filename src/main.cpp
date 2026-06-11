@@ -2804,6 +2804,33 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus
     return true;
 }
 
+bool ReadBlockHeaderFromDisk(CBlockHeader& header, const CBlockIndex* pindex, const Consensus::Params& consensusParams)
+{
+    CDiskBlockPos pos = pindex->GetBlockPos();
+
+    // A CBlock on disk serializes its CBlockHeader base first, so reading
+    // just the header prefix at nDataPos skips deserializing every
+    // transaction. No proof-of-work/proof-of-node recheck either: the block
+    // was fully validated at accept time and callers serve or inspect the
+    // header rather than validate it. Reading the wrong bytes is still
+    // caught — the reconstructed hash must match the index entry.
+    CAutoFile filein(OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION);
+    if (filein.IsNull())
+        return error("%s: OpenBlockFile failed for %s", __func__, pos.ToString());
+
+    try {
+        filein >> header;
+    }
+    catch (const std::exception& e) {
+        return error("%s: Deserialize or I/O error - %s at %s", __func__, e.what(), pos.ToString());
+    }
+
+    if (header.GetHash() != pindex->GetBlockHash())
+        return error("%s: GetHash() doesn't match index for %s at %s",
+                __func__, pindex->ToString(), pos.ToString());
+    return true;
+}
+
 // On a fluxnode the header data of buried blocks is pruned from memory
 // (pHeaderData == nullptr) to save RAM. Connect/disconnect/serving paths that
 // run on such a block must restore the header fields first. These helpers
@@ -2817,7 +2844,7 @@ static void EnsureHeaderDataFromBlock(CBlockIndex* pindex, const CBlock& block)
     pindex->RestoreHeaderData(block);
 }
 
-// Returns false if the block could not be read back from disk. Callers must
+// Returns false if the header could not be read back from disk. Callers must
 // treat that as block-file corruption and fail hard — continuing with zeroed
 // header fields would pop a wrong (empty) Sapling anchor and, once the entry
 // is dirtied, overwrite the good on-disk block index record with zeroes.
@@ -2825,10 +2852,10 @@ static bool EnsureHeaderDataFromDisk(CBlockIndex* pindex, const Consensus::Param
 {
     if (!pindex || pindex->pHeaderData)
         return true;
-    CBlock block;
-    if (!ReadBlockFromDisk(block, pindex, consensusParams))
+    CBlockHeader header;
+    if (!ReadBlockHeaderFromDisk(header, pindex, consensusParams))
         return false;
-    EnsureHeaderDataFromBlock(pindex, block);
+    pindex->RestoreHeaderData(header);
     return true;
 }
 
@@ -2839,14 +2866,10 @@ static bool EnsureHeaderDataFromDisk(CBlockIndex* pindex, const Consensus::Param
 static CBlockHeader GetFullBlockHeader(const CBlockIndex* pindex, const Consensus::Params& consensusParams)
 {
     CBlockHeader header = pindex->GetBlockHeader();
-    if (!pindex->pHeaderData) {
-        CBlock block;
-        if (ReadBlockFromDisk(block, pindex, consensusParams))
-            header = block.GetBlockHeader();
-    } else if (header.IsPOW() && header.nSolution.empty()) {
-        CBlock block;
-        if (ReadBlockFromDisk(block, pindex, consensusParams))
-            header.nSolution = block.nSolution;
+    if (!pindex->pHeaderData || (header.IsPOW() && header.nSolution.empty())) {
+        CBlockHeader diskHeader;
+        if (ReadBlockHeaderFromDisk(diskHeader, pindex, consensusParams))
+            header = diskHeader;
     }
     return header;
 }
