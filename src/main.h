@@ -513,6 +513,13 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus
  * transaction deserialization and no proof recheck (validated at accept).
  * Fails if the reconstructed hash does not match the index entry. */
 bool ReadBlockHeaderFromDisk(CBlockHeader& header, const CBlockIndex* pindex, const Consensus::Params& consensusParams);
+/** Return a complete block header for serving over P2P/RPC, transparently
+ * re-reading from disk (header prefix only) when the in-memory header data
+ * was pruned on a fluxnode, or when nSolution was omitted for a
+ * compact-stored block. Returns false — with header holding the partial
+ * in-memory view — if the disk read fails; callers decide whether partial
+ * data is acceptable (P2P best-effort) or an error (RPC). */
+bool GetFullBlockHeader(CBlockHeader& header, const CBlockIndex* pindex, const Consensus::Params& consensusParams);
 
 /** Functions for validating blocks and updating the block tree */
 

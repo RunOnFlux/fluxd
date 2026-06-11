@@ -2532,15 +2532,9 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
                 if (NetworkUpgradeActive(pindex->pprev->nHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
                     // hashFinalSaplingRoot is a block-header field that may have
                     // been pruned from memory; read it from disk if so.
-                    uint256 saplingAnchor;
-                    if (pindex->pprev->pHeaderData) {
-                        saplingAnchor = pindex->pprev->pHeaderData->hashFinalSaplingRoot;
-                    } else {
-                        CBlock prevBlock;
-                        assert(ReadBlockFromDisk(prevBlock, pindex->pprev, Params().GetConsensus()));
-                        saplingAnchor = prevBlock.hashFinalSaplingRoot;
-                    }
-                    assert(pcoinsTip->GetSaplingAnchorAt(saplingAnchor, saplingTree));
+                    CBlockHeader prevHeader;
+                    assert(GetFullBlockHeader(prevHeader, pindex->pprev, Params().GetConsensus()));
+                    assert(pcoinsTip->GetSaplingAnchorAt(prevHeader.hashFinalSaplingRoot, saplingTree));
                 }
             }
             // Increment note witness caches
@@ -4563,16 +4557,10 @@ int CMerkleTx::GetDepthInMainChainINTERNAL(const CBlockIndex* &pindexRet) const
         // never returns zero for a real tx, so comparing against a zeroed
         // root would mis-report every confirmed tx in a pruned block as
         // conflicted (depth -1) after each restart.
-        uint256 hashMerkleRoot;
-        if (pindex->pHeaderData) {
-            hashMerkleRoot = pindex->pHeaderData->hashMerkleRoot;
-        } else {
-            CBlock block;
-            if (!ReadBlockFromDisk(block, pindex, Params().GetConsensus()))
-                return 0;
-            hashMerkleRoot = block.hashMerkleRoot;
-        }
-        if (CBlock::CheckMerkleBranch(GetHash(), vMerkleBranch, nIndex) != hashMerkleRoot)
+        CBlockHeader header;
+        if (!GetFullBlockHeader(header, pindex, Params().GetConsensus()))
+            return 0;
+        if (CBlock::CheckMerkleBranch(GetHash(), vMerkleBranch, nIndex) != header.hashMerkleRoot)
             return 0;
         fMerkleVerified = true;
     }

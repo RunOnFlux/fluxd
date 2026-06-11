@@ -111,64 +111,28 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
     result.pushKV("confirmations", confirmations);
     result.pushKV("height", blockindex->nHeight);
     result.pushKV("version", blockindex->nVersion);
-    if (blockindex->pHeaderData) {
-        result.pushKV("merkleroot", blockindex->pHeaderData->hashMerkleRoot.GetHex());
-        result.pushKV("finalsaplingroot", blockindex->pHeaderData->hashFinalSaplingRoot.GetHex());
-    } else {
-        // Header data pruned, fall back to reading from disk
-        CBlock block;
-        if (ReadBlockFromDisk(block, blockindex, Params().GetConsensus())) {
-            result.pushKV("merkleroot", block.hashMerkleRoot.GetHex());
-            result.pushKV("finalsaplingroot", block.hashFinalSaplingRoot.GetHex());
-        } else {
-            result.pushKV("merkleroot", "");
-            result.pushKV("finalsaplingroot", "");
-        }
-    }
+
+    // Header fields may be pruned from memory on a fluxnode;
+    // GetFullBlockHeader re-reads them from disk (header prefix only). On a
+    // failed read, emit empty strings rather than erroring the whole call —
+    // matching the previous per-field fallback behavior.
+    CBlockHeader fullHeader;
+    bool fHaveHeader = GetFullBlockHeader(fullHeader, blockindex, Params().GetConsensus());
+    result.pushKV("merkleroot", fHaveHeader ? fullHeader.hashMerkleRoot.GetHex() : "");
+    result.pushKV("finalsaplingroot", fHaveHeader ? fullHeader.hashFinalSaplingRoot.GetHex() : "");
     result.pushKV("time", (int64_t)blockindex->nTime);
 
     // Add POW or PON fields based on block version
     if (blockindex->nVersion >= CBlockHeader::PON_VERSION) {
         // PON block fields
         result.pushKV("type", "PON");
-        if (blockindex->pHeaderData) {
-            result.pushKV("collateral", blockindex->pHeaderData->nodesCollateral.ToString());
-            result.pushKV("blocksig", HexStr(blockindex->pHeaderData->vchBlockSig));
-        } else {
-            CBlock block;
-            if (ReadBlockFromDisk(block, blockindex, Params().GetConsensus())) {
-                result.pushKV("collateral", block.nodesCollateral.ToString());
-                result.pushKV("blocksig", HexStr(block.vchBlockSig));
-            } else {
-                result.pushKV("collateral", "");
-                result.pushKV("blocksig", "");
-            }
-        }
+        result.pushKV("collateral", fHaveHeader ? fullHeader.nodesCollateral.ToString() : "");
+        result.pushKV("blocksig", fHaveHeader ? HexStr(fullHeader.vchBlockSig) : "");
     } else {
         // POW block fields
         result.pushKV("type", "POW");
-        if (blockindex->pHeaderData) {
-            result.pushKV("nonce", blockindex->pHeaderData->nNonce.GetHex());
-            if (blockindex->pHeaderData->nSolution.empty()) {
-                CBlock block;
-                if (ReadBlockFromDisk(block, blockindex, Params().GetConsensus())) {
-                    result.pushKV("solution", HexStr(block.nSolution));
-                } else {
-                    result.pushKV("solution", "");
-                }
-            } else {
-                result.pushKV("solution", HexStr(blockindex->pHeaderData->nSolution));
-            }
-        } else {
-            CBlock block;
-            if (ReadBlockFromDisk(block, blockindex, Params().GetConsensus())) {
-                result.pushKV("nonce", block.nNonce.GetHex());
-                result.pushKV("solution", HexStr(block.nSolution));
-            } else {
-                result.pushKV("nonce", "");
-                result.pushKV("solution", "");
-            }
-        }
+        result.pushKV("nonce", fHaveHeader ? fullHeader.nNonce.GetHex() : "");
+        result.pushKV("solution", fHaveHeader ? HexStr(fullHeader.nSolution) : "");
     }
     
     result.pushKV("bits", strprintf("%08x", blockindex->nBits));
@@ -716,23 +680,8 @@ UniValue getblockheader(const UniValue& params, bool fHelp)
     if (!fVerbose)
     {
         CBlockHeader header;
-        if (pblockindex->HasHeaderData()) {
-            header = pblockindex->GetBlockHeader();
-            if (header.IsPOW() && header.nSolution.empty()) {
-                CBlock block;
-                if (ReadBlockFromDisk(block, pblockindex, Params().GetConsensus())) {
-                    header.nSolution = block.nSolution;
-                }
-            }
-        } else {
-            // Header data pruned, read full block from disk
-            CBlock block;
-            if (ReadBlockFromDisk(block, pblockindex, Params().GetConsensus())) {
-                header = block.GetBlockHeader();
-            } else {
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not found on disk");
-            }
-        }
+        if (!GetFullBlockHeader(header, pblockindex, Params().GetConsensus()))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not found on disk");
         CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
         ssBlock << header;
         std::string strHex = HexStr(ssBlock.begin(), ssBlock.end());
