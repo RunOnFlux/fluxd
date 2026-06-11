@@ -4507,7 +4507,13 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
             // re-accumulate header data in memory.
             for (CBlockIndex* pindexRestored : vRestoredHeaderData)
                 pindexRestored->FreeHeaderData();
-            g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
+            // Unforced: when the fluxnode cache is clean this must not touch
+            // the sync marker. This flush also runs during init, before
+            // RecoverFluxnodeCache (e.g. from RewindBlockIndex) — forcing a
+            // marker write there would overwrite the marker with the current
+            // in-memory tip and destroy the divergence that tells recovery a
+            // crash happened.
+            g_fluxnodeCache.PersistToDisk(chainActive.Tip(), false);
         }
         // Finally remove any pruned files
         if (fFlushForPrune)
