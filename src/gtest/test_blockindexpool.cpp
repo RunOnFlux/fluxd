@@ -170,11 +170,11 @@ TEST(BlockIndex, CopyDeepCopiesHeaderDataAndResidentFields)
 
 TEST(BlockIndex, RestoreHeaderDataAfterPruneSerializesIdentically)
 {
-    // M2/M6 regression contract: a pruned-then-restored entry must produce a
-    // byte-identical CDiskBlockIndex record to one that was never pruned.
-    // (The flush path restores dirty-but-pruned entries from disk before
-    // serialization; fabricating an empty HeaderData — the old fallback —
-    // would overwrite a good leveldb record with zeroed header fields.)
+    // A pruned-then-restored entry must produce a byte-identical
+    // CDiskBlockIndex record to one that was never pruned: the flush path
+    // restores dirty-but-pruned entries from disk before serialization, and
+    // any divergence here would overwrite a good leveldb record with wrong
+    // header fields.
     CBlockHeader h = MakePopulatedHeader();
     h.hashPrevBlock = uint256();
     CBlockIndex idx(h);
