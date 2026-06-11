@@ -248,8 +248,12 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
         assert_equal(marker_height, 51)
 
         # Leave running nodes behind so the framework teardown is happy.
+        # node1 keeps its mocked clock: its blocks carry far-future
+        # timestamps, and a real-clock startup would reject them as invalid
+        # ("Corrupted block database detected").
         self.restart_node0()
-        self.nodes[1] = start_node(1, self.options.tmpdir, ["-debug"])
+        self.nodes[1] = start_node(1, self.options.tmpdir,
+                                   ["-debug", "-mocktime=1900000000"])
 
         print("All fluxnode cache recovery scenarios passed.")
 
