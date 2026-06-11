@@ -115,7 +115,7 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
     // Header fields may be pruned from memory on a fluxnode;
     // GetFullBlockHeader re-reads them from disk (header prefix only). On a
     // failed read, emit empty strings rather than erroring the whole call —
-    // matching the previous per-field fallback behavior.
+    // the resident fields (height, time, bits, work) are still useful.
     CBlockHeader fullHeader;
     bool fHaveHeader = GetFullBlockHeader(fullHeader, blockindex, Params().GetConsensus());
     result.pushKV("merkleroot", fHaveHeader ? fullHeader.hashMerkleRoot.GetHex() : "");
