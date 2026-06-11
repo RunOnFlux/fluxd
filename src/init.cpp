@@ -1908,8 +1908,11 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     if (mapArgs.count("-blocknotify"))
         uiInterface.NotifyBlockTip.connect(BlockNotifyCallback);
 
+    // Must abort BEFORE ActivateBestChain: replaying blocks onto an
+    // unrecovered fluxnode cache double-applies their effects and overwrites
+    // good on-disk undo records with ones rebuilt from the corrupt state.
     if (!RecoverFluxnodeCache(chainparams))
-        strErrors << "Failed to recover fluxnode cache";
+        return InitError(_("Failed to recover the fluxnode cache. Restart with -reindex to rebuild it."));
 
     uiInterface.InitMessage(_("Activating best chain..."));
     // scan for better chains in the block chain database, that are not yet connected in the active best chain
