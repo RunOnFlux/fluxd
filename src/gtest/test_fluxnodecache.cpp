@@ -2,11 +2,12 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
-// Tests for FluxnodeCache persistence. M7 regression: a forced PersistToDisk
-// must write the sync-state marker even when the cache has nothing dirty —
-// recovery repairs a stale marker via PersistToDisk(tip, true), which
-// previously no-op'd (dirty sets are empty at init), so the node re-entered
-// recovery on every restart.
+// Tests for FluxnodeCache persistence: a forced PersistToDisk must write the
+// sync-state marker even when the cache has nothing dirty. Crash recovery
+// repairs a stale marker via PersistToDisk(tip, true) while the cache is
+// still clean at init — if the forced write silently skipped, the stale
+// marker would survive and the node would re-enter recovery on every
+// restart.
 
 #include <gtest/gtest.h>
 
