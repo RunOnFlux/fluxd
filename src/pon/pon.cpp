@@ -243,13 +243,18 @@ unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
 int ComparePonForkChoice(const CBlockIndex* a, const CBlockIndex* b)
 {
     // VRF blocks: compare by the committed VRF output (un-grindable). Legacy PON
-    // blocks: by GetPONHash. A VRF and a legacy block (mixed-version fork around
-    // activation) each use their own score; lower wins in all cases.
+    // blocks: by the PON hash cached on the index entry. A VRF and a legacy block
+    // (mixed-version fork around activation) each use their own score; lower wins
+    // in all cases. Both scores are resident fields: recomputing the legacy hash
+    // from GetBlockHeader() would hash a zeroed nodesCollateral once the entry's
+    // header data has been pruned, and the score would change when header data is
+    // restored — mutating a comparator key in place for entries already inside
+    // setBlockIndexCandidates.
     bool vrfA = (a->nVersion >= CBlockHeader::PON_VRF_VERSION);
     bool vrfB = (b->nVersion >= CBlockHeader::PON_VRF_VERSION);
 
-    uint256 scoreA = vrfA ? a->nodesVrfOutput : GetPONHash(a->GetBlockHeader());
-    uint256 scoreB = vrfB ? b->nodesVrfOutput : GetPONHash(b->GetBlockHeader());
+    const uint256& scoreA = vrfA ? a->nodesVrfOutput : a->hashPON;
+    const uint256& scoreB = vrfB ? b->nodesVrfOutput : b->hashPON;
 
     if (scoreA < scoreB) return -1;  // a preferred
     if (scoreA > scoreB) return 1;   // b preferred
