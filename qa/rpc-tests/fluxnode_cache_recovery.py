@@ -40,6 +40,7 @@ Requires the 'plyvel' python package (pip install plyvel).
 import os
 import shutil
 import struct
+import time
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
@@ -210,7 +211,13 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
         assert_equal(fork_hash, tip_hash)
         node.invalidateblock(fork_hash)
         assert_equal(node.getblockcount(), 49)
+        # Regtest mining is deterministic: without a clock shift, re-mining at
+        # height 50 reproduces the exact block that was just invalidated and
+        # the daemon rejects it. Mock the clock forward so chain B's blocks
+        # get different timestamps (and therefore different hashes).
+        node.setmocktime(int(time.time()) + 3600)
         node.generate(2)                               # chain B, height 51
+        node.setmocktime(0)
         new_tip_hash = node.getbestblockhash()
         assert_equal(node.getblockcount(), 51)
         self.stop0()
