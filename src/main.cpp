@@ -163,9 +163,15 @@ namespace {
             bool isPONBlockB = (pb->nVersion >= 100);
 
             if (isPONBlockA && isPONBlockB && pa->nHeight == pb->nHeight) {
-                // Both are PON blocks at same height - use PON hash as tie-breaker
-                uint256 ponHashA = GetPONHash(pa->GetBlockHeader());
-                uint256 ponHashB = GetPONHash(pb->GetBlockHeader());
+                // Both are PON blocks at same height - use PON hash as tie-breaker.
+                // Use the resident cached hash: recomputing from GetBlockHeader()
+                // would hash a zeroed nodesCollateral for pruned entries (wrong
+                // tie-break vs the network), and the result would change when
+                // connect/disconnect restores header data on an entry already in
+                // setBlockIndexCandidates — an in-place comparator-key mutation
+                // that breaks set ordering and makes erase-by-key silently fail.
+                const uint256& ponHashA = pa->hashPON;
+                const uint256& ponHashB = pb->hashPON;
 
                 if (ponHashA < ponHashB) {
                     LogPrint("pon", "PON tie-breaker: Block %s (PON hash %s) wins over %s (PON hash %s) at height %d\n",
@@ -5180,6 +5186,10 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     // Construct new block index object
     CBlockIndex* pindexNew = new CBlockIndex(block);
     assert(pindexNew);
+    // Cache the PON hash for the fork-choice tie-breaker; it must stay
+    // available after the header data is pruned.
+    if (block.IsPON())
+        pindexNew->hashPON = GetPONHash(block);
     // We assign the sequence id to blocks only when the full data is available,
     // to avoid miners withholding blocks but broadcasting headers, to get a
     // competitive advantage.
@@ -8292,6 +8302,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             // since the checkpoint validates the chain
             CBlockIndex* pindexNew = new CBlockIndex(compactHeader);
             assert(pindexNew);
+            if (compactHeader.IsPON())
+                pindexNew->hashPON = GetPONHash(compactHeader);
             pindexNew->nSequenceId = 0;
 
             // Insert using the provided/computed hash
