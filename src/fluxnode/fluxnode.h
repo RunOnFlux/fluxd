@@ -496,8 +496,7 @@ public:
     void EraseFromListSet(const COutPoint& p_OutPoint);
     void EraseFromList(const std::set<COutPoint>& setToRemove, const Tier nTier);
 
-    void DumpFluxnodeCache();
-    void PersistToDisk(const CBlockIndex* pTip, bool fForce = false);
+    void PersistToDisk(const CBlockIndex* pTip, bool fForce);
 
     // Delegate helper - checks cache first, then database
     bool GetDelegates(const COutPoint& outpoint, CFluxnodeDelegates& delegates);

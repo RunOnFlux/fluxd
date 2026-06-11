@@ -92,7 +92,8 @@ flux_gtest_SOURCES += \
 	gtest/test_delegates.cpp \
 	gtest/test_emergencyblock.cpp \
 	gtest/test_net.cpp \
-	gtest/test_blockindexpool.cpp
+	gtest/test_blockindexpool.cpp \
+	gtest/test_fluxnodecache.cpp
 if ENABLE_WALLET
 flux_gtest_SOURCES += \
 	wallet/gtest/test_paymentdisclosure.cpp \
