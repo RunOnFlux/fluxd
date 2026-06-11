@@ -2868,12 +2868,18 @@ static bool EnsureHeaderDataFromDisk(CBlockIndex* pindex, const Consensus::Param
 bool GetFullBlockHeader(CBlockHeader& header, const CBlockIndex* pindex, const Consensus::Params& consensusParams)
 {
     header = pindex->GetBlockHeader();
-    if (!pindex->pHeaderData || (header.IsPOW() && header.nSolution.empty())) {
-        CBlockHeader diskHeader;
-        if (!ReadBlockHeaderFromDisk(diskHeader, pindex, consensusParams))
-            return false;
-        header = diskHeader;
+    bool fNeedDisk = !pindex->pHeaderData || (header.IsPOW() && header.nSolution.empty());
+    if (!fNeedDisk)
+        return true;
+
+    CBlockHeader diskHeader;
+    if (!ReadBlockHeaderFromDisk(diskHeader, pindex, consensusParams)) {
+        // A resident header is still usable when only the omitted nSolution
+        // could not be completed from disk; report failure only when the
+        // header fields themselves are unavailable (pruned and unreadable).
+        return pindex->pHeaderData != nullptr;
     }
+    header = diskHeader;
     return true;
 }
 
