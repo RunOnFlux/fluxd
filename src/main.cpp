@@ -3489,6 +3489,83 @@ enum DisconnectResult
  *  When UNCLEAN or FAILED is returned, view is left in an indeterminate state.
  *  The addressIndex and spentIndex will be updated if requested.
  */
+/**
+ * Undo only the fluxnode-cache effects of a block, in exactly the order
+ * DisconnectBlock applies them: undo-record read -> AddBackUndoData ->
+ * CheckForUndoExpiredStartTx -> reverse-tx loop (UndoNewStart /
+ * UndoNewConfirm / delegate restore decision) -> delegate map push.
+ * Touches no coins or chainstate. Used by DisconnectBlock and by
+ * RecoverFluxnodeCache's marker-chain rewind, which must undo the fluxnode
+ * effects of blocks that are NOT part of the current chainstate (the sync
+ * marker can sit ahead of the coins DB, or on a fork after a crashed reorg).
+ */
+static bool DisconnectFluxnodeOnly(const CBlock& block, const CBlockIndex* pindex, FluxnodeCache* p_fluxnodeCache)
+{
+    if (!p_fluxnodeCache)
+        return error("%s: p_fluxnodeCache is null", __func__);
+
+    CFluxnodeTxBlockUndo fluxnodeBlockUndo;
+    if (!pFluxnodeDB->ReadBlockUndoFluxnodeData(block.GetHash(), fluxnodeBlockUndo))
+        return error("%s: block fluxnodetx undo data inconsistent", __func__);
+
+    LogPrintf("DISCONNECT BLOCK %d: Read undo data - %d UPDATE_CONFIRM undos, %d paid node undos\n",
+              pindex->nHeight, fluxnodeBlockUndo.mapUpdateLastConfirmHeight.size(), fluxnodeBlockUndo.mapLastPaidHeights.size());
+
+    p_fluxnodeCache->AddBackUndoData(fluxnodeBlockUndo);
+    p_fluxnodeCache->CheckForUndoExpiredStartTx(pindex->nHeight);
+
+    std::set<COutPoint> setDelegatesToRemove;
+    std::map<COutPoint, CFluxnodeDelegates> mapDelegatesToAdd;
+
+    // undo fluxnode transactions in reverse order
+    for (int i = block.vtx.size() - 1; i >= 0; i--) {
+        const CTransaction& tx = block.vtx[i];
+        if (!tx.IsFluxnodeTx())
+            continue;
+
+        if (tx.nType == FLUXNODE_START_TX_TYPE) {
+            // Undo the start from the list
+            p_fluxnodeCache->UndoNewStart(tx, pindex->nHeight);
+            if (tx.HasDelegates() && tx.fUsingDelegates && tx.IsUpdatingDelegate()) {
+                LogPrint("fluxnode", "DisconnectBlock: Undoing delegate change for %s\n", tx.collateralIn.ToString());
+                auto it = fluxnodeBlockUndo.mapOldDelegates.find(tx.collateralIn);
+
+                if (it != fluxnodeBlockUndo.mapOldDelegates.end()) {
+                    // Had old delegates - restore them
+                    mapDelegatesToAdd[tx.collateralIn] = it->second;
+                } else {
+                    // No old delegates - this was a new addition, erase it
+                    setDelegatesToRemove.insert(tx.collateralIn);
+                }
+            }
+        } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
+            if (tx.nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM) {
+                p_fluxnodeCache->UndoNewConfirm(tx);
+            } else if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
+                // Handled by the p_fluxnodeCache->AddBackUndoData function
+                // This function uses the undo block data and handles it accordingly
+            }
+        }
+    }
+
+    // Add delegate restore/removal operations to the cache instead of writing directly to database
+    for (const auto& pair : mapDelegatesToAdd) {
+        // Had old delegates - restore them to cache
+        p_fluxnodeCache->mapDelegateToWrite[pair.first] = pair.second;
+        // Remove from erase set if it was there
+        p_fluxnodeCache->setDelegateToErase.erase(pair.first);
+    }
+
+    for (const auto& outpoint : setDelegatesToRemove) {
+        // Mark for erasure in cache
+        p_fluxnodeCache->setDelegateToErase.insert(outpoint);
+        // Remove from write map if it was there
+        p_fluxnodeCache->mapDelegateToWrite.erase(outpoint);
+    }
+
+    return true;
+}
+
 static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& state,
     const CBlockIndex* pindex, CCoinsViewCache& view, FluxnodeCache* p_fluxnodeCache, const CChainParams& chainparams,
     const bool updateIndices)
@@ -3496,9 +3573,6 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
     assert(pindex->GetBlockHash() == view.GetBestBlock());
 
     bool fClean = true;
-
-    std::set<COutPoint> setDelegatesToRemove;
-    std::map<COutPoint, CFluxnodeDelegates> mapDelegatesToAdd;
 
     CBlockUndo blockUndo;
     CDiskBlockPos pos = pindex->GetUndoPos();
@@ -3516,27 +3590,15 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
         return DISCONNECT_FAILED;
     }
 
-    CFluxnodeTxBlockUndo fluxnodeBlockUndo;
-    if (!pFluxnodeDB->ReadBlockUndoFluxnodeData(block.GetHash(), fluxnodeBlockUndo)) {
-        error("DisconnectBlock(): block fluxnodetx undo data inconsistent");
+    // Undo the fluxnode-cache effects of this block (reads the fluxnode undo
+    // record, restores tracker/confirmed state and delegates into the local
+    // cache). Coins/chainstate effects are undone below.
+    if (!DisconnectFluxnodeOnly(block, pindex, p_fluxnodeCache))
         return DISCONNECT_FAILED;
-    }
-
-    LogPrintf("DISCONNECT BLOCK %d: Read undo data - %d UPDATE_CONFIRM undos, %d paid node undos\n",
-              pindex->nHeight, fluxnodeBlockUndo.mapUpdateLastConfirmHeight.size(), fluxnodeBlockUndo.mapLastPaidHeights.size());
-
-    if (!p_fluxnodeCache) {
-        error("DisconnectBlock(): p_fluxnodeCache is null");
-        return DISCONNECT_FAILED;
-    }
-
-    p_fluxnodeCache->AddBackUndoData(fluxnodeBlockUndo);
 
     std::vector<CAddressIndexDbEntry> addressIndex;
     std::vector<CAddressUnspentDbEntry> addressUnspentIndex;
     std::vector<CSpentIndexDbEntry> spentIndex;
-
-    p_fluxnodeCache->CheckForUndoExpiredStartTx(pindex->nHeight);
 
     // undo transactions in reverse order
     LogPrintf("%s: Undoing transactions for block: %d\n", __func__, pindex->nHeight);
@@ -3562,32 +3624,6 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
                     addressUnspentIndex.push_back(make_pair(
                         CAddressUnspentKey(scriptType, addrHash, hash, k),
                         CAddressUnspentValue()));
-                }
-            }
-        }
-
-        if (tx.IsFluxnodeTx()) {
-            if (tx.nType == FLUXNODE_START_TX_TYPE) {
-                // Undo the start from the list
-                p_fluxnodeCache->UndoNewStart(tx, pindex->nHeight);
-                if (tx.HasDelegates() && tx.fUsingDelegates && tx.IsUpdatingDelegate()) {
-                    LogPrint("fluxnode", "DisconnectBlock: Undoing delegate change for %s\n", tx.collateralIn.ToString());
-                    auto it = fluxnodeBlockUndo.mapOldDelegates.find(tx.collateralIn);
-
-                    if (it != fluxnodeBlockUndo.mapOldDelegates.end()) {
-                        // Had old delegates - restore them
-                        mapDelegatesToAdd[tx.collateralIn] = it->second;
-                    } else {
-                        // No old delegates - this was a new addition, erase it
-                        setDelegatesToRemove.insert(tx.collateralIn);
-                    }
-                }
-            } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
-                if (tx.nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM) {
-                    p_fluxnodeCache->UndoNewConfirm(tx);
-                } else if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
-                    // Handled by the p_fluxnodeCache->AddBackUndoData function
-                    // This function uses the undo block data and handles it accordingly
                 }
             }
         }
@@ -3697,29 +3733,6 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
         if (!pblocktree->UpdateSpentIndex(spentIndex)) {
             AbortNode(state, "Failed to write transaction index");
             return DISCONNECT_FAILED;
-        }
-    }
-
-    // Add delegate restore/removal operations to the cache instead of writing directly to database
-    if (!mapDelegatesToAdd.empty()) {
-        for (const auto& pair : mapDelegatesToAdd) {
-            // Had old delegates - restore them to cache
-            if (p_fluxnodeCache) {
-                p_fluxnodeCache->mapDelegateToWrite[pair.first] = pair.second;
-                // Remove from erase set if it was there
-                p_fluxnodeCache->setDelegateToErase.erase(pair.first);
-            }
-        }
-    }
-
-    if (!setDelegatesToRemove.empty()) {
-        for (const auto& outpoint : setDelegatesToRemove) {
-            // Mark for erasure in cache
-            if (p_fluxnodeCache) {
-                p_fluxnodeCache->setDelegateToErase.insert(outpoint);
-                // Remove from write map if it was there
-                p_fluxnodeCache->mapDelegateToWrite.erase(outpoint);
-            }
         }
     }
 
@@ -6473,6 +6486,11 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
     return true;
 }
 
+//! Maximum depth the fluxnode-cache recovery will rewind. Undo records older
+//! than this are pruned by CleanupOldFluxnodeData (same window), so a deeper
+//! rewind would silently under-rewind; require -reindex instead.
+static const int MAX_FLUXNODE_RECOVERY_DEPTH = 5040;
+
 bool RecoverFluxnodeCache(const CChainParams& chainparams)
 {
     LOCK(cs_main);
@@ -6494,66 +6512,111 @@ bool RecoverFluxnodeCache(const CChainParams& chainparams)
         return true;
     }
 
-    // Find the sync state block on the active chain
-    CBlockIndex* pSyncBlock = nullptr;
-    if (syncState.nHeight >= 0 && syncState.nHeight <= chainActive.Height()) {
-        CBlockIndex* pCandidate = chainActive[syncState.nHeight];
-        if (pCandidate && pCandidate->GetBlockHash() == syncState.bestBlockHash)
-            pSyncBlock = pCandidate;
-    }
-
-    int nDisconnectTo;
-    if (pSyncBlock) {
-        // Sync state is on the active chain — disconnect back to it
-        nDisconnectTo = pSyncBlock->nHeight;
-    } else {
-        // Sync state is on a different fork (crash during reorg).
-        // Find the sync state block in the block index and walk back
-        // to the common ancestor with the active chain.
-        LogPrintf("RecoverFluxnodeCache: sync state block %s at height %d is NOT on active chain (crash during reorg)\n",
-                  syncState.bestBlockHash.ToString(), syncState.nHeight);
-
-        BlockMap::iterator mi = mapBlockIndex.find(syncState.bestBlockHash);
-        if (mi == mapBlockIndex.end()) {
-            LogPrintf("RecoverFluxnodeCache: sync state block not in block index (stale marker), writing fresh sync state\n");
-            g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
-            return true;
-        }
-
-        // Walk back from the sync state block to find where it meets the active chain
-        CBlockIndex* pFork = mi->second;
-        while (pFork && !chainActive.Contains(pFork))
-            pFork = pFork->pprev;
-
-        if (!pFork) {
-            LogPrintf("RecoverFluxnodeCache: no common ancestor found, cannot recover — need -reindex\n");
-            return true;
-        }
-
-        LogPrintf("RecoverFluxnodeCache: common ancestor at height %d\n", pFork->nHeight);
-        nDisconnectTo = pFork->nHeight;
-    }
-
-    int nBlocksToReplay = chainActive.Height() - nDisconnectTo;
-    if (nBlocksToReplay <= 0)
+    // Locate the marker block in the block index. The on-disk fluxnode DB
+    // reflects the chain AS SEEN FROM THE MARKER: the marker is written in
+    // the same synced batch as the data (PersistToDisk), so the marker's
+    // chain — not the active chain — is what the fluxnode DB has applied.
+    BlockMap::iterator mi = mapBlockIndex.find(syncState.bestBlockHash);
+    if (mi == mapBlockIndex.end()) {
+        LogPrintf("RecoverFluxnodeCache: sync state block not in block index (stale marker), writing fresh sync state\n");
+        g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
         return true;
+    }
+    CBlockIndex* pMarker = mi->second;
 
-    LogPrintf("RecoverFluxnodeCache: disconnecting %d blocks (tip %d -> %d) for fluxnode cache replay\n",
-              nBlocksToReplay, chainActive.Height(), nDisconnectTo);
+    // Common ancestor of the marker's chain and the active chain. Covers all
+    // marker positions: behind the tip on the active chain (ancestor ==
+    // marker, plain lag), ahead of the tip on the same chain (ancestor ==
+    // tip, the periodic write ran ahead of the ~24h coins flush), or on a
+    // fork (crash during reorg).
+    CBlockIndex* pAncestor = pMarker;
+    while (pAncestor && !chainActive.Contains(pAncestor))
+        pAncestor = pAncestor->pprev;
 
+    if (!pAncestor) {
+        return error("RecoverFluxnodeCache: no common ancestor between sync marker %s (height %d) and the active chain — "
+                     "fluxnode cache is unrecoverable, restart with -reindex",
+                     syncState.bestBlockHash.ToString(), syncState.nHeight);
+    }
+
+    // Depth cap: both the marker-chain rewind and the chainstate disconnect
+    // consume fluxnode undo records, which are pruned beyond the retention
+    // window. Refuse to "recover" past it — that would silently under-rewind.
+    int nMarkerRewindDepth = pMarker->nHeight - pAncestor->nHeight;
+    int nChainstateDepth = chainActive.Height() - pAncestor->nHeight;
+    if (nMarkerRewindDepth > MAX_FLUXNODE_RECOVERY_DEPTH || nChainstateDepth > MAX_FLUXNODE_RECOVERY_DEPTH) {
+        return error("RecoverFluxnodeCache: recovery needs to rewind %d blocks (marker %d / chainstate %d), beyond the "
+                     "%d-block undo retention window — restart with -reindex",
+                     std::max(nMarkerRewindDepth, nChainstateDepth), nMarkerRewindDepth, nChainstateDepth,
+                     MAX_FLUXNODE_RECOVERY_DEPTH);
+    }
+
+    // Phase 1: fluxnode-only rewind along the MARKER's chain, marker down to
+    // (but excluding) the common ancestor. These blocks' fluxnode effects are
+    // in the on-disk DB but are not (or no longer) part of the chainstate's
+    // path, so DisconnectTip can never undo them — without this rewind,
+    // ActivateBestChain would replay onto a cache that already contains
+    // their effects (double-applied deltas, rebuilt undo records overwriting
+    // good ones, nLastPaidHeight resets). Each block uses a fresh local cache
+    // flushed immediately, exactly mirroring DisconnectTip: multi-block
+    // batching would be incorrect (setAddToConfirmHeight semantics and
+    // AddBackUndoData's already-in-local guard both assume per-block Flush).
+    int nFluxnodeRewound = 0;
+    if (pMarker != pAncestor) {
+        LogPrintf("RecoverFluxnodeCache: sync marker %s (height %d) is not the common ancestor (height %d); "
+                  "rewinding %d blocks of fluxnode state along the marker's chain\n",
+                  syncState.bestBlockHash.ToString(), syncState.nHeight, pAncestor->nHeight, nMarkerRewindDepth);
+
+        for (CBlockIndex* pindex = pMarker; pindex != pAncestor; pindex = pindex->pprev) {
+            CBlock block;
+            if (!ReadBlockFromDisk(block, pindex, chainparams.GetConsensus())) {
+                return error("RecoverFluxnodeCache: failed to read block %s (height %d) for fluxnode rewind — "
+                             "block files corrupt, restart with -reindex",
+                             pindex->GetBlockHash().ToString(), pindex->nHeight);
+            }
+
+            FluxnodeCache localCache;
+            if (!DisconnectFluxnodeOnly(block, pindex, &localCache)) {
+                return error("RecoverFluxnodeCache: failed to undo fluxnode effects of block %s (height %d) — "
+                             "restart with -reindex",
+                             pindex->GetBlockHash().ToString(), pindex->nHeight);
+            }
+            if (!localCache.Flush()) {
+                return error("RecoverFluxnodeCache: failed to flush fluxnode cache while rewinding block %s (height %d)",
+                             pindex->GetBlockHash().ToString(), pindex->nHeight);
+            }
+            nFluxnodeRewound++;
+        }
+        CRPCFluxnodeCache::ClearFluxnodeListCache();
+    }
+
+    // Phase 2: chainstate disconnect down to the common ancestor (unchanged
+    // behavior). DisconnectTip undoes both coins and fluxnode effects; for
+    // active-chain blocks the fluxnode DB may or may not have applied them,
+    // but the undo operations converge to the ancestor state either way.
     CValidationState state;
-    while (chainActive.Height() > nDisconnectTo) {
-        if (!DisconnectTip(state, chainparams, true)) {
-            return error("RecoverFluxnodeCache: failed to disconnect block at height %d", chainActive.Height());
+    int nBlocksToReplay = chainActive.Height() - pAncestor->nHeight;
+    if (nBlocksToReplay > 0) {
+        LogPrintf("RecoverFluxnodeCache: disconnecting %d blocks (tip %d -> %d) for fluxnode cache replay\n",
+                  nBlocksToReplay, chainActive.Height(), pAncestor->nHeight);
+
+        while (chainActive.Height() > pAncestor->nHeight) {
+            if (!DisconnectTip(state, chainparams, true)) {
+                return error("RecoverFluxnodeCache: failed to disconnect block at height %d", chainActive.Height());
+            }
         }
     }
 
+    // Write the repaired state and marker (fForce: the cache may be clean if
+    // only the marker was wrong). ActivateBestChain replays forward from the
+    // ancestor, rewriting now-correct undo records as it goes.
     g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
 
     if (!FlushStateToDisk(state, FLUSH_STATE_ALWAYS))
         return false;
 
-    LogPrintf("RecoverFluxnodeCache: disconnected %d blocks, ActivateBestChain will reconnect them\n", nBlocksToReplay);
+    LogPrintf("RecoverFluxnodeCache: rewound %d marker-chain blocks, disconnected %d chainstate blocks; "
+              "ActivateBestChain will reconnect to the best tip\n", nFluxnodeRewound, nBlocksToReplay);
     return true;
 }
 
