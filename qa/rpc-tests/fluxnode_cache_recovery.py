@@ -19,15 +19,21 @@ Covers the M1/M7 fixes from the 2026-06 memory-branch review:
   along the marker's chain (M1 phase 1) followed by the chainstate
   disconnect; node converges to the best tip
 
-The sync marker is manipulated directly in <datadir>/regtest/determ_zelnodes
-with plyvel while the node is stopped. Key = b's'; value = 32-byte block hash
-in internal byte order followed by an int32-LE height. The DB is written by
-the old-style CDBWrapper (no obfuscation key).
+Marker divergence is manufactured with directory snapshots of
+<datadir>/regtest/determ_zelnodes taken between restarts — i.e. only fluxd's
+own leveldb writes. (Writing the marker with plyvel does NOT work: modern
+plyvel/leveldb produces a MANIFEST the daemon's older bundled leveldb
+silently ignores, so the daemon never sees the write. Reads are compatible,
+so plyvel is used read-only to assert the marker contents; key = b's',
+value = 32-byte block hash in internal byte order + int32-LE height, no
+obfuscation.) The stale-marker scenario takes its foreign fluxnode DB from a
+second, never-connected node whose blocks node0 has never seen.
 
 Requires the 'plyvel' python package (pip install plyvel).
 """
 
 import os
+import shutil
 import struct
 
 from test_framework.test_framework import BitcoinTestFramework
@@ -45,22 +51,29 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
 
     def __init__(self):
         super().__init__()
-        self.num_nodes = 1
+        self.num_nodes = 2
 
     def setup_chain(self):
         print(f"Initializing test directory {self.options.tmpdir}")
         initialize_chain_clean(self.options.tmpdir, self.num_nodes)
 
     def setup_network(self, split=False):
-        self.nodes = [start_node(0, self.options.tmpdir, ["-debug"])]
+        # node1 exists only to produce a foreign fluxnode DB for the
+        # stale-marker scenario; the nodes are never connected.
+        self.nodes = [
+            start_node(0, self.options.tmpdir, ["-debug"]),
+            start_node(1, self.options.tmpdir, ["-debug"]),
+        ]
         self.is_network_split = False
 
-    # --- fluxnode DB marker helpers -------------------------------------
+    # --- fluxnode DB helpers ----------------------------------------------
 
-    def fluxnode_db_path(self):
-        return os.path.join(self.options.tmpdir, "node0", "regtest", "determ_zelnodes")
+    def fluxnode_db_path(self, node_index=0):
+        return os.path.join(self.options.tmpdir, f"node{node_index}",
+                            "regtest", "determ_zelnodes")
 
     def read_marker(self):
+        """Read-only plyvel access (read compatibility is fine; see module doc)."""
         db = plyvel.DB(self.fluxnode_db_path())
         try:
             raw = db.get(b"s")
@@ -71,15 +84,19 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
         finally:
             db.close()
 
-    def write_marker(self, block_hash_hex, height):
-        db = plyvel.DB(self.fluxnode_db_path())
-        try:
-            raw = bytes.fromhex(block_hash_hex)[::-1] + struct.pack("<i", height)
-            db.put(b"s", raw)
-        finally:
-            db.close()
+    def snapshot_db(self, name):
+        src = self.fluxnode_db_path()
+        dst = src + "." + name
+        shutil.rmtree(dst, ignore_errors=True)
+        shutil.copytree(src, dst)
 
-    # --- debug.log helpers ----------------------------------------------
+    def restore_db(self, name, from_node=0):
+        src = self.fluxnode_db_path(from_node) + ("." + name if name else "")
+        dst = self.fluxnode_db_path()
+        shutil.rmtree(dst)
+        shutil.copytree(src, dst)
+
+    # --- debug.log helpers ------------------------------------------------
 
     def debug_log_path(self):
         return os.path.join(self.options.tmpdir, "node0", "regtest", "debug.log")
@@ -92,28 +109,39 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
             f.seek(offset)
             return f.read()
 
-    # --- node lifecycle ---------------------------------------------------
+    # --- node lifecycle -----------------------------------------------------
 
-    def restart_node(self):
+    def restart_node0(self):
         offset = self.mark_log()
         self.nodes[0] = start_node(0, self.options.tmpdir, ["-debug"])
         return offset
 
-    def stop(self):
+    def stop0(self):
         stop_node(self.nodes[0], 0)
 
-    # --- the test ---------------------------------------------------------
+    # --- the test -------------------------------------------------------------
 
     def run_test(self):
         node = self.nodes[0]
 
-        print("Mining 50 blocks...")
-        node.generate(50)
+        # node1: mine a short foreign chain (same genesis, blocks node0 has
+        # never seen) and capture its fluxnode DB, then retire it.
+        self.nodes[1].generate(5)
+        stop_node(self.nodes[1], 1)
+
+        print("Mining 40 blocks on node0...")
+        node.generate(40)
+        self.stop0()
+        self.snapshot_db("h40")            # marker = active-chain block at height 40
+
+        print("Mining 10 more blocks...")
+        self.restart_node0()
+        node = self.nodes[0]
+        node.generate(10)
         tip_hash = node.getbestblockhash()
         tip_height = node.getblockcount()
         assert_equal(tip_height, 50)
-        behind_hash = node.getblockhash(tip_height - 10)
-        self.stop()
+        self.stop0()
 
         # Sanity: a clean shutdown leaves the marker at the tip.
         marker_hash, marker_height = self.read_marker()
@@ -121,52 +149,59 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
         assert_equal(marker_height, tip_height)
 
         print("Clean restart: recovery must not run...")
-        offset = self.restart_node()
+        offset = self.restart_node0()
         log = self.log_since(offset)
         assert "no recovery needed" in log, "expected recovery skip on clean restart"
         assert "RecoverFluxnodeCache: disconnecting" not in log
-        self.stop()
+        self.stop0()
 
-        print("Stale marker: repaired once, then skipped (M7)...")
-        self.write_marker("ff" * 32, tip_height + 5)
-        offset = self.restart_node()
+        print("Stale marker (foreign DB): repaired once, then skipped (M7)...")
+        self.snapshot_db("clean50")
+        self.restore_db("", from_node=1)   # node1's DB: marker unknown to node0
+        offset = self.restart_node0()
         log = self.log_since(offset)
         assert "stale marker" in log, "expected stale-marker repair path"
-        self.stop()
+        self.stop0()
         # The forced persist must have actually written the fresh marker even
         # though the cache was clean — this is the M7 regression assertion.
         marker_hash, marker_height = self.read_marker()
         assert_equal(marker_hash, tip_hash)
         assert_equal(marker_height, tip_height)
-        offset = self.restart_node()
+        offset = self.restart_node0()
         log = self.log_since(offset)
         assert "no recovery needed" in log, \
             "stale-marker repair did not stick: recovery re-ran on the next restart"
-        self.stop()
+        self.stop0()
 
         print("Marker behind the tip: disconnect and replay...")
-        self.write_marker(behind_hash, tip_height - 10)
-        offset = self.restart_node()
+        self.restore_db("h40")
+        offset = self.restart_node0()
         log = self.log_since(offset)
         assert "RecoverFluxnodeCache: disconnecting 10 blocks" in log, \
             "expected a 10-block chainstate disconnect"
         node = self.nodes[0]
         assert_equal(node.getblockcount(), tip_height)
         assert_equal(node.getbestblockhash(), tip_hash)
+        self.stop0()
+        self.snapshot_db("forkA")          # marker = tip A (height 50)
 
         print("Marker on a stale fork: fluxnode-only rewind along the marker's chain (M1)...")
-        # Manufacture a fork: invalidate the tip, mine a competing chain that
-        # is longer, leaving the old tip as a stale fork block in the index.
-        fork_hash = node.getbestblockhash()           # height 50, chain A
+        # Manufacture a fork: invalidate tip A and mine a longer chain B,
+        # leaving A as a stale fork block in the index. Then restore the
+        # snapshot whose marker points at A.
+        self.restart_node0()
+        node = self.nodes[0]
+        fork_hash = node.getbestblockhash()            # A, height 50
+        assert_equal(fork_hash, tip_hash)
         node.invalidateblock(fork_hash)
         assert_equal(node.getblockcount(), 49)
-        node.generate(2)                              # chain B, height 51
+        node.generate(2)                               # chain B, height 51
         new_tip_hash = node.getbestblockhash()
         assert_equal(node.getblockcount(), 51)
-        self.stop()
+        self.stop0()
 
-        self.write_marker(fork_hash, 50)
-        offset = self.restart_node()
+        self.restore_db("forkA")
+        offset = self.restart_node0()
         log = self.log_since(offset)
         assert "rewinding 1 blocks of fluxnode state along the marker's chain" in log, \
             "expected the marker-chain fluxnode-only rewind (M1 phase 1)"
@@ -175,15 +210,16 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
         node = self.nodes[0]
         assert_equal(node.getblockcount(), 51)
         assert_equal(node.getbestblockhash(), new_tip_hash)
-        self.stop()
+        self.stop0()
 
         # After the recovery + clean shutdown the marker sits at the new tip.
         marker_hash, marker_height = self.read_marker()
         assert_equal(marker_hash, new_tip_hash)
         assert_equal(marker_height, 51)
 
-        # Leave a running node behind so the framework teardown is happy.
-        self.restart_node()
+        # Leave running nodes behind so the framework teardown is happy.
+        self.restart_node0()
+        self.nodes[1] = start_node(1, self.options.tmpdir, ["-debug"])
 
         print("All fluxnode cache recovery scenarios passed.")
 
