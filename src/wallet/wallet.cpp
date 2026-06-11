@@ -2531,10 +2531,17 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
             if (pindex->pprev) {
                 if (NetworkUpgradeActive(pindex->pprev->nHeight, Params().GetConsensus(), Consensus::UPGRADE_ACADIA)) {
                     // hashFinalSaplingRoot is a block-header field that may have
-                    // been pruned from memory; read it from disk if so.
-                    CBlockHeader prevHeader;
-                    assert(GetFullBlockHeader(prevHeader, pindex->pprev, Params().GetConsensus()));
-                    assert(pcoinsTip->GetSaplingAnchorAt(prevHeader.hashFinalSaplingRoot, saplingTree));
+                    // been pruned from memory; read it from disk (header prefix
+                    // only) if so. A resident header needs no disk access.
+                    uint256 saplingAnchor;
+                    if (pindex->pprev->pHeaderData) {
+                        saplingAnchor = pindex->pprev->pHeaderData->hashFinalSaplingRoot;
+                    } else {
+                        CBlockHeader prevHeader;
+                        assert(ReadBlockHeaderFromDisk(prevHeader, pindex->pprev, Params().GetConsensus()));
+                        saplingAnchor = prevHeader.hashFinalSaplingRoot;
+                    }
+                    assert(pcoinsTip->GetSaplingAnchorAt(saplingAnchor, saplingTree));
                 }
             }
             // Increment note witness caches
@@ -4553,14 +4560,21 @@ int CMerkleTx::GetDepthInMainChainINTERNAL(const CBlockIndex* &pindexRet) const
     if (!fMerkleVerified)
     {
         // hashMerkleRoot is a block-header field that may have been pruned
-        // from memory on a fluxnode; read it from disk if so. CheckMerkleBranch
+        // from memory on a fluxnode; read it from disk (header prefix only)
+        // if so — a resident header needs no disk access. CheckMerkleBranch
         // never returns zero for a real tx, so comparing against a zeroed
         // root would mis-report every confirmed tx in a pruned block as
         // conflicted (depth -1) after each restart.
-        CBlockHeader header;
-        if (!GetFullBlockHeader(header, pindex, Params().GetConsensus()))
-            return 0;
-        if (CBlock::CheckMerkleBranch(GetHash(), vMerkleBranch, nIndex) != header.hashMerkleRoot)
+        uint256 hashMerkleRoot;
+        if (pindex->pHeaderData) {
+            hashMerkleRoot = pindex->pHeaderData->hashMerkleRoot;
+        } else {
+            CBlockHeader header;
+            if (!ReadBlockHeaderFromDisk(header, pindex, Params().GetConsensus()))
+                return 0;
+            hashMerkleRoot = header.hashMerkleRoot;
+        }
+        if (CBlock::CheckMerkleBranch(GetHash(), vMerkleBranch, nIndex) != hashMerkleRoot)
             return 0;
         fMerkleVerified = true;
     }
