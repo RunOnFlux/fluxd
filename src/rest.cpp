@@ -152,21 +152,9 @@ static bool rest_headers(HTTPRequest* req,
 
     CDataStream ssHeader(SER_NETWORK, PROTOCOL_VERSION);
     for (const CBlockIndex *pindex : headers) {
+        // Serving is best-effort: a failed read serializes the partial view.
         CBlockHeader header;
-        if (pindex->HasHeaderData()) {
-            header = pindex->GetBlockHeader();
-            if (header.IsPOW() && header.nSolution.empty()) {
-                CBlock block;
-                if (ReadBlockFromDisk(block, pindex, Params().GetConsensus())) {
-                    header.nSolution = block.nSolution;
-                }
-            }
-        } else {
-            CBlock block;
-            if (ReadBlockFromDisk(block, pindex, Params().GetConsensus())) {
-                header = block.GetBlockHeader();
-            }
-        }
+        GetFullBlockHeader(header, pindex, Params().GetConsensus());
         ssHeader << header;
     }
 
