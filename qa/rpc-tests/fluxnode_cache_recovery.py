@@ -23,13 +23,16 @@ and rewinds/replays as needed. Scenarios:
 
 Marker divergence is manufactured with directory snapshots of
 <datadir>/regtest/determ_zelnodes taken between restarts — i.e. only fluxd's
-own leveldb writes. (Writing the marker with plyvel does NOT work: modern
-plyvel/leveldb produces a MANIFEST the daemon's older bundled leveldb
-silently ignores, so the daemon never sees the write. Reads are compatible,
-so plyvel is used read-only to assert the marker contents; key = b's',
-value = 32-byte block hash in internal byte order + int32-LE height, no
-obfuscation.) The stale-marker scenario takes its foreign fluxnode DB from a
-second, never-connected node whose blocks node0 has never seen.
+own leveldb writes. plyvel must NEVER open a DB directory the daemon will
+reopen: the daemon's bundled leveldb is older and built without snappy,
+while merely OPENING a DB with modern plyvel compacts the write-ahead log
+into snappy-compressed tables (poisoning the DB — the daemon then dies with
+"corrupted compressed block contents") and its explicit writes land in a
+MANIFEST the old leveldb silently ignores. Marker assertions therefore read
+a throwaway COPY of the DB directory (key = b's', value = 32-byte block hash
+in internal byte order + int32-LE height, no obfuscation). The stale-marker
+scenario takes its foreign fluxnode DB from a second, never-connected node
+whose blocks node0 has never seen.
 
 Requires the 'plyvel' python package (pip install plyvel).
 """
@@ -75,8 +78,13 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
                             "regtest", "determ_zelnodes")
 
     def read_marker(self):
-        """Read-only plyvel access (read compatibility is fine; see module doc)."""
-        db = plyvel.DB(self.fluxnode_db_path())
+        """Read the marker from a throwaway copy: plyvel must never open the
+        live DB directory (see module docstring)."""
+        src = self.fluxnode_db_path()
+        tmp = src + ".inspect"
+        shutil.rmtree(tmp, ignore_errors=True)
+        shutil.copytree(src, tmp)
+        db = plyvel.DB(tmp)
         try:
             raw = db.get(b"s")
             assert raw is not None and len(raw) == 36, f"unexpected marker record: {raw!r}"
@@ -85,6 +93,7 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
             return block_hash, height
         finally:
             db.close()
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def snapshot_db(self, name):
         src = self.fluxnode_db_path()
