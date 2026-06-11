@@ -4264,7 +4264,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (fluxnodeTxBlockUndo.vecExpiredDosData.size() ||
         fluxnodeTxBlockUndo.vecExpiredConfirmedData.size() ||
         fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight.size() ||
-        fluxnodeTxBlockUndo.mapLastPaidHeights.size())
+        fluxnodeTxBlockUndo.mapLastPaidHeights.size() ||
+        fluxnodeTxBlockUndo.mapLastIpAddress.size() ||
+        fluxnodeTxBlockUndo.mapOldDelegates.size())
     {
         if (!pFluxnodeDB->WriteBlockUndoFluxnodeData(block.GetHash(), fluxnodeTxBlockUndo))
             return AbortNode(state, "Failed to write fluxnodetx undo data");
