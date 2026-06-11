@@ -101,6 +101,7 @@ TEST(BlockIndex, PruneFreesBlockFileDataKeepsResidentState)
     idx.nChainSproutValue = 222;
     idx.nSaplingValue = 333;
     idx.nChainSaplingValue = 444;
+    idx.hashPON = uint256S("cc");
 
     ASSERT_TRUE(idx.HasHeaderData());
     EXPECT_EQ(idx.GetBlockHeader().hashMerkleRoot, h.hashMerkleRoot);
@@ -119,6 +120,10 @@ TEST(BlockIndex, PruneFreesBlockFileDataKeepsResidentState)
     EXPECT_EQ(idx.nChainSproutValue, std::optional<CAmount>(222));
     EXPECT_EQ(idx.nSaplingValue, (CAmount)333);
     EXPECT_EQ(idx.nChainSaplingValue, std::optional<CAmount>(444));
+    // The cached PON hash is the fork-choice comparator key for PON entries;
+    // if it did not survive the prune, equal-work ties on a restarted
+    // fluxnode would hash zeroed headers and resolve against the network.
+    EXPECT_EQ(idx.hashPON, uint256S("cc"));
 }
 
 TEST(BlockIndex, GetBlockHeaderZeroedAfterPrune)

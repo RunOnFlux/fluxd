@@ -228,6 +228,16 @@ public:
     uint256 hashSproutAnchor;
     uint256 hashFinalSproutRoot;
 
+    //! (memory only) Cached PON hash for nVersion >= PON_VERSION entries.
+    //! Resident (not in the prunable HeaderData) because the fork-choice
+    //! tie-breaker (CBlockIndexWorkComparator) reads it for entries whose
+    //! header data has been pruned — recomputing there would hash a zeroed
+    //! nodesCollateral (wrong result), and restoring header data on entries
+    //! sitting in setBlockIndexCandidates would mutate the comparator key
+    //! in place (strict-weak-ordering violation). Computed from the header
+    //! at load time (before pruning) and when the entry is created.
+    uint256 hashPON;
+
     //! Block-file data: present in the block on disk and therefore rebuildable.
     //! This is what gets pruned from memory for buried blocks. Allocated on
     //! demand; may be nullptr after pruning.
@@ -291,7 +301,7 @@ public:
           nSproutValue(other.nSproutValue), nChainSproutValue(other.nChainSproutValue),
           nSaplingValue(other.nSaplingValue), nChainSaplingValue(other.nChainSaplingValue),
           nCachedBranchId(other.nCachedBranchId), hashSproutAnchor(other.hashSproutAnchor),
-          hashFinalSproutRoot(other.hashFinalSproutRoot),
+          hashFinalSproutRoot(other.hashFinalSproutRoot), hashPON(other.hashPON),
           pHeaderData(nullptr), nSequenceId(other.nSequenceId)
     {
         if (other.pHeaderData) {
@@ -324,6 +334,7 @@ public:
             nCachedBranchId = other.nCachedBranchId;
             hashSproutAnchor = other.hashSproutAnchor;
             hashFinalSproutRoot = other.hashFinalSproutRoot;
+            hashPON = other.hashPON;
             nSequenceId = other.nSequenceId;
             delete pHeaderData;
             if (other.pHeaderData) {
@@ -361,6 +372,7 @@ public:
         nCachedBranchId    = std::nullopt;
         hashSproutAnchor   = uint256();
         hashFinalSproutRoot = uint256();
+        hashPON            = uint256();
 
         pHeaderData = nullptr;
     }
