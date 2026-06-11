@@ -37,6 +37,7 @@
 #include <map>
 #include <set>
 #include <stdint.h>
+#include <atomic>
 #include <string>
 #include <utility>
 #include <vector>
@@ -202,6 +203,10 @@ extern bool fTimestampIndex;
 extern bool fIsBareMultisigStd;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;
+// Set once RecoverFluxnodeCache has reconciled the fluxnode DB sync marker
+// with the chainstate at startup. Until then, flushes must not force-write
+// the marker or they would erase the crash evidence recovery reads.
+extern std::atomic<bool> fFluxnodeCacheRecovered;
 // TODO: remove this flag by structuring our code such that
 // it is unneeded for testing
 extern bool fCoinbaseEnforcedProtectionEnabled;
