@@ -509,6 +509,10 @@ bool GetTimestampIndex(unsigned int high, unsigned int low, bool fActiveOnly,
 bool WriteBlockToDisk(const CBlock& block, CDiskBlockPos& pos, const CMessageHeader::MessageStartChars& messageStart);
 bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus::Params& consensusParams);
 bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus::Params& consensusParams);
+/** Read only the CBlockHeader prefix of a block at its data position — no
+ * transaction deserialization and no proof recheck (validated at accept).
+ * Fails if the reconstructed hash does not match the index entry. */
+bool ReadBlockHeaderFromDisk(CBlockHeader& header, const CBlockIndex* pindex, const Consensus::Params& consensusParams);
 
 /** Functions for validating blocks and updating the block tree */
 
