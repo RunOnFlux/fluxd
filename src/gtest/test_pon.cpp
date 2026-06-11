@@ -646,3 +646,46 @@ TEST_F(PONTest, EcvrfProveVerifyRoundTrip) {
     EXPECT_EQ(proof2, proof);
     EXPECT_EQ(beta3, beta);
 }
+
+TEST_F(PONTest, VrfMessagePerNodeUnderSharedOperatorKey) {
+    // Operator keys are shared across an owner's fleet in practice. The VRF message must
+    // therefore mix in the per-node collateral outpoint: with the key alone, N same-key
+    // nodes share one lottery draw and broadcast N identical-priority blocks on a win.
+    const Consensus::Params& params = Params().GetConsensus();
+
+    COutPoint collateralA(uint256S("0xaa"), 0);
+    COutPoint collateralB(uint256S("0xbb"), 0);
+    COutPoint collateralA1(uint256S("0xaa"), 1);
+
+    uint256 msgA = GetPonVrfMessage(NULL, 100, collateralA, params);
+    uint256 msgB = GetPonVrfMessage(NULL, 100, collateralB, params);
+    uint256 msgA1 = GetPonVrfMessage(NULL, 100, collateralA1, params);
+
+    // Distinct nodes (different txid OR different vout) get distinct messages.
+    EXPECT_NE(msgA, msgB);
+    EXPECT_NE(msgA, msgA1);
+
+    // Same node, same slot is deterministic; a new slot is a fresh draw.
+    EXPECT_EQ(msgA, GetPonVrfMessage(NULL, 100, collateralA, params));
+    EXPECT_NE(msgA, GetPonVrfMessage(NULL, 101, collateralA, params));
+
+    // Under ONE shared operator key, distinct messages yield independent VRF outputs,
+    // each verifiable against the same pubkey — restoring one draw per node.
+    CKey opKey;
+    opKey.MakeNewKey(true);
+    CPubKey opPub = opKey.GetPubKey();
+
+    std::vector<unsigned char> proofA, proofB;
+    uint256 yA, yB;
+    ASSERT_TRUE(ECVRF_Prove(opKey, opPub, msgA, proofA, yA));
+    ASSERT_TRUE(ECVRF_Prove(opKey, opPub, msgB, proofB, yB));
+    EXPECT_NE(yA, yB);
+
+    uint256 yCheck;
+    EXPECT_TRUE(ECVRF_Verify(opPub, msgA, proofA, yCheck));
+    EXPECT_EQ(yCheck, yA);
+
+    // A proof made for node A does not verify as node B (cross-node replay rejected).
+    uint256 yx;
+    EXPECT_FALSE(ECVRF_Verify(opPub, msgB, proofA, yx));
+}

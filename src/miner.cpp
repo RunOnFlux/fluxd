@@ -577,7 +577,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         if (pblock->nVersion >= CBlockHeader::PON_VRF_VERSION) {
             int64_t genesisTimestamp = chainparams.GenesisBlock().nTime;
             uint32_t vrfSlot = GetSlotNumber(pblock->nTime, genesisTimestamp, chainparams.GetConsensus());
-            uint256 seed = GetPonVrfMessage(pindexPrev, vrfSlot, chainparams.GetConsensus());
+            uint256 seed = GetPonVrfMessage(pindexPrev, vrfSlot, pblock->nodesCollateral, chainparams.GetConsensus());
             std::vector<unsigned char> vrfProof;
             uint256 vrfOut;
             CKey vk; CPubKey vpub; std::string verr;

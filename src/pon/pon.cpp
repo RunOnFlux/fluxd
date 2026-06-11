@@ -123,12 +123,18 @@ uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& par
 // rotates and the chain stays live (without this, a node is eligible for either every slot
 // or no slot in an epoch). The slot (from nTime) carries only the minor ~10-slot future-time
 // grind already acknowledged in the design — the large prevBlockHash/coinbase grind is gone.
-uint256 GetPonVrfMessage(const CBlockIndex* pindexPrev, uint32_t slot, const Consensus::Params& params)
+// Mixing in the collateral outpoint makes the draw per-node under shared operator keys
+// (standard fleet practice): without it, N same-key nodes share ONE draw (1/N rewards) and
+// on a win all N broadcast at the identical VRF-derived delay, with identical outputs that
+// also void the lowest-VRF fork-choice tie-break. The outpoint is fixed at node registration
+// — before any future epoch seed exists — so it adds no grinding surface.
+uint256 GetPonVrfMessage(const CBlockIndex* pindexPrev, uint32_t slot, const COutPoint& collateral, const Consensus::Params& params)
 {
     uint256 epochSeed = GetEpochSeed(pindexPrev, params);
     CHashWriter ss(SER_GETHASH, 0);
     ss << epochSeed;
     ss << slot;
+    ss << collateral;
     return ss.GetHash();
 }
 
@@ -397,7 +403,7 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex*
         if (IsPONVRFActive(currentHeight)) {
             int64_t genesisTimestamp = Params().GenesisBlock().nTime;
             uint32_t slot = GetSlotNumber(block.nTime, genesisTimestamp, Params().GetConsensus());
-            uint256 seed = GetPonVrfMessage(pindexPrev, slot, params);
+            uint256 seed = GetPonVrfMessage(pindexPrev, slot, block.nodesCollateral, params);
             uint256 betaComputed;
             if (!ECVRF_Verify(data.pubKey, seed, block.nodesVrfProof, betaComputed)) {
                 // Proof depends on chain-state (seed) and the cache; treat like a signature
