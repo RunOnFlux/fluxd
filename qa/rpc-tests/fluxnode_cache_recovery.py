@@ -64,10 +64,14 @@ class FluxnodeCacheRecoveryTest(BitcoinTestFramework):
 
     def setup_network(self, split=False):
         # node1 exists only to produce a foreign fluxnode DB for the
-        # stale-marker scenario; the nodes are never connected.
+        # stale-marker scenario; the nodes are never connected. Regtest
+        # mining is deterministic enough that two isolated nodes produce
+        # identical block hashes, so node1 runs on a mocked clock to force
+        # its chain to genuinely diverge — its marker hash must be unknown
+        # to node0's block index.
         self.nodes = [
             start_node(0, self.options.tmpdir, ["-debug"]),
-            start_node(1, self.options.tmpdir, ["-debug"]),
+            start_node(1, self.options.tmpdir, ["-debug", "-mocktime=1900000000"]),
         ]
         self.is_network_split = False
 
