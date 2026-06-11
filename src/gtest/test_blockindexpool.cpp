@@ -163,6 +163,38 @@ TEST(BlockIndex, CopyDeepCopiesHeaderDataAndResidentFields)
     EXPECT_EQ(b.GetBlockHeader().hashMerkleRoot, h.hashMerkleRoot);
 }
 
+TEST(BlockIndex, RestoreHeaderDataAfterPruneSerializesIdentically)
+{
+    // M2/M6 regression contract: a pruned-then-restored entry must produce a
+    // byte-identical CDiskBlockIndex record to one that was never pruned.
+    // (The flush path restores dirty-but-pruned entries from disk before
+    // serialization; fabricating an empty HeaderData — the old fallback —
+    // would overwrite a good leveldb record with zeroed header fields.)
+    CBlockHeader h = MakePopulatedHeader();
+    h.hashPrevBlock = uint256();
+    CBlockIndex idx(h);
+    idx.nHeight  = 1234;
+    idx.nStatus  = BLOCK_VALID_SCRIPTS | BLOCK_HAVE_DATA;
+    idx.nFile    = 1;
+    idx.nDataPos = 77;
+    uint256 blockHash = h.GetHash();
+    idx.phashBlock = &blockHash;
+
+    CDataStream ssBefore(SER_DISK, CLIENT_VERSION);
+    ssBefore << CDiskBlockIndex(&idx);
+
+    idx.FreeHeaderData();                 // the buried-entry prune
+    ASSERT_FALSE(idx.HasHeaderData());
+    idx.RestoreHeaderData(h);             // flush-side restore from disk read
+    ASSERT_TRUE(idx.HasHeaderData());
+
+    CDataStream ssAfter(SER_DISK, CLIENT_VERSION);
+    ssAfter << CDiskBlockIndex(&idx);
+
+    EXPECT_EQ(std::vector<unsigned char>(ssBefore.begin(), ssBefore.end()),
+              std::vector<unsigned char>(ssAfter.begin(), ssAfter.end()));
+}
+
 // ---- on-disk format (no reindex) -------------------------------------------
 
 TEST(BlockIndex, DiskBlockIndexSerializationRoundTrip)
