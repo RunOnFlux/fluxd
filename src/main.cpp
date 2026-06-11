@@ -153,24 +153,24 @@ namespace {
             if (pa->nChainWork > pb->nChainWork) return false;
             if (pa->nChainWork < pb->nChainWork) return true;
 
-            // For PON blocks at same height (same chain work), use PON hash as deterministic tie-breaker
-            // This prevents network splits when multiple eligible nodes create competing blocks
-            // Lower PON hash wins (same ordering as our rank-based coordination)
-            bool isPONBlockA = (pa->nVersion >= 100);
-            bool isPONBlockB = (pb->nVersion >= 100);
+            // For PON blocks at same height (same chain work), use a deterministic
+            // tie-breaker so all nodes converge on the same block instead of splitting.
+            bool isPONBlockA = (pa->nVersion >= CBlockHeader::PON_VERSION);
+            bool isPONBlockB = (pb->nVersion >= CBlockHeader::PON_VERSION);
 
             if (isPONBlockA && isPONBlockB && pa->nHeight == pb->nHeight) {
-                // Both are PON blocks at same height - use PON hash as tie-breaker
-                uint256 ponHashA = GetPONHash(pa->GetBlockHeader());
-                uint256 ponHashB = GetPONHash(pb->GetBlockHeader());
-
-                if (ponHashA < ponHashB) {
-                    return false; // A has better (lower) hash, A wins
+                // Deterministic PON tie-break (see ComparePonForkChoice): PON-VRF blocks
+                // compare by un-grindable VRF output, legacy PON blocks by GetPONHash.
+                // Every node computes the same winner regardless of arrival order, so the
+                // network converges instead of forking back and forth.
+                int cmp = ComparePonForkChoice(pa, pb);
+                if (cmp < 0) {
+                    return false; // A preferred (lower score), A wins
                 }
-                if (ponHashA > ponHashB) {
-                    return true;  // B has better (lower) hash, B wins
+                if (cmp > 0) {
+                    return true;  // B preferred (lower score), B wins
                 }
-                // If hashes are equal, fall through to sequence ID
+                // Undecided (equal scores): fall through to sequence ID
             }
 
             // ... then by earliest time received, ...
@@ -2775,7 +2775,11 @@ bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus:
               CheckProofOfWork(block.GetHash(), block.nBits, consensusParams)))
             return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
     } else {
-        if (!CheckProofOfNode(GetPONHash(block), block.nBits, consensusParams) && !IsEmergencyBlock(block)) {
+        // For PON-VRF blocks the eligibility value is the committed VRF output, not GetPONHash.
+        uint256 ponEligibilityValue = (block.nVersion >= CBlockHeader::PON_VRF_VERSION)
+                                          ? block.nodesVrfOutput
+                                          : GetPONHash(block);
+        if (!CheckProofOfNode(ponEligibilityValue, block.nBits, consensusParams) && !IsEmergencyBlock(block)) {
             return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
         }
     }
@@ -5337,8 +5341,13 @@ bool CheckBlockHeader(
                              REJECT_INVALID, "bad-pon-sig-size");
 
         if (!IsEmergencyBlock((block))) {
-            // Check proof of work matches claimed amount
-            if (fCheckPOW && !CheckProofOfNode(GetPONHash(block), block.nBits, chainparams.GetConsensus()))
+            // Check proof of node matches claimed amount. For PON-VRF blocks the eligibility
+            // value is the committed VRF output (the full proof is verified contextually in
+            // ContextualCheckPONBlockHeader); for legacy PON blocks it is GetPONHash.
+            uint256 ponEligibilityValue = (block.nVersion >= CBlockHeader::PON_VRF_VERSION)
+                                              ? block.nodesVrfOutput
+                                              : GetPONHash(block);
+            if (fCheckPOW && !CheckProofOfNode(ponEligibilityValue, block.nBits, chainparams.GetConsensus()))
                 return state.DoS(50, error("CheckBlockHeader(): proof of node failed"),
                                  REJECT_INVALID, "high-hash");
         }
