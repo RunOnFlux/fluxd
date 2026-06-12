@@ -10,9 +10,6 @@
 #include <string>
 #include <vector>
 
-#include <sys/mman.h>
-#include <unistd.h>
-
 class CBlockIndex;
 class uint256;
 
