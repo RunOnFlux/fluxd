@@ -2826,9 +2826,11 @@ bool ReadBlockHeaderFromDisk(CBlockHeader& header, const CBlockIndex* pindex, co
         return error("%s: Deserialize or I/O error - %s at %s", __func__, e.what(), pos.ToString());
     }
 
+    // Identify the block by its immutable hash: callers may run without
+    // cs_main, and CBlockIndex::ToString() reads prunable header data.
     if (header.GetHash() != pindex->GetBlockHash())
         return error("%s: GetHash() doesn't match index for %s at %s",
-                __func__, pindex->ToString(), pos.ToString());
+                __func__, pindex->GetBlockHash().ToString(), pos.ToString());
     return true;
 }
 
@@ -7947,78 +7949,93 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         uint256 hashStop;
         vRecv >> locator >> hashStop;
 
-        LOCK(cs_main);
-
-        if (IsInitialBlockDownload(chainparams))
-            return true;
-
-        CBlockIndex* pindex = NULL;
-        if (locator.IsNull())
+        // Serving headers for buried (pruned) entries re-reads them from
+        // disk, and a cold batch can take whole seconds. The index walk
+        // needs cs_main, the disk reads do not: index entries are never
+        // freed at runtime and the read path uses only immutable fields.
+        // So: snapshot the resident header fields under the lock, then do
+        // the slow rehydration reads after releasing it — holding cs_main
+        // across them would starve RPC and validation for the duration.
+        // The snapshot must not be completed lock-free from pHeaderData:
+        // reorg paths rehydrate entries concurrently under cs_main, so a
+        // lock-free reader could observe a half-filled allocation.
+        bool useCompactHeaders = false;
+        std::vector<CBlockHeader> vHeaders;
+        std::vector<std::pair<size_t, const CBlockIndex*>> vNeedDisk;
         {
-            // If locator is null, return the hashStop block
-            BlockMap::iterator mi = mapBlockIndex.find(hashStop);
-            if (mi == mapBlockIndex.end())
+            LOCK(cs_main);
+
+            if (IsInitialBlockDownload(chainparams))
                 return true;
-            pindex = (*mi).second;
-        }
-        else
-        {
-            // Find the last block the caller has in the main chain
-            pindex = FindForkInGlobalIndex(chainActive, locator);
-            if (pindex)
-                pindex = chainActive.Next(pindex);
-        }
 
-        // Check if peer supports compact headers and if we're sending checkpointed blocks
-        int latestCheckpoint = Checkpoints::GetTotalBlocksEstimate(chainparams.Checkpoints());
-        bool useCompactHeaders = (pfrom->nVersion >= CMPHEADERS_VERSION) &&
-                                 pindex && (pindex->nHeight < latestCheckpoint);
-
-        if (useCompactHeaders) {
-            // Send compact headers for checkpointed blocks (saves bandwidth)
-            // POW blocks: omit nSolution (~1344 bytes saved per header)
-            // PON blocks: include all data (already compact)
-            vector<CCompactBlockHeader> vCompactHeaders;
-
-            // Increase limit for compact headers since they're smaller
-            // 2000 headers: POW = 280KB, PON = 482KB (well under MAX_PROTOCOL_MESSAGE_LENGTH)
-            int nLimit = 2000;
-
-            LogPrint("net", "getheaders (compact) %d to %s from peer=%d\n",
-                     pindex->nHeight, hashStop.ToString(), pfrom->id);
-
-            for (; pindex; pindex = chainActive.Next(pindex))
+            CBlockIndex* pindex = NULL;
+            if (locator.IsNull())
             {
-                // Serving is best-effort: a failed read pushes the partial view.
-                CBlockHeader fullHeader;
-                GetFullBlockHeader(fullHeader, pindex, chainparams.GetConsensus());
-                vCompactHeaders.push_back(CCompactBlockHeader(fullHeader));
-                if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
-                    break;
+                // If locator is null, return the hashStop block
+                BlockMap::iterator mi = mapBlockIndex.find(hashStop);
+                if (mi == mapBlockIndex.end())
+                    return true;
+                pindex = (*mi).second;
             }
-            pfrom->PushMessage("cmpheaders", vCompactHeaders);
-        } else {
-            // Send regular headers (peer doesn't support compact, or blocks not checkpointed)
-            // we must use CBlocks, as CBlockHeaders won't include the 0x00 nTx count at the end
-            vector<CBlock> vHeaders;
-            int nLimit = MAX_HEADERS_RESULTS;
+            else
+            {
+                // Find the last block the caller has in the main chain
+                pindex = FindForkInGlobalIndex(chainActive, locator);
+                if (pindex)
+                    pindex = chainActive.Next(pindex);
+            }
 
-            LogPrint("net", "getheaders %d to %s from peer=%d\n",
+            // Check if peer supports compact headers and if we're sending checkpointed blocks
+            int latestCheckpoint = Checkpoints::GetTotalBlocksEstimate(chainparams.Checkpoints());
+            useCompactHeaders = (pfrom->nVersion >= CMPHEADERS_VERSION) &&
+                                pindex && (pindex->nHeight < latestCheckpoint);
+
+            // Compact headers are small enough for bigger batches:
+            // 2000 headers: POW = 280KB, PON = 482KB (well under MAX_PROTOCOL_MESSAGE_LENGTH)
+            int nLimit = useCompactHeaders ? 2000 : MAX_HEADERS_RESULTS;
+
+            LogPrint("net", "getheaders%s %d to %s from peer=%d\n",
+                     useCompactHeaders ? " (compact)" : "",
                      (pindex ? pindex->nHeight : -1), hashStop.ToString(), pfrom->id);
 
             for (; pindex; pindex = chainActive.Next(pindex))
             {
-                // GetFullBlockHeader re-reads from disk when the header data was
-                // pruned (buried block on a fluxnode) or when only nSolution was
-                // omitted, so we never serve zeroed merkle roots / nonces.
-                // Serving is best-effort: a failed read pushes the partial view.
-                CBlockHeader header;
-                GetFullBlockHeader(header, pindex, chainparams.GetConsensus());
-                vHeaders.push_back(header);
+                vHeaders.push_back(pindex->GetBlockHeader());
+                // Entries whose header data was pruned (buried block on a
+                // fluxnode) or held without nSolution must be completed from
+                // disk so we never serve zeroed merkle roots / nonces.
+                const CBlockHeader& h = vHeaders.back();
+                if (!pindex->pHeaderData || (h.IsPOW() && h.nSolution.empty()))
+                    vNeedDisk.emplace_back(vHeaders.size() - 1, pindex);
                 if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
                     break;
             }
-            pfrom->PushMessage("headers", vHeaders);
+        }
+
+        // Slow phase, lock-free: rehydrate from the block files. Serving is
+        // best-effort — a failed read keeps the resident snapshot.
+        for (const auto& entry : vNeedDisk) {
+            CBlockHeader diskHeader;
+            if (ReadBlockHeaderFromDisk(diskHeader, entry.second, chainparams.GetConsensus()))
+                vHeaders[entry.first] = diskHeader;
+        }
+
+        if (useCompactHeaders) {
+            // Compact headers for checkpointed blocks (saves bandwidth):
+            // POW blocks omit nSolution (~1344 bytes saved per header),
+            // PON blocks include all data (already compact)
+            vector<CCompactBlockHeader> vCompactHeaders;
+            vCompactHeaders.reserve(vHeaders.size());
+            for (const CBlockHeader& header : vHeaders)
+                vCompactHeaders.push_back(CCompactBlockHeader(header));
+            pfrom->PushMessage("cmpheaders", vCompactHeaders);
+        } else {
+            // we must use CBlocks, as CBlockHeaders won't include the 0x00 nTx count at the end
+            vector<CBlock> vBlockHeaders;
+            vBlockHeaders.reserve(vHeaders.size());
+            for (const CBlockHeader& header : vHeaders)
+                vBlockHeaders.push_back(CBlock(header));
+            pfrom->PushMessage("headers", vBlockHeaders);
         }
     }
 
