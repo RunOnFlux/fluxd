@@ -49,7 +49,9 @@
 #include <filesystem>
 #include <fstream>
 #include <cmath>
+#ifndef WIN32
 #include <sys/statvfs.h>
+#endif
 
 #include "emergencyblock.h"
 
@@ -6230,6 +6232,9 @@ bool static LoadBlockIndexDB()
     // equivalent to any node being unable to write its chainstate.)
     static const uint64_t ARENA_MIN_FREE_BYTES = 2ULL * 1024 * 1024 * 1024; // 2 GiB
     bool fEnoughDisk = true;
+#ifndef WIN32
+    // POSIX-only check; on Windows the arena itself is inert (pool Initialize
+    // reports failure) so the guard is moot.
     if (fFluxnode) {
         struct statvfs vfs;
         if (statvfs(GetDataDir().string().c_str(), &vfs) == 0) {
@@ -6243,6 +6248,7 @@ bool static LoadBlockIndexDB()
             }
         } // statvfs failure: proceed and let Initialize/heap fallback handle it
     }
+#endif
     if (fFluxnode && fEnoughDisk) {
         g_blockIndexPool = new CBlockIndexPool();
         if (!g_blockIndexPool->Initialize(sizeof(CBlockIndex), sizeof(uint256),
