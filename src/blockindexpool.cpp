@@ -4,8 +4,41 @@
 
 #include "blockindexpool.h"
 
+#ifdef WIN32
+
+// The arena is built on POSIX mmap/ftruncate, which Windows lacks. On Windows
+// the pool is inert: Initialize() reports failure, so every caller takes its
+// heap-fallback path and the node behaves like a stock build. (The pool is
+// only ever engaged on fluxnodes, which are Linux.)
+
+CBlockIndexPool::CBlockIndexPool()
+    : nEntrySize(0), nHashSize(0), nSlotSize(0), nEntriesPerChunk(0),
+      nAllocated(0), nChunkBytes(0), arenaFd(-1)
+{
+}
+
+CBlockIndexPool::~CBlockIndexPool() = default;
+
+bool CBlockIndexPool::AddChunk() { return false; }
+
+bool CBlockIndexPool::Initialize(size_t, size_t, size_t, const std::string&) { return false; }
+
+void* CBlockIndexPool::AllocateEntry() { return nullptr; }
+
+void* CBlockIndexPool::HashAt(size_t) { return nullptr; }
+
+bool CBlockIndexPool::Contains(const void*) const { return false; }
+
+void CBlockIndexPool::AdviseOldBlocksCold(size_t) {}
+
+void CBlockIndexPool::DestroyAll(void (*)(void*)) {}
+
+#else
+
 #include <cstring>
 #include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 #ifndef MADV_COLD
 #define MADV_COLD 20
@@ -144,3 +177,5 @@ void CBlockIndexPool::DestroyAll(void (*destructor)(void*))
     }
     nAllocated = 0;
 }
+
+#endif // WIN32
