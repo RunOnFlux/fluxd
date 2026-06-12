@@ -9,22 +9,29 @@ Header-serving storm: walk the entire header chain over P2P, hard.
 N concurrent connections each sweep the full chain from genesis in
 2000-header getheaders strides, parsing and validating every header on the
 wire. This drives the pruned-entry header-serving path (disk header-prefix
-reads) at sustained rate. Validation asserts the fields that the pre-fix
-code served as zeroes for pruned entries:
+reads) at sustained rate.
 
-  - PoW headers (version < 100): non-zero nNonce, non-empty nSolution,
-    non-zero hashMerkleRoot
-  - PON headers (version >= 100): non-zero hashMerkleRoot, non-empty
-    vchBlockSig
-  - PON-VRF headers (version >= 101): additionally a non-zero nodesVrfOutput
+The server picks the reply format by peer protocol version, and the script
+exercises both:
+
+  - default (legacy mode): advertise a pre-CMPHEADERS protocol version, so
+    every stride is a full `headers` message — PoW headers ship their entire
+    equihash solution (the heaviest serving path)
+  - --compact: advertise the current protocol version, so checkpointed
+    history arrives as `cmpheaders` (solution omitted, explicit block hash)
+    and the post-checkpoint tail as regular `headers`
+
+Validation asserts the fields the pre-fix code served as zeroes for pruned
+entries: non-zero merkle root everywhere; PoW: non-zero nonce (+ non-empty
+solution in legacy mode); PON: non-empty block signature; PON-VRF: non-zero
+VRF output. Chain continuity is asserted via each header's hashPrevBlock.
 
 A ping round-trip is interleaved between strides as a responsiveness probe;
-the max observed ping RTT is reported (a serving-side cs_main stall shows up
-here).
+a serving-side cs_main stall shows up as ping RTT.
 
 Usage:
   python3 header_storm.py --host <node> [--port 16125] [--workers 4]
-                          [--max-batches N] [--rtt-budget 5.0]
+                          [--compact] [--max-batches N] [--rtt-budget 5.0]
 
 stdlib only; no external deps.
 """
@@ -41,10 +48,10 @@ import time
 
 MAINNET_MAGIC = bytes([0x24, 0xE9, 0x27, 0x64])
 GENESIS_HASH_HEX = "00052461a5006c2e3b74ce48992a08695607912d5604c3eb8da25749b0900444"
-PROTOCOL_VERSION = 170022
+CURRENT_PROTOCOL_VERSION = 170022  # >= CMPHEADERS_VERSION: server sends cmpheaders
+LEGACY_PROTOCOL_VERSION = 170020  # < CMPHEADERS_VERSION: server sends full headers
 PON_VERSION = 100
 PON_VRF_VERSION = 101
-HEADERS_PER_REQUEST = 2000
 
 
 def sha256d(b):
@@ -76,9 +83,10 @@ def read_varint(f):
 
 
 class Peer:
-    def __init__(self, host, port, timeout=120):
+    def __init__(self, host, port, protocol_version, timeout=120):
         self.sock = socket.create_connection((host, port), timeout=timeout)
         self.buf = b""
+        self.protocol_version = protocol_version
 
     def send_msg(self, command, payload):
         msg = MAINNET_MAGIC
@@ -111,7 +119,7 @@ class Peer:
     def handshake(self):
         now = int(time.time())
         addr = struct.pack("<Q", 0) + b"\x00" * 16 + struct.pack(">H", 0)
-        payload = struct.pack("<iQq", PROTOCOL_VERSION, 0, now)
+        payload = struct.pack("<iQq", self.protocol_version, 0, now)
         payload += addr + addr
         payload += struct.pack("<Q", random.getrandbits(64))
         ua = b"/header-storm:0.1/"
@@ -142,45 +150,68 @@ class Peer:
                 self.send_msg("pong", pl)
 
     def get_headers(self, locator_hash_le):
-        payload = struct.pack("<I", PROTOCOL_VERSION)
+        payload = struct.pack("<I", self.protocol_version)
         payload += ser_varint(1) + locator_hash_le
         payload += b"\x00" * 32
         self.send_msg("getheaders", payload)
         while True:
             cmd, pl = self.recv_msg()
-            if cmd == "headers":
-                return pl
+            if cmd in ("headers", "cmpheaders"):
+                return cmd, pl
             if cmd == "ping":
                 self.send_msg("pong", pl)
-            # ignore inv/addr/etc.
+            # ignore inv/addr/sendheaders/sendcmpct/etc.
 
 
-def parse_and_validate_headers(payload):
-    """Returns (count, last_hash_le, max_version). Raises on a zeroed field."""
+def _read_common(f):
+    """version, hashPrev, merkle through nBits — shared by both formats."""
+    version = struct.unpack("<i", f.read(4))[0]
+    prev = f.read(32)
+    merkle = f.read(32)
+    sapling = f.read(32)
+    time_bits = f.read(8)
+    return version, prev, merkle, sapling, time_bits
+
+
+def _pon_gethash(version, prev, merkle, sapling, time_bits, collateral, vrf_out):
+    """PON block hash = sha256d over the GETHASH serialization (sig/proof excluded)."""
+    data = struct.pack("<i", version) + prev + merkle + sapling + time_bits + collateral
+    if version >= PON_VRF_VERSION:
+        data += vrf_out
+    return sha256d(data)
+
+
+def _validate_common(version, merkle, prev, expect_prev):
+    if merkle == b"\x00" * 32:
+        raise AssertionError(f"zeroed hashMerkleRoot (v{version})")
+    if expect_prev is not None and prev != expect_prev:
+        raise AssertionError("non-continuous header chain")
+
+
+def parse_headers_msg(payload, expect_prev):
+    """Full `headers` message: CBlock-serialized headers + txn-count varint.
+    Returns (count, last_hash)."""
     f = io.BytesIO(payload)
     count = read_varint(f)
-    last_hash = None
-    max_version = 0
+    last_hash = expect_prev
     for _ in range(count):
         start = f.tell()
-        version = struct.unpack("<i", f.read(4))[0]
-        max_version = max(max_version, version)
-        f.read(32)  # hashPrevBlock
-        merkle = f.read(32)
-        f.read(32)  # hashFinalSaplingRoot
-        f.read(4 + 4)  # nTime, nBits
+        version, prev, merkle, sapling, time_bits = _read_common(f)
+        _validate_common(version, merkle, prev, last_hash)
         if version >= PON_VERSION:
-            f.read(32 + 4)  # nodesCollateral (hash+n)
+            collateral = f.read(36)
+            vrf_out = None
             if version >= PON_VRF_VERSION:
                 vrf_out = f.read(32)
                 if vrf_out == b"\x00" * 32:
                     raise AssertionError(f"zeroed nodesVrfOutput at v{version}")
-                proof_len = read_varint(f)
-                f.read(proof_len)
+                f.read(read_varint(f))  # proof
             sig_len = read_varint(f)
             if sig_len == 0:
                 raise AssertionError("empty vchBlockSig on PON header")
             f.read(sig_len)
+            read_varint(f)  # txn count (0)
+            last_hash = _pon_gethash(version, prev, merkle, sapling, time_bits, collateral, vrf_out)
         else:
             nonce = f.read(32)
             sol_len = read_varint(f)
@@ -189,80 +220,68 @@ def parse_and_validate_headers(payload):
                 raise AssertionError("zeroed nNonce on PoW header")
             if sol_len == 0 or solution == b"\x00" * sol_len:
                 raise AssertionError("missing/zeroed nSolution on PoW header")
-        if merkle == b"\x00" * 32:
-            raise AssertionError(f"zeroed hashMerkleRoot (v{version})")
-        read_varint(f)  # txn count (always 0 in headers msg)
-        end = f.tell()
-        # block hash = sha256d of the GETHASH serialization; for PoW headers
-        # that's the full header incl. solution, for PON it excludes
-        # proof/sig. Recompute only for PoW (cheap enough, exact).
-        if version < PON_VERSION:
+            end = f.tell()
             f.seek(start)
-            last_hash = sha256d(f.read(end - start - 1))  # minus txn varint
-            f.seek(end)
-        else:
-            f.seek(start)
-            f.read(end - start - 1)
-            f.seek(end)
-            # PON GETHASH serialization: strip proof+sig (and re-add nothing);
-            # easier: ask for the next stride using the PREV hash of the next
-            # header — handled by caller via returned payload; fall back to
-            # tracking via hashPrevBlock below.
-            last_hash = None
-    return count, last_hash, max_version
+            raw = f.read(end - start)  # GETHASH form == wire form for PoW
+            read_varint(f)  # txn count (0)
+            last_hash = sha256d(raw)
+    return count, last_hash
 
 
-def extract_last_prev_chain(payload):
-    """Cheap path to continue the walk: the locator for the next request can
-    be the LAST header's hash; for PON headers we don't recompute it, we use
-    the fact that header N+1's hashPrevBlock == hash(header N). So request
-    strides overlap by one: locator = hashPrevBlock of the LAST header, which
-    re-fetches that one header but needs no hashing."""
+def parse_cmpheaders_msg(payload, expect_prev):
+    """`cmpheaders`: vector<CCompactBlockHeader> — PoW entries omit the
+    solution and carry the block hash explicitly; PON entries are full
+    (collateral, sig, then VRF output+proof). Returns (count, last_hash)."""
     f = io.BytesIO(payload)
     count = read_varint(f)
-    prev = None
+    last_hash = expect_prev
     for _ in range(count):
-        version = struct.unpack("<i", f.read(4))[0]
-        prev = f.read(32)
-        f.read(32 + 32 + 4 + 4)
+        version, prev, merkle, sapling, time_bits = _read_common(f)
+        _validate_common(version, merkle, prev, last_hash)
         if version >= PON_VERSION:
-            f.read(32 + 4)
+            collateral = f.read(36)
+            sig_len = read_varint(f)
+            if sig_len == 0:
+                raise AssertionError("empty vchBlockSig on PON cmpheader")
+            f.read(sig_len)
+            vrf_out = None
             if version >= PON_VRF_VERSION:
-                f.read(32)
-                f.read(read_varint(f))
-            f.read(read_varint(f))
+                vrf_out = f.read(32)
+                if vrf_out == b"\x00" * 32:
+                    raise AssertionError(f"zeroed nodesVrfOutput at v{version}")
+                f.read(read_varint(f))  # proof
+            last_hash = _pon_gethash(version, prev, merkle, sapling, time_bits, collateral, vrf_out)
         else:
-            f.read(32)
-            f.read(read_varint(f))
-        read_varint(f)
-    return count, prev
+            nonce = f.read(32)
+            hash_block = f.read(32)
+            if nonce == b"\x00" * 32:
+                raise AssertionError("zeroed nNonce on PoW cmpheader")
+            if hash_block == b"\x00" * 32:
+                raise AssertionError("zeroed hashBlock on PoW cmpheader")
+            last_hash = hash_block
+    return count, last_hash
 
 
-def worker(wid, args, stats, stop_evt):
-    peer = Peer(args.host, args.port)
+def worker(args, stats, stop_evt):
+    proto = CURRENT_PROTOCOL_VERSION if args.compact else LEGACY_PROTOCOL_VERSION
+    peer = Peer(args.host, args.port, proto)
     peer.handshake()
     locator = bytes.fromhex(GENESIS_HASH_HEX)[::-1]  # internal byte order
     batches = 0
     while not stop_evt.is_set():
-        payload = peer.get_headers(locator)
-        count, last_hash, _ = parse_and_validate_headers(payload)
-        if count == 0:
-            break
-        if last_hash is not None:
-            locator = last_hash
-        else:
-            # PON stride: continue from the last header's prev (one-header
-            # overlap, no PON hashing client-side)
-            _, prev = extract_last_prev_chain(payload)
-            if prev == locator:
-                break  # no forward progress => at tip
-            locator = prev
+        kind, payload = peer.get_headers(locator)
+        parse = parse_cmpheaders_msg if kind == "cmpheaders" else parse_headers_msg
+        count, last_hash = parse(payload, locator)
+        if count == 0 or last_hash == locator:
+            break  # at tip
+        locator = last_hash
         batches += 1
         rtt = peer.ping_rtt()
         with stats["lock"]:
             stats["headers"] += count
             stats["batches"] += 1
             stats["max_rtt"] = max(stats["max_rtt"], rtt)
+            stats["kinds"].add(kind)
         if rtt > args.rtt_budget:
             raise AssertionError(f"ping RTT {rtt:.2f}s exceeded budget {args.rtt_budget:.2f}s (serving stall?)")
         if args.max_batches and batches >= args.max_batches:
@@ -276,25 +295,26 @@ def main():
     ap.add_argument("--host", required=True)
     ap.add_argument("--port", type=int, default=16125)
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--compact", action="store_true", help="advertise current protocol (cmpheaders path)")
     ap.add_argument("--max-batches", type=int, default=0, help="0 = walk to tip")
     ap.add_argument("--rtt-budget", type=float, default=5.0)
     args = ap.parse_args()
 
-    stats = {"headers": 0, "batches": 0, "max_rtt": 0.0, "done": 0, "lock": threading.Lock()}
+    stats = {"headers": 0, "batches": 0, "max_rtt": 0.0, "done": 0, "kinds": set(), "lock": threading.Lock()}
     stop_evt = threading.Event()
     threads = []
     errors = []
 
-    def run(wid):
+    def run():
         try:
-            worker(wid, args, stats, stop_evt)
+            worker(args, stats, stop_evt)
         except Exception as e:
-            errors.append(f"worker {wid}: {e!r}")
+            errors.append(repr(e))
             stop_evt.set()
 
     t0 = time.monotonic()
-    for i in range(args.workers):
-        t = threading.Thread(target=run, args=(i,), daemon=True)
+    for _ in range(args.workers):
+        t = threading.Thread(target=run, daemon=True)
         t.start()
         threads.append(t)
     try:
@@ -316,8 +336,8 @@ def main():
         print("FAILED:\n" + "\n".join(errors))
         sys.exit(1)
     print(
-        f"OK: {stats['headers']} headers validated across {stats['batches']} batches, "
-        f"max ping RTT {stats['max_rtt']:.3f}s"
+        f"OK: {stats['headers']} headers validated across {stats['batches']} batches "
+        f"({'/'.join(sorted(stats['kinds']))}), max ping RTT {stats['max_rtt']:.3f}s"
     )
 
 
