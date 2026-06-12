@@ -557,6 +557,55 @@ TEST_F(PONTest, VrfForkChoiceEqualOutputUndecided) {
     EXPECT_EQ(ComparePonForkChoice(&a, &b), 0);
 }
 
+// Legacy PON entries score by the resident cached PON hash; an entry whose
+// header data has been pruned (pHeaderData == nullptr) must compare exactly
+// like an unpruned one, because the comparator may only touch resident fields.
+
+static CBlockIndex MakeLegacyPonIndex(int height, const uint256& ponHash) {
+    CBlockIndex idx;                       // SetNull(): pHeaderData == nullptr (pruned shape)
+    idx.nVersion = CBlockHeader::PON_VERSION;
+    idx.nHeight = height;
+    idx.hashPON = ponHash;
+    return idx;
+}
+
+TEST_F(PONTest, MixedVersionForkChoiceDeterministic) {
+    // A legacy block and a VRF block competing at the same height (the
+    // activation-boundary fork shape): each scores by its own resident value.
+    CBlockIndex legacy = MakeLegacyPonIndex(100, uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa"));
+    CBlockIndex vrf = MakeVrfIndex(100, uint256S("0x00000000000000000000000000000000000000000000000000000000000000bb"));
+
+    int lv = ComparePonForkChoice(&legacy, &vrf);
+    EXPECT_LT(lv, 0);                                    // lower score (legacy aa) preferred
+    EXPECT_EQ(lv, -ComparePonForkChoice(&vrf, &legacy)); // antisymmetric
+    EXPECT_EQ(lv, ComparePonForkChoice(&legacy, &vrf));  // deterministic
+}
+
+TEST_F(PONTest, ForkChoicePrunedEntriesMatchUnpruned) {
+    const uint256 hashA = uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa");
+    const uint256 hashB = uint256S("0x00000000000000000000000000000000000000000000000000000000000000bb");
+
+    // Pruned pair (no header data at all)
+    CBlockIndex prunedA = MakeLegacyPonIndex(100, hashA);
+    CBlockIndex prunedB = MakeLegacyPonIndex(100, hashB);
+    ASSERT_EQ(prunedA.pHeaderData, nullptr);
+    int pruned = ComparePonForkChoice(&prunedA, &prunedB);
+
+    // Same pair with header data present (and deliberately mismatched, to
+    // prove the comparator ignores it)
+    CBlockIndex fullA = MakeLegacyPonIndex(100, hashA);
+    CBlockIndex fullB = MakeLegacyPonIndex(100, hashB);
+    fullA.AllocateHeaderData();
+    fullB.AllocateHeaderData();
+    int full = ComparePonForkChoice(&fullA, &fullB);
+
+    EXPECT_EQ(pruned, full);
+    EXPECT_LT(pruned, 0);
+
+    fullA.FreeHeaderData();
+    fullB.FreeHeaderData();
+}
+
 // --- PON-VRF block-header serialization + hash-commitment -----------------------------
 
 static CBlockHeader MakeVrfHeader() {
