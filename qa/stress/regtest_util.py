@@ -54,7 +54,22 @@ FLUXNODE_ARGS = [
     "-zelnodeoutpoint=" + "11" * 32,
     "-zelnodeindex=0",
     "-zelnodeprivkey=" + regtest_wif(),
+    "-txindex=1",  # fluxnode support refuses to start without transaction indexing
 ]
+
+
+def ensure_bench_stubs():
+    """Fluxnode init requires fluxbenchd + fluxbench-cli files BESIDE the
+    daemon binary (existence check only). UNMANAGED_FLUXBENCHD in the
+    environment skips actually launching them; stub files satisfy the rest.
+    Never overwrites a real binary."""
+    bindir = os.path.dirname(os.path.abspath(shutil.which(BITCOIND) or BITCOIND))
+    for name in ("fluxbenchd", "fluxbench-cli"):
+        path = os.path.join(bindir, name)
+        if not os.path.exists(path):
+            with open(path, "w") as f:
+                f.write("#!/bin/sh\n# stress-suite stub; real fluxbenchd is not used (UNMANAGED_FLUXBENCHD)\nexit 0\n")
+            os.chmod(path, 0o755)
 
 
 class Node:
@@ -80,7 +95,8 @@ class Node:
 
     def start(self, extra=None, wait=True):
         args = [BITCOIND, "-datadir=" + self.datadir, "-daemon=0", *self.extra_args, *list(extra or [])]
-        self.proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        env = dict(os.environ, UNMANAGED_FLUXBENCHD="1")  # don't launch a real fluxbenchd
+        self.proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, env=env)
         if wait:
             self.wait_rpc()
         return self.proc
@@ -135,6 +151,7 @@ class Node:
 
 
 def make_chain(prefix):
+    ensure_bench_stubs()
     base = tempfile.mkdtemp(prefix=prefix)
     miner = Node("miner", base, 28232, 28233)
     fluxnode = Node("fluxnode", base, 28234, 28235, extra_args=FLUXNODE_ARGS)

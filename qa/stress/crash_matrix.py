@@ -33,8 +33,14 @@ import time
 from regtest_util import cleanup, connect, make_chain, wait_sync
 
 KILLS = 12
+# Every legitimate outcome RecoverFluxnodeCache logs: nothing persisted yet
+# (no marker), marker already at tip, stale-marker repair, bounded disconnect/
+# replay, or the full marker-chain rewind. Anything else — especially the
+# init hard-fail — is a test failure.
 RECOVERY_RE = re.compile(
-    r"RecoverFluxnodeCache: (sync state matches chain tip[^\n]*no recovery needed"
+    r"RecoverFluxnodeCache: (no sync state marker, skipping recovery"
+    r"|sync state matches chain tip[^\n]*no recovery needed"
+    r"|sync state block not in block index \(stale marker\)[^\n]*"
     r"|disconnecting \d+ blocks[^\n]*"
     r"|rewound \d+ marker-chain blocks[^\n]*)"
 )
@@ -93,7 +99,10 @@ def main():
                 fluxnode.stop()
                 off = fluxnode.log_offset()
                 fluxnode.start()
-                assert "no recovery needed" in fluxnode.log_since(off), "recovery loop: clean restart re-ran recovery"
+                log = fluxnode.log_since(off)
+                assert "no recovery needed" in log or "skipping recovery" in log, (
+                    "recovery loop: clean restart re-ran recovery"
+                )
                 print("   mid-matrix clean-restart check: no recovery loop")
 
             connect(fluxnode, miner_node)

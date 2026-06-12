@@ -19,13 +19,17 @@ recovery, resident fork-choice) — not just the steady state the soak covers.
 
 **1 — header_storm.py** (python3, stdlib only). Speaks the P2P protocol
 directly: handshake, then N concurrent connections each walking the entire
-header chain from genesis in 2000-header `getheaders` strides (~1340
-requests per walk at current height). Every header is parsed per its
-version's wire format and validated: PoW headers must carry a non-zero
-nonce, non-empty equihash solution and non-zero merkle root (the fields that
-were zeroed by the pre-fix serving bug); PON headers a non-empty block
-signature. The serving node must stay responsive (the script interleaves
-`ping` round-trip timing as a stall probe).
+header chain from genesis in `getheaders` strides. Runs in two modes
+matching the two serving paths: default advertises a pre-CMPHEADERS
+protocol version so every stride is a full `headers` message (160/batch,
+PoW solutions on the wire — the heaviest path), `--compact` advertises the
+current version so checkpointed history arrives as `cmpheaders`
+(2000/batch, solution omitted). Every header is parsed per its version's
+wire format and validated: non-zero merkle root and chain continuity via
+hashPrevBlock everywhere; PoW non-zero nonce (+ non-empty solution in
+legacy mode); PON non-empty block signature; PON-VRF non-zero VRF output.
+The serving node must stay responsive (the script interleaves `ping`
+round-trip timing as a stall probe).
 
 **2 — rehydration_churn.py** (regtest, `-zelnode=1` so load-time pruning is
 active). Mines a chain, restarts to prune it, then loops deep
@@ -38,10 +42,13 @@ restart asserts the leveldb round-trips intact.
 **3 — crash_matrix.py** (regtest, `-zelnode=1`). A background miner extends
 the chain while the harness `kill -9`s the daemon at randomized offsets —
 including inside the 10-block persist window and immediately after boot —
-then restarts and asserts the recovery path engages cleanly
-(`RecoverFluxnodeCache: … no recovery needed` or a bounded
-disconnect/replay; never an abort, never a recovery loop) and that the node
-returns to the pre-kill tip.
+then restarts and asserts every boot takes a legitimate
+`RecoverFluxnodeCache` outcome (never an abort, never a recovery loop) and
+the node reconverges to the miner's tip. Note kill -9 on regtest usually
+loses the recent unflushed chain wholesale, so the *specific*
+marker-divergence recovery shapes are not deterministically reached here —
+they are manufactured byte-exactly by `qa/rpc-tests/fluxnode_cache_recovery.py`;
+this test adds the randomized-timing, always-converges guarantee on top.
 
 **4 — memory_pressure.sh** (operator runbook — touches a mainnet node).
 Re-runs the daemon inside a `systemd-run` scope with `MemoryHigh=500M` +
