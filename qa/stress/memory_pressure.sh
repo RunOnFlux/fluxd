@@ -21,9 +21,22 @@ CSV="/tmp/memory_pressure_$(date +%s).csv"
 
 echo "Stopping services (watchdog first)..."
 systemctl stop flux-watchdog.timer flux-watchdog.service fluxd
+# fluxd shutdown can lag the unit state; the leveldb lock must be free
+# before the capped instance opens the same datadir. Scope the wait to the
+# daemon using THIS datadir — other fluxd instances on the host are not ours.
+while pgrep -f -- "fluxd.*-datadir=$DATADIR( |$)" >/dev/null; do
+  echo "  waiting for the $DATADIR fluxd to exit..."; sleep 3
+done
 
 echo "Starting fluxd under MemoryHigh=${CAP_MB}M MemorySwapMax=0 for ${DURATION}s..."
+# Mirror the production unit's identity and environment (fluxd runs as its
+# own user; HOME carries the .zcash-params lookup) — only the memory limits
+# differ from a normal run.
+SVC_USER=$(systemctl show -p User --value fluxd); SVC_USER=${SVC_USER:-fluxd}
+SVC_GROUP=$(systemctl show -p Group --value fluxd); SVC_GROUP=${SVC_GROUP:-$SVC_USER}
 systemd-run --unit=fluxd-stress --collect \
+  -p User="$SVC_USER" -p Group="$SVC_GROUP" \
+  -E HOME="$DATADIR" -E UNMANAGED_FLUXBENCHD=1 -E MALLOC_ARENA_MAX=1 \
   -p MemoryHigh="${CAP_MB}M" -p MemoryMax="$((CAP_MB + 200))M" -p MemorySwapMax=0 \
   "$FLUXD" -datadir="$DATADIR"
 
@@ -37,11 +50,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# give init time to begin before sampling (params check, db open)
+T0=$(date +%s)
+until PID=$(systemctl show -p MainPID --value fluxd-stress) && [ -n "$PID" ] && [ "$PID" != 0 ] && [ -d "/proc/$PID" ]; do
+  sleep 3
+  if ! systemctl is-active fluxd-stress >/dev/null 2>&1 && [ $(( $(date +%s) - T0 )) -gt 30 ]; then
+    echo "FAIL: fluxd-stress did not start"; journalctl -u fluxd-stress --no-pager | tail -8; exit 1
+  fi
+done
+
 echo "ts,height,RssAnon_kB,RssFile_kB,VmSwap_kB,majflt,mem_current" > "$CSV"
 END=$(( $(date +%s) + DURATION ))
 while [ "$(date +%s)" -lt "$END" ]; do
   PID=$(systemctl show -p MainPID --value fluxd-stress)
-  if [ -z "$PID" ] || [ "$PID" = 0 ]; then
+  if [ -z "$PID" ] || [ "$PID" = 0 ] || [ ! -d "/proc/$PID" ]; then
+    # MainPID can read empty transiently; only fail if the unit is truly down
+    if systemctl is-active fluxd-stress >/dev/null 2>&1; then sleep 5; continue; fi
     echo "FAIL: fluxd-stress not running (OOM-killed?)"; journalctl -u fluxd-stress --no-pager | tail -5
     exit 1
   fi
