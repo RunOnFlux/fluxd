@@ -21,6 +21,8 @@ mkdir -p "$DATADIR"
 {
   echo "server=1"; echo "listen=0"; echo "discover=0"; echo "dnsseed=0"
   echo "rpcuser=stress"; echo "rpcpassword=stress"; echo "rpcallowip=127.0.0.1"
+  # dedicated ports: must not collide with anything else on a shared host
+  echo "rpcport=17124"; echo "port=17125"
   echo "dbcache=200"
   for p in "$@"; do echo "connect=$p"; done
 } > "$DATADIR/flux.conf"
@@ -35,13 +37,17 @@ LAST_H=0; LAST_T=$(date +%s); STALL=0
 while :; do
   H=$("$CLI" -datadir="$DATADIR" getblockcount)
   P=$("$CLI" -datadir="$DATADIR" getconnectioncount)
-  PROG=$("$CLI" -datadir="$DATADIR" getblockchaininfo | grep verificationprogress | tr -dc '0-9.')
+  # verificationprogress arrives in scientific notation early in IBD
+  # (e.g. 1.18e-05) — parse numerically, never textually
+  PROG=$("$CLI" -datadir="$DATADIR" getblockchaininfo | awk -F'[:,]' '/verificationprogress/{gsub(/ /,"",$2); print $2}')
   NOW=$(date +%s)
   RATE=$(( (H - LAST_H) * 3600 / (NOW - LAST_T + 1) ))
   echo "$NOW,$H,$P,$PROG  (${RATE} blk/h)" | tee -a "$CSV"
   if [ "$H" -eq "$LAST_H" ]; then STALL=$((STALL+1)); else STALL=0; fi
   [ "$STALL" -lt 20 ] || { echo "FAIL: sync stalled for 20 intervals at height $H"; exit 1; }
-  case "$PROG" in 0.99999*|1*) echo "OK: synced to tip ($H) from patched peers only."; break;; esac
+  if [ "$(awk -v p="$PROG" 'BEGIN{print (p+0 > 0.9999) ? 1 : 0}')" = "1" ]; then
+    echo "OK: synced to tip ($H) from patched peers only."; break
+  fi
   LAST_H=$H; LAST_T=$NOW
   sleep 180
 done

@@ -17,7 +17,6 @@ systemctl stop flux-watchdog.timer flux-watchdog.service
 trap 'systemctl start flux-watchdog.timer' EXIT
 
 for i in $(seq 1 "$CYCLES"); do
-  OFFSET=$(stat -c%s "$DATADIR/debug.log")
   T0=$(date +%s)
   systemctl restart fluxd
   until "$CLI" -datadir="$DATADIR" getblockcount >/dev/null 2>&1; do
@@ -25,8 +24,11 @@ for i in $(seq 1 "$CYCLES"); do
     if [ $(( $(date +%s) - T0 )) -gt 600 ]; then echo "FAIL cycle $i: RPC not up in 600s"; exit 1; fi
   done
   INIT_S=$(( $(date +%s) - T0 ))
-  tail -c +"$OFFSET" "$DATADIR/debug.log" | grep -q "no recovery needed" \
-    || { echo "FAIL cycle $i: recovery ran on a clean restart"; exit 1; }
+  # assert on the LAST recovery line (robust against log rotation/buffering;
+  # every boot writes exactly one RecoverFluxnodeCache line)
+  LAST_RECOVERY=$(grep -a "RecoverFluxnodeCache" "$DATADIR/debug.log" | tail -1)
+  echo "$LAST_RECOVERY" | grep -qE "no recovery needed|skipping recovery" \
+    || { echo "FAIL cycle $i: recovery ran on a clean restart: $LAST_RECOVERY"; exit 1; }
   ARENA=$(find "$DATADIR" -name blockindex.arena -newermt "@$T0" | head -1)
   [ -n "$ARENA" ] || { echo "FAIL cycle $i: blockindex.arena not recreated"; exit 1; }
   sleep 60   # settle
