@@ -1,0 +1,28 @@
+[project]
+name = "fluxd-stress"
+version = "0.1.0"
+description = "Bounded-blockindex stress suite (P2P header storm + regtest churn/crash harnesses)"
+authors = [
+    { name = "David White", email = "david@runonflux.io" }
+]
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14",
+    "ty>=0.0.1a21",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = [
+    "SIM108",  # ternary rewrites hurt readability in wire-parsing code
+]
+
+[tool.ty.environment]
+python-version = "3.10"
