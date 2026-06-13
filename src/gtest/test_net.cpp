@@ -61,3 +61,32 @@ TEST(NetTests, OnionSubnetMatch)
     EXPECT_FALSE(ip4net.Match(onionA));
     EXPECT_TRUE(ip4net.Match(CService("1.2.3.99", 0, false)));
 }
+
+// v3 onions must be spread across netgroups by the top bits of their pubkey,
+// not collapsed into one bucket (which let cheap mass-onion advertising evict
+// honest onion entries). Each group is {NET_ONION, nibble} (size 2), and a set
+// of distinct onions spans more than one group.
+TEST(NetTests, OnionNetGroup)
+{
+    const char* onions[] = {
+        "p6o2vv3o23tvth5ozzlbchgnxgtxkptf47ge43vhrhglpuohfxnbyfid.onion",
+        "in5ffm447ysvr4q4ma4gdgmychtpcb3emlnbfe4r3mhnb4ctlje6jmyd.onion",
+        "jfb4rhv24cmqi3ccmua2eo623qjv67nbl7jt7zd6mq5xyschv3pgmgyd.onion",
+        "4i3jh7kntubirk6jxqizfxkjucjtdcuipn26meabbr76krxpcqou4lad.onion",
+        "yksgaaldptn6lxsbem6cdtxmbygq7c3llag3pjv6es5rgrsawhcup2ad.onion",
+    };
+    std::set<std::vector<unsigned char> > groups;
+    for (const char* s : onions) {
+        CNetAddr a = CService(s, 0, false);
+        ASSERT_TRUE(a.IsTor());
+        std::vector<unsigned char> g = a.GetGroup();
+        ASSERT_EQ(g.size(), 2u);            // {NET_ONION, pubkey-derived byte}, no longer a lone NET_ONION
+        EXPECT_EQ(g[0], (unsigned char)NET_ONION);
+        groups.insert(g);
+    }
+    // Distinct onions must not all collapse into a single netgroup.
+    EXPECT_GT(groups.size(), 1u);
+    // The same onion always hashes to the same group.
+    EXPECT_EQ(CService(onions[0], 0, false).GetGroup(),
+              CService(onions[0], 0, false).GetGroup());
+}
