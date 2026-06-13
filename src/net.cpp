@@ -570,6 +570,22 @@ void CNode::AddWhitelistedRange(const CSubNet &subnet) {
     vWhitelistedRange.push_back(subnet);
 }
 
+CAddress CNode::GetEffectiveAddr()
+{
+    LOCK(cs_addrName);
+    if (fTorAddrVerified)
+        return CAddress(torVerifiedAddr);
+    return addr;
+}
+
+std::string CNode::GetEffectiveAddrName()
+{
+    LOCK(cs_addrName);
+    if (fTorAddrVerified)
+        return torVerifiedAddr.ToStringIPPort();
+    return addrName;
+}
+
 void CNode::copyStats(CNodeStats &stats)
 {
     stats.nodeid = this->GetId();
@@ -589,8 +605,13 @@ void CNode::copyStats(CNodeStats &stats)
     stats.nRatelimitedAddrs = nRatelimitedAddrs;
     {
         LOCK(cs_addrName);
-        stats.addrName = addrName;
-        stats.m_network = addr.GetNetwork();
+        if (fTorAddrVerified) {
+            stats.addrName = torVerifiedAddr.ToStringIPPort();
+            stats.m_network = torVerifiedAddr.GetNetwork();
+        } else {
+            stats.addrName = addrName;
+            stats.m_network = addr.GetNetwork();
+        }
     }
     stats.m_wants_addrv2 = m_wants_addrv2.load();
 
@@ -816,8 +837,8 @@ public:
         CSHA256 hashA, hashB;
         std::vector<unsigned char> vchA(32), vchB(32);
 
-        vchGroupA = a->addr.GetGroup();
-        vchGroupB = b->addr.GetGroup();
+        vchGroupA = a->GetEffectiveAddr().GetGroup();
+        vchGroupB = b->GetEffectiveAddr().GetGroup();
 
         hashA.Write(begin_ptr(vchGroupA), vchGroupA.size());
         hashB.Write(begin_ptr(vchGroupB), vchGroupB.size());
@@ -913,14 +934,15 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection) {
     int64_t nMostConnectionsTime = 0;
     std::map<std::vector<unsigned char>, std::vector<CNodeRef> > mapAddrCounts;
     for (const CNodeRef &node : vEvictionCandidates) {
-        mapAddrCounts[node->addr.GetGroup()].push_back(node);
-        int64_t grouptime = mapAddrCounts[node->addr.GetGroup()][0]->nTimeConnected;
-        size_t groupsize = mapAddrCounts[node->addr.GetGroup()].size();
+        std::vector<unsigned char> group = node->GetEffectiveAddr().GetGroup();
+        mapAddrCounts[group].push_back(node);
+        int64_t grouptime = mapAddrCounts[group][0]->nTimeConnected;
+        size_t groupsize = mapAddrCounts[group].size();
 
         if (groupsize > nMostConnections || (groupsize == nMostConnections && grouptime > nMostConnectionsTime)) {
             nMostConnections = groupsize;
             nMostConnectionsTime = grouptime;
-            naMostConnections = node->addr.GetGroup();
+            naMostConnections = group;
         }
     }
 
