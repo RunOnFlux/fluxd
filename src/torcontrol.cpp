@@ -500,8 +500,20 @@ TorController::TorController(struct event_base* baseIn, const std::string& targe
     // Read service private key if cached
     std::pair<bool,std::string> pkf = ReadBinaryFile(GetPrivateKeyFile());
     if (pkf.first) {
-        LogPrint("tor", "tor: Reading cached private key from %s\n", GetPrivateKeyFile());
         private_key = pkf.second;
+        // A valid cached key is exactly the 32-byte ed25519 seed. Anything else
+        // (a truncated/corrupt write, or a legacy "ED25519-V3:<base64>" file)
+        // would be read out of bounds at the fixed 32-byte uses below and cached
+        // as a garbage keypair; discard it and let auth_cb regenerate the seed.
+        if (private_key.size() != crypto_sign_ed25519_SEEDBYTES) {
+            LogPrintf("tor: Ignoring malformed cached onion key %s (%u bytes, expected %u); regenerating\n",
+                      GetPrivateKeyFile(), (unsigned)private_key.size(),
+                      (unsigned)crypto_sign_ed25519_SEEDBYTES);
+            sodium_memzero(private_key.data(), private_key.size());
+            private_key.clear();
+        } else {
+            LogPrint("tor", "tor: Reading cached private key from %s\n", GetPrivateKeyFile());
+        }
     }
 }
 
