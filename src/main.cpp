@@ -7373,6 +7373,31 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             uint64_t nCMPCTBLOCKVersion = 1;
             pfrom->PushMessage("sendcmpct", fAnnounceUsingCMPCTBLOCK, nCMPCTBLOCKVersion);
         }
+
+        // Handshake complete: version + verack exchanged. Marked here (not after
+        // the version message) so a BIP155 sendaddrv2 — which arrives between
+        // version and verack — is still accepted by the sendaddrv2 handler.
+        pfrom->fSuccessfullyConnected = true;
+
+        // Initiate Tor authentication for fluxnode peers.
+        // Only when we are a fluxnode and not in initial block download.
+        if (fFluxnode && !fluxnodeOutPoint.IsNull() && !IsInitialBlockDownload(chainparams)) {
+            bool fNeedsTorAuth = false;
+            if (pfrom->fInbound && pfrom->addr.IsLocal()) {
+                // Inbound from 127.0.0.1 = Tor hidden service connection
+                fNeedsTorAuth = true;
+            } else if (!pfrom->fInbound && pfrom->addr.IsTor()) {
+                // Outbound to a .onion address
+                fNeedsTorAuth = true;
+            }
+            if (fNeedsTorAuth) {
+                GetRandBytes(pfrom->nTorAuthChallenge.begin(), 32);
+                pfrom->nTorAuthTimestamp = GetTime();
+                pfrom->fTorAuthSent = true;
+                pfrom->PushMessage("torauthreq", fluxnodeOutPoint, pfrom->nTorAuthChallenge);
+                LogPrint("tor", "torauth: sent challenge to peer=%d\n", pfrom->id);
+            }
+        }
     }
 
 
@@ -7399,31 +7424,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 nodestate->fProvidesHeaderAndIDs = fAnnounceUsingCMPCTBLOCK;
                 if (fAnnounceUsingCMPCTBLOCK)
                     LogPrint("net", "Peer %d will send us compact blocks (high-bandwidth mode)\n", pfrom->id);
-            }
-        }
-
-        // Handshake complete: version + verack exchange finished.
-        // Set after verack (not after version) so that BIP155 sendaddrv2,
-        // which must arrive between version and verack, is accepted.
-        pfrom->fSuccessfullyConnected = true;
-
-        // Initiate Tor authentication for fluxnode peers.
-        // Only when we are a fluxnode and not in initial block download.
-        if (fFluxnode && !fluxnodeOutPoint.IsNull() && !IsInitialBlockDownload(chainparams)) {
-            bool fNeedsTorAuth = false;
-            if (pfrom->fInbound && pfrom->addr.IsLocal()) {
-                // Inbound from 127.0.0.1 = Tor hidden service connection
-                fNeedsTorAuth = true;
-            } else if (!pfrom->fInbound && pfrom->addr.IsTor()) {
-                // Outbound to a .onion address
-                fNeedsTorAuth = true;
-            }
-            if (fNeedsTorAuth) {
-                GetRandBytes(pfrom->nTorAuthChallenge.begin(), 32);
-                pfrom->nTorAuthTimestamp = GetTime();
-                pfrom->fTorAuthSent = true;
-                pfrom->PushMessage("torauthreq", fluxnodeOutPoint, pfrom->nTorAuthChallenge);
-                LogPrint("tor", "torauth: sent challenge to peer=%d\n", pfrom->id);
             }
         }
     }
