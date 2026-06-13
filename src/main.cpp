@@ -7625,13 +7625,23 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                         // which stay as set at connect so unlocked readers on other
                         // threads never race a reassignment. Consumers read the onion
                         // identity through CNode::GetEffectiveAddr().
-                        LOCK(pfrom->cs_addrName);
-                        if (!pfrom->fTorAddrVerified) {
-                            pfrom->torVerifiedAddr = onionService;
-                            pfrom->fTorAddrVerified = true;
+                        {
+                            LOCK(pfrom->cs_addrName);
+                            if (!pfrom->fTorAddrVerified) {
+                                pfrom->torVerifiedAddr = onionService;
+                                pfrom->fTorAddrVerified = true;
+                            }
                         }
                         LogPrint("tor", "torauth: peer=%d onion address verified: %s\n",
                                  pfrom->id, onionAddr);
+                        // Enforce bans against the proven onion. An inbound hidden-
+                        // service peer arrives as 127.0.0.1, so the accept-time
+                        // IsBanned(addr) check cannot see its onion identity.
+                        if (CNode::IsBanned(static_cast<const CNetAddr&>(onionService))) {
+                            LogPrint("tor", "torauth: peer=%d onion %s is banned; disconnecting\n",
+                                     pfrom->id, onionAddr);
+                            pfrom->fDisconnect = true;
+                        }
                     }
                 }
             } else {

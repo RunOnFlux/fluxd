@@ -35,3 +35,29 @@ TEST(NetTests, GetEffectiveAddr)
     EXPECT_TRUE(node->GetEffectiveAddr().IsTor());
     EXPECT_EQ(node->GetEffectiveAddrName(), onion.ToStringIPPort());
 }
+
+// A CSubNet built from a v3 onion must match that exact onion and nothing else,
+// so bans against an onion peer are effective (it used to be flattened to ::/128
+// and Match() returned false for any onion, making onion bans a no-op).
+TEST(NetTests, OnionSubnetMatch)
+{
+    CNetAddr onionA = CService("p6o2vv3o23tvth5ozzlbchgnxgtxkptf47ge43vhrhglpuohfxnbyfid.onion", 0, false);
+    CNetAddr onionB = CService("in5ffm447ysvr4q4ma4gdgmychtpcb3emlnbfe4r3mhnb4ctlje6jmyd.onion", 0, false);
+    CNetAddr ip4 = CService("1.2.3.4", 0, false);
+    ASSERT_TRUE(onionA.IsTor());
+    ASSERT_TRUE(onionB.IsTor());
+    ASSERT_TRUE(ip4.IsIPv4());
+
+    // A single-onion ban matches that onion only.
+    CSubNet banA(onionA.ToString() + "/128");
+    ASSERT_TRUE(banA.IsValid());
+    EXPECT_TRUE(banA.Match(onionA));
+    EXPECT_FALSE(banA.Match(onionB));
+    EXPECT_FALSE(banA.Match(ip4));
+
+    // An IPv4 subnet never matches an onion, and still matches IPv4 normally.
+    CSubNet ip4net("1.2.3.0/24");
+    ASSERT_TRUE(ip4net.IsValid());
+    EXPECT_FALSE(ip4net.Match(onionA));
+    EXPECT_TRUE(ip4net.Match(CService("1.2.3.99", 0, false)));
+}
