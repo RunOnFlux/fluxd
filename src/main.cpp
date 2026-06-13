@@ -7107,6 +7107,7 @@ static const int TORAUTH_MISBEHAVE_NO_HANDSHAKE    = 10;  // torauthreq/resp bef
 static const int TORAUTH_MISBEHAVE_UNKNOWN_OUTPOINT = 10;  // response claims unregistered fluxnode
 static const int TORAUTH_MISBEHAVE_UNSOLICITED      = 20;  // torauthresp without us sending a challenge
 static const int TORAUTH_MISBEHAVE_BAD_SIGNATURE     = 50;  // secp256k1 signature verification failed
+static const int TORAUTH_MISBEHAVE_ONION_MISMATCH    = 50;  // outbound onion proof != dialed address
 
 /** Sign a torauth challenge with both the fluxnode secp256k1 key and the
  *  Tor hidden service ed25519 key. The ed25519 signature covers
@@ -7617,17 +7618,30 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 std::string onionAddr = OnionAddressFromEd25519Pubkey(vchOnionPubKey.data());
                 CService onionService(onionAddr, Params().GetDefaultPort(), false);
                 if (onionService.IsValid()) {
-                    // Record the verified onion without mutating addr/addrName,
-                    // which stay as set at connect so unlocked readers on other
-                    // threads never race a reassignment. Consumers read the onion
-                    // identity through CNode::GetEffectiveAddr().
-                    LOCK(pfrom->cs_addrName);
-                    if (!pfrom->fTorAddrVerified) {
-                        pfrom->torVerifiedAddr = onionService;
-                        pfrom->fTorAddrVerified = true;
+                    // For an outbound connection the proven onion must be the one
+                    // we dialed; otherwise a registered fluxnode controlling a
+                    // different onion could relabel our connection to its own
+                    // address (poisoning anchors, dedup, and the onion cap).
+                    // Inbound peers arrive as 127.0.0.1 and legitimately learn
+                    // their onion identity from the proof, so they are exempt.
+                    if (!pfrom->fInbound &&
+                        static_cast<const CNetAddr&>(onionService) != static_cast<const CNetAddr&>(pfrom->addr)) {
+                        LogPrint("tor", "torauth: peer=%d onion proof %s != dialed %s; rejecting\n",
+                                 pfrom->id, onionAddr, pfrom->addr.ToStringIP());
+                        Misbehaving(pfrom->GetId(), TORAUTH_MISBEHAVE_ONION_MISMATCH);
+                    } else {
+                        // Record the verified onion without mutating addr/addrName,
+                        // which stay as set at connect so unlocked readers on other
+                        // threads never race a reassignment. Consumers read the onion
+                        // identity through CNode::GetEffectiveAddr().
+                        LOCK(pfrom->cs_addrName);
+                        if (!pfrom->fTorAddrVerified) {
+                            pfrom->torVerifiedAddr = onionService;
+                            pfrom->fTorAddrVerified = true;
+                        }
+                        LogPrint("tor", "torauth: peer=%d onion address verified: %s\n",
+                                 pfrom->id, onionAddr);
                     }
-                    LogPrint("tor", "torauth: peer=%d onion address verified: %s\n",
-                             pfrom->id, onionAddr);
                 }
             } else {
                 LogPrint("tor", "torauth: peer=%d onion ed25519 signature INVALID\n",
