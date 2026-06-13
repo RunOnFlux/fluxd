@@ -99,6 +99,9 @@ static bool vfLimited[NET_MAX] = {};
 static CNode* pnodeLocalHost = NULL;
 uint64_t nLocalHostNonce = 0;
 static std::vector<ListenSocket> vhListenSocket;
+// Local port the OS assigned for the dedicated Tor hidden-service bind, so the
+// Tor controller can forward the onion to it (0 = no dedicated bind active).
+static std::atomic<unsigned short> g_onion_local_port{0};
 CAddrMan addrman;
 int nMaxConnections = DEFAULT_MAX_PEER_CONNECTIONS;
 int nMaxOnionOutbound = DEFAULT_MAX_ONION_OUTBOUND;
@@ -143,6 +146,11 @@ void AddOneShot(const std::string& strDest)
 unsigned short GetListenPort()
 {
     return (unsigned short)(GetArg("-port", Params().GetDefaultPort()));
+}
+
+unsigned short GetOnionLocalPort()
+{
+    return g_onion_local_port.load();
 }
 
 // find 'best' local address for a particular peer
@@ -1938,6 +1946,17 @@ bool BindListenPort(const CService &addrBind, string& strError, bool fWhiteliste
         LogPrintf("%s\n", strError);
         CloseSocket(hListenSocket);
         return false;
+    }
+
+    if (fOnion) {
+        // Record the OS-assigned local port so the Tor controller can point the
+        // onion service at it (see GetOnionLocalPort / torcontrol.cpp).
+        struct sockaddr_storage ssBound;
+        socklen_t ssLen = sizeof(ssBound);
+        CService bound;
+        if (getsockname(hListenSocket, (struct sockaddr*)&ssBound, &ssLen) == 0 &&
+            bound.SetSockAddr((const struct sockaddr*)&ssBound))
+            g_onion_local_port = bound.GetPort();
     }
 
     vhListenSocket.push_back(ListenSocket(hListenSocket, fWhitelisted, fOnion));
