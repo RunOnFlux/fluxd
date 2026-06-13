@@ -7,6 +7,8 @@
 #include "net.h"
 #include "netbase.h"
 #include "protocol.h"
+#include "streams.h"
+#include "version.h"
 
 #include <string>
 #include <string_view>
@@ -109,4 +111,20 @@ TEST(NetTests, OnionDestPortSuffix)
     EXPECT_TRUE(is_onion_dest("abc.onion:16125"));
     EXPECT_FALSE(is_onion_dest("example.com:16125"));
     EXPECT_FALSE(is_onion_dest("1.2.3.4:16125"));
+}
+
+// BIP155 addrv2 services is a 64-bit flag field; a high service bit
+// (>= MAX_SIZE) must round-trip, not throw and drop the whole addr batch.
+TEST(NetTests, Addrv2HighServiceBits)
+{
+    const uint64_t highServices = (uint64_t)1 << 40;
+    CAddress in(CService("1.2.3.4", 8333), highServices);
+    in.nTime = 1234567;
+
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    in.SerializeV2(ss);
+
+    CAddress out;
+    EXPECT_NO_THROW(out.UnserializeV2(ss));
+    EXPECT_EQ(out.nServices, highServices);
 }
