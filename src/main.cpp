@@ -7614,9 +7614,15 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 std::string onionAddr = OnionAddressFromEd25519Pubkey(vchOnionPubKey.data());
                 CService onionService(onionAddr, Params().GetDefaultPort(), false);
                 if (onionService.IsValid()) {
+                    // Record the verified onion without mutating addr/addrName,
+                    // which stay as set at connect so unlocked readers on other
+                    // threads never race a reassignment. Consumers read the onion
+                    // identity through CNode::GetEffectiveAddr().
                     LOCK(pfrom->cs_addrName);
-                    pfrom->addr = CAddress(onionService);
-                    pfrom->addrName = onionService.ToStringIPPort();
+                    if (!pfrom->fTorAddrVerified) {
+                        pfrom->torVerifiedAddr = onionService;
+                        pfrom->fTorAddrVerified = true;
+                    }
                     LogPrint("tor", "torauth: peer=%d onion address verified: %s\n",
                              pfrom->id, onionAddr);
                 }
