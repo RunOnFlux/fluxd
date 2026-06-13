@@ -1449,10 +1449,13 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         // provably an onion peer, with no localhost heuristics. Best-effort — a
         // failure here only disables inbound-onion detection, it must not abort.
         if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION)) {
+            // Bind an OS-assigned local port exclusively for inbound hidden-service
+            // traffic; the Tor controller forwards the onion to whatever port we get
+            // (GetOnionLocalPort), so it can never collide with the P2P or RPC port.
             struct in_addr inaddr_loopback;
             inaddr_loopback.s_addr = htonl(INADDR_LOOPBACK);
-            if (!Bind(CService(inaddr_loopback, static_cast<unsigned short>(GetListenPort() + 1)), BF_ONION))
-                LogPrintf("Warning: could not bind dedicated onion port 127.0.0.1:%i; inbound hidden-service peers will not be detected\n", GetListenPort() + 1);
+            if (!Bind(CService(inaddr_loopback, 0), BF_ONION))
+                LogPrintf("Warning: could not bind dedicated onion port; inbound hidden-service peers will not be detected\n");
         }
     }
 

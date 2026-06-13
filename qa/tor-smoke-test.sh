@@ -126,7 +126,7 @@ $CLI -datadir=$BASE/nodeB getpeerinfo | grep -E "\"addr\"|\"network\"|\"addrv2\"
 
 # --- 4b. inbound peer on the hidden-service node must be tagged onion ---
 # nodeB dialed nodeA's onion, so nodeA accepted the connection on its dedicated
-# hidden-service bind (127.0.0.1:port+1) and must report that peer as network=onion.
+# hidden-service bind and must report that peer as network=onion.
 NETS=$($CLI -datadir=$BASE/nodeA getpeerinfo | python3 -c "import sys,json; print(','.join(p.get('network','?') for p in json.load(sys.stdin)))" 2>/dev/null)
 echo "nodeA peer networks: $NETS"
 echo "$NETS" | grep -q onion || fail "nodeA inbound peer not tagged network=onion (dedicated onion bind broken). got: $NETS"

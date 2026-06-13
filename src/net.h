@@ -79,6 +79,9 @@ CNode* FindNode(const CService& ip);
 CNode* ConnectNode(CAddress addrConnect, const char *pszDest = NULL,  bool obfuScationMaster = false);
 bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
 unsigned short GetListenPort();
+/** Local port bound exclusively for inbound Tor hidden-service traffic (the Tor
+ *  controller forwards the onion to it). 0 if no such bind is active. */
+unsigned short GetOnionLocalPort();
 bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false, bool fOnion = false);
 void StartNode(std::vector<std::thread>& threadGroup, CScheduler& scheduler);
 bool StopNode();
@@ -291,8 +294,8 @@ public:
     bool fClient;
     bool fInbound;
     // Set once at accept time when the connection arrived on our dedicated Tor
-    // hidden-service bind (127.0.0.1:listenport+1): a fact about how the peer
-    // reached us, not a localhost guess.
+    // hidden-service bind (a local-only port the Tor controller forwards the
+    // onion to): a fact about how the peer reached us, not a localhost guess.
     bool fInboundOnion{false};
     bool fNetworkNode;
     bool fFeeler;
