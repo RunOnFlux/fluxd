@@ -8,6 +8,9 @@
 #include "netbase.h"
 #include "protocol.h"
 
+#include <string>
+#include <string_view>
+
 // CNode::GetEffectiveAddr / GetEffectiveAddrName expose the peer's verified
 // .onion once a torauth onion proof has been validated, and the connect-time
 // socket address otherwise. addr/addrName stay write-once at connect, so
@@ -89,4 +92,21 @@ TEST(NetTests, OnionNetGroup)
     // The same onion always hashes to the same group.
     EXPECT_EQ(CService(onions[0], 0, false).GetGroup(),
               CService(onions[0], 0, false).GetGroup());
+}
+
+// The onion outbound cap keys off whether a destination string is a .onion.
+// addnode/-connect strings carry a :port suffix, so the host must be split off
+// first — a bare ends_with(".onion") would miss "host.onion:port".
+TEST(NetTests, OnionDestPortSuffix)
+{
+    auto is_onion_dest = [](const char* dest) {
+        int port = 0;
+        std::string host;
+        SplitHostPort(std::string(dest), port, host);
+        return std::string_view(host).ends_with(".onion");
+    };
+    EXPECT_TRUE(is_onion_dest("abc.onion"));
+    EXPECT_TRUE(is_onion_dest("abc.onion:16125"));
+    EXPECT_FALSE(is_onion_dest("example.com:16125"));
+    EXPECT_FALSE(is_onion_dest("1.2.3.4:16125"));
 }
