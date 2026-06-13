@@ -81,8 +81,9 @@ namespace {
     struct ListenSocket {
         SOCKET socket;
         bool whitelisted;
+        bool onion; // dedicated Tor hidden-service bind: inbound here is provably onion
 
-        ListenSocket(SOCKET socket, bool whitelisted) : socket(socket), whitelisted(whitelisted) {}
+        ListenSocket(SOCKET socket, bool whitelisted, bool onion = false) : socket(socket), whitelisted(whitelisted), onion(onion) {}
     };
 }
 
@@ -610,7 +611,9 @@ void CNode::copyStats(CNodeStats &stats)
             stats.m_network = torVerifiedAddr.GetNetwork();
         } else {
             stats.addrName = addrName;
-            stats.m_network = addr.GetNetwork();
+            // An inbound peer that reached us on the dedicated hidden-service
+            // bind is an onion peer even before it proves its .onion identity.
+            stats.m_network = fInboundOnion ? NET_ONION : addr.GetNetwork();
         }
     }
     stats.m_wants_addrv2 = m_wants_addrv2.load();
@@ -1025,6 +1028,7 @@ static void AcceptConnection(const ListenSocket& hListenSocket) {
     CNode* pnode = new CNode(hSocket, addr, "", true);
     pnode->AddRef();
     pnode->fWhitelisted = whitelisted;
+    pnode->fInboundOnion = hListenSocket.onion;
 
     LogPrint("net", "connection from %s accepted\n", addr.ToString());
 
@@ -1843,7 +1847,7 @@ void ThreadMessageHandler()
 
 
 
-bool BindListenPort(const CService &addrBind, string& strError, bool fWhitelisted)
+bool BindListenPort(const CService &addrBind, string& strError, bool fWhitelisted, bool fOnion)
 {
     strError = "";
     int nOne = 1;
@@ -1936,7 +1940,7 @@ bool BindListenPort(const CService &addrBind, string& strError, bool fWhiteliste
         return false;
     }
 
-    vhListenSocket.push_back(ListenSocket(hListenSocket, fWhitelisted));
+    vhListenSocket.push_back(ListenSocket(hListenSocket, fWhitelisted, fOnion));
 
     if (addrBind.IsRoutable() && fDiscover && !fWhitelisted)
         AddLocal(addrBind, LOCAL_BIND);

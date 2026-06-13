@@ -609,8 +609,12 @@ void TorController::auth_cb(TorControlConnection& conn, const TorControlReply& r
             fTorKeyAvailable = true;
         }
 
+        // Advertise the standard P2P port on the onion, but forward it to a
+        // dedicated local port (listenport+1) bound only for hidden-service
+        // traffic, so inbound onion peers are identified by which socket they
+        // arrive on rather than by a 127.0.0.1 heuristic.
         conn.Command(strprintf("ADD_ONION %s Port=%i,127.0.0.1:%i",
-            torKey, GetListenPort(), GetListenPort()),
+            torKey, GetListenPort(), GetListenPort() + 1),
             [this](TorControlConnection& conn, const TorControlReply& reply) { add_onion_cb(conn, reply); });
 
         // Erase key material now that ADD_ONION has been dispatched.
