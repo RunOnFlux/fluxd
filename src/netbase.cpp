@@ -1117,11 +1117,12 @@ std::vector<unsigned char> CNetAddr::GetGroup() const
     }
     else if (IsTor())
     {
-        // For TORv3 onions there is no concept of network locality / sub-prefix:
-        // every onion service has an independent ed25519 keypair. Place all of
-        // them into a single bucket keyed only by the network class. This matches
-        // Bitcoin Core's behavior post-BIP155.
+        // Group v3 onions by the top 4 bits of the ed25519 pubkey (16 buckets),
+        // mirroring Bitcoin Core, so one operator cannot cheaply advertise enough
+        // onions to monopolise a single onion netgroup and evict honest entries
+        // from addrman's per-group tried buckets.
         vchRet.push_back(NET_ONION);
+        vchRet.push_back(m_addr[0] | 0x0F);
         return vchRet;
     }
     // for he.net, use /36 groups
