@@ -7383,8 +7383,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         // Only when we are a fluxnode and not in initial block download.
         if (fFluxnode && !fluxnodeOutPoint.IsNull() && !IsInitialBlockDownload(chainparams)) {
             bool fNeedsTorAuth = false;
-            if (pfrom->fInbound && pfrom->addr.IsLocal()) {
-                // Inbound from 127.0.0.1 = Tor hidden service connection
+            if (pfrom->fInbound && pfrom->fInboundOnion) {
+                // Inbound on our dedicated hidden-service bind: provably a Tor
+                // connection (it could only have arrived through our onion
+                // service), so a local non-tor peer (ssh tunnel, monitor, second
+                // daemon) is never challenged or force-disconnected.
                 fNeedsTorAuth = true;
             } else if (!pfrom->fInbound && pfrom->addr.IsTor()) {
                 // Outbound to a .onion address

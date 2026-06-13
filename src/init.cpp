@@ -114,6 +114,7 @@ enum BindFlags {
     BF_EXPLICIT     = (1U << 0),
     BF_REPORT_ERROR = (1U << 1),
     BF_WHITELIST    = (1U << 2),
+    BF_ONION        = (1U << 3),
 };
 
 static const char* FEE_ESTIMATES_FILENAME="fee_estimates.dat";
@@ -347,7 +348,7 @@ bool static Bind(const CService &addr, unsigned int flags) {
     if (!(flags & BF_EXPLICIT) && IsLimited(addr))
         return false;
     std::string strError;
-    if (!BindListenPort(addr, strError, (flags & BF_WHITELIST) != 0)) {
+    if (!BindListenPort(addr, strError, (flags & BF_WHITELIST) != 0, (flags & BF_ONION) != 0)) {
         if (flags & BF_REPORT_ERROR)
             return InitError(strError);
         return false;
@@ -1441,6 +1442,18 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         }
         if (!fBound)
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
+
+        // Dedicated local bind for inbound Tor hidden-service traffic: the Tor
+        // controller points the onion service's target at 127.0.0.1:(listenport+1)
+        // (see torcontrol.cpp), so any connection accepted on this socket is
+        // provably an onion peer, with no localhost heuristics. Best-effort — a
+        // failure here only disables inbound-onion detection, it must not abort.
+        if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION)) {
+            struct in_addr inaddr_loopback;
+            inaddr_loopback.s_addr = htonl(INADDR_LOOPBACK);
+            if (!Bind(CService(inaddr_loopback, static_cast<unsigned short>(GetListenPort() + 1)), BF_ONION))
+                LogPrintf("Warning: could not bind dedicated onion port 127.0.0.1:%i; inbound hidden-service peers will not be detected\n", GetListenPort() + 1);
+        }
     }
 
     if (mapArgs.count("-externalip")) {
