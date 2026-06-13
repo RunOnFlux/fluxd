@@ -582,8 +582,14 @@ void CNode::AddWhitelistedRange(const CSubNet &subnet) {
 CAddress CNode::GetEffectiveAddr()
 {
     LOCK(cs_addrName);
-    if (fTorAddrVerified)
-        return CAddress(torVerifiedAddr);
+    if (fTorAddrVerified) {
+        // Carry the peer's real services and a current timestamp rather than the
+        // CAddress defaults (NODE_NETWORK / nTime=100000000), so the onion address
+        // is not wrong data at rest if it is ever persisted (e.g. anchors.dat).
+        CAddress ret(torVerifiedAddr, nServices);
+        ret.nTime = GetAdjustedTime();
+        return ret;
+    }
     return addr;
 }
 
