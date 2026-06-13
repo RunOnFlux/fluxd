@@ -137,7 +137,10 @@ public:
     {
         Init();
         nTime = ser_readdata32(s);
-        nServices = ReadCompactSize(s);
+        // BIP155: services is a 64-bit flag field, not a length; its high bits
+        // (>= MAX_SIZE) are legal, so skip the range check that would otherwise
+        // throw and drop the whole addrv2 batch.
+        nServices = ReadCompactSize(s, /*range_check=*/false);
         ((CService*)this)->UnserializeV2(s);
     }
 
