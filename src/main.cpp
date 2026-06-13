@@ -7696,9 +7696,16 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         if (fIsV2) {
             // Read the BIP155-encoded vector via the dedicated wrapper. Bounds
             // are enforced inside CAddrVecV2::Unserialize (max 1000 entries,
-            // max 512-byte address payload).
+            // max 512-byte address payload) by throwing; mirror the v1 oversized
+            // penalty (Misbehaving(20)) rather than letting it fall through to the
+            // generic message handler, which only logs and applies no score.
             CAddrVecV2 wrap(vAddr);
-            vRecv >> wrap;
+            try {
+                vRecv >> wrap;
+            } catch (const std::ios_base::failure&) {
+                Misbehaving(pfrom->GetId(), 20);
+                return error("message addrv2 oversized or malformed");
+            }
         } else {
             vRecv >> vAddr;
         }
