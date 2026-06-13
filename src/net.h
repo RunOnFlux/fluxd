@@ -79,7 +79,7 @@ CNode* FindNode(const CService& ip);
 CNode* ConnectNode(CAddress addrConnect, const char *pszDest = NULL,  bool obfuScationMaster = false);
 bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
 unsigned short GetListenPort();
-bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
+bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false, bool fOnion = false);
 void StartNode(std::vector<std::thread>& threadGroup, CScheduler& scheduler);
 bool StopNode();
 void SocketSendData(CNode *pnode);
@@ -290,6 +290,10 @@ public:
     bool fOneShot;
     bool fClient;
     bool fInbound;
+    // Set once at accept time when the connection arrived on our dedicated Tor
+    // hidden-service bind (127.0.0.1:listenport+1): a fact about how the peer
+    // reached us, not a localhost guess.
+    bool fInboundOnion{false};
     bool fNetworkNode;
     bool fFeeler;
     bool fSuccessfullyConnected;
