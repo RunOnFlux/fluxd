@@ -2484,9 +2484,16 @@ bool CAnchorDB::Read(std::vector<CAddress>& anchors)
         filein >> hashIn;
     }
     catch (const std::exception& e) {
+        filein.fclose();
+        std::filesystem::remove(pathAnchor);
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
     }
     filein.fclose();
+
+    // anchors.dat is a one-shot reconnection hint: consume it now that its bytes
+    // are in memory, so a corrupt or legacy-format file cannot fail to parse and
+    // re-error on every startup. All validation below runs on the in-memory copy.
+    std::filesystem::remove(pathAnchor);
 
     CDataStream ss(vchData, SER_DISK, CLIENT_VERSION);
 
@@ -2508,9 +2515,6 @@ bool CAnchorDB::Read(std::vector<CAddress>& anchors)
         unsigned char nFormat;
         ss >> nFormat;
         if (nFormat != ANCHORS_FORMAT_VERSION) {
-            // Unknown or legacy format: drop the file so it does not error on
-            // every startup (anchors are a best-effort reconnection hint).
-            std::filesystem::remove(pathAnchor);
             return error("%s: Unknown anchors.dat format (%u); ignoring", __func__, nFormat);
         }
         CAddrVecV2 wrapper(anchors);
@@ -2519,9 +2523,6 @@ bool CAnchorDB::Read(std::vector<CAddress>& anchors)
     catch (const std::exception& e) {
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
     }
-
-    // Delete file after reading (one-shot, prevents stale anchors after crash)
-    std::filesystem::remove(pathAnchor);
 
     return true;
 }
