@@ -7106,6 +7106,25 @@ static const int TORAUTH_MISBEHAVE_ONION_MISMATCH    = 50;  // outbound onion pr
  *  signer's fluxnode identity, preventing relay attacks where a MITM
  *  obtains a valid ed25519 signature from the real .onion owner and
  *  presents it as their own. */
+// torauth onion proof payload: the ed25519 signature covers
+// challenge || signer_outpoint_hash, binding the proof to the signer's fluxnode
+// identity. Built in one place so the sign and verify sites cannot diverge.
+static void BuildTorAuthPayload(const uint256& challenge, const COutPoint& outpoint,
+                                unsigned char out[64])
+{
+    memcpy(out, challenge.begin(), 32);
+    memcpy(out + 32, outpoint.hash.begin(), 32);
+}
+
+// Generate and record a fresh torauth challenge for a peer, in one place so the
+// arm-and-record sequence stays consistent everywhere a challenge is initiated.
+static void ArmTorAuthChallenge(CNode* pnode)
+{
+    GetRandBytes(pnode->nTorAuthChallenge.begin(), 32);
+    pnode->nTorAuthTimestamp = GetTime();
+    pnode->fTorAuthSent = true;
+}
+
 static bool TorAuthSign(const uint256& challenge, const COutPoint& signerOutpoint,
                         std::vector<unsigned char>& vchSig,
                         std::vector<unsigned char>& vchOnionSig,
@@ -7127,8 +7146,7 @@ static bool TorAuthSign(const uint256& challenge, const COutPoint& signerOutpoin
     unsigned char torPK[crypto_sign_PUBLICKEYBYTES];
     if (GetTorServiceEd25519Key(torSK, torPK)) {
         unsigned char signBuf[64];
-        memcpy(signBuf, challenge.begin(), 32);
-        memcpy(signBuf + 32, signerOutpoint.hash.begin(), 32);
+        BuildTorAuthPayload(challenge, signerOutpoint, signBuf);
 
         vchOnionSig.resize(crypto_sign_BYTES);
         if (crypto_sign_detached(vchOnionSig.data(), NULL, signBuf, 64, torSK) == 0) {
@@ -7386,9 +7404,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 fNeedsTorAuth = true;
             }
             if (fNeedsTorAuth) {
-                GetRandBytes(pfrom->nTorAuthChallenge.begin(), 32);
-                pfrom->nTorAuthTimestamp = GetTime();
-                pfrom->fTorAuthSent = true;
+                ArmTorAuthChallenge(pfrom);
                 pfrom->PushMessage("torauthreq", fluxnodeOutPoint, pfrom->nTorAuthChallenge);
                 LogPrint("tor", "torauth: sent challenge to peer=%d\n", pfrom->id);
             }
@@ -7486,9 +7502,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         if (fFluxnode && !strFluxnodePrivKey.empty()) {
             // Generate our own challenge for mutual auth (if we haven't already)
             if (!pfrom->fTorAuthSent) {
-                GetRandBytes(pfrom->nTorAuthChallenge.begin(), 32);
-                pfrom->nTorAuthTimestamp = GetTime();
-                pfrom->fTorAuthSent = true;
+                ArmTorAuthChallenge(pfrom);
             }
 
             std::vector<unsigned char> vchSig;
@@ -7598,8 +7612,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             vchOnionPubKey.size() == crypto_sign_PUBLICKEYBYTES) {
 
             unsigned char verifyBuf[64];
-            memcpy(verifyBuf, pfrom->nTorAuthChallenge.begin(), 32);
-            memcpy(verifyBuf + 32, peerOutpoint.hash.begin(), 32);
+            BuildTorAuthPayload(pfrom->nTorAuthChallenge, peerOutpoint, verifyBuf);
 
             if (crypto_sign_verify_detached(vchOnionSig.data(),
                     verifyBuf, 64,
