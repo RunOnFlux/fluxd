@@ -1744,9 +1744,16 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
     //
     // Initiate outbound network connection
     //
-    // Enforce onion outbound cap for both addrman and addnode paths
-    bool fIsOnionDest = addrConnect.IsTor() ||
-        (pszDest && std::string_view(pszDest).ends_with(".onion"));
+    // Enforce onion outbound cap for both addrman and addnode paths. addnode
+    // and -connect strings keep their :port suffix, so split it off before the
+    // .onion test — "host.onion:port" does not end with ".onion".
+    bool fIsOnionDest = addrConnect.IsTor();
+    if (!fIsOnionDest && pszDest) {
+        int nPortOut = 0;
+        std::string strHostOut;
+        SplitHostPort(std::string(pszDest), nPortOut, strHostOut);
+        fIsOnionDest = std::string_view(strHostOut).ends_with(".onion");
+    }
     if (fIsOnionDest) {
         int nOnionOut = 0;
         LOCK(cs_vNodes);
