@@ -1427,6 +1427,14 @@ CSubNet::CSubNet(const std::string &strSubnet, bool fAllowLookup)
     if (LookupHost(strAddress.c_str(), vIP, 1, fAllowLookup))
     {
         network = vIP[0];
+        if (!network.IsIPv4() && !network.IsIPv6())
+        {
+            // Non-IP networks (e.g. v3 onion) have no subnet semantics: match the
+            // exact host. Keep the address intact — the IPv4/IPv6 netmask
+            // normalization below cannot represent it and would zero it out. Any
+            // /mask suffix is ignored (netmask stays all-ones, unused by Match).
+            return;
+        }
         if (slash != strSubnet.npos)
         {
             std::string strNetmask = strSubnet.substr(slash + 1);
@@ -1482,10 +1490,10 @@ bool CSubNet::Match(const CNetAddr &addr) const
 {
     if (!valid || !addr.IsValid())
         return false;
-    // Subnets only make sense for IPv4/IPv6. A v3 onion address has no
-    // subnet semantics; reject the match outright.
-    if (addr.IsTor())
-        return false;
+    // Non-IP networks (e.g. v3 onion) have no subnet semantics: match the exact
+    // host, so a ban against a specific onion is effective.
+    if (!network.IsIPv4() && !network.IsIPv6())
+        return network == addr;
     uint8_t addrV1[16], netV1[16];
     addr.SerializeV1Array(addrV1);
     network.SerializeV1Array(netV1);
@@ -1497,6 +1505,9 @@ bool CSubNet::Match(const CNetAddr &addr) const
 
 std::string CSubNet::ToString() const
 {
+    // Non-IP networks (e.g. v3 onion) are single-host: there is no netmask to show.
+    if (!network.IsIPv4() && !network.IsIPv6())
+        return network.ToString();
     std::string strNetmask;
     if (network.IsIPv4())
         strNetmask = strprintf("%u.%u.%u.%u", netmask[12], netmask[13], netmask[14], netmask[15]);
