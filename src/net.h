@@ -316,9 +316,15 @@ public:
     COutPoint torAuthOutpoint;                   // peer's verified fluxnode outpoint
     std::atomic<int64_t> nTorAuthTimestamp{0};    // when we sent the challenge
 
-    // Guards writes to addr and addrName (e.g., torauth onion proof
-    // updating addr from 127.0.0.1 to the verified .onion address)
-    // while other threads read them in copyStats / ThreadSocketHandler.
+    // The peer's verified .onion address, learned from a validated torauth onion
+    // proof. Written once under cs_addrName; addr/addrName stay as set at connect
+    // (write-once) so unlocked readers on other threads never race a reassignment.
+    // Consumers that want the onion identity read it via GetEffectiveAddr().
+    CService torVerifiedAddr;
+    std::atomic<bool> fTorAddrVerified{false};
+
+    // Guards writes to torVerifiedAddr while other threads read it (or the
+    // write-once addr/addrName) in copyStats / GetEffectiveAddr.
     CCriticalSection cs_addrName;
 
     CSemaphoreGrant grantOutbound;
@@ -408,6 +414,13 @@ public:
     NodeId GetId() const {
       return id;
     }
+
+    // The peer's effective network address/name: the verified .onion when a
+    // torauth onion proof has been validated, otherwise the address we connected
+    // with. addr/addrName are write-once at connect; this reflects the onion
+    // identity that the old in-place relabel used to expose to consumers.
+    CAddress GetEffectiveAddr();
+    std::string GetEffectiveAddrName();
 
     int GetRefCount()
     {
