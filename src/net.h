@@ -155,6 +155,12 @@ extern CAddrMan addrman;
 extern int nMaxConnections;
 extern int nMaxOnionOutbound;
 
+/** Whether an onion outbound dial must be refused by the onion-outbound cap.
+ *  Feeler connections are one-shot probes (they disconnect on success and never
+ *  hold a slot) and are exempt, so a maxonionoutbound=0 hub can still
+ *  feeler-verify onion addresses; persistent onion dials are capped. */
+bool OnionOutboundCapReached(bool fFeeler, int nOnionOut);
+
 extern std::vector<CNode*> vNodes;
 extern CCriticalSection cs_vNodes;
 extern std::map<CInv, CDataStream> mapRelay;

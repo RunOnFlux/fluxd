@@ -173,3 +173,24 @@ TEST(NetTests, OnionBanRoundTrip)
     CNode::Unban(onionA);                   // restore global state for other tests
     EXPECT_FALSE(CNode::IsBanned(onionA));
 }
+
+// A feeler is a one-shot probe exempt from the onion outbound cap, so a
+// maxonionoutbound=0 hub still feeler-verifies onion addresses while persistent
+// onion dials stay capped. Both cap sites (ThreadOpenConnections selection and
+// OpenNetworkConnection) route through OnionOutboundCapReached so they cannot
+// diverge on the exemption.
+TEST(NetTests, OnionFeelerExemptFromOutboundCap)
+{
+    const int saved = nMaxOnionOutbound;
+
+    nMaxOnionOutbound = 0;                            // a directly-public hub
+    EXPECT_FALSE(OnionOutboundCapReached(true, 0));   // feeler exempt even at cap 0
+    EXPECT_TRUE(OnionOutboundCapReached(false, 0));   // persistent dial refused at cap 0
+
+    nMaxOnionOutbound = 2;                            // a NAT node
+    EXPECT_FALSE(OnionOutboundCapReached(false, 1));  // below the cap -> allowed
+    EXPECT_TRUE(OnionOutboundCapReached(false, 2));   // at the cap -> refused
+    EXPECT_FALSE(OnionOutboundCapReached(true, 2));   // feeler exempt even at the cap
+
+    nMaxOnionOutbound = saved;                        // restore global for other tests
+}
