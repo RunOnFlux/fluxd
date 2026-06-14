@@ -601,6 +601,18 @@ std::string CNode::GetEffectiveAddrName()
     return addrName;
 }
 
+std::optional<CAddress> CNode::OnionAwareBanTarget()
+{
+    // A hidden-service peer connects from 127.0.0.1, so its socket addr is
+    // loopback; ban the verified .onion instead. An unproven loopback peer has
+    // no routable identity to ban (disconnect-only). addr is write-once.
+    if (fTorAddrVerified)
+        return GetEffectiveAddr();
+    if (addr.IsLocal())
+        return std::nullopt;
+    return addr;
+}
+
 void CNode::copyStats(CNodeStats &stats)
 {
     stats.nodeid = this->GetId();
@@ -838,24 +850,28 @@ static bool ReverseCompareNodeTimeConnected(const CNodeRef &a, const CNodeRef &b
     return a->nTimeConnected > b->nTimeConnected;
 }
 
+// Sorts eviction candidates into a keyed-random netgroup order. Each candidate's
+// effective netgroup is snapshotted once by the caller and passed in: a peer's
+// GetEffectiveAddr() can change when it completes torauth on another thread, and
+// a key that shifted between comparisons would break std::sort's strict weak
+// ordering. The secret key is process-stable so the protected groups stay
+// unpredictable to an attacker.
 class CompareNetGroupKeyed
 {
-    std::vector<unsigned char> vchSecretKey;
+    const std::vector<unsigned char>& vchSecretKey;
+    const std::map<CNode*, std::vector<unsigned char>>& mapGroups;
 public:
-    CompareNetGroupKeyed()
-    {
-        vchSecretKey.resize(32, 0);
-        GetRandBytes(vchSecretKey.data(), vchSecretKey.size());
-    }
+    CompareNetGroupKeyed(const std::vector<unsigned char>& secretKey,
+                         const std::map<CNode*, std::vector<unsigned char>>& groups)
+        : vchSecretKey(secretKey), mapGroups(groups) {}
 
-    bool operator()(const CNodeRef &a, const CNodeRef &b)
+    bool operator()(const CNodeRef &a, const CNodeRef &b) const
     {
-        std::vector<unsigned char> vchGroupA, vchGroupB;
         CSHA256 hashA, hashB;
         std::vector<unsigned char> vchA(32), vchB(32);
 
-        vchGroupA = a->GetEffectiveAddr().GetGroup();
-        vchGroupB = b->GetEffectiveAddr().GetGroup();
+        const std::vector<unsigned char>& vchGroupA = mapGroups.at(&*a);
+        const std::vector<unsigned char>& vchGroupB = mapGroups.at(&*b);
 
         hashA.Write(begin_ptr(vchGroupA), vchGroupA.size());
         hashB.Write(begin_ptr(vchGroupB), vchGroupB.size());
@@ -922,10 +938,22 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection) {
         }
     }
 
+    // Snapshot each candidate's effective netgroup once before sorting: a peer can
+    // complete torauth on another thread and flip GetEffectiveAddr() between
+    // comparisons, which would break std::sort's strict weak ordering.
+    std::map<CNode*, std::vector<unsigned char>> mapEvictionGroups;
+    for (const CNodeRef &node : vEvictionCandidates)
+        mapEvictionGroups[&*node] = node->GetEffectiveAddr().GetGroup();
+
     // Deterministically select 4 peers to protect by netgroup.
     // An attacker cannot predict which netgroups will be protected.
-    static CompareNetGroupKeyed comparerNetGroupKeyed;
-    std::sort(vEvictionCandidates.begin(), vEvictionCandidates.end(), comparerNetGroupKeyed);
+    static const std::vector<unsigned char> vchNetGroupKey = []{
+        std::vector<unsigned char> key(32, 0);
+        GetRandBytes(key.data(), key.size());
+        return key;
+    }();
+    std::sort(vEvictionCandidates.begin(), vEvictionCandidates.end(),
+              CompareNetGroupKeyed(vchNetGroupKey, mapEvictionGroups));
     vEvictionCandidates.erase(vEvictionCandidates.end() - std::min(4, static_cast<int>(vEvictionCandidates.size())), vEvictionCandidates.end());
 
     if (vEvictionCandidates.empty()) return false;
@@ -951,7 +979,7 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection) {
     int64_t nMostConnectionsTime = 0;
     std::map<std::vector<unsigned char>, std::vector<CNodeRef> > mapAddrCounts;
     for (const CNodeRef &node : vEvictionCandidates) {
-        std::vector<unsigned char> group = node->GetEffectiveAddr().GetGroup();
+        std::vector<unsigned char> group = mapEvictionGroups.at(&*node);
         mapAddrCounts[group].push_back(node);
         int64_t grouptime = mapAddrCounts[group][0]->nTimeConnected;
         size_t groupsize = mapAddrCounts[group].size();
@@ -1312,7 +1340,7 @@ void ThreadSocketHandler()
                 // haven't completed torauth within the timeout.
                 else if (pnode->fTorAuthSent && !pnode->fTorAuthenticated
                          && nTime - pnode->nTorAuthTimestamp > TORAUTH_TIMEOUT_SECONDS
-                         && ((pnode->fInbound && pnode->addr.IsLocal())
+                         && ((pnode->fInbound && pnode->fInboundOnion)
                              || (!pnode->fInbound && pnode->addr.IsTor())))
                 {
                     LogPrint("net", "torauth: peer=%d failed to authenticate within timeout; disconnecting\n", pnode->id);
@@ -1608,8 +1636,8 @@ void ThreadOpenConnections()
             CAddrInfo addr = addrman.Select(fFeeler);
 
             // if we selected an invalid address, restart
-            // Exempt Tor from the group check (all onion share one group);
-            // onion outbound is governed by nMaxOnionOutbound instead.
+            // Exempt Tor from the per-netgroup outbound-diversity check; onion
+            // outbound is governed by nMaxOnionOutbound instead.
             if (!addr.IsValid() || IsLocal(addr))
                 break;
             if (setConnected.count(addr.GetGroup()) && !addr.IsTor())
@@ -1963,13 +1991,21 @@ bool BindListenPort(const CService &addrBind, string& strError, bool fWhiteliste
 
     if (fOnion) {
         // Record the OS-assigned local port so the Tor controller can point the
-        // onion service at it (see GetOnionLocalPort / torcontrol.cpp).
+        // onion service at it (see GetOnionLocalPort / torcontrol.cpp). If the
+        // port can't be read the dedicated bind is useless — nothing would be
+        // forwarded to it — so close it and fail rather than leave an orphan
+        // listener consuming an accept slot.
         struct sockaddr_storage ssBound;
         socklen_t ssLen = sizeof(ssBound);
         CService bound;
-        if (getsockname(hListenSocket, (struct sockaddr*)&ssBound, &ssLen) == 0 &&
-            bound.SetSockAddr((const struct sockaddr*)&ssBound))
-            g_onion_local_port = bound.GetPort();
+        if (getsockname(hListenSocket, (struct sockaddr*)&ssBound, &ssLen) != 0 ||
+            !bound.SetSockAddr((const struct sockaddr*)&ssBound)) {
+            strError = "Error: could not determine the dedicated onion bind port";
+            LogPrintf("%s\n", strError);
+            CloseSocket(hListenSocket);
+            return false;
+        }
+        g_onion_local_port = bound.GetPort();
     }
 
     vhListenSocket.push_back(ListenSocket(hListenSocket, fWhitelisted, fOnion));
@@ -2113,7 +2149,10 @@ bool StopNode()
             for (CNode* pnode : vNodes) {
                 if (!pnode->fInbound && !pnode->fOneShot && !pnode->fDisconnect &&
                     pnode->fSuccessfullyConnected) {
-                    anchors.push_back(pnode->addr);
+                    // Persist the verified onion identity via GetEffectiveAddr so its
+                    // services/timestamp are real, not the default metadata a
+                    // -addnode/-connect onion dial leaves on the raw CAddress.
+                    anchors.push_back(pnode->GetEffectiveAddr());
                     if (anchors.size() >= MAX_ANCHOR_CONNECTIONS)
                         break;
                 }
@@ -2462,7 +2501,10 @@ bool CAnchorDB::Read(std::vector<CAddress>& anchors)
         return error("%s: Failed to open file %s", __func__, pathAnchor.string());
 
     // use file size to size memory buffer
-    int fileSize = std::filesystem::file_size(pathAnchor);
+    std::error_code ec;
+    int fileSize = std::filesystem::file_size(pathAnchor, ec);
+    if (ec)
+        return error("%s: Failed to determine size of file %s", __func__, pathAnchor.string());
     int dataSize = fileSize - sizeof(uint256);
     if (dataSize < 0)
         dataSize = 0;
@@ -2477,7 +2519,7 @@ bool CAnchorDB::Read(std::vector<CAddress>& anchors)
     }
     catch (const std::exception& e) {
         filein.fclose();
-        std::filesystem::remove(pathAnchor);
+        std::filesystem::remove(pathAnchor, ec);
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
     }
     filein.fclose();
@@ -2485,7 +2527,8 @@ bool CAnchorDB::Read(std::vector<CAddress>& anchors)
     // anchors.dat is a one-shot reconnection hint: consume it now that its bytes
     // are in memory, so a corrupt or legacy-format file cannot fail to parse and
     // re-error on every startup. All validation below runs on the in-memory copy.
-    std::filesystem::remove(pathAnchor);
+    // Best-effort removal so a failure here cannot throw out of startup.
+    std::filesystem::remove(pathAnchor, ec);
 
     CDataStream ss(vchData, SER_DISK, CLIENT_VERSION);
 

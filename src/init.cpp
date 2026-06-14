@@ -1443,19 +1443,18 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         if (!fBound)
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
 
-        // Dedicated local bind for inbound Tor hidden-service traffic: the Tor
-        // controller points the onion service's target at 127.0.0.1:(listenport+1)
-        // (see torcontrol.cpp), so any connection accepted on this socket is
-        // provably an onion peer, with no localhost heuristics. Best-effort — a
-        // failure here only disables inbound-onion detection, it must not abort.
+        // Dedicated local bind for inbound Tor hidden-service traffic. The Tor
+        // controller forwards the onion service to an OS-assigned loopback port
+        // (recorded via GetOnionLocalPort; see torcontrol.cpp), so any connection
+        // accepted on this socket is provably an onion peer with no localhost
+        // heuristics, and the port can never collide with the P2P or RPC port. If
+        // this bind fails the hidden service is disabled entirely (StartTorControl
+        // is gated on it) rather than run without secure inbound-onion handling.
         if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION)) {
-            // Bind an OS-assigned local port exclusively for inbound hidden-service
-            // traffic; the Tor controller forwards the onion to whatever port we get
-            // (GetOnionLocalPort), so it can never collide with the P2P or RPC port.
             struct in_addr inaddr_loopback;
             inaddr_loopback.s_addr = htonl(INADDR_LOOPBACK);
             if (!Bind(CService(inaddr_loopback, 0), BF_ONION))
-                LogPrintf("Warning: could not bind dedicated onion port; inbound hidden-service peers will not be detected\n");
+                LogPrintf("Warning: could not bind dedicated onion port; the Tor hidden service will be disabled\n");
         }
     }
 
@@ -2117,8 +2116,16 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     LogPrintf("Creating thread #%d: txnotify\n", threadGroup.size());
     threadGroup.emplace_back([&]() { ThreadNotifyRecentlyAdded(g_txnotify_interrupt); });
 
-    if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
-        StartTorControl(threadGroup, scheduler);
+    if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION)) {
+        // Only run the hidden service if the dedicated onion bind came up. Without
+        // it, inbound onion peers arrive on the shared P2P port indistinguishable
+        // from local processes and cannot be authenticated; a reachable but
+        // unauthenticatable hidden service is worse than none, so disable it.
+        if (GetOnionLocalPort() != 0)
+            StartTorControl(threadGroup, scheduler);
+        else
+            LogPrintf("Tor hidden service not started: dedicated onion bind unavailable.\n");
+    }
 
     StartNode(threadGroup, scheduler);
 
