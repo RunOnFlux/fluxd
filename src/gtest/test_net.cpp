@@ -128,3 +128,48 @@ TEST(NetTests, Addrv2HighServiceBits)
     EXPECT_NO_THROW(out.UnserializeV2(ss));
     EXPECT_EQ(out.nServices, highServices);
 }
+
+// The automatic misbehavior-ban path must ban a hidden-service peer by its
+// verified .onion, not the 127.0.0.1 it connects from, and must not ban an
+// unproven loopback peer at all. OnionAwareBanTarget centralizes that choice.
+TEST(NetTests, OnionAwareBanTarget)
+{
+    CService onion("p6o2vv3o23tvth5ozzlbchgnxgtxkptf47ge43vhrhglpuohfxnbyfid.onion", 16125, false);
+
+    // Inbound hidden-service peer: socket is loopback, identity is the onion.
+    // Heap-allocated and intentionally not freed (see GetEffectiveAddr above).
+    CNode* onionPeer = new CNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 16125, false)),
+                                 "127.0.0.1:16125", /*fInbound=*/true);
+    EXPECT_FALSE(onionPeer->OnionAwareBanTarget().has_value());  // unproven loopback -> no ban
+    onionPeer->torVerifiedAddr = onion;
+    onionPeer->fTorAddrVerified = true;
+    ASSERT_TRUE(onionPeer->OnionAwareBanTarget().has_value());   // proven -> a ban target
+    EXPECT_TRUE(onionPeer->OnionAwareBanTarget()->IsTor());      // ... and it is the onion
+
+    // Routable inbound peer: ban its own address (never exempt).
+    CNode* ipPeer = new CNode(INVALID_SOCKET, CAddress(CService("8.8.8.8", 16125, false)),
+                              "8.8.8.8:16125", /*fInbound=*/true);
+    ASSERT_TRUE(ipPeer->OnionAwareBanTarget().has_value());
+    EXPECT_FALSE(ipPeer->OnionAwareBanTarget()->IsTor());
+}
+
+// CNode::Ban(onion) must round-trip through the single-host onion CSubNet so the
+// at-auth IsBanned(onion) check can refuse a reconnecting banned hidden service.
+TEST(NetTests, OnionBanRoundTrip)
+{
+    CNetAddr onionA = CService("p6o2vv3o23tvth5ozzlbchgnxgtxkptf47ge43vhrhglpuohfxnbyfid.onion", 0, false);
+    CNetAddr onionB = CService("in5ffm447ysvr4q4ma4gdgmychtpcb3emlnbfe4r3mhnb4ctlje6jmyd.onion", 0, false);
+    CNetAddr ip4 = CService("1.2.3.4", 0, false);
+    ASSERT_TRUE(onionA.IsTor());
+
+    CNode::Unban(onionA);                 // test isolation: known clean slate
+    EXPECT_FALSE(CNode::IsBanned(onionA));
+
+    CNode::Ban(onionA);
+    EXPECT_TRUE(CNode::IsBanned(onionA));   // the banned onion is refused on reconnect
+    EXPECT_FALSE(CNode::IsBanned(onionB));  // a different onion is not
+    EXPECT_FALSE(CNode::IsBanned(ip4));     // an IP is not
+
+    CNode::Unban(onionA);                   // restore global state for other tests
+    EXPECT_FALSE(CNode::IsBanned(onionA));
+}

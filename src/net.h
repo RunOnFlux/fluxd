@@ -24,6 +24,7 @@
 #include "utilstrencodings.h"
 
 #include <deque>
+#include <optional>
 #include <stdint.h>
 
 #ifndef WIN32
@@ -261,6 +262,8 @@ class CNode
 {
 public:
     // socket
+    // Set once from the peer's version handshake and read-only afterwards, so the
+    // unsynchronized reads in GetEffectiveAddr/copyStats are safe.
     uint64_t nServices;
     SOCKET hSocket;
     CDataStream ssSend;
@@ -428,6 +431,12 @@ public:
     // identity that the old in-place relabel used to expose to consumers.
     CAddress GetEffectiveAddr();
     std::string GetEffectiveAddrName();
+
+    // The address the automatic misbehavior-ban path should ban for this peer:
+    // the verified .onion for a hidden-service peer (whose socket addr is
+    // loopback), nothing for an unproven loopback peer, otherwise the peer's
+    // own address. Shared by the ban sites so they cannot diverge.
+    std::optional<CAddress> OnionAwareBanTarget();
 
     int GetRefCount()
     {
