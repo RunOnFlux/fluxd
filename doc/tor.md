@@ -102,10 +102,10 @@ create an ephemeral v3 hidden service, and persist the ed25519 private key to
 `onion_v3_private_key` in the data directory so the same address comes back
 on every restart.
 
-The feature is enabled by default if fluxd is listening (`-listen`) and a Tor
-control port is reachable. It can be disabled with `-listenonion=0` and
-configured with the `-torcontrol` and `-torpassword` settings. To see verbose
-debugging information, pass `-debug=tor`.
+The feature is off by default; enable it explicitly with `-listenonion=1`. It
+also needs fluxd to be listening (`-listen`) and a reachable Tor control port.
+When enabled it is configured with the `-torcontrol` and `-torpassword`
+settings. To see verbose debugging information, pass `-debug=tor`.
 
 Connecting to Tor's control socket requires one of two authentication methods.
 For SAFECOOKIE authentication, the user running fluxd must have read access
