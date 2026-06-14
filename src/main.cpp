@@ -7792,7 +7792,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         LogPrint("net", "Received addr: %u addresses (%u processed, %u rate-limited) peer=%d\n",
                  vAddr.size(), nProcessedAddrs, nRatelimitedAddrs, pfrom->GetId());
 
-        addrman.Add(vAddrOk, pfrom->addr, 2 * 60 * 60);
+        // Use the peer's verified .onion (when proven) as the addrman source so
+        // onion-learned gossip spreads across onion source groups instead of
+        // collapsing under the 127.0.0.1 a hidden-service peer connects from.
+        addrman.Add(vAddrOk, pfrom->GetEffectiveAddr(), 2 * 60 * 60);
         if (vAddr.size() < 1000)
             pfrom->fGetAddr = false;
         if (pfrom->fOneShot)
@@ -8959,8 +8962,10 @@ bool ProcessMessages(CNode* pfrom)
                 // Flux in ProcessMessages()
                 // Lets ban for default 24 hours the node that sent us an unprocessable message
                 if (strstr(e.what(), "Unknown transaction format")) {
-                    CNetAddr netaddr(pfrom->addr.ToStringIP());
-                    CNode::Ban(netaddr, 0);
+                    // Ban a hidden-service peer by its verified .onion, not the
+                    // 127.0.0.1 it connects from; never ban a loopback address.
+                    if (auto banTarget = pfrom->OnionAwareBanTarget())
+                        CNode::Ban(*banTarget, 0);
                 }
                 PrintExceptionContinue(&e, "ProcessMessages()");
             }
@@ -9107,12 +9112,10 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 LogPrintf("Warning: not punishing whitelisted peer %s!\n", pto->addr.ToString());
             else {
                 pto->fDisconnect = true;
-                if (pto->addr.IsLocal())
-                    LogPrintf("Warning: not banning local peer %s!\n", pto->addr.ToString());
+                if (auto banTarget = pto->OnionAwareBanTarget())
+                    CNode::Ban(*banTarget);
                 else
-                {
-                    CNode::Ban(pto->addr);
-                }
+                    LogPrintf("Warning: not banning local peer %s!\n", pto->addr.ToString());
             }
             state.fShouldBan = false;
         }
