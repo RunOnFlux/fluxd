@@ -1659,8 +1659,9 @@ void ThreadOpenConnections()
                 break;
             }
 
-            // Enforce onion outbound cap
-            if (addr.IsTor() && nOnionOutbound >= nMaxOnionOutbound)
+            // Enforce onion outbound cap. Feelers already broke out above (they
+            // are exempt); this governs persistent onion outbound.
+            if (addr.IsTor() && OnionOutboundCapReached(fFeeler, nOnionOutbound))
                 continue;
 
             // only consider very recently tried nodes after 30 failed attempts
@@ -1772,6 +1773,14 @@ void ThreadOpenAddedConnections()
     }
 }
 
+bool OnionOutboundCapReached(bool fFeeler, int nOnionOut)
+{
+    // Feeler connections are one-shot probes that disconnect on success, so they
+    // never hold a persistent slot and are exempt from the cap — this is what lets
+    // a maxonionoutbound=0 hub feeler-verify onion addresses.
+    return !fFeeler && nOnionOut >= nMaxOnionOutbound;
+}
+
 // if successful, this moves the passed grant to the constructed node
 bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot, bool fFeeler)
 {
@@ -1794,7 +1803,7 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
         for (CNode* pnode : vNodes)
             if (!pnode->fInbound && pnode->addr.IsTor())
                 nOnionOut++;
-        if (nOnionOut >= nMaxOnionOutbound)
+        if (OnionOutboundCapReached(fFeeler, nOnionOut))
             return false;
     }
 
