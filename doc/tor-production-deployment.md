@@ -6,8 +6,7 @@ fluxnodes. It covers the two node types (public IP and NAT), the
 security model, and the rationale behind the design.
 
 For manual operator setup and fluxd's Tor command-line options, see
-[`tor.md`](tor.md). For the BIP155/TORv3 implementation details, see
-[`build-journal-bip155-torv3.md`](build-journal-bip155-torv3.md).
+[`tor.md`](tor.md).
 
 
 1. Why Tor on fluxnodes
