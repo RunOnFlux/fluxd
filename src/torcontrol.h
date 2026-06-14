@@ -14,7 +14,11 @@
 #include "scheduler.h"
 
 extern const std::string DEFAULT_TOR_CONTROL;
-static const bool DEFAULT_LISTEN_ONION = true;
+// Creating a Tor hidden service is opt-in: a node only stands one up when it is
+// told to with -listenonion=1. The deployment image enables the Tor control
+// port on every node, so an on-by-default would make even directly-reachable
+// hub nodes — which must not advertise an onion service — create one.
+static const bool DEFAULT_LISTEN_ONION = false;
 
 void StartTorControl(std::vector<std::thread>& threadGroup, CScheduler& scheduler);
 void InterruptTorControl();
