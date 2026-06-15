@@ -26,6 +26,25 @@ uint256 GetPONHash(const COutPoint& collateral, const uint256& prevBlockHash, ui
 // Calculate the slot number for a given timestamp relative to genesis
 uint32_t GetSlotNumber(int64_t timestamp, int64_t genesisTimestamp, const Consensus::Params& params);
 
+// PON-VRF: epoch seed (randomness) for VRF eligibility — derived from a buried block
+// window the current proposer did not author, so it is not grindable.
+uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& params);
+
+// PON-VRF: per-slot VRF input = H(epoch_seed || slot || collateral). Mixing the slot gives
+// a fresh eligibility draw each slot (leader rotation / liveness). Mixing the collateral
+// outpoint makes the draw per-NODE: operator keys are shared across an owner's fleet in
+// practice, and with a shared key alone every node computes the identical VRF output —
+// collapsing N nodes to one lottery draw and broadcasting N identical-priority blocks on a
+// win. Used by both the minter and ContextualCheckPONBlockHeader so prover and verifier
+// agree (the header already commits the outpoint as nodesCollateral).
+uint256 GetPonVrfMessage(const CBlockIndex* pindexPrev, uint32_t slot, const COutPoint& collateral, const Consensus::Params& params);
+
+// PON fork-choice tie-break between two competing same-work/same-height PON blocks.
+// Returns <0 if a is preferred (wins the tie), >0 if b is preferred, 0 if undecided
+// (caller falls back to first-seen). PON-VRF blocks compare by VRF output (un-grindable);
+// legacy PON blocks by GetPONHash. Lower value wins in both cases.
+int ComparePonForkChoice(const CBlockIndex* a, const CBlockIndex* b);
+
 // Get next PON work required (difficulty adjustment)
 unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast);
 

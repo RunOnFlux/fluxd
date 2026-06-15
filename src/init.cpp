@@ -114,6 +114,7 @@ enum BindFlags {
     BF_EXPLICIT     = (1U << 0),
     BF_REPORT_ERROR = (1U << 1),
     BF_WHITELIST    = (1U << 2),
+    BF_ONION        = (1U << 3),
 };
 
 static const char* FEE_ESTIMATES_FILENAME="fee_estimates.dat";
@@ -347,7 +348,7 @@ bool static Bind(const CService &addr, unsigned int flags) {
     if (!(flags & BF_EXPLICIT) && IsLimited(addr))
         return false;
     std::string strError;
-    if (!BindListenPort(addr, strError, (flags & BF_WHITELIST) != 0)) {
+    if (!BindListenPort(addr, strError, (flags & BF_WHITELIST) != 0, (flags & BF_ONION) != 0)) {
         if (flags & BF_REPORT_ERROR)
             return InitError(strError);
         return false;
@@ -1365,6 +1366,9 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         }
     }
 
+    if (mapArgs.count("-maxonionoutbound"))
+        nMaxOnionOutbound = GetArg("-maxonionoutbound", nMaxOnionOutbound);
+
     if (mapArgs.count("-whitelist")) {
         for (const std::string& net : mapMultiArgs["-whitelist"]) {
             CSubNet subnet(net);
@@ -1378,7 +1382,7 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     // -proxy sets a proxy for all outgoing network traffic
     // -noproxy (or -proxy=0) as well as the empty string can be used to not set a proxy, this is the default
     std::string proxyArg = GetArg("-proxy", "");
-    SetLimited(NET_TOR);
+    SetLimited(NET_ONION);
     if (proxyArg != "" && proxyArg != "0") {
         proxyType addrProxy = proxyType(CService(proxyArg, 9050), proxyRandomize);
         if (!addrProxy.IsValid())
@@ -1386,9 +1390,9 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 
         SetProxy(NET_IPV4, addrProxy);
         SetProxy(NET_IPV6, addrProxy);
-        SetProxy(NET_TOR, addrProxy);
+        SetProxy(NET_ONION, addrProxy);
         SetNameProxy(addrProxy);
-        SetLimited(NET_TOR, false); // by default, -proxy sets onion as reachable, unless -noonion later
+        SetLimited(NET_ONION, false); // by default, -proxy sets onion as reachable, unless -noonion later
     }
 
     // -onion can be used to set only a proxy for .onion, or override normal proxy for .onion addresses
@@ -1397,13 +1401,13 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     std::string onionArg = GetArg("-onion", "");
     if (onionArg != "") {
         if (onionArg == "0") { // Handle -noonion/-onion=0
-            SetLimited(NET_TOR); // set onions as unreachable
+            SetLimited(NET_ONION); // set onions as unreachable
         } else {
             proxyType addrOnion = proxyType(CService(onionArg, 9050), proxyRandomize);
             if (!addrOnion.IsValid())
                 return InitError(strprintf(_("Invalid -onion address: '%s'"), onionArg));
-            SetProxy(NET_TOR, addrOnion);
-            SetLimited(NET_TOR, false);
+            SetProxy(NET_ONION, addrOnion);
+            SetLimited(NET_ONION, false);
         }
     }
 
@@ -1438,6 +1442,20 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         }
         if (!fBound)
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
+
+        // Dedicated local bind for inbound Tor hidden-service traffic. The Tor
+        // controller forwards the onion service to an OS-assigned loopback port
+        // (recorded via GetOnionLocalPort; see torcontrol.cpp), so any connection
+        // accepted on this socket is provably an onion peer with no localhost
+        // heuristics, and the port can never collide with the P2P or RPC port. If
+        // this bind fails the hidden service is disabled entirely (StartTorControl
+        // is gated on it) rather than run without secure inbound-onion handling.
+        if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION)) {
+            struct in_addr inaddr_loopback;
+            inaddr_loopback.s_addr = htonl(INADDR_LOOPBACK);
+            if (!Bind(CService(inaddr_loopback, 0), BF_ONION))
+                LogPrintf("Warning: could not bind dedicated onion port; the Tor hidden service will be disabled\n");
+        }
     }
 
     if (mapArgs.count("-externalip")) {
@@ -1964,6 +1982,12 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         }
     #endif
 
+    // Fluxnodes must remain reachable on clearnet (IPv4).
+    if (fFluxnode && IsLimited(NET_IPV4)) {
+        return InitError(_("Fluxnodes must remain reachable on IPv4. "
+                           "Cannot use -onlynet without including ipv4."));
+    }
+
     if (fFluxnode) {
         LogPrintf("IS FLUXNODE\n");
         strFluxnodeAddr = GetArg("-zelnodeaddr", "");
@@ -2092,8 +2116,16 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     LogPrintf("Creating thread #%d: txnotify\n", threadGroup.size());
     threadGroup.emplace_back([&]() { ThreadNotifyRecentlyAdded(g_txnotify_interrupt); });
 
-    if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
-        StartTorControl(threadGroup, scheduler);
+    if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION)) {
+        // Only run the hidden service if the dedicated onion bind came up. Without
+        // it, inbound onion peers arrive on the shared P2P port indistinguishable
+        // from local processes and cannot be authenticated; a reachable but
+        // unauthenticatable hidden service is worse than none, so disable it.
+        if (GetOnionLocalPort() != 0)
+            StartTorControl(threadGroup, scheduler);
+        else
+            LogPrintf("Tor hidden service not started: dedicated onion bind unavailable.\n");
+    }
 
     StartNode(threadGroup, scheduler);
 

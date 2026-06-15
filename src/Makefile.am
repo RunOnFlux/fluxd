@@ -365,6 +365,8 @@ crypto_libbitcoin_crypto_a_SOURCES = \
   crypto/sha1.h \
   crypto/sha256.cpp \
   crypto/sha256.h \
+  crypto/sha3.cpp \
+  crypto/sha3.h \
   crypto/sha512.cpp \
   crypto/sha512.h \
   crypto/siphash.cpp \
@@ -397,6 +399,8 @@ libbitcoin_common_a_SOURCES = \
   core_read.cpp \
   core_write.cpp \
   hash.cpp \
+  crypto/ecvrf.cpp \
+  crypto/ecvrf.h \
   key.cpp \
   key_io.cpp \
   keystore.cpp \

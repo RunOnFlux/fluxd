@@ -11,6 +11,7 @@
 
 #include "bloom.h"
 #include "compat.h"
+#include "primitives/transaction.h"
 #include "hash.h"
 #include "limitedmap.h"
 #include "mruset.h"
@@ -23,6 +24,7 @@
 #include "utilstrencodings.h"
 
 #include <deque>
+#include <optional>
 #include <stdint.h>
 
 #ifndef WIN32
@@ -78,7 +80,10 @@ CNode* FindNode(const CService& ip);
 CNode* ConnectNode(CAddress addrConnect, const char *pszDest = NULL,  bool obfuScationMaster = false);
 bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
 unsigned short GetListenPort();
-bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
+/** Local port bound exclusively for inbound Tor hidden-service traffic (the Tor
+ *  controller forwards the onion to it). 0 if no such bind is active. */
+unsigned short GetOnionLocalPort();
+bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false, bool fOnion = false);
 void StartNode(std::vector<std::thread>& threadGroup, CScheduler& scheduler);
 bool StopNode();
 void SocketSendData(CNode *pnode);
@@ -148,6 +153,31 @@ extern uint64_t nLocalHostNonce;
 extern CAddrMan addrman;
 /** Maximum number of connections to simultaneously allow (aka connection slots) */
 extern int nMaxConnections;
+extern int nMaxOnionOutbound;
+/** Maximum number of outbound connections (shared by all outbound classes). */
+extern const int MAX_OUTBOUND_CONNECTIONS;
+
+/** Whether an onion outbound dial must be refused by the onion-outbound cap.
+ *  Feeler connections are one-shot probes (they disconnect on success and never
+ *  hold a slot) and are exempt, so a maxonionoutbound=0 hub can still
+ *  feeler-verify onion addresses; persistent onion dials are capped. */
+bool OnionOutboundCapReached(bool fFeeler, int nOnionOut);
+
+/** Whether a clearnet outbound dial must be refused to keep the onion-outbound
+ *  reservation free. Clearnet outbound is held below the total cap minus the
+ *  onion reservation (MAX_OUTBOUND_CONNECTIONS - nMaxOnionOutbound) so that fast
+ *  clearnet dials cannot fill every slot and starve persistent onion peers out
+ *  of the shared outbound pool. Feelers are one-shot probes and exempt, matching
+ *  OnionOutboundCapReached. The caller gates this on onion being reachable, so a
+ *  clearnet-only node still fills every outbound slot. */
+bool ClearnetOutboundCapReached(bool fFeeler, int nClearnetOut);
+
+/** Of two connections to the same fluxnode, whether to drop the inbound one
+ *  (keep the outbound). Both ends must drop the same connection or each tears
+ *  down what the other keeps and both die, so the choice is derived from the two
+ *  fluxnode outpoints, which both ends know after mutual torauth: the lower
+ *  outpoint's owner keeps its outbound, the other keeps its inbound. */
+bool TorAuthDedupDropInbound(const COutPoint& myOutpoint, const COutPoint& peerOutpoint);
 
 extern std::vector<CNode*> vNodes;
 extern CCriticalSection cs_vNodes;
@@ -197,6 +227,13 @@ public:
     // Addr rate limit
     uint64_t nProcessedAddrs;
     uint64_t nRatelimitedAddrs;
+
+    // Network classification of the peer (ipv4 / ipv6 / onion / unroutable),
+    // taken from CAddress::GetNetwork() at copy time.
+    Network m_network;
+    // BIP155: peer negotiated SENDADDRV2 before VERACK and is willing to
+    // exchange addrv2 messages (and therefore v3 onion addresses) with us.
+    bool m_wants_addrv2;
 };
 
 
@@ -249,6 +286,8 @@ class CNode
 {
 public:
     // socket
+    // Set once from the peer's version handshake and read-only afterwards, so the
+    // unsynchronized reads in GetEffectiveAddr/copyStats are safe.
     uint64_t nServices;
     SOCKET hSocket;
     CDataStream ssSend;
@@ -281,6 +320,10 @@ public:
     bool fOneShot;
     bool fClient;
     bool fInbound;
+    // Set once at accept time when the connection arrived on our dedicated Tor
+    // hidden-service bind (a local-only port the Tor controller forwards the
+    // onion to): a fact about how the peer reached us, not a localhost guess.
+    bool fInboundOnion{false};
     bool fNetworkNode;
     bool fFeeler;
     bool fSuccessfullyConnected;
@@ -291,6 +334,33 @@ public:
     //    until it has initialized its bloom filter.
     bool fRelayTxes;
     bool fSentAddr;
+    /** BIP155: peer has sent us SENDADDRV2 (must arrive before VERACK).
+     *  When true, we send addr gossip in addrv2 format and may transmit
+     *  v3 onion addresses to this peer; when false, we use the legacy
+     *  addr message and silently drop v3 onions for this peer. */
+    std::atomic_bool m_wants_addrv2{false};
+
+    // Tor fluxnode authentication state.
+    // fTorAuthSent, fTorAuthenticated, and nTorAuthTimestamp are written in
+    // ProcessMessage (message handler thread) and read in ThreadSocketHandler
+    // (socket handler thread), so they must be atomic to avoid data races.
+    uint256 nTorAuthChallenge;                   // random nonce we sent to peer
+    std::atomic_bool fTorAuthSent{false};         // we have sent a torauthreq
+    std::atomic_bool fTorAuthenticated{false};    // peer has proven fluxnode identity
+    COutPoint torAuthOutpoint;                   // peer's verified fluxnode outpoint
+    std::atomic<int64_t> nTorAuthTimestamp{0};    // when we sent the challenge
+
+    // The peer's verified .onion address, learned from a validated torauth onion
+    // proof. Written once under cs_addrName; addr/addrName stay as set at connect
+    // (write-once) so unlocked readers on other threads never race a reassignment.
+    // Consumers that want the onion identity read it via GetEffectiveAddr().
+    CService torVerifiedAddr;
+    std::atomic<bool> fTorAddrVerified{false};
+
+    // Guards writes to torVerifiedAddr while other threads read it (or the
+    // write-once addr/addrName) in copyStats / GetEffectiveAddr.
+    CCriticalSection cs_addrName;
+
     CSemaphoreGrant grantOutbound;
     CCriticalSection cs_filter;
     CBloomFilter* pfilter;
@@ -378,6 +448,19 @@ public:
     NodeId GetId() const {
       return id;
     }
+
+    // The peer's effective network address/name: the verified .onion when a
+    // torauth onion proof has been validated, otherwise the address we connected
+    // with. addr/addrName are write-once at connect; this reflects the onion
+    // identity that the old in-place relabel used to expose to consumers.
+    CAddress GetEffectiveAddr();
+    std::string GetEffectiveAddrName();
+
+    // The address the automatic misbehavior-ban path should ban for this peer:
+    // the verified .onion for a hidden-service peer (whose socket addr is
+    // loopback), nothing for an unproven loopback peer, otherwise the peer's
+    // own address. Shared by the ban sites so they cannot diverge.
+    std::optional<CAddress> OnionAwareBanTarget();
 
     int GetRefCount()
     {

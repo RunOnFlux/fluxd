@@ -1442,7 +1442,13 @@ TEST(WalletTests, CachedWitnessesCleanIndex) {
         EXPECT_EQ(sproutAnchors.back(), anchors.first);
         EXPECT_EQ(saplingAnchors.back(), anchors.second);
 
-        if ((i == 5) || (i == 50)) {
+        // Decrement at two heights strictly below the chain tip. The wallet's
+        // witnesses sit at the tip height (numBlocks - 1), so a reorg-decrement
+        // below it is a no-op that must leave the cache and the final anchor
+        // untouched. The deeper point is derived from WITNESS_CACHE_SIZE (which
+        // scales with MAX_REORG_LENGTH) rather than a literal, so it cannot land
+        // on the tip when the cache is small.
+        if ((i == 5) || (i == WITNESS_CACHE_SIZE - 1)) {
             // Pretend a reorg happened that was recorded in the block files
             {
                 wallet.DecrementNoteWitnesses(&(indices[i]));

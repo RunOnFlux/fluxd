@@ -32,6 +32,7 @@
 #endif
 
 #include <filesystem>
+#include <string_view>
 #include <condition_variable>
 #include <mutex>
 #include <condition_variable>
@@ -73,13 +74,15 @@ static inline bool InterruptibleSleep(int64_t milliseconds)
 using namespace std;
 
 namespace {
-    const int MAX_OUTBOUND_CONNECTIONS = 16;
+    const int DEFAULT_MAX_ONION_OUTBOUND = 2;
+    const int TORAUTH_TIMEOUT_SECONDS = 60;
 
     struct ListenSocket {
         SOCKET socket;
         bool whitelisted;
+        bool onion; // dedicated Tor hidden-service bind: inbound here is provably onion
 
-        ListenSocket(SOCKET socket, bool whitelisted) : socket(socket), whitelisted(whitelisted) {}
+        ListenSocket(SOCKET socket, bool whitelisted, bool onion = false) : socket(socket), whitelisted(whitelisted), onion(onion) {}
     };
 }
 
@@ -95,8 +98,13 @@ static bool vfLimited[NET_MAX] = {};
 static CNode* pnodeLocalHost = NULL;
 uint64_t nLocalHostNonce = 0;
 static std::vector<ListenSocket> vhListenSocket;
+// Local port the OS assigned for the dedicated Tor hidden-service bind, so the
+// Tor controller can forward the onion to it (0 = no dedicated bind active).
+static std::atomic<unsigned short> g_onion_local_port{0};
 CAddrMan addrman;
 int nMaxConnections = DEFAULT_MAX_PEER_CONNECTIONS;
+int nMaxOnionOutbound = DEFAULT_MAX_ONION_OUTBOUND;
+const int MAX_OUTBOUND_CONNECTIONS = 16;
 bool fAddressesInitialized = false;
 std::string strSubVersion;
 
@@ -138,6 +146,11 @@ void AddOneShot(const std::string& strDest)
 unsigned short GetListenPort()
 {
     return (unsigned short)(GetArg("-port", Params().GetDefaultPort()));
+}
+
+unsigned short GetOnionLocalPort()
+{
+    return g_onion_local_port.load();
 }
 
 // find 'best' local address for a particular peer
@@ -566,6 +579,40 @@ void CNode::AddWhitelistedRange(const CSubNet &subnet) {
     vWhitelistedRange.push_back(subnet);
 }
 
+CAddress CNode::GetEffectiveAddr()
+{
+    LOCK(cs_addrName);
+    if (fTorAddrVerified) {
+        // Carry the peer's real services and a current timestamp rather than the
+        // CAddress defaults (NODE_NETWORK / nTime=100000000), so the onion address
+        // is not wrong data at rest if it is ever persisted (e.g. anchors.dat).
+        CAddress ret(torVerifiedAddr, nServices);
+        ret.nTime = GetAdjustedTime();
+        return ret;
+    }
+    return addr;
+}
+
+std::string CNode::GetEffectiveAddrName()
+{
+    LOCK(cs_addrName);
+    if (fTorAddrVerified)
+        return torVerifiedAddr.ToStringIPPort();
+    return addrName;
+}
+
+std::optional<CAddress> CNode::OnionAwareBanTarget()
+{
+    // A hidden-service peer connects from 127.0.0.1, so its socket addr is
+    // loopback; ban the verified .onion instead. An unproven loopback peer has
+    // no routable identity to ban (disconnect-only). addr is write-once.
+    if (fTorAddrVerified)
+        return GetEffectiveAddr();
+    if (addr.IsLocal())
+        return std::nullopt;
+    return addr;
+}
+
 void CNode::copyStats(CNodeStats &stats)
 {
     stats.nodeid = this->GetId();
@@ -574,7 +621,6 @@ void CNode::copyStats(CNodeStats &stats)
     stats.nLastRecv = nLastRecv;
     stats.nTimeConnected = nTimeConnected;
     stats.nTimeOffset = nTimeOffset;
-    stats.addrName = addrName;
     stats.nVersion = nVersion;
     stats.cleanSubVer = cleanSubVer;
     stats.fInbound = fInbound;
@@ -584,6 +630,19 @@ void CNode::copyStats(CNodeStats &stats)
     stats.fWhitelisted = fWhitelisted;
     stats.nProcessedAddrs = nProcessedAddrs;
     stats.nRatelimitedAddrs = nRatelimitedAddrs;
+    {
+        LOCK(cs_addrName);
+        if (fTorAddrVerified) {
+            stats.addrName = torVerifiedAddr.ToStringIPPort();
+            stats.m_network = torVerifiedAddr.GetNetwork();
+        } else {
+            stats.addrName = addrName;
+            // An inbound peer that reached us on the dedicated hidden-service
+            // bind is an onion peer even before it proves its .onion identity.
+            stats.m_network = fInboundOnion ? NET_ONION : addr.GetNetwork();
+        }
+    }
+    stats.m_wants_addrv2 = m_wants_addrv2.load();
 
     // It is common for nodes with good ping times to suddenly become lagged,
     // due to a new block arriving or other large transfer.
@@ -791,24 +850,28 @@ static bool ReverseCompareNodeTimeConnected(const CNodeRef &a, const CNodeRef &b
     return a->nTimeConnected > b->nTimeConnected;
 }
 
+// Sorts eviction candidates into a keyed-random netgroup order. Each candidate's
+// effective netgroup is snapshotted once by the caller and passed in: a peer's
+// GetEffectiveAddr() can change when it completes torauth on another thread, and
+// a key that shifted between comparisons would break std::sort's strict weak
+// ordering. The secret key is process-stable so the protected groups stay
+// unpredictable to an attacker.
 class CompareNetGroupKeyed
 {
-    std::vector<unsigned char> vchSecretKey;
+    const std::vector<unsigned char>& vchSecretKey;
+    const std::map<CNode*, std::vector<unsigned char>>& mapGroups;
 public:
-    CompareNetGroupKeyed()
-    {
-        vchSecretKey.resize(32, 0);
-        GetRandBytes(vchSecretKey.data(), vchSecretKey.size());
-    }
+    CompareNetGroupKeyed(const std::vector<unsigned char>& secretKey,
+                         const std::map<CNode*, std::vector<unsigned char>>& groups)
+        : vchSecretKey(secretKey), mapGroups(groups) {}
 
-    bool operator()(const CNodeRef &a, const CNodeRef &b)
+    bool operator()(const CNodeRef &a, const CNodeRef &b) const
     {
-        std::vector<unsigned char> vchGroupA, vchGroupB;
         CSHA256 hashA, hashB;
         std::vector<unsigned char> vchA(32), vchB(32);
 
-        vchGroupA = a->addr.GetGroup();
-        vchGroupB = b->addr.GetGroup();
+        const std::vector<unsigned char>& vchGroupA = mapGroups.at(&*a);
+        const std::vector<unsigned char>& vchGroupB = mapGroups.at(&*b);
 
         hashA.Write(begin_ptr(vchGroupA), vchGroupA.size());
         hashB.Write(begin_ptr(vchGroupB), vchGroupB.size());
@@ -875,10 +938,22 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection) {
         }
     }
 
+    // Snapshot each candidate's effective netgroup once before sorting: a peer can
+    // complete torauth on another thread and flip GetEffectiveAddr() between
+    // comparisons, which would break std::sort's strict weak ordering.
+    std::map<CNode*, std::vector<unsigned char>> mapEvictionGroups;
+    for (const CNodeRef &node : vEvictionCandidates)
+        mapEvictionGroups[&*node] = node->GetEffectiveAddr().GetGroup();
+
     // Deterministically select 4 peers to protect by netgroup.
     // An attacker cannot predict which netgroups will be protected.
-    static CompareNetGroupKeyed comparerNetGroupKeyed;
-    std::sort(vEvictionCandidates.begin(), vEvictionCandidates.end(), comparerNetGroupKeyed);
+    static const std::vector<unsigned char> vchNetGroupKey = []{
+        std::vector<unsigned char> key(32, 0);
+        GetRandBytes(key.data(), key.size());
+        return key;
+    }();
+    std::sort(vEvictionCandidates.begin(), vEvictionCandidates.end(),
+              CompareNetGroupKeyed(vchNetGroupKey, mapEvictionGroups));
     vEvictionCandidates.erase(vEvictionCandidates.end() - std::min(4, static_cast<int>(vEvictionCandidates.size())), vEvictionCandidates.end());
 
     if (vEvictionCandidates.empty()) return false;
@@ -904,14 +979,15 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection) {
     int64_t nMostConnectionsTime = 0;
     std::map<std::vector<unsigned char>, std::vector<CNodeRef> > mapAddrCounts;
     for (const CNodeRef &node : vEvictionCandidates) {
-        mapAddrCounts[node->addr.GetGroup()].push_back(node);
-        int64_t grouptime = mapAddrCounts[node->addr.GetGroup()][0]->nTimeConnected;
-        size_t groupsize = mapAddrCounts[node->addr.GetGroup()].size();
+        std::vector<unsigned char> group = mapEvictionGroups.at(&*node);
+        mapAddrCounts[group].push_back(node);
+        int64_t grouptime = mapAddrCounts[group][0]->nTimeConnected;
+        size_t groupsize = mapAddrCounts[group].size();
 
         if (groupsize > nMostConnections || (groupsize == nMostConnections && grouptime > nMostConnectionsTime)) {
             nMostConnections = groupsize;
             nMostConnectionsTime = grouptime;
-            naMostConnections = node->addr.GetGroup();
+            naMostConnections = group;
         }
     }
 
@@ -994,6 +1070,7 @@ static void AcceptConnection(const ListenSocket& hListenSocket) {
     CNode* pnode = new CNode(hSocket, addr, "", true);
     pnode->AddRef();
     pnode->fWhitelisted = whitelisted;
+    pnode->fInboundOnion = hListenSocket.onion;
 
     LogPrint("net", "connection from %s accepted\n", addr.ToString());
 
@@ -1258,6 +1335,17 @@ void ThreadSocketHandler()
                     LogPrintf("ping timeout: %fs\n", 0.000001 * (GetTimeMicros() - pnode->nPingUsecStart));
                     pnode->fDisconnect = true;
                 }
+                // Tor authentication timeout: disconnect Tor peers (both
+                // inbound hidden-service and outbound-to-onion) that
+                // haven't completed torauth within the timeout.
+                else if (pnode->fTorAuthSent && !pnode->fTorAuthenticated
+                         && nTime - pnode->nTorAuthTimestamp > TORAUTH_TIMEOUT_SECONDS
+                         && ((pnode->fInbound && pnode->fInboundOnion)
+                             || (!pnode->fInbound && pnode->addr.IsTor())))
+                {
+                    LogPrint("net", "torauth: peer=%d failed to authenticate within timeout; disconnecting\n", pnode->id);
+                    pnode->fDisconnect = true;
+                }
             }
         }
         {
@@ -1518,6 +1606,7 @@ void ThreadOpenConnections()
         // Only connect out to one peer per network group (/16 for IPv4).
         // Do this here so we don't have to critsect vNodes inside mapAddresses critsect.
         int nOutbound = 0;
+        int nOnionOutbound = 0;
         set<vector<unsigned char> > setConnected;
         {
             LOCK(cs_vNodes);
@@ -1525,6 +1614,8 @@ void ThreadOpenConnections()
                 if (!pnode->fInbound) {
                     setConnected.insert(pnode->addr.GetGroup());
                     nOutbound++;
+                    if (pnode->addr.IsTor())
+                        nOnionOutbound++;
                 }
             }
         }
@@ -1545,7 +1636,11 @@ void ThreadOpenConnections()
             CAddrInfo addr = addrman.Select(fFeeler);
 
             // if we selected an invalid address, restart
-            if (!addr.IsValid() || setConnected.count(addr.GetGroup()) || IsLocal(addr))
+            // Exempt Tor from the per-netgroup outbound-diversity check; onion
+            // outbound is governed by nMaxOnionOutbound instead.
+            if (!addr.IsValid() || IsLocal(addr))
+                break;
+            if (setConnected.count(addr.GetGroup()) && !addr.IsTor())
                 break;
 
             // If we didn't find an appropriate destination after trying 100 addresses fetched from addrman,
@@ -1563,6 +1658,11 @@ void ThreadOpenConnections()
                 addrConnect = addr;
                 break;
             }
+
+            // Enforce onion outbound cap. Feelers already broke out above (they
+            // are exempt); this governs persistent onion outbound.
+            if (addr.IsTor() && OnionOutboundCapReached(fFeeler, nOnionOutbound))
+                continue;
 
             // only consider very recently tried nodes after 30 failed attempts
             if (nANow - addr.nLastTry < 600 && nTries < 30)
@@ -1673,12 +1773,77 @@ void ThreadOpenAddedConnections()
     }
 }
 
+bool OnionOutboundCapReached(bool fFeeler, int nOnionOut)
+{
+    // Feeler connections are one-shot probes that disconnect on success, so they
+    // never hold a persistent slot and are exempt from the cap — this is what lets
+    // a maxonionoutbound=0 hub feeler-verify onion addresses.
+    return !fFeeler && nOnionOut >= nMaxOnionOutbound;
+}
+
+bool ClearnetOutboundCapReached(bool fFeeler, int nClearnetOut)
+{
+    // Mirror of the onion cap on the clearnet side: hold clearnet outbound below
+    // the total cap minus the onion reservation so fast clearnet dials cannot
+    // fill every slot and starve persistent onion peers. Feelers are exempt for
+    // the same reason as in OnionOutboundCapReached.
+    return !fFeeler && nClearnetOut >= MAX_OUTBOUND_CONNECTIONS - nMaxOnionOutbound;
+}
+
+bool TorAuthDedupDropInbound(const COutPoint& myOutpoint, const COutPoint& peerOutpoint)
+{
+    // Keep the connection initiated by the lower outpoint's owner so both ends
+    // independently elect the same connection: if my outpoint is lower I keep my
+    // outbound (drop the inbound), otherwise I keep my inbound (drop the
+    // outbound). torauth has already proven identity in both directions, so
+    // keeping a verified inbound is safe.
+    return myOutpoint < peerOutpoint;
+}
+
 // if successful, this moves the passed grant to the constructed node
 bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot, bool fFeeler)
 {
     //
     // Initiate outbound network connection
     //
+    // Enforce onion outbound cap for both addrman and addnode paths. addnode
+    // and -connect strings keep their :port suffix, so split it off before the
+    // .onion test — "host.onion:port" does not end with ".onion".
+    bool fIsOnionDest = addrConnect.IsTor();
+    if (!fIsOnionDest && pszDest) {
+        int nPortOut = 0;
+        std::string strHostOut;
+        SplitHostPort(std::string(pszDest), nPortOut, strHostOut);
+        fIsOnionDest = std::string_view(strHostOut).ends_with(".onion");
+    }
+    if (fIsOnionDest) {
+        int nOnionOut = 0;
+        LOCK(cs_vNodes);
+        for (CNode* pnode : vNodes)
+            if (!pnode->fInbound && pnode->addr.IsTor())
+                nOnionOut++;
+        if (OnionOutboundCapReached(fFeeler, nOnionOut))
+            return false;
+    } else {
+        // Reserve the onion-outbound slots: only when onion is reachable, hold
+        // clearnet outbound below the total cap minus the onion reservation, so
+        // a saturated clearnet pool can never starve persistent onion peers.
+        // Gated on the onion proxy being set, so a clearnet-only node still uses
+        // every outbound slot.
+        proxyType onionProxy;
+        if (GetProxy(NET_ONION, onionProxy)) {
+            int nClearnetOut = 0;
+            {
+                LOCK(cs_vNodes);
+                for (CNode* pnode : vNodes)
+                    if (!pnode->fInbound && !pnode->addr.IsTor())
+                        nClearnetOut++;
+            }
+            if (ClearnetOutboundCapReached(fFeeler, nClearnetOut))
+                return false;
+        }
+    }
+
     if (!pszDest) {
         if (IsLocal(addrConnect) ||
             FindNode((CNetAddr)addrConnect) || CNode::IsBanned(addrConnect) ||
@@ -1777,7 +1942,7 @@ void ThreadMessageHandler()
 
 
 
-bool BindListenPort(const CService &addrBind, string& strError, bool fWhitelisted)
+bool BindListenPort(const CService &addrBind, string& strError, bool fWhitelisted, bool fOnion)
 {
     strError = "";
     int nOne = 1;
@@ -1870,7 +2035,26 @@ bool BindListenPort(const CService &addrBind, string& strError, bool fWhiteliste
         return false;
     }
 
-    vhListenSocket.push_back(ListenSocket(hListenSocket, fWhitelisted));
+    if (fOnion) {
+        // Record the OS-assigned local port so the Tor controller can point the
+        // onion service at it (see GetOnionLocalPort / torcontrol.cpp). If the
+        // port can't be read the dedicated bind is useless — nothing would be
+        // forwarded to it — so close it and fail rather than leave an orphan
+        // listener consuming an accept slot.
+        struct sockaddr_storage ssBound;
+        socklen_t ssLen = sizeof(ssBound);
+        CService bound;
+        if (getsockname(hListenSocket, (struct sockaddr*)&ssBound, &ssLen) != 0 ||
+            !bound.SetSockAddr((const struct sockaddr*)&ssBound)) {
+            strError = "Error: could not determine the dedicated onion bind port";
+            LogPrintf("%s\n", strError);
+            CloseSocket(hListenSocket);
+            return false;
+        }
+        g_onion_local_port = bound.GetPort();
+    }
+
+    vhListenSocket.push_back(ListenSocket(hListenSocket, fWhitelisted, fOnion));
 
     if (addrBind.IsRoutable() && fDiscover && !fWhitelisted)
         AddLocal(addrBind, LOCAL_BIND);
@@ -2011,7 +2195,10 @@ bool StopNode()
             for (CNode* pnode : vNodes) {
                 if (!pnode->fInbound && !pnode->fOneShot && !pnode->fDisconnect &&
                     pnode->fSuccessfullyConnected) {
-                    anchors.push_back(pnode->addr);
+                    // Persist the verified onion identity via GetEffectiveAddr so its
+                    // services/timestamp are real, not the default metadata a
+                    // -addnode/-connect onion dial leaves on the raw CAddress.
+                    anchors.push_back(pnode->GetEffectiveAddr());
                     if (anchors.size() >= MAX_ANCHOR_CONNECTIONS)
                         break;
                 }
@@ -2300,6 +2487,9 @@ bool CAddrDB::Read(CAddrMan& addr)
 // CAnchorDB
 //
 
+//! anchors.dat format: 2 = BIP155 type-tagged entries (matches ADDRMAN_FORMAT_VERSION semantics)
+static const unsigned char ANCHORS_FORMAT_VERSION = 2;
+
 CAnchorDB::CAnchorDB()
 {
     pathAnchor = GetDataDir() / "anchors.dat";
@@ -2315,7 +2505,12 @@ bool CAnchorDB::Write(const std::vector<CAddress>& anchors)
     // serialize addresses, checksum data up to that point, then append csum
     CDataStream ss(SER_DISK, CLIENT_VERSION);
     ss << FLATDATA(Params().MessageStart());
-    ss << anchors;
+    // BIP155: anchors must use the type-tagged V2 encoding — the legacy
+    // CAddress path cannot represent v3 onions and collapses them to ::.
+    // The format byte distinguishes this from pre-BIP155 anchors.dat, which
+    // starts with the vector CompactSize directly.
+    ss << ANCHORS_FORMAT_VERSION;
+    ss << CAddrVecV2(anchors);
     uint256 hash = Hash(ss.begin(), ss.end());
     ss << hash;
 
@@ -2352,7 +2547,10 @@ bool CAnchorDB::Read(std::vector<CAddress>& anchors)
         return error("%s: Failed to open file %s", __func__, pathAnchor.string());
 
     // use file size to size memory buffer
-    int fileSize = std::filesystem::file_size(pathAnchor);
+    std::error_code ec;
+    int fileSize = std::filesystem::file_size(pathAnchor, ec);
+    if (ec)
+        return error("%s: Failed to determine size of file %s", __func__, pathAnchor.string());
     int dataSize = fileSize - sizeof(uint256);
     if (dataSize < 0)
         dataSize = 0;
@@ -2366,9 +2564,17 @@ bool CAnchorDB::Read(std::vector<CAddress>& anchors)
         filein >> hashIn;
     }
     catch (const std::exception& e) {
+        filein.fclose();
+        std::filesystem::remove(pathAnchor, ec);
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
     }
     filein.fclose();
+
+    // anchors.dat is a one-shot reconnection hint: consume it now that its bytes
+    // are in memory, so a corrupt or legacy-format file cannot fail to parse and
+    // re-error on every startup. All validation below runs on the in-memory copy.
+    // Best-effort removal so a failure here cannot throw out of startup.
+    std::filesystem::remove(pathAnchor, ec);
 
     CDataStream ss(vchData, SER_DISK, CLIENT_VERSION);
 
@@ -2386,15 +2592,18 @@ bool CAnchorDB::Read(std::vector<CAddress>& anchors)
         if (memcmp(pchMsgTmp, Params().MessageStart(), sizeof(pchMsgTmp)))
             return error("%s: Invalid network magic number", __func__);
 
-        // de-serialize anchor addresses
-        ss >> anchors;
+        // de-serialize format byte + anchor addresses (BIP155 V2 encoding)
+        unsigned char nFormat;
+        ss >> nFormat;
+        if (nFormat != ANCHORS_FORMAT_VERSION) {
+            return error("%s: Unknown anchors.dat format (%u); ignoring", __func__, nFormat);
+        }
+        CAddrVecV2 wrapper(anchors);
+        ss >> wrapper;
     }
     catch (const std::exception& e) {
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
     }
-
-    // Delete file after reading (one-shot, prevents stale anchors after crash)
-    std::filesystem::remove(pathAnchor);
 
     return true;
 }
@@ -2428,6 +2637,9 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     fFeeler = false;
     fSuccessfullyConnected = false;
     fDisconnect = false;
+    nTorAuthChallenge.SetNull();
+    // fTorAuthSent, fTorAuthenticated, nTorAuthTimestamp have atomic
+    // in-class initializers (net.h).
     nRefCount = 0;
     nSendSize = 0;
     nSendOffset = 0;

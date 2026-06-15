@@ -9,6 +9,7 @@
 #include "sodium.h"
 
 #include "addrman.h"
+#include "torcontrol.h"
 #include "alert.h"
 #include "arith_uint256.h"
 #include "blockencodings.h"
@@ -153,24 +154,24 @@ namespace {
             if (pa->nChainWork > pb->nChainWork) return false;
             if (pa->nChainWork < pb->nChainWork) return true;
 
-            // For PON blocks at same height (same chain work), use PON hash as deterministic tie-breaker
-            // This prevents network splits when multiple eligible nodes create competing blocks
-            // Lower PON hash wins (same ordering as our rank-based coordination)
-            bool isPONBlockA = (pa->nVersion >= 100);
-            bool isPONBlockB = (pb->nVersion >= 100);
+            // For PON blocks at same height (same chain work), use a deterministic
+            // tie-breaker so all nodes converge on the same block instead of splitting.
+            bool isPONBlockA = (pa->nVersion >= CBlockHeader::PON_VERSION);
+            bool isPONBlockB = (pb->nVersion >= CBlockHeader::PON_VERSION);
 
             if (isPONBlockA && isPONBlockB && pa->nHeight == pb->nHeight) {
-                // Both are PON blocks at same height - use PON hash as tie-breaker
-                uint256 ponHashA = GetPONHash(pa->GetBlockHeader());
-                uint256 ponHashB = GetPONHash(pb->GetBlockHeader());
-
-                if (ponHashA < ponHashB) {
-                    return false; // A has better (lower) hash, A wins
+                // Deterministic PON tie-break (see ComparePonForkChoice): PON-VRF blocks
+                // compare by un-grindable VRF output, legacy PON blocks by GetPONHash.
+                // Every node computes the same winner regardless of arrival order, so the
+                // network converges instead of forking back and forth.
+                int cmp = ComparePonForkChoice(pa, pb);
+                if (cmp < 0) {
+                    return false; // A preferred (lower score), A wins
                 }
-                if (ponHashA > ponHashB) {
-                    return true;  // B has better (lower) hash, B wins
+                if (cmp > 0) {
+                    return true;  // B preferred (lower score), B wins
                 }
-                // If hashes are equal, fall through to sequence ID
+                // Undecided (equal scores): fall through to sequence ID
             }
 
             // ... then by earliest time received, ...
@@ -2775,7 +2776,11 @@ bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus:
               CheckProofOfWork(block.GetHash(), block.nBits, consensusParams)))
             return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
     } else {
-        if (!CheckProofOfNode(GetPONHash(block), block.nBits, consensusParams) && !IsEmergencyBlock(block)) {
+        // For PON-VRF blocks the eligibility value is the committed VRF output, not GetPONHash.
+        uint256 ponEligibilityValue = (block.nVersion >= CBlockHeader::PON_VRF_VERSION)
+                                          ? block.nodesVrfOutput
+                                          : GetPONHash(block);
+        if (!CheckProofOfNode(ponEligibilityValue, block.nBits, consensusParams) && !IsEmergencyBlock(block)) {
             return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
         }
     }
@@ -5337,8 +5342,13 @@ bool CheckBlockHeader(
                              REJECT_INVALID, "bad-pon-sig-size");
 
         if (!IsEmergencyBlock((block))) {
-            // Check proof of work matches claimed amount
-            if (fCheckPOW && !CheckProofOfNode(GetPONHash(block), block.nBits, chainparams.GetConsensus()))
+            // Check proof of node matches claimed amount. For PON-VRF blocks the eligibility
+            // value is the committed VRF output (the full proof is verified contextually in
+            // ContextualCheckPONBlockHeader); for legacy PON blocks it is GetPONHash.
+            uint256 ponEligibilityValue = (block.nVersion >= CBlockHeader::PON_VRF_VERSION)
+                                              ? block.nodesVrfOutput
+                                              : GetPONHash(block);
+            if (fCheckPOW && !CheckProofOfNode(ponEligibilityValue, block.nBits, chainparams.GetConsensus()))
                 return state.DoS(50, error("CheckBlockHeader(): proof of node failed"),
                                  REJECT_INVALID, "high-hash");
         }
@@ -7092,6 +7102,72 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
     }
 }
 
+// Torauth misbehaving scores — named constants so the rationale is explicit.
+static const int TORAUTH_MISBEHAVE_NO_HANDSHAKE    = 10;  // torauthreq/resp before verack
+static const int TORAUTH_MISBEHAVE_UNKNOWN_OUTPOINT = 10;  // response claims unregistered fluxnode
+static const int TORAUTH_MISBEHAVE_UNSOLICITED      = 20;  // torauthresp without us sending a challenge
+static const int TORAUTH_MISBEHAVE_BAD_SIGNATURE     = 50;  // secp256k1 signature verification failed
+static const int TORAUTH_MISBEHAVE_ONION_MISMATCH    = 50;  // outbound onion proof != dialed address
+
+/** Sign a torauth challenge with both the fluxnode secp256k1 key and the
+ *  Tor hidden service ed25519 key. The ed25519 signature covers
+ *  challenge || signer_outpoint.hash to bind the onion proof to the
+ *  signer's fluxnode identity, preventing relay attacks where a MITM
+ *  obtains a valid ed25519 signature from the real .onion owner and
+ *  presents it as their own. */
+// torauth onion proof payload: the ed25519 signature covers
+// challenge || signer_outpoint_hash, binding the proof to the signer's fluxnode
+// identity. Built in one place so the sign and verify sites cannot diverge.
+static void BuildTorAuthPayload(const uint256& challenge, const COutPoint& outpoint,
+                                unsigned char out[64])
+{
+    memcpy(out, challenge.begin(), 32);
+    memcpy(out + 32, outpoint.hash.begin(), 32);
+}
+
+// Generate and record a fresh torauth challenge for a peer, in one place so the
+// arm-and-record sequence stays consistent everywhere a challenge is initiated.
+static void ArmTorAuthChallenge(CNode* pnode)
+{
+    GetRandBytes(pnode->nTorAuthChallenge.begin(), 32);
+    pnode->nTorAuthTimestamp = GetTime();
+    pnode->fTorAuthSent = true;
+}
+
+static bool TorAuthSign(const uint256& challenge, const COutPoint& signerOutpoint,
+                        std::vector<unsigned char>& vchSig,
+                        std::vector<unsigned char>& vchOnionSig,
+                        std::vector<unsigned char>& vchOnionPubKey)
+{
+    CKey key;
+    CPubKey pubkey;
+    std::string errorMessage;
+    if (!obfuScationSigner.SetKey(strFluxnodePrivKey, errorMessage, key, pubkey))
+        return false;
+
+    std::string strChallenge = challenge.ToString();
+    if (!obfuScationSigner.SignMessage(strChallenge, errorMessage, vchSig, key))
+        return false;
+
+    // ed25519 onion proof: sign (challenge || outpoint_hash) so the signature
+    // is bound to this specific fluxnode's identity.
+    unsigned char torSK[crypto_sign_SECRETKEYBYTES];
+    unsigned char torPK[crypto_sign_PUBLICKEYBYTES];
+    if (GetTorServiceEd25519Key(torSK, torPK)) {
+        unsigned char signBuf[64];
+        BuildTorAuthPayload(challenge, signerOutpoint, signBuf);
+
+        vchOnionSig.resize(crypto_sign_BYTES);
+        if (crypto_sign_detached(vchOnionSig.data(), NULL, signBuf, 64, torSK) == 0) {
+            vchOnionPubKey.assign(torPK, torPK + crypto_sign_PUBLICKEYBYTES);
+        } else {
+            vchOnionSig.clear();
+        }
+        sodium_memzero(torSK, sizeof(torSK));
+    }
+    return true;
+}
+
 bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived)
 {
     const CChainParams& chainparams = Params();
@@ -7165,6 +7241,23 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             return true;
         }
 
+        // Best-effort early duplicate detection for inbound Tor peers.
+        // Inbound hidden-service connections arrive from 127.0.0.1, so the
+        // normal FindNode() duplicate check misses them.  If the peer
+        // advertises its .onion in addrFrom we can catch it here.  This is
+        // unreliable (addrFrom may be 0.0.0.0 if the peer's Tor hidden
+        // service is externally configured), so fluxnodes get a second,
+        // cryptographic duplicate check after torauth completes.
+        if (pfrom->fInbound && addrFrom.IsValid() && addrFrom.IsTor()) {
+            CNode* pDup = FindNode((CNetAddr)addrFrom);
+            if (pDup && !pDup->fInbound) {
+                LogPrintf("duplicate connection from %s (inbound vs existing outbound peer=%d); disconnecting inbound peer=%d\n",
+                          addrFrom.ToString(), pDup->GetId(), pfrom->GetId());
+                pfrom->fDisconnect = true;
+                return true;
+            }
+        }
+
         pfrom->addrLocal = addrMe;
         if (pfrom->fInbound && addrMe.IsRoutable())
         {
@@ -7179,6 +7272,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         // Potentially mark this peer as a preferred download peer.
         UpdatePreferredDownload(pfrom, State(pfrom->GetId()));
+
+        // BIP155: announce addrv2 support BEFORE verack so the peer knows our
+        // intent before completing the handshake. Only meaningful for peers
+        // running a protocol version that knows about the message at all.
+        if (pfrom->nVersion >= SENDADDRV2_VERSION) {
+            pfrom->PushMessage("sendaddrv2");
+        }
 
         // Change version
         pfrom->PushMessage("verack");
@@ -7227,10 +7327,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 alert.RelayTo(pfrom);
         }
 
-        pfrom->fSuccessfullyConnected = true;
-
         if (pfrom->fFeeler) {
-            // Feeler connection succeeded — address is verified good, disconnect
             LogPrint("net", "Feeler connection to %s succeeded, disconnecting\n", pfrom->addr.ToString());
             pfrom->fDisconnect = true;
             return true;
@@ -7295,6 +7392,32 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             uint64_t nCMPCTBLOCKVersion = 1;
             pfrom->PushMessage("sendcmpct", fAnnounceUsingCMPCTBLOCK, nCMPCTBLOCKVersion);
         }
+
+        // Handshake complete: version + verack exchanged. Marked here (not after
+        // the version message) so a BIP155 sendaddrv2 — which arrives between
+        // version and verack — is still accepted by the sendaddrv2 handler.
+        pfrom->fSuccessfullyConnected = true;
+
+        // Initiate Tor authentication for fluxnode peers.
+        // Only when we are a fluxnode and not in initial block download.
+        if (fFluxnode && !fluxnodeOutPoint.IsNull() && !IsInitialBlockDownload(chainparams)) {
+            bool fNeedsTorAuth = false;
+            if (pfrom->fInbound && pfrom->fInboundOnion) {
+                // Inbound on our dedicated hidden-service bind: provably a Tor
+                // connection (it could only have arrived through our onion
+                // service), so a local non-tor peer (ssh tunnel, monitor, second
+                // daemon) is never challenged or force-disconnected.
+                fNeedsTorAuth = true;
+            } else if (!pfrom->fInbound && pfrom->addr.IsTor()) {
+                // Outbound to a .onion address
+                fNeedsTorAuth = true;
+            }
+            if (fNeedsTorAuth) {
+                ArmTorAuthChallenge(pfrom);
+                pfrom->PushMessage("torauthreq", fluxnodeOutPoint, pfrom->nTorAuthChallenge);
+                LogPrint("tor", "torauth: sent challenge to peer=%d\n", pfrom->id);
+            }
+        }
     }
 
 
@@ -7342,10 +7465,254 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     }
 
 
-    else if (strCommand == "addr")
+    else if (strCommand == "sendaddrv2")
     {
+        // BIP155: SENDADDRV2 must arrive before VERACK; receiving it after the
+        // handshake is complete should be ignored per BIP155 ("MUST NOT treat
+        // as a protocol violation"). Match Bitcoin Core behavior: log + ignore.
+        if (pfrom->fSuccessfullyConnected) {
+            LogPrint("net", "sendaddrv2 received after VERACK from peer=%d; ignoring\n", pfrom->GetId());
+            return false;
+        }
+        pfrom->m_wants_addrv2 = true;
+        return true;
+    }
+
+
+    else if (strCommand == "torauthreq")
+    {
+        if (!pfrom->fSuccessfullyConnected) {
+            Misbehaving(pfrom->GetId(), TORAUTH_MISBEHAVE_NO_HANDSHAKE);
+            return false;
+        }
+
+        COutPoint peerOutpoint;
+        uint256 challenge;
+        vRecv >> peerOutpoint >> challenge;
+
+        // Self-connection detection
+        if (peerOutpoint == fluxnodeOutPoint) {
+            LogPrintf("torauth: self-connection detected from peer=%d; disconnecting\n", pfrom->id);
+            pfrom->fDisconnect = true;
+            return true;
+        }
+
+        // Verify the sender claims a real fluxnode identity
+        {
+            LOCK(g_fluxnodeCache.cs);
+            if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(peerOutpoint) == 0) {
+                LogPrint("tor", "torauth: peer=%d claims unknown outpoint %s; ignoring\n",
+                         pfrom->id, peerOutpoint.ToFullString());
+                return true;
+            }
+        }
+
+        // If WE are a fluxnode, sign the challenge and respond
+        if (fFluxnode && !strFluxnodePrivKey.empty()) {
+            // Generate our own challenge for mutual auth (if we haven't already)
+            if (!pfrom->fTorAuthSent) {
+                ArmTorAuthChallenge(pfrom);
+            }
+
+            std::vector<unsigned char> vchSig;
+            std::vector<unsigned char> vchOnionSig;
+            std::vector<unsigned char> vchOnionPubKey;
+            if (!TorAuthSign(challenge, fluxnodeOutPoint, vchSig, vchOnionSig, vchOnionPubKey)) {
+                LogPrintf("torauth: failed to sign challenge for peer=%d\n", pfrom->id);
+                return true;
+            }
+
+            pfrom->PushMessage("torauthresp", fluxnodeOutPoint, vchSig,
+                               pfrom->nTorAuthChallenge,
+                               vchOnionSig, vchOnionPubKey);
+            LogPrint("tor", "torauth: responded to challenge from peer=%d (onion proof: %s)\n",
+                     pfrom->id, vchOnionPubKey.empty() ? "no" : "yes");
+        }
+        return true;
+    }
+
+
+    else if (strCommand == "torauthresp")
+    {
+        if (!pfrom->fSuccessfullyConnected) {
+            Misbehaving(pfrom->GetId(), TORAUTH_MISBEHAVE_NO_HANDSHAKE);
+            return false;
+        }
+
+        // Already authenticated — ignore duplicate
+        if (pfrom->fTorAuthenticated)
+            return true;
+
+        if (!pfrom->fTorAuthSent) {
+            // We never sent a challenge to this peer
+            Misbehaving(pfrom->GetId(), TORAUTH_MISBEHAVE_UNSOLICITED);
+            return false;
+        }
+
+        COutPoint peerOutpoint;
+        std::vector<unsigned char> vchSig;
+        uint256 peerChallenge;
+        vRecv >> peerOutpoint >> vchSig >> peerChallenge;
+
+        // Read optional onion proof fields (backward compatible)
+        std::vector<unsigned char> vchOnionSig;
+        std::vector<unsigned char> vchOnionPubKey;
+        if (!vRecv.empty()) {
+            vRecv >> vchOnionSig >> vchOnionPubKey;
+        }
+
+        // Look up peer's fluxnode pubkey
+        CPubKey peerPubKey;
+        {
+            LOCK(g_fluxnodeCache.cs);
+            if (g_fluxnodeCache.mapConfirmedFluxnodeData.count(peerOutpoint) == 0) {
+                LogPrint("tor", "torauth: peer=%d response claims unknown outpoint %s\n",
+                         pfrom->id, peerOutpoint.ToFullString());
+                Misbehaving(pfrom->GetId(), TORAUTH_MISBEHAVE_UNKNOWN_OUTPOINT);
+                return false;
+            }
+            peerPubKey = g_fluxnodeCache.mapConfirmedFluxnodeData[peerOutpoint].pubKey;
+        }
+
+        // Verify the signature against our challenge
+        std::string strChallenge = pfrom->nTorAuthChallenge.ToString();
+        std::string errorMessage;
+        if (!obfuScationSigner.VerifyMessage(peerPubKey, vchSig, strChallenge, errorMessage)) {
+            LogPrint("tor", "torauth: peer=%d signature verification FAILED: %s\n",
+                     pfrom->id, errorMessage);
+            Misbehaving(pfrom->GetId(), TORAUTH_MISBEHAVE_BAD_SIGNATURE);
+            return false;
+        }
+
+        // Authentication succeeded. Set identity and check for duplicates
+        // atomically under cs_vNodes to prevent a race where two connections
+        // from the same fluxnode both pass verification simultaneously.
+        {
+            LOCK(cs_vNodes);
+            pfrom->fTorAuthenticated = true;
+            pfrom->torAuthOutpoint = peerOutpoint;
+
+            // Detect duplicate connections by fluxnode identity.
+            // Inbound Tor connections arrive from 127.0.0.1, so address-based
+            // duplicate detection misses them.  Now that we have a cryptographic
+            // identity (the verified outpoint), check whether another peer already
+            // authenticated with the same outpoint and disconnect the duplicate.
+            for (CNode* pnode : vNodes) {
+                if (pnode == pfrom)
+                    continue;
+                if (pnode->fTorAuthenticated && pnode->torAuthOutpoint == peerOutpoint) {
+                    // Both ends must drop the same one of the two connections, or
+                    // each tears down what the other keeps and both die. Decide
+                    // deterministically from the two outpoints so both ends elect
+                    // the same connection.
+                    CNode* pInbound = pfrom->fInbound ? pfrom : pnode;
+                    CNode* pOutbound = pfrom->fInbound ? pnode : pfrom;
+                    CNode* pDisconnect = TorAuthDedupDropInbound(fluxnodeOutPoint, peerOutpoint) ? pInbound : pOutbound;
+                    LogPrintf("torauth: duplicate fluxnode %s on peer=%d and peer=%d; disconnecting peer=%d\n",
+                              peerOutpoint.ToFullString(), pfrom->id, pnode->id, pDisconnect->id);
+                    pDisconnect->fDisconnect = true;
+                    break;
+                }
+            }
+        }
+        LogPrint("tor", "torauth: peer=%d authenticated as fluxnode %s\n",
+                 pfrom->id, peerOutpoint.ToFullString());
+
+        // Verify onion address proof of ownership.
+        // The ed25519 signature covers challenge || signer_outpoint_hash to
+        // bind the proof to the peer's identity and prevent relay attacks.
+        if (vchOnionSig.size() == crypto_sign_BYTES &&
+            vchOnionPubKey.size() == crypto_sign_PUBLICKEYBYTES) {
+
+            unsigned char verifyBuf[64];
+            BuildTorAuthPayload(pfrom->nTorAuthChallenge, peerOutpoint, verifyBuf);
+
+            if (crypto_sign_verify_detached(vchOnionSig.data(),
+                    verifyBuf, 64,
+                    vchOnionPubKey.data()) == 0) {
+
+                // Reconstruct .onion address from the verified pubkey
+                std::string onionAddr = OnionAddressFromEd25519Pubkey(vchOnionPubKey.data());
+                CService onionService(onionAddr, Params().GetDefaultPort(), false);
+                if (onionService.IsValid()) {
+                    // For an outbound connection the proven onion must be the one
+                    // we dialed; otherwise a registered fluxnode controlling a
+                    // different onion could relabel our connection to its own
+                    // address (poisoning anchors, dedup, and the onion cap).
+                    // Inbound peers arrive as 127.0.0.1 and legitimately learn
+                    // their onion identity from the proof, so they are exempt.
+                    if (!pfrom->fInbound &&
+                        static_cast<const CNetAddr&>(onionService) != static_cast<const CNetAddr&>(pfrom->addr)) {
+                        LogPrint("tor", "torauth: peer=%d onion proof %s != dialed %s; rejecting\n",
+                                 pfrom->id, onionAddr, pfrom->addr.ToStringIP());
+                        Misbehaving(pfrom->GetId(), TORAUTH_MISBEHAVE_ONION_MISMATCH);
+                    } else {
+                        // Record the verified onion without mutating addr/addrName,
+                        // which stay as set at connect so unlocked readers on other
+                        // threads never race a reassignment. Consumers read the onion
+                        // identity through CNode::GetEffectiveAddr().
+                        {
+                            LOCK(pfrom->cs_addrName);
+                            if (!pfrom->fTorAddrVerified) {
+                                pfrom->torVerifiedAddr = onionService;
+                                pfrom->fTorAddrVerified = true;
+                            }
+                        }
+                        LogPrint("tor", "torauth: peer=%d onion address verified: %s\n",
+                                 pfrom->id, onionAddr);
+                        // Enforce bans against the proven onion. An inbound hidden-
+                        // service peer arrives as 127.0.0.1, so the accept-time
+                        // IsBanned(addr) check cannot see its onion identity.
+                        if (CNode::IsBanned(static_cast<const CNetAddr&>(onionService))) {
+                            LogPrint("tor", "torauth: peer=%d onion %s is banned; disconnecting\n",
+                                     pfrom->id, onionAddr);
+                            pfrom->fDisconnect = true;
+                        }
+                    }
+                }
+            } else {
+                LogPrint("tor", "torauth: peer=%d onion ed25519 signature INVALID\n",
+                         pfrom->id);
+            }
+        }
+
+        // If peer sent us a challenge back (mutual auth), sign and respond
+        if (!peerChallenge.IsNull() && fFluxnode && !strFluxnodePrivKey.empty()) {
+            std::vector<unsigned char> vchSig2;
+            std::vector<unsigned char> vchOnionSig2;
+            std::vector<unsigned char> vchOnionPubKey2;
+            if (TorAuthSign(peerChallenge, fluxnodeOutPoint, vchSig2, vchOnionSig2, vchOnionPubKey2)) {
+                uint256 nullChallenge;
+                pfrom->PushMessage("torauthresp", fluxnodeOutPoint, vchSig2,
+                                   nullChallenge,
+                                   vchOnionSig2, vchOnionPubKey2);
+            }
+        }
+
+        return true;
+    }
+
+
+    else if (strCommand == "addr" || strCommand == "addrv2")
+    {
+        const bool fIsV2 = (strCommand == "addrv2");
         vector<CAddress> vAddr;
-        vRecv >> vAddr;
+        if (fIsV2) {
+            // Read the BIP155-encoded vector via the dedicated wrapper. Bounds
+            // are enforced inside CAddrVecV2::Unserialize (max 1000 entries,
+            // max 512-byte address payload) by throwing; mirror the v1 oversized
+            // penalty (Misbehaving(20)) rather than letting it fall through to the
+            // generic message handler, which only logs and applies no score.
+            CAddrVecV2 wrap(vAddr);
+            try {
+                vRecv >> wrap;
+            } catch (const std::ios_base::failure&) {
+                Misbehaving(pfrom->GetId(), 20);
+                return error("message addrv2 oversized or malformed");
+            }
+        } else {
+            vRecv >> vAddr;
+        }
 
         // Don't want addr from older versions unless seeding
         if (pfrom->nVersion < CADDR_TIME_VERSION && addrman.size() > 1000)
@@ -7353,7 +7720,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         if (vAddr.size() > 1000)
         {
             Misbehaving(pfrom->GetId(), 20);
-            return error("message addr size() = %u", vAddr.size());
+            return error("message %s size() = %u", strCommand, vAddr.size());
         }
 
         // Store the new addresses
@@ -7438,7 +7805,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         LogPrint("net", "Received addr: %u addresses (%u processed, %u rate-limited) peer=%d\n",
                  vAddr.size(), nProcessedAddrs, nRatelimitedAddrs, pfrom->GetId());
 
-        addrman.Add(vAddrOk, pfrom->addr, 2 * 60 * 60);
+        // Use the peer's verified .onion (when proven) as the addrman source so
+        // onion-learned gossip spreads across onion source groups instead of
+        // collapsing under the 127.0.0.1 a hidden-service peer connects from.
+        addrman.Add(vAddrOk, pfrom->GetEffectiveAddr(), 2 * 60 * 60);
         if (vAddr.size() < 1000)
             pfrom->fGetAddr = false;
         if (pfrom->fOneShot)
@@ -8239,12 +8609,15 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     // to users' AddrMan and later request them by sending getaddr messages.
     // Making nodes which are behind NAT and can only make outgoing connections ignore
     // the getaddr message mitigates the attack.
-    else if ((strCommand == "getaddr") && (pfrom->fInbound))
+    else if ((strCommand == "getaddr" || strCommand == "getaddrv2") && (pfrom->fInbound))
     {
-        // Only send one GetAddr response per connection to reduce resource waste
-        //  and discourage addr stamping of INV announcements.
+        // Both v1 and v2 dump the address book the same way; the actual wire
+        // format is selected at flush time in SendMessages based on
+        // pfrom->m_wants_addrv2 (which the peer asserts via SENDADDRV2 before
+        // VERACK). Per BIP155, getaddrv2 from a peer that never sent
+        // sendaddrv2 is still answered, just in addr (v1) format.
         if (pfrom->fSentAddr) {
-            LogPrint("net", "Ignoring repeated \"getaddr\". peer=%d\n", pfrom->id);
+            LogPrint("net", "Ignoring repeated \"%s\". peer=%d\n", strCommand, pfrom->id);
             return true;
         }
         pfrom->fSentAddr = true;
@@ -8602,8 +8975,10 @@ bool ProcessMessages(CNode* pfrom)
                 // Flux in ProcessMessages()
                 // Lets ban for default 24 hours the node that sent us an unprocessable message
                 if (strstr(e.what(), "Unknown transaction format")) {
-                    CNetAddr netaddr(pfrom->addr.ToStringIP());
-                    CNode::Ban(netaddr, 0);
+                    // Ban a hidden-service peer by its verified .onion, not the
+                    // 127.0.0.1 it connects from; never ban a loopback address.
+                    if (auto banTarget = pfrom->OnionAwareBanTarget())
+                        CNode::Ban(*banTarget, 0);
                 }
                 PrintExceptionContinue(&e, "ProcessMessages()");
             }
@@ -8696,14 +9071,26 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         }
 
         //
-        // Message: addr
+        // Message: addr / addrv2
         //
+        // BIP155: peers that have sent us SENDADDRV2 (negotiated before
+        // VERACK) receive the addrv2 message and are eligible to learn about
+        // v3 onion addresses; everyone else gets the legacy addr message and
+        // we silently filter out any v3 onions before sending so that the
+        // peer doesn't see a confusing 16-zero-byte "address".
         if (fSendTrickle)
         {
+            const bool fUseV2 = pto->m_wants_addrv2.load();
+            const char* msg_type = fUseV2 ? "addrv2" : "addr";
+
             vector<CAddress> vAddr;
             vAddr.reserve(pto->vAddrToSend.size());
             for (const CAddress& addr : pto->vAddrToSend)
             {
+                // Drop v3 onion addresses on the floor for legacy peers — the
+                // V1 wire format simply cannot represent them.
+                if (!fUseV2 && addr.IsTor())
+                    continue;
                 if (!pto->addrKnown.contains(addr.GetKey()))
                 {
                     pto->addrKnown.insert(addr.GetKey());
@@ -8711,14 +9098,25 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     // receiver rejects addr messages larger than 1000
                     if (vAddr.size() >= 1000)
                     {
-                        pto->PushMessage("addr", vAddr);
+                        if (fUseV2) {
+                            CAddrVecV2 wrap(vAddr);
+                            pto->PushMessage(msg_type, wrap);
+                        } else {
+                            pto->PushMessage(msg_type, vAddr);
+                        }
                         vAddr.clear();
                     }
                 }
             }
             pto->vAddrToSend.clear();
-            if (!vAddr.empty())
-                pto->PushMessage("addr", vAddr);
+            if (!vAddr.empty()) {
+                if (fUseV2) {
+                    CAddrVecV2 wrap(vAddr);
+                    pto->PushMessage(msg_type, wrap);
+                } else {
+                    pto->PushMessage(msg_type, vAddr);
+                }
+            }
         }
 
         CNodeState &state = *State(pto->GetId());
@@ -8727,12 +9125,10 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 LogPrintf("Warning: not punishing whitelisted peer %s!\n", pto->addr.ToString());
             else {
                 pto->fDisconnect = true;
-                if (pto->addr.IsLocal())
-                    LogPrintf("Warning: not banning local peer %s!\n", pto->addr.ToString());
+                if (auto banTarget = pto->OnionAwareBanTarget())
+                    CNode::Ban(*banTarget);
                 else
-                {
-                    CNode::Ban(pto->addr);
-                }
+                    LogPrintf("Warning: not banning local peer %s!\n", pto->addr.ToString());
             }
             state.fShouldBan = false;
         }
