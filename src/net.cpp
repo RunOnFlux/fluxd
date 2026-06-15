@@ -74,7 +74,6 @@ static inline bool InterruptibleSleep(int64_t milliseconds)
 using namespace std;
 
 namespace {
-    const int MAX_OUTBOUND_CONNECTIONS = 16;
     const int DEFAULT_MAX_ONION_OUTBOUND = 2;
     const int TORAUTH_TIMEOUT_SECONDS = 60;
 
@@ -105,6 +104,7 @@ static std::atomic<unsigned short> g_onion_local_port{0};
 CAddrMan addrman;
 int nMaxConnections = DEFAULT_MAX_PEER_CONNECTIONS;
 int nMaxOnionOutbound = DEFAULT_MAX_ONION_OUTBOUND;
+const int MAX_OUTBOUND_CONNECTIONS = 16;
 bool fAddressesInitialized = false;
 std::string strSubVersion;
 
@@ -1781,6 +1781,25 @@ bool OnionOutboundCapReached(bool fFeeler, int nOnionOut)
     return !fFeeler && nOnionOut >= nMaxOnionOutbound;
 }
 
+bool ClearnetOutboundCapReached(bool fFeeler, int nClearnetOut)
+{
+    // Mirror of the onion cap on the clearnet side: hold clearnet outbound below
+    // the total cap minus the onion reservation so fast clearnet dials cannot
+    // fill every slot and starve persistent onion peers. Feelers are exempt for
+    // the same reason as in OnionOutboundCapReached.
+    return !fFeeler && nClearnetOut >= MAX_OUTBOUND_CONNECTIONS - nMaxOnionOutbound;
+}
+
+bool TorAuthDedupDropInbound(const COutPoint& myOutpoint, const COutPoint& peerOutpoint)
+{
+    // Keep the connection initiated by the lower outpoint's owner so both ends
+    // independently elect the same connection: if my outpoint is lower I keep my
+    // outbound (drop the inbound), otherwise I keep my inbound (drop the
+    // outbound). torauth has already proven identity in both directions, so
+    // keeping a verified inbound is safe.
+    return myOutpoint < peerOutpoint;
+}
+
 // if successful, this moves the passed grant to the constructed node
 bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot, bool fFeeler)
 {
@@ -1805,6 +1824,24 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
                 nOnionOut++;
         if (OnionOutboundCapReached(fFeeler, nOnionOut))
             return false;
+    } else {
+        // Reserve the onion-outbound slots: only when onion is reachable, hold
+        // clearnet outbound below the total cap minus the onion reservation, so
+        // a saturated clearnet pool can never starve persistent onion peers.
+        // Gated on the onion proxy being set, so a clearnet-only node still uses
+        // every outbound slot.
+        proxyType onionProxy;
+        if (GetProxy(NET_ONION, onionProxy)) {
+            int nClearnetOut = 0;
+            {
+                LOCK(cs_vNodes);
+                for (CNode* pnode : vNodes)
+                    if (!pnode->fInbound && !pnode->addr.IsTor())
+                        nClearnetOut++;
+            }
+            if (ClearnetOutboundCapReached(fFeeler, nClearnetOut))
+                return false;
+        }
     }
 
     if (!pszDest) {

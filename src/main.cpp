@@ -7592,9 +7592,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 if (pnode == pfrom)
                     continue;
                 if (pnode->fTorAuthenticated && pnode->torAuthOutpoint == peerOutpoint) {
-                    // Prefer the outbound connection (we initiated it, so it's
-                    // harder to spoof).  Disconnect whichever is inbound.
-                    CNode* pDisconnect = pfrom->fInbound ? pfrom : pnode;
+                    // Both ends must drop the same one of the two connections, or
+                    // each tears down what the other keeps and both die. Decide
+                    // deterministically from the two outpoints so both ends elect
+                    // the same connection.
+                    CNode* pInbound = pfrom->fInbound ? pfrom : pnode;
+                    CNode* pOutbound = pfrom->fInbound ? pnode : pfrom;
+                    CNode* pDisconnect = TorAuthDedupDropInbound(fluxnodeOutPoint, peerOutpoint) ? pInbound : pOutbound;
                     LogPrintf("torauth: duplicate fluxnode %s on peer=%d and peer=%d; disconnecting peer=%d\n",
                               peerOutpoint.ToFullString(), pfrom->id, pnode->id, pDisconnect->id);
                     pDisconnect->fDisconnect = true;
