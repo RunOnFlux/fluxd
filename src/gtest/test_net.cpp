@@ -6,8 +6,10 @@
 
 #include "net.h"
 #include "netbase.h"
+#include "primitives/transaction.h"
 #include "protocol.h"
 #include "streams.h"
+#include "uint256.h"
 #include "version.h"
 
 #include <string>
@@ -193,4 +195,48 @@ TEST(NetTests, OnionFeelerExemptFromOutboundCap)
     EXPECT_FALSE(OnionOutboundCapReached(true, 2));   // feeler exempt even at the cap
 
     nMaxOnionOutbound = saved;                        // restore global for other tests
+}
+
+// Clearnet outbound is held below MAX_OUTBOUND_CONNECTIONS - nMaxOnionOutbound so
+// fast clearnet dials cannot fill every slot and starve persistent onion peers
+// out of the shared outbound pool. Feelers are one-shot probes and exempt,
+// matching OnionOutboundCapReached.
+TEST(NetTests, ClearnetReservationCap)
+{
+    const int saved = nMaxOnionOutbound;
+
+    nMaxOnionOutbound = 2;                                       // reserve 2 onion slots
+    const int cap = MAX_OUTBOUND_CONNECTIONS - 2;               // clearnet held below this
+    EXPECT_FALSE(ClearnetOutboundCapReached(false, cap - 1));   // below the reservation -> allowed
+    EXPECT_TRUE(ClearnetOutboundCapReached(false, cap));        // at it -> refused, slots kept for onion
+    EXPECT_FALSE(ClearnetOutboundCapReached(true, cap));        // feeler exempt even at the reservation
+
+    nMaxOnionOutbound = 0;                                       // a hub reserves nothing for persistent onion
+    EXPECT_FALSE(ClearnetOutboundCapReached(false, MAX_OUTBOUND_CONNECTIONS - 1));
+    EXPECT_TRUE(ClearnetOutboundCapReached(false, MAX_OUTBOUND_CONNECTIONS));
+
+    nMaxOnionOutbound = saved;                                   // restore global for other tests
+}
+
+// Two connections to the same fluxnode must resolve to the SAME survivor on both
+// ends, or each drops what the other keeps and both die. The choice is derived
+// from the two outpoints so the ends agree without coordination.
+TEST(NetTests, TorAuthDedupConverges)
+{
+    COutPoint lo(uint256S("01"), 0);
+    COutPoint hi(uint256S("02"), 0);
+    ASSERT_TRUE(lo < hi);
+
+    // The lower outpoint's owner keeps its outbound; the higher keeps its inbound.
+    EXPECT_TRUE(TorAuthDedupDropInbound(lo, hi));    // I am lower  -> keep outbound (drop inbound)
+    EXPECT_FALSE(TorAuthDedupDropInbound(hi, lo));   // I am higher -> keep inbound (drop outbound)
+
+    // Convergence check. Connection X is the one the lo node initiated (lo's
+    // outbound / hi's inbound); connection Y the one the hi node initiated. Each
+    // end names the connection it keeps; both must name the same one.
+    auto kept = [](const COutPoint& me, const COutPoint& peer, char myOutbound, char myInbound) {
+        return TorAuthDedupDropInbound(me, peer) ? myOutbound : myInbound;
+    };
+    EXPECT_EQ(kept(lo, hi, 'X', 'Y'), kept(hi, lo, 'Y', 'X'));  // both keep X
+    EXPECT_EQ('X', kept(lo, hi, 'X', 'Y'));
 }

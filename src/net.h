@@ -154,12 +154,30 @@ extern CAddrMan addrman;
 /** Maximum number of connections to simultaneously allow (aka connection slots) */
 extern int nMaxConnections;
 extern int nMaxOnionOutbound;
+/** Maximum number of outbound connections (shared by all outbound classes). */
+extern const int MAX_OUTBOUND_CONNECTIONS;
 
 /** Whether an onion outbound dial must be refused by the onion-outbound cap.
  *  Feeler connections are one-shot probes (they disconnect on success and never
  *  hold a slot) and are exempt, so a maxonionoutbound=0 hub can still
  *  feeler-verify onion addresses; persistent onion dials are capped. */
 bool OnionOutboundCapReached(bool fFeeler, int nOnionOut);
+
+/** Whether a clearnet outbound dial must be refused to keep the onion-outbound
+ *  reservation free. Clearnet outbound is held below the total cap minus the
+ *  onion reservation (MAX_OUTBOUND_CONNECTIONS - nMaxOnionOutbound) so that fast
+ *  clearnet dials cannot fill every slot and starve persistent onion peers out
+ *  of the shared outbound pool. Feelers are one-shot probes and exempt, matching
+ *  OnionOutboundCapReached. The caller gates this on onion being reachable, so a
+ *  clearnet-only node still fills every outbound slot. */
+bool ClearnetOutboundCapReached(bool fFeeler, int nClearnetOut);
+
+/** Of two connections to the same fluxnode, whether to drop the inbound one
+ *  (keep the outbound). Both ends must drop the same connection or each tears
+ *  down what the other keeps and both die, so the choice is derived from the two
+ *  fluxnode outpoints, which both ends know after mutual torauth: the lower
+ *  outpoint's owner keeps its outbound, the other keeps its inbound. */
+bool TorAuthDedupDropInbound(const COutPoint& myOutpoint, const COutPoint& peerOutpoint);
 
 extern std::vector<CNode*> vNodes;
 extern CCriticalSection cs_vNodes;
