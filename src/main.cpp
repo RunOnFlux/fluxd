@@ -2884,6 +2884,44 @@ bool GetFullBlockHeader(CBlockHeader& header, const CBlockIndex* pindex, const C
     return true;
 }
 
+// Runtime-accepted block index entries keep their (rebuildable) header data
+// resident only for this many blocks below the active tip; older active-chain
+// entries have it freed and re-read from disk on demand. Bounds the runtime
+// HeaderData working set — the load-time entries are already pruned at startup
+// (LoadBlockIndexGuts) — while keeping recent-block relay and shallow reorgs off
+// the disk path.
+static const int RUNTIME_HEADERDATA_PRUNE_WINDOW = 1000;
+
+bool ShouldFreeAgedHeaderData(bool fIsFluxnode, int nBelowTip, int nWindow, bool fHasBlockData, bool fHasHeaderData)
+{
+    // Only fluxnodes prune; only past the hot window; only when the block data
+    // is on disk (so the freed header data can be rebuilt) and header data is
+    // actually resident to free. The block-data guard is essential: header-only
+    // entries cannot be rebuilt and must stay resident, exactly as the load-time
+    // prune in LoadBlockIndexGuts requires.
+    return fIsFluxnode && fHasBlockData && fHasHeaderData && nBelowTip >= nWindow;
+}
+
+// Runtime counterpart to the load-time HeaderData prune: once the tip advances,
+// free the header data of the active-chain entry that has just aged out of the
+// hot window, so runtime-accepted entries don't accumulate it in RAM. Re-read
+// from disk on demand (reorg/serving/disconnect) via EnsureHeaderDataFromDisk.
+static void PruneAgedHeaderData(const CBlockIndex* pindexTip)
+{
+    if (!fFluxnode || !pindexTip)
+        return;
+    int nAgeOutHeight = pindexTip->nHeight - RUNTIME_HEADERDATA_PRUNE_WINDOW;
+    if (nAgeOutHeight < 0)
+        return;
+    CBlockIndex* pindexOld = chainActive[nAgeOutHeight];
+    if (pindexOld &&
+        ShouldFreeAgedHeaderData(fFluxnode, pindexTip->nHeight - pindexOld->nHeight,
+                                 RUNTIME_HEADERDATA_PRUNE_WINDOW,
+                                 (pindexOld->nStatus & BLOCK_HAVE_DATA) != 0,
+                                 pindexOld->HasHeaderData()))
+        pindexOld->FreeHeaderData();
+}
+
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
 {
     // Once Proof of Node goes active.
@@ -4793,6 +4831,10 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     // Update chainActive & related variables.
     UpdateTip(pindexNew, chainparams);
 
+    // Free the header data of the entry that just aged out of the hot window so
+    // runtime-accepted entries don't accumulate it in RAM (see PruneAgedHeaderData).
+    PruneAgedHeaderData(pindexNew);
+
     // Periodically check and shrink debug.log if needed (every 20000 blocks, ~1 week at 30s intervals)
     // Uses -maxdebugfilesize (threshold) and -debuglogretainsize (keep size) parameters
     if (pindexNew && GetBoolArg("-shrinkdebugfile", !fDebug) && pindexNew->nHeight % 20000 == 0) {
@@ -5187,6 +5229,29 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
     return true;
 }
 
+// Allocate a block index entry for a header accepted at runtime, mirroring
+// InsertBlockIndex's arena/heap split: placement-construct it in the file-backed
+// arena (reclaimable RssFile) when the pool is available, otherwise plain heap.
+// Inserts into mapBlockIndex and points phashBlock at a stable hash. This is
+// what keeps runtime-accepted entries from accumulating as pinned heap, the same
+// way the load-time path (InsertBlockIndex) already does.
+static CBlockIndex* AddBlockIndexFromHeader(const CBlockHeader& block, const uint256& hash)
+{
+    void* mem = g_blockIndexPool ? g_blockIndexPool->AllocateEntry() : nullptr;
+    if (mem) {
+        CBlockIndex* pindexNew = new (mem) CBlockIndex(block);
+        uint256* pHash = static_cast<uint256*>(g_blockIndexPool->HashAt(g_blockIndexPool->Size() - 1));
+        *pHash = hash;
+        pindexNew->phashBlock = pHash;
+        mapBlockIndex.insert(make_pair(hash, pindexNew));
+        return pindexNew;
+    }
+    CBlockIndex* pindexNew = new CBlockIndex(block);
+    BlockMap::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+    pindexNew->phashBlock = &((*mi).first);
+    return pindexNew;
+}
+
 CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
 {
     // Check for duplicate
@@ -5195,8 +5260,8 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     if (it != mapBlockIndex.end())
         return it->second;
 
-    // Construct new block index object
-    CBlockIndex* pindexNew = new CBlockIndex(block);
+    // Construct new block index object (arena-backed when available)
+    CBlockIndex* pindexNew = AddBlockIndexFromHeader(block, hash);
     assert(pindexNew);
     // Cache the PON hash for the fork-choice tie-breaker; it must stay
     // available after the header data is pruned.
@@ -5206,8 +5271,6 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     // to avoid miners withholding blocks but broadcasting headers, to get a
     // competitive advantage.
     pindexNew->nSequenceId = 0;
-    BlockMap::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
-    pindexNew->phashBlock = &((*mi).first);
     BlockMap::iterator miPrev = mapBlockIndex.find(block.hashPrevBlock);
     if (miPrev != mapBlockIndex.end())
     {
@@ -8329,15 +8392,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             // Create new block index entry
             // For POW blocks without nSolution, we trust the hash from the sender
             // since the checkpoint validates the chain
-            CBlockIndex* pindexNew = new CBlockIndex(compactHeader);
+            CBlockIndex* pindexNew = AddBlockIndexFromHeader(compactHeader, hash);
             assert(pindexNew);
             if (compactHeader.IsPON())
                 pindexNew->hashPON = GetPONHash(compactHeader);
             pindexNew->nSequenceId = 0;
-
-            // Insert using the provided/computed hash
-            BlockMap::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
-            pindexNew->phashBlock = &((*mi).first);
 
             if (pindexPrev) {
                 pindexNew->pprev = pindexPrev;
