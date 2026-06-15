@@ -18,6 +18,7 @@
 #include "chain.h"
 #include "blockindexpool.h"
 #include "clientversion.h"
+#include "main.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "streams.h"
@@ -258,4 +259,29 @@ TEST(BlockIndex, DiskBlockIndexSerializationRoundTrip)
 
     // The hash reconstructed from the round-tripped header matches the original.
     EXPECT_EQ(disk2.GetBlockHash(), h.GetHash());
+}
+
+// ShouldFreeAgedHeaderData is the decision behind the runtime HeaderData prune
+// (PruneAgedHeaderData): once a connected block ages past the window, free its
+// rebuildable header data. The guards matter — a header-only entry (no block on
+// disk) cannot be rebuilt and must NOT be pruned, and only fluxnodes prune.
+TEST(BlockIndex, RuntimeHeaderDataPruneDecision)
+{
+    const int W = 1000;
+    // At/past the window, fluxnode, block data on disk, header data resident -> free it.
+    EXPECT_TRUE(ShouldFreeAgedHeaderData(/*fluxnode=*/true, /*belowTip=*/W, W, /*hasBlockData=*/true, /*hasHeaderData=*/true));
+    EXPECT_TRUE(ShouldFreeAgedHeaderData(true, W + 500, W, true, true));
+
+    // Inside the window -> keep (boundary / off-by-one guard).
+    EXPECT_FALSE(ShouldFreeAgedHeaderData(true, W - 1, W, true, true));
+
+    // Non-fluxnode -> never prune (master behaviour).
+    EXPECT_FALSE(ShouldFreeAgedHeaderData(false, W, W, true, true));
+
+    // Header-only entry (no block data on disk) -> must stay resident; it cannot
+    // be rebuilt from disk. This is the essential guard.
+    EXPECT_FALSE(ShouldFreeAgedHeaderData(true, W, W, /*hasBlockData=*/false, true));
+
+    // Already pruned (no resident header data) -> nothing to free.
+    EXPECT_FALSE(ShouldFreeAgedHeaderData(true, W, W, true, /*hasHeaderData=*/false));
 }
