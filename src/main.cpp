@@ -4736,6 +4736,16 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
     }
     // Update cached incremental witnesses
     GetMainSignals().ChainTip(pindexDelete, &block, newSproutTree, newSaplingTree, false);
+
+    // The disconnected block has left the active chain. On a fluxnode, free its
+    // prunable header data now: PruneAgedHeaderData only sweeps the active chain,
+    // so a reorg's losing-fork entries (whose header data is rehydrated to
+    // disconnect them) would otherwise retain it in RAM indefinitely. It is
+    // rebuilt from disk on demand, and re-restored by ConnectTip if the block is
+    // later reconnected. (BLOCK_HAVE_DATA guards rebuildability, as elsewhere.)
+    if (fFluxnode && (pindexDelete->nStatus & BLOCK_HAVE_DATA))
+        pindexDelete->FreeHeaderData();
+
     return true;
 }
 
