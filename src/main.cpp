@@ -3574,10 +3574,23 @@ enum DisconnectResult
  * effects of blocks that are NOT part of the current chainstate (the sync
  * marker can sit ahead of the coins DB, or on a fork after a crashed reorg).
  */
-static bool DisconnectFluxnodeOnly(const CBlock& block, const CBlockIndex* pindex, FluxnodeCache* p_fluxnodeCache)
+static bool DisconnectFluxnodeOnly(const CBlock& block, const CBlockIndex* pindex, FluxnodeCache* p_fluxnodeCache, bool fRequireUndoRecord = false)
 {
     if (!p_fluxnodeCache)
         return error("%s: p_fluxnodeCache is null", __func__);
+
+    // During crash recovery every block we rewind must still have its undo
+    // record on disk. An absent record is ambiguous: the block may have changed
+    // no fluxnode state (none was ever written) or the record may have been
+    // pruned by CleanupOldFluxnodeData. Recovery cannot tell these apart, and a
+    // pruned record would make us silently under-rewind and corrupt the cache,
+    // so when fRequireUndoRecord is set we fail closed and demand -reindex. The
+    // live disconnect path rewinds only recent blocks whose records are never
+    // pruned, so it keeps tolerating an absent (legitimately empty) record.
+    if (fRequireUndoRecord && !pFluxnodeDB->ExistsBlockUndoFluxnodeData(block.GetHash()))
+        return error("%s: fluxnode undo record missing for block %s (height %d) — it may have been "
+                     "pruned beyond the recovery window; restart with -reindex",
+                     __func__, block.GetHash().ToString(), pindex->nHeight);
 
     CFluxnodeTxBlockUndo fluxnodeBlockUndo;
     if (!pFluxnodeDB->ReadBlockUndoFluxnodeData(block.GetHash(), fluxnodeBlockUndo))
@@ -6680,7 +6693,7 @@ bool RecoverFluxnodeCache(const CChainParams& chainparams)
             }
 
             FluxnodeCache localCache;
-            if (!DisconnectFluxnodeOnly(block, pindex, &localCache)) {
+            if (!DisconnectFluxnodeOnly(block, pindex, &localCache, /*fRequireUndoRecord=*/true)) {
                 return error("RecoverFluxnodeCache: failed to undo fluxnode effects of block %s (height %d) — "
                              "restart with -reindex",
                              pindex->GetBlockHash().ToString(), pindex->nHeight);
@@ -6861,9 +6874,18 @@ bool RewindBlockIndex(const CChainParams& chainparams, bool& clearWitnessCaches)
     for (auto pindex : vBlocks) {
         auto ret = mapBlockIndex.find(*pindex->phashBlock);
         if (ret != mapBlockIndex.end()) {
+            // erase is about to invalidate ret; capture the non-const entry
+            // pointer the map owns so we can free its prunable HeaderData.
+            CBlockIndex* pEntry = ret->second;
             mapBlockIndex.erase(ret);
-            if (!g_blockIndexPool || !g_blockIndexPool->Contains(pindex))
-                delete pindex;
+            if (!g_blockIndexPool || !g_blockIndexPool->Contains(pEntry))
+                delete pEntry;
+            else
+                // Arena-backed entry: its slot can't be freed here (slots are
+                // never reused and are destructed at shutdown), but its prunable
+                // HeaderData is a separate heap allocation that would otherwise
+                // leak until then — free it now.
+                pEntry->FreeHeaderData();
         }
     }
 
@@ -8082,13 +8104,23 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             }
         }
 
-        // Slow phase, lock-free: rehydrate from the block files. Serving is
-        // best-effort — a failed read keeps the resident snapshot.
+        // Slow phase, lock-free: rehydrate from the block files. An entry in
+        // vNeedDisk has an incomplete resident snapshot (a pruned entry's merkle
+        // root/nonce are zeroed; a checkpointed POW entry's nSolution is empty),
+        // so if its disk read fails it must not be served. Truncate the batch at
+        // the first such entry to keep a valid contiguous prefix — the peer
+        // re-requests from there (and a persistent local read failure is its cue
+        // to try another node) instead of receiving a malformed header.
+        size_t nServe = vHeaders.size();
         for (const auto& entry : vNeedDisk) {
             CBlockHeader diskHeader;
             if (ReadBlockHeaderFromDisk(diskHeader, entry.second, chainparams.GetConsensus()))
                 vHeaders[entry.first] = diskHeader;
+            else
+                nServe = std::min(nServe, entry.first);
         }
+        if (nServe < vHeaders.size())
+            vHeaders.resize(nServe);
 
         if (useCompactHeaders) {
             // Compact headers for checkpointed blocks (saves bandwidth):
