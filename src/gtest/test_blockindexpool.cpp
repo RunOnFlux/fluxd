@@ -3,7 +3,7 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 // Tests for the fluxnode block-index memory work:
-//  - CBlockIndexPool (the sparse, O_TMPFILE-backed arena) incl. the
+//  - CBlockIndexPool (the segmented, file-backed arena, blockindex.arena) incl. the
 //    exhaustion -> nullptr path that triggers the heap fallback, and the
 //    Initialize-failure path (unsupported dir) that also falls back to heap.
 //  - The CBlockIndex HeaderData split: pruning frees only the rebuildable
