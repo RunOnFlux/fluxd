@@ -120,6 +120,11 @@ bool CDeterministicFluxnodeDB::ReadBlockUndoFluxnodeData(const uint256 &p_blockH
     return true;
 }
 
+bool CDeterministicFluxnodeDB::ExistsBlockUndoFluxnodeData(const uint256& p_blockHash)
+{
+    return Exists(std::make_pair(BLOCK_FLUXNODE_UNDO_DATA, p_blockHash));
+}
+
 bool CDeterministicFluxnodeDB::CleanupOldFluxnodeData()
 {
     LOCK(cs_main);
