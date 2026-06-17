@@ -19,6 +19,12 @@ class COutPoint;
 class CFluxnodeTxBlockUndo;
 class CFluxnodeDelegates;
 
+// Fluxnode undo records are retained for this many blocks below the active tip;
+// CleanupOldFluxnodeData prunes anything older. Recovery relies on it both to
+// bound how far it rewinds and to tell a pruned record from a legitimately
+// empty one. ~720 blocks/day * 7 days.
+static const int ONE_WEEK_OF_BLOCK_COUNT = 5040;
+
 struct FluxnodeSyncState {
     uint256 bestBlockHash;
     int nHeight;
