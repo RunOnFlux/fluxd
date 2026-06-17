@@ -16,8 +16,7 @@ static const char BLOCK_FLUXNODE_UNDO_DATA = 'u';
 static const char FLUXNODE_DELEGATE_DATA = 'f';
 static const char DB_FLUXNODE_SYNC_STATE = 's';
 
-// EST 720 blocks * 7 Days
-static const int ONE_WEEK_OF_BLOCK_COUNT = 5040;
+// ONE_WEEK_OF_BLOCK_COUNT is defined in fluxnodecachedb.h (shared with recovery).
 
 // If we remove this or more things from the deterministic database
 // We do a compact database call
