@@ -44,9 +44,9 @@
 #include "util/threadinterrupt.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
+#include "blockindexpool.h"
 #include "fluxnode/fluxnodeconfig.h"
 #include "fluxnode/fluxnode.h"
-#include "fluxnode/fluxnodecachedb.h"
 #include "fluxnode/obfuscation.h"
 #include "fluxnode/activefluxnode.h"
 #include "snapshot/snapshotdb.h"
@@ -1581,6 +1581,9 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
                     g_fluxnodeCache.SortList(currentTier);
                 }
 
+                // Set fFluxnode early so LoadBlockIndex can use it
+                fFluxnode = GetBoolArg("-zelnode", false);
+
                 uiInterface.InitMessage(_("Loading block index..."));
                 if (!LoadBlockIndex()) {
                     strLoadError = _("Error loading block database");
@@ -1664,31 +1667,6 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
             } else {
                 return InitError(strLoadError);
             }
-        }
-    }
-
-    // Check fluxnode cache sync state for crash recovery detection
-    // If mismatch detected, log a warning
-    if (pFluxnodeDB && pcoinsTip && !fReindex) {
-        FluxnodeSyncState fluxnodeSyncState;
-        if (pFluxnodeDB->ReadSyncState(fluxnodeSyncState)) {
-            uint256 coinsBestBlock = pcoinsTip->GetBestBlock();
-            CBlockIndex* pindex = chainActive.Tip();
-            int coinsHeight = pindex ? pindex->nHeight : 0;
-
-            if (fluxnodeSyncState.bestBlockHash != coinsBestBlock) {
-                LogPrintf("WARNING: Fluxnode cache is out of sync with blockchain state.\n"
-                          "  Fluxnode DB synced to: %s (height %d)\n"
-                          "  Coins DB best block:   %s (height %d)\n"
-                          "  This may have occurred due to an unexpected shutdown or crash.\n",
-                          fluxnodeSyncState.bestBlockHash.ToString(), fluxnodeSyncState.nHeight,
-                          coinsBestBlock.ToString(), coinsHeight);
-            } else {
-                LogPrint("dfluxnode", "Fluxnode cache sync state OK: %s (height %d)\n",
-                        fluxnodeSyncState.bestBlockHash.ToString(), fluxnodeSyncState.nHeight);
-            }
-        } else {
-            LogPrint("dfluxnode", "No fluxnode sync state found (first run or pre-upgrade database)\n");
         }
     }
 
@@ -1930,11 +1908,45 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     if (mapArgs.count("-blocknotify"))
         uiInterface.NotifyBlockTip.connect(BlockNotifyCallback);
 
+    // Must abort BEFORE ActivateBestChain: replaying blocks onto an
+    // unrecovered fluxnode cache double-applies their effects and overwrites
+    // good on-disk undo records with ones rebuilt from the corrupt state.
+    if (!RecoverFluxnodeCache(chainparams))
+        return InitError(_("Failed to recover the fluxnode cache. Restart with -reindex to rebuild it."));
+    // From here on, flushes may force-write the fluxnode sync marker.
+    fFluxnodeCacheRecovered = true;
+
     uiInterface.InitMessage(_("Activating best chain..."));
     // scan for better chains in the block chain database, that are not yet connected in the active best chain
     CValidationState state;
     if (!ActivateBestChain(state, chainparams))
         strErrors << "Failed to connect best block";
+
+    // Hint to the OS that old block index pages are cold. The pool
+    // allocates sequentially so old blocks are at lower addresses.
+    if (g_blockIndexPool && chainActive.Tip()) {
+        g_blockIndexPool->AdviseOldBlocksCold(1000);
+        LogPrintf("Block index pool: %lu entries, advised OS that old pages are cold\n",
+                  (unsigned long)g_blockIndexPool->Size());
+    }
+
+    // Prune header data from buried block index entries to save memory.
+    // Header-only entries (no block data on disk) are skipped: their header
+    // fields cannot be rebuilt from disk, so they must stay resident.
+    if (fFluxnode && chainActive.Tip()) {
+        int nPruneBelow = chainActive.Height() - 100;
+        int64_t nPruned = 0;
+        for (auto& [hash, pindex] : mapBlockIndex)
+        {
+            if (pindex->nHeight < nPruneBelow && pindex->HasHeaderData() &&
+                (pindex->nStatus & BLOCK_HAVE_DATA)) {
+                pindex->FreeHeaderData();
+                nPruned++;
+            }
+        }
+        if (nPruned > 0)
+            LogPrintf("Freed header data from %lld buried block index entries\n", nPruned);
+    }
 
     std::vector<std::filesystem::path> vImportFiles;
     if (mapArgs.count("-loadblock"))
@@ -1950,7 +1962,6 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
             MilliSleep(10);
     }
 
-    fFluxnode = GetBoolArg("-zelnode", false);
     fArcane = getenv("UNMANAGED_FLUXBENCHD") != NULL;
 
     if ((fFluxnode || fluxnodeConfig.getCount() > -1) && fTxIndex == false) {

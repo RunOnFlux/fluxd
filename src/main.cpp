@@ -5,6 +5,7 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "main.h"
+#include "blockindexpool.h"
 
 #include "sodium.h"
 
@@ -48,6 +49,9 @@
 #include <filesystem>
 #include <fstream>
 #include <cmath>
+#ifndef WIN32
+#include <sys/statvfs.h>
+#endif
 
 #include "emergencyblock.h"
 
@@ -68,6 +72,7 @@ using namespace std;
 CCriticalSection cs_main;
 
 BlockMap mapBlockIndex;
+CBlockIndexPool* g_blockIndexPool = nullptr;
 CChain chainActive;
 CBlockIndex *pindexBestHeader = NULL;
 static int64_t nTimeBestReceived = 0;
@@ -93,6 +98,7 @@ uint64_t nPruneTarget = 0;
 bool fAlerts = DEFAULT_ALERTS;
 bool fIsVerifying = false;
 bool fJustDisconnectedTip = false;
+std::atomic<bool> fFluxnodeCacheRecovered{false};
 /* If the tip is older than this (in seconds), the node is considered to be in initial block download.
  */
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
@@ -153,24 +159,30 @@ namespace {
             if (pa->nChainWork > pb->nChainWork) return false;
             if (pa->nChainWork < pb->nChainWork) return true;
 
-            // For PON blocks at same height (same chain work), use PON hash as deterministic tie-breaker
-            // This prevents network splits when multiple eligible nodes create competing blocks
-            // Lower PON hash wins (same ordering as our rank-based coordination)
-            bool isPONBlockA = (pa->nVersion >= 100);
-            bool isPONBlockB = (pb->nVersion >= 100);
+            // For PON blocks at same height (same chain work), use a deterministic
+            // tie-breaker so all nodes converge on the same block instead of splitting.
+            bool isPONBlockA = (pa->nVersion >= CBlockHeader::PON_VERSION);
+            bool isPONBlockB = (pb->nVersion >= CBlockHeader::PON_VERSION);
 
             if (isPONBlockA && isPONBlockB && pa->nHeight == pb->nHeight) {
-                // Both are PON blocks at same height - use PON hash as tie-breaker
-                uint256 ponHashA = GetPONHash(pa->GetBlockHeader());
-                uint256 ponHashB = GetPONHash(pb->GetBlockHeader());
-
-                if (ponHashA < ponHashB) {
-                    return false; // A has better (lower) hash, A wins
+                // Deterministic PON tie-break (see ComparePonForkChoice): PON-VRF blocks
+                // compare by un-grindable VRF output, legacy PON blocks by the resident
+                // cached PON hash. Every node computes the same winner regardless of
+                // arrival order, so the network converges instead of forking. The scores
+                // must come from resident fields: recomputing from GetBlockHeader()
+                // would hash a zeroed nodesCollateral for pruned entries (wrong
+                // tie-break vs the network), and the result would change when
+                // connect/disconnect restores header data on an entry already in
+                // setBlockIndexCandidates — an in-place comparator-key mutation
+                // that breaks set ordering and makes erase-by-key silently fail.
+                int cmp = ComparePonForkChoice(pa, pb);
+                if (cmp < 0) {
+                    return false; // A preferred (lower score), A wins
                 }
-                if (ponHashA > ponHashB) {
-                    return true;  // B has better (lower) hash, B wins
+                if (cmp > 0) {
+                    return true;  // B preferred (lower score), B wins
                 }
-                // If hashes are equal, fall through to sequence ID
+                // Undecided (equal scores): fall through to sequence ID
             }
 
             // ... then by earliest time received, ...
@@ -2775,7 +2787,11 @@ bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus:
               CheckProofOfWork(block.GetHash(), block.nBits, consensusParams)))
             return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
     } else {
-        if (!CheckProofOfNode(GetPONHash(block), block.nBits, consensusParams) && !IsEmergencyBlock(block)) {
+        // For PON-VRF blocks the eligibility value is the committed VRF output, not GetPONHash.
+        uint256 ponEligibilityValue = (block.nVersion >= CBlockHeader::PON_VRF_VERSION)
+                                          ? block.nodesVrfOutput
+                                          : GetPONHash(block);
+        if (!CheckProofOfNode(ponEligibilityValue, block.nBits, consensusParams) && !IsEmergencyBlock(block)) {
             return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
         }
     }
@@ -2791,6 +2807,119 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus
         return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() doesn't match index for %s at %s",
                 pindex->ToString(), pindex->GetBlockPos().ToString());
     return true;
+}
+
+bool ReadBlockHeaderFromDisk(CBlockHeader& header, const CBlockIndex* pindex, const Consensus::Params& consensusParams)
+{
+    CDiskBlockPos pos = pindex->GetBlockPos();
+
+    // A CBlock on disk serializes its CBlockHeader base first, so reading
+    // just the header prefix at nDataPos skips deserializing every
+    // transaction. No proof-of-work/proof-of-node recheck either: the block
+    // was fully validated at accept time and callers serve or inspect the
+    // header rather than validate it. Reading the wrong bytes is still
+    // caught — the reconstructed hash must match the index entry.
+    CAutoFile filein(OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION);
+    if (filein.IsNull())
+        return error("%s: OpenBlockFile failed for %s", __func__, pos.ToString());
+
+    try {
+        filein >> header;
+    }
+    catch (const std::exception& e) {
+        return error("%s: Deserialize or I/O error - %s at %s", __func__, e.what(), pos.ToString());
+    }
+
+    // Identify the block by its immutable hash: callers may run without
+    // cs_main, and CBlockIndex::ToString() reads prunable header data.
+    if (header.GetHash() != pindex->GetBlockHash())
+        return error("%s: GetHash() doesn't match index for %s at %s",
+                __func__, pindex->GetBlockHash().ToString(), pos.ToString());
+    return true;
+}
+
+// On a fluxnode the header data of buried blocks is pruned from memory
+// (pHeaderData == nullptr) to save RAM. Connect/disconnect/serving paths that
+// run on such a block must restore the header fields first. These helpers
+// allocate pHeaderData if missing and repopulate the *header* fields (the only
+// ones reconstructable from the block); cumulative value-pool fields are left
+// at their defaults and recomputed by the connect logic that needs them.
+static void EnsureHeaderDataFromBlock(CBlockIndex* pindex, const CBlock& block)
+{
+    if (!pindex || pindex->pHeaderData)
+        return;
+    pindex->RestoreHeaderData(block);
+}
+
+// Returns false if the header could not be read back from disk. Callers must
+// treat that as block-file corruption and fail hard — continuing with zeroed
+// header fields would pop a wrong (empty) Sapling anchor and, once the entry
+// is dirtied, overwrite the good on-disk block index record with zeroes.
+static bool EnsureHeaderDataFromDisk(CBlockIndex* pindex, const Consensus::Params& consensusParams)
+{
+    if (!pindex || pindex->pHeaderData)
+        return true;
+    CBlockHeader header;
+    if (!ReadBlockHeaderFromDisk(header, pindex, consensusParams))
+        return false;
+    pindex->RestoreHeaderData(header);
+    return true;
+}
+
+bool GetFullBlockHeader(CBlockHeader& header, const CBlockIndex* pindex, const Consensus::Params& consensusParams)
+{
+    header = pindex->GetBlockHeader();
+    bool fNeedDisk = !pindex->pHeaderData || (header.IsPOW() && header.nSolution.empty());
+    if (!fNeedDisk)
+        return true;
+
+    CBlockHeader diskHeader;
+    if (!ReadBlockHeaderFromDisk(diskHeader, pindex, consensusParams)) {
+        // A resident header is still usable when only the omitted nSolution
+        // could not be completed from disk; report failure only when the
+        // header fields themselves are unavailable (pruned and unreadable).
+        return pindex->pHeaderData != nullptr;
+    }
+    header = diskHeader;
+    return true;
+}
+
+// Runtime-accepted block index entries keep their (rebuildable) header data
+// resident only for this many blocks below the active tip; older active-chain
+// entries have it freed and re-read from disk on demand. Bounds the runtime
+// HeaderData working set — the load-time entries are already pruned at startup
+// (LoadBlockIndexGuts) — while keeping recent-block relay and shallow reorgs off
+// the disk path.
+static const int RUNTIME_HEADERDATA_PRUNE_WINDOW = 1000;
+
+bool ShouldFreeAgedHeaderData(bool fIsFluxnode, int nBelowTip, int nWindow, bool fHasBlockData, bool fHasHeaderData)
+{
+    // Only fluxnodes prune; only past the hot window; only when the block data
+    // is on disk (so the freed header data can be rebuilt) and header data is
+    // actually resident to free. The block-data guard is essential: header-only
+    // entries cannot be rebuilt and must stay resident, exactly as the load-time
+    // prune in LoadBlockIndexGuts requires.
+    return fIsFluxnode && fHasBlockData && fHasHeaderData && nBelowTip >= nWindow;
+}
+
+// Runtime counterpart to the load-time HeaderData prune: once the tip advances,
+// free the header data of the active-chain entry that has just aged out of the
+// hot window, so runtime-accepted entries don't accumulate it in RAM. Re-read
+// from disk on demand (reorg/serving/disconnect) via EnsureHeaderDataFromDisk.
+static void PruneAgedHeaderData(const CBlockIndex* pindexTip)
+{
+    if (!fFluxnode || !pindexTip)
+        return;
+    int nAgeOutHeight = pindexTip->nHeight - RUNTIME_HEADERDATA_PRUNE_WINDOW;
+    if (nAgeOutHeight < 0)
+        return;
+    CBlockIndex* pindexOld = chainActive[nAgeOutHeight];
+    if (pindexOld &&
+        ShouldFreeAgedHeaderData(fFluxnode, pindexTip->nHeight - pindexOld->nHeight,
+                                 RUNTIME_HEADERDATA_PRUNE_WINDOW,
+                                 (pindexOld->nStatus & BLOCK_HAVE_DATA) != 0,
+                                 pindexOld->HasHeaderData()))
+        pindexOld->FreeHeaderData();
 }
 
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
@@ -3439,6 +3568,98 @@ enum DisconnectResult
  *  When UNCLEAN or FAILED is returned, view is left in an indeterminate state.
  *  The addressIndex and spentIndex will be updated if requested.
  */
+/**
+ * Undo only the fluxnode-cache effects of a block, in exactly the order
+ * DisconnectBlock applies them: undo-record read -> AddBackUndoData ->
+ * CheckForUndoExpiredStartTx -> reverse-tx loop (UndoNewStart /
+ * UndoNewConfirm / delegate restore decision) -> delegate map push.
+ * Touches no coins or chainstate. Used by DisconnectBlock and by
+ * RecoverFluxnodeCache's marker-chain rewind, which must undo the fluxnode
+ * effects of blocks that are NOT part of the current chainstate (the sync
+ * marker can sit ahead of the coins DB, or on a fork after a crashed reorg).
+ */
+static bool DisconnectFluxnodeOnly(const CBlock& block, const CBlockIndex* pindex, FluxnodeCache* p_fluxnodeCache, bool fRequireUndoRecord = false)
+{
+    if (!p_fluxnodeCache)
+        return error("%s: p_fluxnodeCache is null", __func__);
+
+    // During crash recovery a missing undo record is ambiguous: the block may
+    // have changed no fluxnode state (none was ever written) or CleanupOldFluxnodeData
+    // may have pruned it. They can only be confused for a block old enough to
+    // have been pruned — at or below the retention cutoff (tip - ONE_WEEK_OF_BLOCK_COUNT).
+    // Above the cutoff the record was never pruned, so an absent one means the
+    // block was a no-op for fluxnode state; tolerate it (an empty rewind), as the
+    // live disconnect path does. At or below the cutoff we cannot tell pruned from
+    // empty and a pruned record would silently under-rewind, so fail closed to
+    // -reindex.
+    if (fRequireUndoRecord && !pFluxnodeDB->ExistsBlockUndoFluxnodeData(block.GetHash()) &&
+        pindex->nHeight <= chainActive.Height() - ONE_WEEK_OF_BLOCK_COUNT)
+        return error("%s: fluxnode undo record missing for block %s (height %d) at/below the "
+                     "retention cutoff — it may have been pruned; restart with -reindex",
+                     __func__, block.GetHash().ToString(), pindex->nHeight);
+
+    CFluxnodeTxBlockUndo fluxnodeBlockUndo;
+    if (!pFluxnodeDB->ReadBlockUndoFluxnodeData(block.GetHash(), fluxnodeBlockUndo))
+        return error("%s: block fluxnodetx undo data inconsistent", __func__);
+
+    LogPrintf("DISCONNECT BLOCK %d: Read undo data - %d UPDATE_CONFIRM undos, %d paid node undos\n",
+              pindex->nHeight, fluxnodeBlockUndo.mapUpdateLastConfirmHeight.size(), fluxnodeBlockUndo.mapLastPaidHeights.size());
+
+    p_fluxnodeCache->AddBackUndoData(fluxnodeBlockUndo);
+    p_fluxnodeCache->CheckForUndoExpiredStartTx(pindex->nHeight);
+
+    std::set<COutPoint> setDelegatesToRemove;
+    std::map<COutPoint, CFluxnodeDelegates> mapDelegatesToAdd;
+
+    // undo fluxnode transactions in reverse order
+    for (int i = block.vtx.size() - 1; i >= 0; i--) {
+        const CTransaction& tx = block.vtx[i];
+        if (!tx.IsFluxnodeTx())
+            continue;
+
+        if (tx.nType == FLUXNODE_START_TX_TYPE) {
+            // Undo the start from the list
+            p_fluxnodeCache->UndoNewStart(tx, pindex->nHeight);
+            if (tx.HasDelegates() && tx.fUsingDelegates && tx.IsUpdatingDelegate()) {
+                LogPrint("fluxnode", "DisconnectBlock: Undoing delegate change for %s\n", tx.collateralIn.ToString());
+                auto it = fluxnodeBlockUndo.mapOldDelegates.find(tx.collateralIn);
+
+                if (it != fluxnodeBlockUndo.mapOldDelegates.end()) {
+                    // Had old delegates - restore them
+                    mapDelegatesToAdd[tx.collateralIn] = it->second;
+                } else {
+                    // No old delegates - this was a new addition, erase it
+                    setDelegatesToRemove.insert(tx.collateralIn);
+                }
+            }
+        } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
+            if (tx.nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM) {
+                p_fluxnodeCache->UndoNewConfirm(tx);
+            } else if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
+                // Handled by the p_fluxnodeCache->AddBackUndoData function
+                // This function uses the undo block data and handles it accordingly
+            }
+        }
+    }
+
+    // Add delegate restore/removal operations to the cache instead of writing directly to database
+    for (const auto& pair : mapDelegatesToAdd) {
+        // Had old delegates - restore them to cache
+        p_fluxnodeCache->mapDelegateToWrite[pair.first] = pair.second;
+        // Remove from erase set if it was there
+        p_fluxnodeCache->setDelegateToErase.erase(pair.first);
+    }
+
+    for (const auto& outpoint : setDelegatesToRemove) {
+        // Mark for erasure in cache
+        p_fluxnodeCache->setDelegateToErase.insert(outpoint);
+        // Remove from write map if it was there
+        p_fluxnodeCache->mapDelegateToWrite.erase(outpoint);
+    }
+
+    return true;
+}
+
 static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& state,
     const CBlockIndex* pindex, CCoinsViewCache& view, FluxnodeCache* p_fluxnodeCache, const CChainParams& chainparams,
     const bool updateIndices)
@@ -3446,9 +3667,6 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
     assert(pindex->GetBlockHash() == view.GetBestBlock());
 
     bool fClean = true;
-
-    std::set<COutPoint> setDelegatesToRemove;
-    std::map<COutPoint, CFluxnodeDelegates> mapDelegatesToAdd;
 
     CBlockUndo blockUndo;
     CDiskBlockPos pos = pindex->GetUndoPos();
@@ -3466,27 +3684,15 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
         return DISCONNECT_FAILED;
     }
 
-    CFluxnodeTxBlockUndo fluxnodeBlockUndo;
-    if (!pFluxnodeDB->ReadBlockUndoFluxnodeData(block.GetHash(), fluxnodeBlockUndo)) {
-        error("DisconnectBlock(): block fluxnodetx undo data inconsistent");
+    // Undo the fluxnode-cache effects of this block (reads the fluxnode undo
+    // record, restores tracker/confirmed state and delegates into the local
+    // cache). Coins/chainstate effects are undone below.
+    if (!DisconnectFluxnodeOnly(block, pindex, p_fluxnodeCache))
         return DISCONNECT_FAILED;
-    }
-
-    LogPrintf("DISCONNECT BLOCK %d: Read undo data - %d UPDATE_CONFIRM undos, %d paid node undos\n",
-              pindex->nHeight, fluxnodeBlockUndo.mapUpdateLastConfirmHeight.size(), fluxnodeBlockUndo.mapLastPaidHeights.size());
-
-    if (!p_fluxnodeCache) {
-        error("DisconnectBlock(): p_fluxnodeCache is null");
-        return DISCONNECT_FAILED;
-    }
-
-    p_fluxnodeCache->AddBackUndoData(fluxnodeBlockUndo);
 
     std::vector<CAddressIndexDbEntry> addressIndex;
     std::vector<CAddressUnspentDbEntry> addressUnspentIndex;
     std::vector<CSpentIndexDbEntry> spentIndex;
-
-    p_fluxnodeCache->CheckForUndoExpiredStartTx(pindex->nHeight);
 
     // undo transactions in reverse order
     LogPrintf("%s: Undoing transactions for block: %d\n", __func__, pindex->nHeight);
@@ -3512,32 +3718,6 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
                     addressUnspentIndex.push_back(make_pair(
                         CAddressUnspentKey(scriptType, addrHash, hash, k),
                         CAddressUnspentValue()));
-                }
-            }
-        }
-
-        if (tx.IsFluxnodeTx()) {
-            if (tx.nType == FLUXNODE_START_TX_TYPE) {
-                // Undo the start from the list
-                p_fluxnodeCache->UndoNewStart(tx, pindex->nHeight);
-                if (tx.HasDelegates() && tx.fUsingDelegates && tx.IsUpdatingDelegate()) {
-                    LogPrint("fluxnode", "DisconnectBlock: Undoing delegate change for %s\n", tx.collateralIn.ToString());
-                    auto it = fluxnodeBlockUndo.mapOldDelegates.find(tx.collateralIn);
-
-                    if (it != fluxnodeBlockUndo.mapOldDelegates.end()) {
-                        // Had old delegates - restore them
-                        mapDelegatesToAdd[tx.collateralIn] = it->second;
-                    } else {
-                        // No old delegates - this was a new addition, erase it
-                        setDelegatesToRemove.insert(tx.collateralIn);
-                    }
-                }
-            } else if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
-                if (tx.nUpdateType == FluxnodeUpdateType::INITIAL_CONFIRM) {
-                    p_fluxnodeCache->UndoNewConfirm(tx);
-                } else if (tx.nUpdateType == FluxnodeUpdateType::UPDATE_CONFIRM) {
-                    // Handled by the p_fluxnodeCache->AddBackUndoData function
-                    // This function uses the undo block data and handles it accordingly
                 }
             }
         }
@@ -3617,7 +3797,13 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
     // the Sapling activation height. Otherwise, the last anchor was the
     // empty root.
     if (NetworkUpgradeActive(pindex->pprev->nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_ACADIA)) {
-        view.PopAnchor(pindex->pprev->hashFinalSaplingRoot, SAPLING);
+        // pprev may be buried and have had its header data pruned; restore it
+        // from disk so hashFinalSaplingRoot is the real value, not a zeroed one.
+        if (!EnsureHeaderDataFromDisk(pindex->pprev, chainparams.GetConsensus())) {
+            AbortNode(state, "Failed to read block from disk to restore pruned header data");
+            return DISCONNECT_FAILED;
+        }
+        view.PopAnchor(pindex->pprev->pHeaderData->hashFinalSaplingRoot, SAPLING);
     } else {
         view.PopAnchor(SaplingMerkleTree::empty_root(), SAPLING);
     }
@@ -3641,29 +3827,6 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
         if (!pblocktree->UpdateSpentIndex(spentIndex)) {
             AbortNode(state, "Failed to write transaction index");
             return DISCONNECT_FAILED;
-        }
-    }
-
-    // Add delegate restore/removal operations to the cache instead of writing directly to database
-    if (!mapDelegatesToAdd.empty()) {
-        for (const auto& pair : mapDelegatesToAdd) {
-            // Had old delegates - restore them to cache
-            if (p_fluxnodeCache) {
-                p_fluxnodeCache->mapDelegateToWrite[pair.first] = pair.second;
-                // Remove from erase set if it was there
-                p_fluxnodeCache->setDelegateToErase.erase(pair.first);
-            }
-        }
-    }
-
-    if (!setDelegatesToRemove.empty()) {
-        for (const auto& outpoint : setDelegatesToRemove) {
-            // Mark for erasure in cache
-            if (p_fluxnodeCache) {
-                p_fluxnodeCache->setDelegateToErase.insert(outpoint);
-                // Remove from write map if it was there
-                p_fluxnodeCache->mapDelegateToWrite.erase(outpoint);
-            }
         }
     }
 
@@ -3792,6 +3955,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                   CCoinsViewCache& view, const CChainParams& chainparams, bool fJustCheck, FluxnodeCache* p_fluxnodeCache)
 {
     AssertLockHeld(cs_main);
+
+    // If this block's header data was pruned (buried block being reconnected
+    // during a deep reorg/invalidateblock), restore it from the block in hand
+    // before the value-pool/anchor bookkeeping below dereferences pHeaderData.
+    EnsureHeaderDataFromBlock(pindex, block);
 
     bool fExpensiveChecks = true;
     if (fCheckpointsEnabled) {
@@ -4203,7 +4371,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (fluxnodeTxBlockUndo.vecExpiredDosData.size() ||
         fluxnodeTxBlockUndo.vecExpiredConfirmedData.size() ||
         fluxnodeTxBlockUndo.mapUpdateLastConfirmHeight.size() ||
-        fluxnodeTxBlockUndo.mapLastPaidHeights.size())
+        fluxnodeTxBlockUndo.mapLastPaidHeights.size() ||
+        fluxnodeTxBlockUndo.mapLastIpAddress.size() ||
+        fluxnodeTxBlockUndo.mapOldDelegates.size())
     {
         if (!pFluxnodeDB->WriteBlockUndoFluxnodeData(block.GetHash(), fluxnodeTxBlockUndo))
             return AbortNode(state, "Failed to write fluxnodetx undo data");
@@ -4369,14 +4539,41 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
             }
 
             std::vector<const CBlockIndex*> vBlocks;
+            std::vector<CBlockIndex*> vRestoredHeaderData;
             vBlocks.reserve(setDirtyBlockIndex.size());
             for (set<CBlockIndex*>::iterator it = setDirtyBlockIndex.begin(); it != setDirtyBlockIndex.end(); ) {
+                // A dirty entry may have had its header data pruned (e.g.
+                // invalidateblock dirtying buried entries on a fluxnode), but
+                // CDiskBlockIndex serializes through pHeaderData. Restore it
+                // from disk before the write; an unreadable block means
+                // corrupt block files, and aborting beats overwriting a good
+                // leveldb record with zeroed header fields.
+                if (!(*it)->HasHeaderData()) {
+                    if (!EnsureHeaderDataFromDisk(*it, chainparams.GetConsensus()))
+                        return AbortNode(state, strprintf("Failed to restore pruned header data for block index write (block %s)",
+                                                          (*it)->GetBlockHash().ToString()));
+                    vRestoredHeaderData.push_back(*it);
+                }
                 vBlocks.push_back(*it);
                 setDirtyBlockIndex.erase(it++);
             }
             if (!pblocktree->WriteBatchSync(vFiles, nLastBlockFile, vBlocks)) {
                 return AbortNode(state, "Files to write to block index database");
             }
+            // Entries restored only for this write were buried-and-pruned
+            // before the flush; re-prune them so a deep invalidateblock can't
+            // re-accumulate header data in memory.
+            for (CBlockIndex* pindexRestored : vRestoredHeaderData)
+                pindexRestored->FreeHeaderData();
+            // The marker write is forced only after crash recovery has run.
+            // This flush also executes during init, before
+            // RecoverFluxnodeCache (e.g. RewindBlockIndex ends with an
+            // unconditional flush) — forcing a marker write there would
+            // overwrite the on-disk marker with the current in-memory tip and
+            // destroy the divergence that tells recovery a crash happened.
+            // After recovery, forcing keeps the marker at the tip even when
+            // no fluxnode data is dirty.
+            g_fluxnodeCache.PersistToDisk(chainActive.Tip(), fFluxnodeCacheRecovered.load());
         }
         // Finally remove any pruned files
         if (fFlushForPrune)
@@ -4398,15 +4595,6 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
         // Flush the chainstate (which may refer to block index entries).
         if (!pcoinsTip->Flush())
             return AbortNode(state, "Failed to write to coin database");
-
-        // Dump Fluxnode cache to database with sync state marker
-        // This uses atomic batch writes to ensure consistency between
-        // fluxnode data and the sync state marker
-        if (chainActive.Tip()) {
-            g_fluxnodeCache.DumpFluxnodeCache(chainActive.Tip()->GetBlockHash(), chainActive.Height());
-        } else {
-            g_fluxnodeCache.DumpFluxnodeCache();
-        }
         nLastFlush = nNow;
     }
     if ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) && nNow > nLastSetChain + nNextWriteInterval * 1000000) {
@@ -4548,6 +4736,16 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
     }
     // Update cached incremental witnesses
     GetMainSignals().ChainTip(pindexDelete, &block, newSproutTree, newSaplingTree, false);
+
+    // The disconnected block has left the active chain. On a fluxnode, free its
+    // prunable header data now: PruneAgedHeaderData only sweeps the active chain,
+    // so a reorg's losing-fork entries (whose header data is rehydrated to
+    // disconnect them) would otherwise retain it in RAM indefinitely. It is
+    // rebuilt from disk on demand, and re-restored by ConnectTip if the block is
+    // later reconnected. (BLOCK_HAVE_DATA guards rebuildability, as elsewhere.)
+    if (fFluxnode && (pindexDelete->nStatus & BLOCK_HAVE_DATA))
+        pindexDelete->FreeHeaderData();
+
     return true;
 }
 
@@ -4657,6 +4855,10 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
 
     // Update chainActive & related variables.
     UpdateTip(pindexNew, chainparams);
+
+    // Free the header data of the entry that just aged out of the hot window so
+    // runtime-accepted entries don't accumulate it in RAM (see PruneAgedHeaderData).
+    PruneAgedHeaderData(pindexNew);
 
     // Periodically check and shrink debug.log if needed (every 20000 blocks, ~1 week at 30s intervals)
     // Uses -maxdebugfilesize (threshold) and -debuglogretainsize (keep size) parameters
@@ -5052,6 +5254,29 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
     return true;
 }
 
+// Allocate a block index entry for a header accepted at runtime, mirroring
+// InsertBlockIndex's arena/heap split: placement-construct it in the file-backed
+// arena (reclaimable RssFile) when the pool is available, otherwise plain heap.
+// Inserts into mapBlockIndex and points phashBlock at a stable hash. This is
+// what keeps runtime-accepted entries from accumulating as pinned heap, the same
+// way the load-time path (InsertBlockIndex) already does.
+static CBlockIndex* AddBlockIndexFromHeader(const CBlockHeader& block, const uint256& hash)
+{
+    void* mem = g_blockIndexPool ? g_blockIndexPool->AllocateEntry() : nullptr;
+    if (mem) {
+        CBlockIndex* pindexNew = new (mem) CBlockIndex(block);
+        uint256* pHash = static_cast<uint256*>(g_blockIndexPool->HashAt(g_blockIndexPool->Size() - 1));
+        *pHash = hash;
+        pindexNew->phashBlock = pHash;
+        mapBlockIndex.insert(make_pair(hash, pindexNew));
+        return pindexNew;
+    }
+    CBlockIndex* pindexNew = new CBlockIndex(block);
+    BlockMap::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+    pindexNew->phashBlock = &((*mi).first);
+    return pindexNew;
+}
+
 CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
 {
     // Check for duplicate
@@ -5060,15 +5285,17 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     if (it != mapBlockIndex.end())
         return it->second;
 
-    // Construct new block index object
-    CBlockIndex* pindexNew = new CBlockIndex(block);
+    // Construct new block index object (arena-backed when available)
+    CBlockIndex* pindexNew = AddBlockIndexFromHeader(block, hash);
     assert(pindexNew);
+    // Cache the PON hash for the fork-choice tie-breaker; it must stay
+    // available after the header data is pruned.
+    if (block.IsPON())
+        pindexNew->hashPON = GetPONHash(block);
     // We assign the sequence id to blocks only when the full data is available,
     // to avoid miners withholding blocks but broadcasting headers, to get a
     // competitive advantage.
     pindexNew->nSequenceId = 0;
-    BlockMap::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
-    pindexNew->phashBlock = &((*mi).first);
     BlockMap::iterator miPrev = mapBlockIndex.find(block.hashPrevBlock);
     if (miPrev != mapBlockIndex.end())
     {
@@ -5138,14 +5365,15 @@ bool ReceivedBlockTransactions(
     // This is important for blocks that were initially created from compact headers
     // (which don't have nSolution for POW blocks)
     pindexNew->nVersion = block.nVersion;
-    pindexNew->hashMerkleRoot = block.hashMerkleRoot;
-    pindexNew->hashFinalSaplingRoot = block.hashFinalSaplingRoot;
     pindexNew->nTime = block.nTime;
     pindexNew->nBits = block.nBits;
-    pindexNew->nNonce = block.nNonce;
-    pindexNew->nSolution = block.nSolution;
-    pindexNew->nodesCollateral = block.nodesCollateral;
-    pindexNew->vchBlockSig = block.vchBlockSig;
+    pindexNew->AllocateHeaderData();
+    pindexNew->pHeaderData->hashMerkleRoot = block.hashMerkleRoot;
+    pindexNew->pHeaderData->hashFinalSaplingRoot = block.hashFinalSaplingRoot;
+    pindexNew->pHeaderData->nNonce = block.nNonce;
+    pindexNew->pHeaderData->nSolution = block.nSolution;
+    pindexNew->pHeaderData->nodesCollateral = block.nodesCollateral;
+    pindexNew->pHeaderData->vchBlockSig = block.vchBlockSig;
 
     pindexNew->nTx = block.vtx.size();
     pindexNew->nChainTx = 0;
@@ -5184,6 +5412,8 @@ bool ReceivedBlockTransactions(
             CBlockIndex *pindex = queue.front();
             queue.pop_front();
             pindex->nChainTx = (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
+            // Value-pool fields live directly on CBlockIndex (always resident),
+            // so propagation is correct even when header data has been pruned.
             if (pindex->pprev) {
                 if (pindex->pprev->nChainSproutValue && pindex->nSproutValue) {
                     pindex->nChainSproutValue = *pindex->pprev->nChainSproutValue + *pindex->nSproutValue;
@@ -5337,8 +5567,13 @@ bool CheckBlockHeader(
                              REJECT_INVALID, "bad-pon-sig-size");
 
         if (!IsEmergencyBlock((block))) {
-            // Check proof of work matches claimed amount
-            if (fCheckPOW && !CheckProofOfNode(GetPONHash(block), block.nBits, chainparams.GetConsensus()))
+            // Check proof of node matches claimed amount. For PON-VRF blocks the eligibility
+            // value is the committed VRF output (the full proof is verified contextually in
+            // ContextualCheckPONBlockHeader); for legacy PON blocks it is GetPONHash.
+            uint256 ponEligibilityValue = (block.nVersion >= CBlockHeader::PON_VRF_VERSION)
+                                              ? block.nodesVrfOutput
+                                              : GetPONHash(block);
+            if (fCheckPOW && !CheckProofOfNode(ponEligibilityValue, block.nBits, chainparams.GetConsensus()))
                 return state.DoS(50, error("CheckBlockHeader(): proof of node failed"),
                                  REJECT_INVALID, "high-hash");
         }
@@ -5758,8 +5993,8 @@ static bool AcceptBlock(const CBlock& block, CValidationState& state, const CCha
     // The header may have arrived earlier with a different (possibly invalid) signature,
     // since vchBlockSig is not committed to the block hash. Now that we've validated
     // the full block with a valid signature, update the index to store the correct one.
-    if (block.IsPON() && pindex->vchBlockSig != block.vchBlockSig) {
-        pindex->vchBlockSig = block.vchBlockSig;
+    if (block.IsPON() && pindex->pHeaderData && pindex->pHeaderData->vchBlockSig != block.vchBlockSig) {
+        pindex->pHeaderData->vchBlockSig = block.vchBlockSig;
         setDirtyBlockIndex.insert(pindex);
     }
 
@@ -6031,12 +6266,39 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
     if (mi != mapBlockIndex.end())
         return (*mi).second;
 
-    // Create new
-    CBlockIndex* pindexNew = new CBlockIndex();
-    if (!pindexNew)
-        throw runtime_error("LoadBlockIndex(): new CBlockIndex failed");
-    mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
-    pindexNew->phashBlock = &((*mi).first);
+    // Allocate from the arena if available, otherwise (non-fluxnode, arena
+    // init failed, or arena exhausted) fall back to plain heap allocation.
+    // The arena and heap entries coexist: cleanup distinguishes them by
+    // CBlockIndexPool::Contains(), so heap fallbacks are deleted while arena
+    // entries are only destructed. Exhaustion therefore degrades gracefully
+    // instead of aborting the node.
+    CBlockIndex* pindexNew = nullptr;
+    void* mem = g_blockIndexPool ? g_blockIndexPool->AllocateEntry() : nullptr;
+    if (mem) {
+        pindexNew = new (mem) CBlockIndex();
+
+        // Store hash in arena's parallel array and point phashBlock there
+        size_t index = g_blockIndexPool->Size() - 1;
+        uint256* pHash = static_cast<uint256*>(g_blockIndexPool->HashAt(index));
+        *pHash = hash;
+        pindexNew->phashBlock = pHash;
+
+        mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+    } else {
+        if (g_blockIndexPool) {
+            static bool fWarnedExhausted = false;
+            if (!fWarnedExhausted) {
+                fWarnedExhausted = true;
+                LogPrintf("WARNING: block index arena exhausted; allocating remaining "
+                          "entries on the heap (bounded-memory benefit reduced)\n");
+            }
+        }
+        pindexNew = new CBlockIndex();
+        if (!pindexNew)
+            throw runtime_error("InsertBlockIndex(): new CBlockIndex failed");
+        mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+        pindexNew->phashBlock = &((*mi).first);
+    }
 
     return pindexNew;
 }
@@ -6044,6 +6306,63 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
 bool static LoadBlockIndexDB()
 {
     const CChainParams& chainparams = Params();
+
+    // Initialize the block index arena — fluxnodes only. The arena is the
+    // memory-optimization path (segmented file-backed storage so cold block
+    // index pages evict to disk, keeping RSS bounded on low-RAM nodes); it
+    // is paired with header-data pruning, which is also fluxnode-gated.
+    // Non-fluxnodes fall through to plain heap allocation (master behavior)
+    // and never create the backing file.
+    //
+    // Storage is segmented: blockindex.arena grows ~128 MiB at a time as the
+    // chain grows (each slot is a CBlockIndex + its hash), so file size and
+    // virtual size track actual usage with no fixed reservation and no hard
+    // ceiling. If a chunk can't be mapped, InsertBlockIndex falls back to heap
+    // per-entry rather than aborting.
+    static const size_t CHUNK_BYTES = 128ULL * 1024 * 1024;
+    const size_t slotBytes = sizeof(CBlockIndex) + sizeof(uint256);
+    const size_t entriesPerChunk = CHUNK_BYTES / slotBytes;
+    // Cold index pages evict to blockindex.arena, not swap. ftruncate grows it
+    // sparsely (no blocks until written), so low disk can't be detected at
+    // allocation time; a genuinely full datadir would later SIGBUS on write (a
+    // clean crash — the arena is scratch and rebuilds from leveldb). Guard the
+    // *startup* case: if the datadir is already low on space, skip the arena
+    // and use heap allocation. (Runtime disk-fill is a benign residual,
+    // equivalent to any node being unable to write its chainstate.)
+    static const uint64_t ARENA_MIN_FREE_BYTES = 2ULL * 1024 * 1024 * 1024; // 2 GiB
+    bool fEnoughDisk = true;
+#ifndef WIN32
+    // POSIX-only check; on Windows the arena itself is inert (pool Initialize
+    // reports failure) so the guard is moot.
+    if (fFluxnode) {
+        struct statvfs vfs;
+        if (statvfs(GetDataDir().string().c_str(), &vfs) == 0) {
+            uint64_t freeBytes = (uint64_t)vfs.f_bavail * vfs.f_frsize;
+            if (freeBytes < ARENA_MIN_FREE_BYTES) {
+                fEnoughDisk = false;
+                LogPrintf("Block index arena: datadir has only %lu MiB free (< %lu MiB); "
+                          "using heap allocation instead\n",
+                          (unsigned long)(freeBytes >> 20),
+                          (unsigned long)(ARENA_MIN_FREE_BYTES >> 20));
+            }
+        } // statvfs failure: proceed and let Initialize/heap fallback handle it
+    }
+#endif
+    if (fFluxnode && fEnoughDisk) {
+        g_blockIndexPool = new CBlockIndexPool();
+        if (!g_blockIndexPool->Initialize(sizeof(CBlockIndex), sizeof(uint256),
+                                          entriesPerChunk, GetDataDir().string())) {
+            delete g_blockIndexPool;
+            g_blockIndexPool = nullptr;
+            LogPrintf("WARNING: Failed to initialize block index arena, falling back to heap allocation\n");
+        } else {
+            LogPrintf("Block index arena: segmented file-backed, %lu entries per ~128 MiB chunk\n",
+                      (unsigned long)entriesPerChunk);
+        }
+    }
+    if (fFluxnode)
+        mapBlockIndex.reserve(4000000);
+
     if (!pblocktree->LoadBlockIndexGuts(InsertBlockIndex))
         return false;
 
@@ -6094,8 +6413,10 @@ bool static LoadBlockIndexDB()
             // override and set the in-memory size of shielded pools to zero.  An unshielding transaction
             // can then be used to trigger and test the handling of turnstile violations.
             if (fExperimentalMode && mapArgs.count("-developersetpoolsizezero")) {
-                pindex->nChainSproutValue = 0;
-                pindex->nChainSaplingValue = 0;
+                {
+                    pindex->nChainSproutValue = 0;
+                    pindex->nChainSaplingValue = 0;
+                }
             }
         }
         // Construct in-memory chain of branch IDs.
@@ -6303,6 +6624,140 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
     return true;
 }
 
+//! Maximum depth the fluxnode-cache recovery will rewind. Undo records older
+//! than this are pruned by CleanupOldFluxnodeData (same window), so a deeper
+//! rewind would silently under-rewind; require -reindex instead.
+static const int MAX_FLUXNODE_RECOVERY_DEPTH = 5040;
+
+bool RecoverFluxnodeCache(const CChainParams& chainparams)
+{
+    LOCK(cs_main);
+
+    FluxnodeSyncState syncState;
+    if (!pFluxnodeDB || !pFluxnodeDB->ReadSyncState(syncState)) {
+        LogPrintf("RecoverFluxnodeCache: no sync state marker, skipping recovery\n");
+        return true;
+    }
+
+    if (!chainActive.Tip()) {
+        LogPrintf("RecoverFluxnodeCache: no active chain, skipping recovery\n");
+        return true;
+    }
+
+    if (syncState.bestBlockHash == chainActive.Tip()->GetBlockHash()) {
+        LogPrintf("RecoverFluxnodeCache: sync state matches chain tip at height %d, no recovery needed\n",
+                  syncState.nHeight);
+        return true;
+    }
+
+    // Locate the marker block in the block index. The on-disk fluxnode DB
+    // reflects the chain AS SEEN FROM THE MARKER: the marker is written in
+    // the same synced batch as the data (PersistToDisk), so the marker's
+    // chain — not the active chain — is what the fluxnode DB has applied.
+    BlockMap::iterator mi = mapBlockIndex.find(syncState.bestBlockHash);
+    if (mi == mapBlockIndex.end()) {
+        LogPrintf("RecoverFluxnodeCache: sync state block not in block index (stale marker), writing fresh sync state\n");
+        g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
+        return true;
+    }
+    CBlockIndex* pMarker = mi->second;
+
+    // Common ancestor of the marker's chain and the active chain. Covers all
+    // marker positions: behind the tip on the active chain (ancestor ==
+    // marker, plain lag), ahead of the tip on the same chain (ancestor ==
+    // tip, the periodic write ran ahead of the ~24h coins flush), or on a
+    // fork (crash during reorg).
+    CBlockIndex* pAncestor = pMarker;
+    while (pAncestor && !chainActive.Contains(pAncestor))
+        pAncestor = pAncestor->pprev;
+
+    if (!pAncestor) {
+        return error("RecoverFluxnodeCache: no common ancestor between sync marker %s (height %d) and the active chain — "
+                     "fluxnode cache is unrecoverable, restart with -reindex",
+                     syncState.bestBlockHash.ToString(), syncState.nHeight);
+    }
+
+    // Depth cap: both the marker-chain rewind and the chainstate disconnect
+    // consume fluxnode undo records, which are pruned beyond the retention
+    // window. Refuse to "recover" past it — that would silently under-rewind.
+    int nMarkerRewindDepth = pMarker->nHeight - pAncestor->nHeight;
+    int nChainstateDepth = chainActive.Height() - pAncestor->nHeight;
+    if (nMarkerRewindDepth > MAX_FLUXNODE_RECOVERY_DEPTH || nChainstateDepth > MAX_FLUXNODE_RECOVERY_DEPTH) {
+        return error("RecoverFluxnodeCache: recovery needs to rewind %d blocks (marker %d / chainstate %d), beyond the "
+                     "%d-block undo retention window — restart with -reindex",
+                     std::max(nMarkerRewindDepth, nChainstateDepth), nMarkerRewindDepth, nChainstateDepth,
+                     MAX_FLUXNODE_RECOVERY_DEPTH);
+    }
+
+    // Phase 1: fluxnode-only rewind along the MARKER's chain, marker down to
+    // (but excluding) the common ancestor. These blocks' fluxnode effects are
+    // in the on-disk DB but are not (or no longer) part of the chainstate's
+    // path, so DisconnectTip can never undo them — without this rewind,
+    // ActivateBestChain would replay onto a cache that already contains
+    // their effects (double-applied deltas, rebuilt undo records overwriting
+    // good ones, nLastPaidHeight resets). Each block uses a fresh local cache
+    // flushed immediately, exactly mirroring DisconnectTip: multi-block
+    // batching would be incorrect (setAddToConfirmHeight semantics and
+    // AddBackUndoData's already-in-local guard both assume per-block Flush).
+    int nFluxnodeRewound = 0;
+    if (pMarker != pAncestor) {
+        LogPrintf("RecoverFluxnodeCache: sync marker %s (height %d) is not the common ancestor (height %d); "
+                  "rewinding %d blocks of fluxnode state along the marker's chain\n",
+                  syncState.bestBlockHash.ToString(), syncState.nHeight, pAncestor->nHeight, nMarkerRewindDepth);
+
+        for (CBlockIndex* pindex = pMarker; pindex != pAncestor; pindex = pindex->pprev) {
+            CBlock block;
+            if (!ReadBlockFromDisk(block, pindex, chainparams.GetConsensus())) {
+                return error("RecoverFluxnodeCache: failed to read block %s (height %d) for fluxnode rewind — "
+                             "block files corrupt, restart with -reindex",
+                             pindex->GetBlockHash().ToString(), pindex->nHeight);
+            }
+
+            FluxnodeCache localCache;
+            if (!DisconnectFluxnodeOnly(block, pindex, &localCache, /*fRequireUndoRecord=*/true)) {
+                return error("RecoverFluxnodeCache: failed to undo fluxnode effects of block %s (height %d) — "
+                             "restart with -reindex",
+                             pindex->GetBlockHash().ToString(), pindex->nHeight);
+            }
+            if (!localCache.Flush()) {
+                return error("RecoverFluxnodeCache: failed to flush fluxnode cache while rewinding block %s (height %d)",
+                             pindex->GetBlockHash().ToString(), pindex->nHeight);
+            }
+            nFluxnodeRewound++;
+        }
+        CRPCFluxnodeCache::ClearFluxnodeListCache();
+    }
+
+    // Phase 2: chainstate disconnect down to the common ancestor (unchanged
+    // behavior). DisconnectTip undoes both coins and fluxnode effects; for
+    // active-chain blocks the fluxnode DB may or may not have applied them,
+    // but the undo operations converge to the ancestor state either way.
+    CValidationState state;
+    int nBlocksToReplay = chainActive.Height() - pAncestor->nHeight;
+    if (nBlocksToReplay > 0) {
+        LogPrintf("RecoverFluxnodeCache: disconnecting %d blocks (tip %d -> %d) for fluxnode cache replay\n",
+                  nBlocksToReplay, chainActive.Height(), pAncestor->nHeight);
+
+        while (chainActive.Height() > pAncestor->nHeight) {
+            if (!DisconnectTip(state, chainparams, true)) {
+                return error("RecoverFluxnodeCache: failed to disconnect block at height %d", chainActive.Height());
+            }
+        }
+    }
+
+    // Write the repaired state and marker (fForce: the cache may be clean if
+    // only the marker was wrong). ActivateBestChain replays forward from the
+    // ancestor, rewriting now-correct undo records as it goes.
+    g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
+
+    if (!FlushStateToDisk(state, FLUSH_STATE_ALWAYS))
+        return false;
+
+    LogPrintf("RecoverFluxnodeCache: rewound %d marker-chain blocks, disconnected %d chainstate blocks; "
+              "ActivateBestChain will reconnect to the best tip\n", nFluxnodeRewound, nBlocksToReplay);
+    return true;
+}
+
 bool RewindBlockIndex(const CChainParams& chainparams, bool& clearWitnessCaches)
 {
     LOCK(cs_main);
@@ -6440,8 +6895,18 @@ bool RewindBlockIndex(const CChainParams& chainparams, bool& clearWitnessCaches)
     for (auto pindex : vBlocks) {
         auto ret = mapBlockIndex.find(*pindex->phashBlock);
         if (ret != mapBlockIndex.end()) {
+            // erase is about to invalidate ret; capture the non-const entry
+            // pointer the map owns so we can free its prunable HeaderData.
+            CBlockIndex* pEntry = ret->second;
             mapBlockIndex.erase(ret);
-            delete pindex;
+            if (!g_blockIndexPool || !g_blockIndexPool->Contains(pEntry))
+                delete pEntry;
+            else
+                // Arena-backed entry: its slot can't be freed here (slots are
+                // never reused and are destructed at shutdown), but its prunable
+                // HeaderData is a separate heap allocation that would otherwise
+                // leak until then — free it now.
+                pEntry->FreeHeaderData();
         }
     }
 
@@ -6480,8 +6945,23 @@ void UnloadBlockIndex()
     mapNodeState.clear();
     recentRejects.reset(NULL);
 
-    for (BlockMap::value_type& entry : mapBlockIndex) {
-        delete entry.second;
+    if (g_blockIndexPool) {
+        // Heap-fallback entries (allocated when a chunk could not be mapped)
+        // live outside the pool and must be deleted individually; the pool's
+        // own entries are destructed in place by DestroyAll.
+        for (BlockMap::value_type& entry : mapBlockIndex) {
+            if (!g_blockIndexPool->Contains(entry.second))
+                delete entry.second;
+        }
+        g_blockIndexPool->DestroyAll([](void* p) {
+            static_cast<CBlockIndex*>(p)->~CBlockIndex();
+        });
+        delete g_blockIndexPool;
+        g_blockIndexPool = nullptr;
+    } else {
+        for (BlockMap::value_type& entry : mapBlockIndex) {
+            delete entry.second;
+        }
     }
     mapBlockIndex.clear();
     fHavePruned = false;
@@ -7582,69 +8062,113 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         uint256 hashStop;
         vRecv >> locator >> hashStop;
 
-        LOCK(cs_main);
-
-        if (IsInitialBlockDownload(chainparams))
-            return true;
-
-        CBlockIndex* pindex = NULL;
-        if (locator.IsNull())
+        // Serving headers for buried (pruned) entries re-reads them from
+        // disk, and a cold batch can take whole seconds. The index walk
+        // needs cs_main, the disk reads do not: index entries are never
+        // freed at runtime and the read path uses only immutable fields.
+        // So: snapshot the resident header fields under the lock, then do
+        // the slow rehydration reads after releasing it — holding cs_main
+        // across them would starve RPC and validation for the duration.
+        // The snapshot must not be completed lock-free from pHeaderData:
+        // reorg paths rehydrate entries concurrently under cs_main, so a
+        // lock-free reader could observe a half-filled allocation.
+        bool useCompactHeaders = false;
+        std::vector<CBlockHeader> vHeaders;
+        std::vector<std::pair<size_t, const CBlockIndex*>> vNeedDisk;
         {
-            // If locator is null, return the hashStop block
-            BlockMap::iterator mi = mapBlockIndex.find(hashStop);
-            if (mi == mapBlockIndex.end())
+            LOCK(cs_main);
+
+            if (IsInitialBlockDownload(chainparams))
                 return true;
-            pindex = (*mi).second;
-        }
-        else
-        {
-            // Find the last block the caller has in the main chain
-            pindex = FindForkInGlobalIndex(chainActive, locator);
-            if (pindex)
-                pindex = chainActive.Next(pindex);
-        }
 
-        // Check if peer supports compact headers and if we're sending checkpointed blocks
-        int latestCheckpoint = Checkpoints::GetTotalBlocksEstimate(chainparams.Checkpoints());
-        bool useCompactHeaders = (pfrom->nVersion >= CMPHEADERS_VERSION) &&
-                                 pindex && (pindex->nHeight < latestCheckpoint);
-
-        if (useCompactHeaders) {
-            // Send compact headers for checkpointed blocks (saves bandwidth)
-            // POW blocks: omit nSolution (~1344 bytes saved per header)
-            // PON blocks: include all data (already compact)
-            vector<CCompactBlockHeader> vCompactHeaders;
-
-            // Increase limit for compact headers since they're smaller
-            // 2000 headers: POW = 280KB, PON = 482KB (well under MAX_PROTOCOL_MESSAGE_LENGTH)
-            int nLimit = 2000;
-
-            LogPrint("net", "getheaders (compact) %d to %s from peer=%d\n",
-                     pindex->nHeight, hashStop.ToString(), pfrom->id);
-
-            for (; pindex; pindex = chainActive.Next(pindex))
+            CBlockIndex* pindex = NULL;
+            if (locator.IsNull())
             {
-                vCompactHeaders.push_back(CCompactBlockHeader(pindex->GetBlockHeader()));
-                if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
-                    break;
+                // If locator is null, return the hashStop block
+                BlockMap::iterator mi = mapBlockIndex.find(hashStop);
+                if (mi == mapBlockIndex.end())
+                    return true;
+                pindex = (*mi).second;
             }
-            pfrom->PushMessage("cmpheaders", vCompactHeaders);
-        } else {
-            // Send regular headers (peer doesn't support compact, or blocks not checkpointed)
-            // we must use CBlocks, as CBlockHeaders won't include the 0x00 nTx count at the end
-            vector<CBlock> vHeaders;
-            int nLimit = MAX_HEADERS_RESULTS;
+            else
+            {
+                // Find the last block the caller has in the main chain
+                pindex = FindForkInGlobalIndex(chainActive, locator);
+                if (pindex)
+                    pindex = chainActive.Next(pindex);
+            }
 
-            LogPrint("net", "getheaders %d to %s from peer=%d\n",
+            // Check if peer supports compact headers and if we're sending checkpointed blocks
+            int latestCheckpoint = Checkpoints::GetTotalBlocksEstimate(chainparams.Checkpoints());
+            useCompactHeaders = (pfrom->nVersion >= CMPHEADERS_VERSION) &&
+                                pindex && (pindex->nHeight < latestCheckpoint);
+
+            // Compact headers are small enough for bigger batches:
+            // 2000 headers: POW = 280KB, PON = 482KB (well under MAX_PROTOCOL_MESSAGE_LENGTH)
+            int nLimit = useCompactHeaders ? 2000 : MAX_HEADERS_RESULTS;
+
+            LogPrint("net", "getheaders%s %d to %s from peer=%d\n",
+                     useCompactHeaders ? " (compact)" : "",
                      (pindex ? pindex->nHeight : -1), hashStop.ToString(), pfrom->id);
 
             for (; pindex; pindex = chainActive.Next(pindex))
             {
-                vHeaders.push_back(CBlock(pindex->GetBlockHeader()));
+                vHeaders.push_back(pindex->GetBlockHeader());
+                // Entries whose header data was pruned (buried block on a
+                // fluxnode) or held without nSolution must be completed from
+                // disk so we never serve zeroed merkle roots / nonces.
+                const CBlockHeader& h = vHeaders.back();
+                if (!pindex->pHeaderData || (h.IsPOW() && h.nSolution.empty()))
+                    vNeedDisk.emplace_back(vHeaders.size() - 1, pindex);
                 if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
                     break;
             }
-            pfrom->PushMessage("headers", vHeaders);
+        }
+
+        // Slow phase, lock-free: rehydrate from the block files. An entry in
+        // vNeedDisk has an incomplete resident snapshot (a pruned entry's merkle
+        // root/nonce are zeroed; a checkpointed POW entry's nSolution is empty),
+        // so if its disk read fails it must not be served. Truncate the batch at
+        // the first such entry to keep a valid contiguous prefix — the peer
+        // re-requests from there (and a persistent local read failure is its cue
+        // to try another node) instead of receiving a malformed header.
+        const size_t nWalked = vHeaders.size();
+        size_t nServe = nWalked;
+        for (const auto& entry : vNeedDisk) {
+            CBlockHeader diskHeader;
+            if (ReadBlockHeaderFromDisk(diskHeader, entry.second, chainparams.GetConsensus()))
+                vHeaders[entry.first] = diskHeader;
+            else
+                nServe = std::min(nServe, entry.first);
+        }
+        if (nServe < vHeaders.size())
+            vHeaders.resize(nServe);
+
+        // If the walk found blocks but the first one was unreadable, the batch is
+        // now empty. Don't send it: an empty headers/cmpheaders message means "end
+        // of chain — stop asking this peer", so the peer would drop us as a header
+        // source. Returning nothing lets it time out and retry elsewhere. (An empty
+        // batch because the walk found no blocks at all is a normal end-of-chain
+        // reply and is still sent below.)
+        if (vHeaders.empty() && nWalked > 0)
+            return true;
+
+        if (useCompactHeaders) {
+            // Compact headers for checkpointed blocks (saves bandwidth):
+            // POW blocks omit nSolution (~1344 bytes saved per header),
+            // PON blocks include all data (already compact)
+            vector<CCompactBlockHeader> vCompactHeaders;
+            vCompactHeaders.reserve(vHeaders.size());
+            for (const CBlockHeader& header : vHeaders)
+                vCompactHeaders.push_back(CCompactBlockHeader(header));
+            pfrom->PushMessage("cmpheaders", vCompactHeaders);
+        } else {
+            // we must use CBlocks, as CBlockHeaders won't include the 0x00 nTx count at the end
+            vector<CBlock> vBlockHeaders;
+            vBlockHeaders.reserve(vHeaders.size());
+            for (const CBlockHeader& header : vHeaders)
+                vBlockHeaders.push_back(CBlock(header));
+            pfrom->PushMessage("headers", vBlockHeaders);
         }
     }
 
@@ -7929,13 +8453,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             // Create new block index entry
             // For POW blocks without nSolution, we trust the hash from the sender
             // since the checkpoint validates the chain
-            CBlockIndex* pindexNew = new CBlockIndex(compactHeader);
+            CBlockIndex* pindexNew = AddBlockIndexFromHeader(compactHeader, hash);
             assert(pindexNew);
+            if (compactHeader.IsPON())
+                pindexNew->hashPON = GetPONHash(compactHeader);
             pindexNew->nSequenceId = 0;
-
-            // Insert using the provided/computed hash
-            BlockMap::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
-            pindexNew->phashBlock = &((*mi).first);
 
             if (pindexPrev) {
                 pindexNew->pprev = pindexPrev;
@@ -8928,13 +9450,26 @@ static class CMainCleanup
 public:
     CMainCleanup() {}
     ~CMainCleanup() {
-        // block headers
-        BlockMap::iterator it1 = mapBlockIndex.begin();
-        for (; it1 != mapBlockIndex.end(); it1++)
-            delete (*it1).second;
+        if (g_blockIndexPool) {
+            // Heap-fallback entries (allocated when a chunk could not be
+            // mapped) live outside the pool and must be deleted individually;
+            // the pool's own entries are destructed in place by DestroyAll.
+            for (BlockMap::value_type& entry : mapBlockIndex) {
+                if (!g_blockIndexPool->Contains(entry.second))
+                    delete entry.second;
+            }
+            g_blockIndexPool->DestroyAll([](void* p) {
+                static_cast<CBlockIndex*>(p)->~CBlockIndex();
+            });
+            delete g_blockIndexPool;
+            g_blockIndexPool = nullptr;
+        } else {
+            BlockMap::iterator it1 = mapBlockIndex.begin();
+            for (; it1 != mapBlockIndex.end(); it1++)
+                delete (*it1).second;
+        }
         mapBlockIndex.clear();
 
-        // orphan transactions
         mapOrphanTransactions.clear();
         mapOrphanTransactionsByPrev.clear();
     }

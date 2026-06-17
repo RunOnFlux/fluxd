@@ -100,7 +100,7 @@ static UniValue ValuePoolDesc(
     return rv;
 }
 
-UniValue blockheaderToJSON(const CBlockIndex* blockindex)
+UniValue blockheaderToJSON(const CBlockIndex* blockindex, const CBlockHeader* fullHeaderOverride = nullptr, bool fHaveHeaderOverride = false)
 {
     UniValue result(UniValue::VOBJ);
     result.pushKV("hash", blockindex->GetBlockHash().GetHex());
@@ -111,21 +111,36 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
     result.pushKV("confirmations", confirmations);
     result.pushKV("height", blockindex->nHeight);
     result.pushKV("version", blockindex->nVersion);
-    result.pushKV("merkleroot", blockindex->hashMerkleRoot.GetHex());
-    result.pushKV("finalsaplingroot", blockindex->hashFinalSaplingRoot.GetHex());
+
+    // Header fields may be pruned from memory on a fluxnode;
+    // GetFullBlockHeader re-reads them from disk (header prefix only). On a
+    // failed read, emit empty strings rather than erroring the whole call —
+    // the resident fields (height, time, bits, work) are still useful.
+    // A caller that already fetched the header off-lock (rest_headers, to keep
+    // disk reads off cs_main) supplies it via fullHeaderOverride.
+    CBlockHeader fullHeader;
+    bool fHaveHeader;
+    if (fullHeaderOverride) {
+        fullHeader = *fullHeaderOverride;
+        fHaveHeader = fHaveHeaderOverride;
+    } else {
+        fHaveHeader = GetFullBlockHeader(fullHeader, blockindex, Params().GetConsensus());
+    }
+    result.pushKV("merkleroot", fHaveHeader ? fullHeader.hashMerkleRoot.GetHex() : "");
+    result.pushKV("finalsaplingroot", fHaveHeader ? fullHeader.hashFinalSaplingRoot.GetHex() : "");
     result.pushKV("time", (int64_t)blockindex->nTime);
-    
+
     // Add POW or PON fields based on block version
     if (blockindex->nVersion >= CBlockHeader::PON_VERSION) {
         // PON block fields
         result.pushKV("type", "PON");
-        result.pushKV("collateral", blockindex->nodesCollateral.ToString());
-        result.pushKV("blocksig", HexStr(blockindex->vchBlockSig));
+        result.pushKV("collateral", fHaveHeader ? fullHeader.nodesCollateral.ToString() : "");
+        result.pushKV("blocksig", fHaveHeader ? HexStr(fullHeader.vchBlockSig) : "");
     } else {
         // POW block fields
         result.pushKV("type", "POW");
-        result.pushKV("nonce", blockindex->nNonce.GetHex());
-        result.pushKV("solution", HexStr(blockindex->nSolution));
+        result.pushKV("nonce", fHaveHeader ? fullHeader.nNonce.GetHex() : "");
+        result.pushKV("solution", fHaveHeader ? HexStr(fullHeader.nSolution) : "");
     }
     
     result.pushKV("bits", strprintf("%08x", blockindex->nBits));
@@ -277,8 +292,12 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool tx
     result.pushKV("anchor", blockindex->hashFinalSproutRoot.GetHex());
 
     UniValue valuePools(UniValue::VARR);
-    valuePools.push_back(ValuePoolDesc("sprout", blockindex->nChainSproutValue, blockindex->nSproutValue));
-    valuePools.push_back(ValuePoolDesc("sapling", blockindex->nChainSaplingValue, blockindex->nSaplingValue));
+    valuePools.push_back(ValuePoolDesc("sprout",
+        blockindex->nChainSproutValue,
+        blockindex->nSproutValue));
+    valuePools.push_back(ValuePoolDesc("sapling",
+        blockindex->nChainSaplingValue,
+        std::optional<CAmount>(blockindex->nSaplingValue)));
     result.pushKV("valuePools", valuePools);
 
     if (blockindex->pprev)
@@ -668,8 +687,11 @@ UniValue getblockheader(const UniValue& params, bool fHelp)
 
     if (!fVerbose)
     {
+        CBlockHeader header;
+        if (!GetFullBlockHeader(header, pblockindex, Params().GetConsensus()))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not found on disk");
         CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
-        ssBlock << pblockindex->GetBlockHeader();
+        ssBlock << header;
         std::string strHex = HexStr(ssBlock.begin(), ssBlock.end());
         return strHex;
     }

@@ -158,6 +158,12 @@ AC_ARG_ENABLE([zmq],
 
 AC_ARG_WITH([protoc-bindir],[AS_HELP_STRING([--with-protoc-bindir=BIN_DIR],[specify protoc bin path])], [protoc_bin_path=$withval], [])
 
+AC_ARG_ENABLE([jemalloc],
+  [AS_HELP_STRING([--disable-jemalloc],
+  [disable jemalloc memory allocator (default is yes)])],
+  [use_jemalloc=$enableval],
+  [use_jemalloc=yes])
+
 AC_ARG_ENABLE(man,
     [AS_HELP_STRING([--disable-man],
                     [do not install man pages (default is to install)])],,
@@ -608,6 +614,17 @@ else
     AC_DEFINE(ENABLE_PROTON, 0, [Define to 1 to enable Proton functions])
 fi
 
+dnl Check for jemalloc
+if test "x$use_jemalloc" = "xyes"; then
+  AC_CHECK_LIB([jemalloc], [malloc_stats_print],
+    [JEMALLOC_LIBS="-ljemalloc"],
+    [AC_MSG_WARN([libjemalloc not found, disabling jemalloc support])
+    use_jemalloc=no])
+fi
+if test "x$use_jemalloc" = "xyes"; then
+  AC_DEFINE(HAVE_JEMALLOC, 1, [Define to 1 if jemalloc is available])
+fi
+
 dnl Boost is used for header-only libraries (Signals2)
 dnl Compiled Boost libraries removed in C++20 upgrade - only headers needed
 use_boost=yes
@@ -813,6 +830,7 @@ fi
 AM_CONDITIONAL([ENABLE_ZMQ], [test "x$use_zmq" = "xyes"])
 
 AM_CONDITIONAL([ENABLE_PROTON], [test "x$use_proton" = "xyes"])
+AM_CONDITIONAL([HAVE_JEMALLOC], [test "x$use_jemalloc" = "xyes"])
 
 AC_MSG_CHECKING([whether to build test_bitcoin])
 if test x$use_tests = xyes; then
@@ -881,6 +899,7 @@ AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(ZMQ_LIBS)
 AC_SUBST(LIBFLUX_LIBS)
 AC_SUBST(PROTON_LIBS)
+AC_SUBST(JEMALLOC_LIBS)
 AC_CONFIG_FILES([Makefile src/Makefile doc/man/Makefile src/test/buildenv.py])
 AC_CONFIG_FILES([qa/pull-tester/run-bitcoind-for-test.sh],[chmod +x qa/pull-tester/run-bitcoind-for-test.sh])
 AC_CONFIG_FILES([qa/pull-tester/tests-config.sh],[chmod +x qa/pull-tester/tests-config.sh])
@@ -908,7 +927,7 @@ PKGCONFIG_LIBDIR_TEMP="$PKG_CONFIG_LIBDIR"
 unset PKG_CONFIG_LIBDIR
 PKG_CONFIG_LIBDIR="$PKGCONFIG_LIBDIR_TEMP"
 
-ac_configure_args="${ac_configure_args} --disable-shared --with-pic --with-bignum=no --enable-module-recovery"
+ac_configure_args="${ac_configure_args} --disable-shared --with-pic --with-bignum=no --enable-module-recovery --enable-module-vrf"
 AC_CONFIG_SUBDIRS([src/secp256k1 src/univalue])
 
 AC_OUTPUT
@@ -929,6 +948,7 @@ echo "Options used to compile and link:"
 echo "  with wallet   = $enable_wallet"
 echo "  with proton   = $use_proton"
 echo "  with zmq      = $use_zmq"
+echo "  with jemalloc = $use_jemalloc"
 echo "  with test     = $use_tests"
 echo "  debug enabled = $enable_debug"
 echo "  werror        = $enable_werror"

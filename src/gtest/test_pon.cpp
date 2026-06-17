@@ -7,9 +7,17 @@
 #include "chainparams.h"
 #include "consensus/params.h"
 #include "main.h"
+#include "pon/pon.h"
 #include "pon/pon-fork.h"
 #include "primitives/block.h"
+#include "chain.h"
+#include "uint256.h"
 #include "amount.h"
+#include "crypto/ecvrf.h"
+#include "key.h"
+#include "pubkey.h"
+#include "streams.h"
+#include "version.h"
 
 // Define node tiers for testing (from fluxnode/fluxnode.h)
 #ifndef CUMULUS
@@ -504,4 +512,247 @@ TEST_F(PONTest, POWBlockHeaderSerialization) {
     EXPECT_EQ(powBlock2.nBits, powBlock.nBits);
     EXPECT_EQ(powBlock2.nNonce, powBlock.nNonce);
     EXPECT_EQ(powBlock2.nSolution, powBlock.nSolution);
+}
+
+// --- PON-VRF deterministic fork choice (ComparePonForkChoice) -------------------------
+// This is the convergence guarantee: competing same-height VRF blocks must resolve to the
+// same winner on every node (lowest VRF output), regardless of arrival order.
+
+static CBlockIndex MakeVrfIndex(int height, const uint256& vrfOut) {
+    CBlockIndex idx;                       // SetNull() via default ctor
+    idx.nVersion = CBlockHeader::PON_VRF_VERSION;
+    idx.nHeight = height;
+    idx.nodesVrfOutput = vrfOut;
+    return idx;
+}
+
+TEST_F(PONTest, VrfForkChoiceLowestOutputWins) {
+    CBlockIndex a = MakeVrfIndex(100, uint256S("0x1111111111111111111111111111111111111111111111111111111111111111"));
+    CBlockIndex b = MakeVrfIndex(100, uint256S("0x2222222222222222222222222222222222222222222222222222222222222222"));
+
+    // Whichever output is lower by uint256 ordering must be preferred (negative result).
+    // (The exact ordering direction is irrelevant to convergence; determinism is.)
+    bool aLower = (a.nodesVrfOutput < b.nodesVrfOutput);
+    EXPECT_EQ(ComparePonForkChoice(&a, &b) < 0, aLower);
+    EXPECT_EQ(ComparePonForkChoice(&a, &b) > 0, !aLower);
+}
+
+TEST_F(PONTest, VrfForkChoiceAntisymmetricAndDeterministic) {
+    CBlockIndex a = MakeVrfIndex(100, uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa"));
+    CBlockIndex b = MakeVrfIndex(100, uint256S("0x00000000000000000000000000000000000000000000000000000000000000bb"));
+
+    int ab = ComparePonForkChoice(&a, &b);
+    // Antisymmetry: swapping arguments flips the sign — so all nodes agree on the winner.
+    EXPECT_EQ(ab, -ComparePonForkChoice(&b, &a));
+    // Determinism: same inputs always give the same result.
+    EXPECT_EQ(ab, ComparePonForkChoice(&a, &b));
+    EXPECT_NE(ab, 0); // distinct outputs are decided, never a tie
+}
+
+TEST_F(PONTest, VrfForkChoiceEqualOutputUndecided) {
+    uint256 same = uint256S("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+    CBlockIndex a = MakeVrfIndex(100, same);
+    CBlockIndex b = MakeVrfIndex(100, same);
+    // Identical VRF output -> no decision; caller falls back to first-seen.
+    EXPECT_EQ(ComparePonForkChoice(&a, &b), 0);
+}
+
+// A v101 (PON-VRF) block commits nodesVrfOutput to its block hash, so the
+// hand-written CBlockIndex copy operations MUST carry it. The serialization
+// write path builds CDiskBlockIndex(*pindex) through the copy constructor, so
+// an omitted field is persisted as zero and the entry fails its hash check on
+// the next startup. Guards against the copy ctor / operator= dropping it.
+TEST_F(PONTest, VrfOutputSurvivesCBlockIndexCopy) {
+    const uint256 vrf = uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa");
+    CBlockIndex original = MakeVrfIndex(100, vrf);
+    ASSERT_EQ(original.nodesVrfOutput, vrf);
+
+    CBlockIndex copyCtor(original);
+    EXPECT_EQ(copyCtor.nodesVrfOutput, vrf) << "CBlockIndex copy constructor dropped nodesVrfOutput";
+
+    CBlockIndex assigned;
+    assigned = original;
+    EXPECT_EQ(assigned.nodesVrfOutput, vrf) << "CBlockIndex operator= dropped nodesVrfOutput";
+}
+
+// Legacy PON entries score by the resident cached PON hash; an entry whose
+// header data has been pruned (pHeaderData == nullptr) must compare exactly
+// like an unpruned one, because the comparator may only touch resident fields.
+
+static CBlockIndex MakeLegacyPonIndex(int height, const uint256& ponHash) {
+    CBlockIndex idx;                       // SetNull(): pHeaderData == nullptr (pruned shape)
+    idx.nVersion = CBlockHeader::PON_VERSION;
+    idx.nHeight = height;
+    idx.hashPON = ponHash;
+    return idx;
+}
+
+TEST_F(PONTest, MixedVersionForkChoiceDeterministic) {
+    // A legacy block and a VRF block competing at the same height (the
+    // activation-boundary fork shape): each scores by its own resident value.
+    CBlockIndex legacy = MakeLegacyPonIndex(100, uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa"));
+    CBlockIndex vrf = MakeVrfIndex(100, uint256S("0x00000000000000000000000000000000000000000000000000000000000000bb"));
+
+    int lv = ComparePonForkChoice(&legacy, &vrf);
+    EXPECT_LT(lv, 0);                                    // lower score (legacy aa) preferred
+    EXPECT_EQ(lv, -ComparePonForkChoice(&vrf, &legacy)); // antisymmetric
+    EXPECT_EQ(lv, ComparePonForkChoice(&legacy, &vrf));  // deterministic
+}
+
+TEST_F(PONTest, ForkChoicePrunedEntriesMatchUnpruned) {
+    const uint256 hashA = uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa");
+    const uint256 hashB = uint256S("0x00000000000000000000000000000000000000000000000000000000000000bb");
+
+    // Pruned pair (no header data at all)
+    CBlockIndex prunedA = MakeLegacyPonIndex(100, hashA);
+    CBlockIndex prunedB = MakeLegacyPonIndex(100, hashB);
+    ASSERT_EQ(prunedA.pHeaderData, nullptr);
+    int pruned = ComparePonForkChoice(&prunedA, &prunedB);
+
+    // Same pair with header data present (and deliberately mismatched, to
+    // prove the comparator ignores it)
+    CBlockIndex fullA = MakeLegacyPonIndex(100, hashA);
+    CBlockIndex fullB = MakeLegacyPonIndex(100, hashB);
+    fullA.AllocateHeaderData();
+    fullB.AllocateHeaderData();
+    int full = ComparePonForkChoice(&fullA, &fullB);
+
+    EXPECT_EQ(pruned, full);
+    EXPECT_LT(pruned, 0);
+
+    fullA.FreeHeaderData();
+    fullB.FreeHeaderData();
+}
+
+// --- PON-VRF block-header serialization + hash-commitment -----------------------------
+
+static CBlockHeader MakeVrfHeader() {
+    CBlockHeader h;
+    h.nVersion = CBlockHeader::PON_VRF_VERSION;
+    h.hashPrevBlock = uint256S("0x01");
+    h.hashMerkleRoot = uint256S("0x02");
+    h.hashFinalSaplingRoot = uint256S("0x03");
+    h.nTime = 1700000000;
+    h.nBits = 0x1d00ffff;
+    h.nodesCollateral = COutPoint(uint256S("0x04"), 1);
+    h.nodesVrfOutput = uint256S("0x0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a");
+    h.nodesVrfProof = std::vector<unsigned char>(81, 0x77);
+    h.vchBlockSig = std::vector<unsigned char>(64, 0x99);
+    return h;
+}
+
+TEST_F(PONTest, VrfBlockHeaderSerializationRoundTrip) {
+    CBlockHeader h = MakeVrfHeader();
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    ss << h;
+    CBlockHeader h2;
+    ss >> h2;
+    EXPECT_EQ(h2.nVersion, h.nVersion);
+    EXPECT_EQ(h2.nodesCollateral, h.nodesCollateral);
+    EXPECT_EQ(h2.nodesVrfOutput, h.nodesVrfOutput);
+    EXPECT_EQ(h2.nodesVrfProof, h.nodesVrfProof);
+    EXPECT_EQ(h2.vchBlockSig, h.vchBlockSig);
+    EXPECT_EQ(h2.GetHash(), h.GetHash());
+}
+
+TEST_F(PONTest, VrfOutputCommittedProofExcludedFromHash) {
+    CBlockHeader base = MakeVrfHeader();
+    uint256 h0 = base.GetHash();
+
+    // The proof is excluded from the block hash (like the signature): changing it must NOT
+    // change the hash — required so CBlockIndex (which omits the proof) recomputes correctly.
+    CBlockHeader p = base;
+    p.nodesVrfProof = std::vector<unsigned char>(81, 0x11);
+    EXPECT_EQ(p.GetHash(), h0);
+
+    // The VRF output IS committed: changing it MUST change the hash (so it is signed/immutable
+    // and usable as the deterministic fork-choice key).
+    CBlockHeader o = base;
+    o.nodesVrfOutput = uint256S("0x0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b");
+    EXPECT_NE(o.GetHash(), h0);
+}
+
+// --- Real ECVRF prove/verify path (the same crypto ContextualCheckPONBlockHeader runs) -
+
+TEST_F(PONTest, EcvrfProveVerifyRoundTrip) {
+    CKey key;
+    key.MakeNewKey(true);
+    CPubKey pub = key.GetPubKey();
+    uint256 seed = uint256S("0x1111111111111111111111111111111111111111111111111111111111111111");
+
+    std::vector<unsigned char> proof;
+    uint256 beta;
+    ASSERT_TRUE(ECVRF_Prove(key, pub, seed, proof, beta));
+    EXPECT_EQ(proof.size(), 81u);
+
+    // Verify against the same key+seed reproduces the output.
+    uint256 beta2;
+    EXPECT_TRUE(ECVRF_Verify(pub, seed, proof, beta2));
+    EXPECT_EQ(beta2, beta);
+
+    // Tampered proof is rejected.
+    std::vector<unsigned char> badProof = proof;
+    badProof[40] ^= 0x01;
+    uint256 bx;
+    EXPECT_FALSE(ECVRF_Verify(pub, seed, badProof, bx));
+
+    // Wrong seed is rejected (binds the output to the epoch seed).
+    uint256 by;
+    EXPECT_FALSE(ECVRF_Verify(pub, uint256S("0x99"), proof, by));
+
+    // Wrong key is rejected (binds the output to the operator key).
+    CKey other;
+    other.MakeNewKey(true);
+    uint256 bz;
+    EXPECT_FALSE(ECVRF_Verify(other.GetPubKey(), seed, proof, bz));
+
+    // Deterministic: proving again yields the identical proof+output (RFC 6979 nonce).
+    std::vector<unsigned char> proof2;
+    uint256 beta3;
+    ASSERT_TRUE(ECVRF_Prove(key, pub, seed, proof2, beta3));
+    EXPECT_EQ(proof2, proof);
+    EXPECT_EQ(beta3, beta);
+}
+
+TEST_F(PONTest, VrfMessagePerNodeUnderSharedOperatorKey) {
+    // Operator keys are shared across an owner's fleet in practice. The VRF message must
+    // therefore mix in the per-node collateral outpoint: with the key alone, N same-key
+    // nodes share one lottery draw and broadcast N identical-priority blocks on a win.
+    const Consensus::Params& params = Params().GetConsensus();
+
+    COutPoint collateralA(uint256S("0xaa"), 0);
+    COutPoint collateralB(uint256S("0xbb"), 0);
+    COutPoint collateralA1(uint256S("0xaa"), 1);
+
+    uint256 msgA = GetPonVrfMessage(NULL, 100, collateralA, params);
+    uint256 msgB = GetPonVrfMessage(NULL, 100, collateralB, params);
+    uint256 msgA1 = GetPonVrfMessage(NULL, 100, collateralA1, params);
+
+    // Distinct nodes (different txid OR different vout) get distinct messages.
+    EXPECT_NE(msgA, msgB);
+    EXPECT_NE(msgA, msgA1);
+
+    // Same node, same slot is deterministic; a new slot is a fresh draw.
+    EXPECT_EQ(msgA, GetPonVrfMessage(NULL, 100, collateralA, params));
+    EXPECT_NE(msgA, GetPonVrfMessage(NULL, 101, collateralA, params));
+
+    // Under ONE shared operator key, distinct messages yield independent VRF outputs,
+    // each verifiable against the same pubkey — restoring one draw per node.
+    CKey opKey;
+    opKey.MakeNewKey(true);
+    CPubKey opPub = opKey.GetPubKey();
+
+    std::vector<unsigned char> proofA, proofB;
+    uint256 yA, yB;
+    ASSERT_TRUE(ECVRF_Prove(opKey, opPub, msgA, proofA, yA));
+    ASSERT_TRUE(ECVRF_Prove(opKey, opPub, msgB, proofB, yB));
+    EXPECT_NE(yA, yB);
+
+    uint256 yCheck;
+    EXPECT_TRUE(ECVRF_Verify(opPub, msgA, proofA, yCheck));
+    EXPECT_EQ(yCheck, yA);
+
+    // A proof made for node A does not verify as node B (cross-node replay rejected).
+    uint256 yx;
+    EXPECT_FALSE(ECVRF_Verify(opPub, msgB, proofA, yx));
 }

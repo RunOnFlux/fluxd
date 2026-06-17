@@ -12,6 +12,7 @@
 #include "main.h"
 #include "pow.h"
 #include "uint256.h"
+#include "util.h"
 #include "key_io.h"
 
 #include <stdint.h>
@@ -522,21 +523,25 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                 pindexNew->nFile          = diskindex.nFile;
                 pindexNew->nDataPos       = diskindex.nDataPos;
                 pindexNew->nUndoPos       = diskindex.nUndoPos;
-                pindexNew->hashSproutAnchor     = diskindex.hashSproutAnchor;
                 pindexNew->nVersion       = diskindex.nVersion;
-                pindexNew->hashMerkleRoot = diskindex.hashMerkleRoot;
-                pindexNew->hashFinalSaplingRoot   = diskindex.hashFinalSaplingRoot;
                 pindexNew->nTime          = diskindex.nTime;
                 pindexNew->nBits          = diskindex.nBits;
-                pindexNew->nNonce         = diskindex.nNonce;
-                pindexNew->nSolution      = diskindex.nSolution;
-                pindexNew->nodesCollateral = diskindex.nodesCollateral;
-                pindexNew->vchBlockSig    = diskindex.vchBlockSig;
                 pindexNew->nStatus        = diskindex.nStatus;
-                pindexNew->nCachedBranchId = diskindex.nCachedBranchId;
                 pindexNew->nTx            = diskindex.nTx;
-                pindexNew->nSproutValue   = diskindex.nSproutValue;
-                pindexNew->nSaplingValue  = diskindex.nSaplingValue;
+                pindexNew->nodesVrfOutput = diskindex.nodesVrfOutput;
+
+                // These live directly on CBlockIndex (not in the prunable
+                // HeaderData) because init-time checks read them before the chain
+                // is reconnected; copy them from the deserialized record.
+                pindexNew->nSproutValue     = diskindex.nSproutValue;
+                pindexNew->nSaplingValue    = diskindex.nSaplingValue;
+                pindexNew->nCachedBranchId  = diskindex.nCachedBranchId;
+                pindexNew->hashSproutAnchor = diskindex.hashSproutAnchor;
+
+                if (diskindex.pHeaderData) {
+                    pindexNew->AllocateHeaderData();
+                    *pindexNew->pHeaderData = *diskindex.pHeaderData;
+                }
 
                 // Consistency checks
                 auto header = pindexNew->GetBlockHeader();
@@ -554,13 +559,34 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                 }
 
                 if (header.IsPON()) {
-                    if (!CheckProofOfNode(GetPONHash(header), pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight) && !IsEmergencyBlock(header))
+                    // Cache the PON hash while the header data is still
+                    // resident: the fork-choice tie-breaker needs it after
+                    // the prune below.
+                    pindexNew->hashPON = GetPONHash(header);
+                    // For PON-VRF blocks the eligibility value is the committed VRF output, not GetPONHash.
+                    const uint256& ponEligibilityValue = (header.nVersion >= CBlockHeader::PON_VRF_VERSION)
+                                                      ? pindexNew->nodesVrfOutput
+                                                      : pindexNew->hashPON;
+                    if (!CheckProofOfNode(ponEligibilityValue, pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight) && !IsEmergencyBlock(header))
                         return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
                 } else if (!isCheckpointed) {
                     // Only verify PoW for non-checkpointed POW blocks
                     if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, Params().GetConsensus()))
                         return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
                 }
+
+                // Fluxnode memory optimization: header data was only needed for the
+                // consistency checks above. Free it now, during load, instead of
+                // holding every entry's header data resident until the post-
+                // ActivateBestChain prune — that accumulation is the multi-GB init
+                // memory transient. It is rebuilt from disk on demand when a block
+                // is connected, disconnected, or served. nChainWork/skiplist build
+                // need only the skeleton, and the shielded value-pool fields now
+                // live directly on CBlockIndex, so this is safe regardless of ZIP209.
+                // Header-only entries (no block data on disk) are skipped: their
+                // header fields cannot be rebuilt, so they must stay resident.
+                if (fFluxnode && (pindexNew->nStatus & BLOCK_HAVE_DATA))
+                    pindexNew->FreeHeaderData();
 
                 pcursor->Next();
             } else {
