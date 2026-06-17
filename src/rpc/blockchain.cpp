@@ -100,7 +100,7 @@ static UniValue ValuePoolDesc(
     return rv;
 }
 
-UniValue blockheaderToJSON(const CBlockIndex* blockindex)
+UniValue blockheaderToJSON(const CBlockIndex* blockindex, const CBlockHeader* fullHeaderOverride = nullptr, bool fHaveHeaderOverride = false)
 {
     UniValue result(UniValue::VOBJ);
     result.pushKV("hash", blockindex->GetBlockHash().GetHex());
@@ -116,8 +116,16 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
     // GetFullBlockHeader re-reads them from disk (header prefix only). On a
     // failed read, emit empty strings rather than erroring the whole call —
     // the resident fields (height, time, bits, work) are still useful.
+    // A caller that already fetched the header off-lock (rest_headers, to keep
+    // disk reads off cs_main) supplies it via fullHeaderOverride.
     CBlockHeader fullHeader;
-    bool fHaveHeader = GetFullBlockHeader(fullHeader, blockindex, Params().GetConsensus());
+    bool fHaveHeader;
+    if (fullHeaderOverride) {
+        fullHeader = *fullHeaderOverride;
+        fHaveHeader = fHaveHeaderOverride;
+    } else {
+        fHaveHeader = GetFullBlockHeader(fullHeader, blockindex, Params().GetConsensus());
+    }
     result.pushKV("merkleroot", fHaveHeader ? fullHeader.hashMerkleRoot.GetHex() : "");
     result.pushKV("finalsaplingroot", fHaveHeader ? fullHeader.hashFinalSaplingRoot.GetHex() : "");
     result.pushKV("time", (int64_t)blockindex->nTime);
