@@ -557,6 +557,24 @@ TEST_F(PONTest, VrfForkChoiceEqualOutputUndecided) {
     EXPECT_EQ(ComparePonForkChoice(&a, &b), 0);
 }
 
+// A v101 (PON-VRF) block commits nodesVrfOutput to its block hash, so the
+// hand-written CBlockIndex copy operations MUST carry it. The serialization
+// write path builds CDiskBlockIndex(*pindex) through the copy constructor, so
+// an omitted field is persisted as zero and the entry fails its hash check on
+// the next startup. Guards against the copy ctor / operator= dropping it.
+TEST_F(PONTest, VrfOutputSurvivesCBlockIndexCopy) {
+    const uint256 vrf = uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa");
+    CBlockIndex original = MakeVrfIndex(100, vrf);
+    ASSERT_EQ(original.nodesVrfOutput, vrf);
+
+    CBlockIndex copyCtor(original);
+    EXPECT_EQ(copyCtor.nodesVrfOutput, vrf) << "CBlockIndex copy constructor dropped nodesVrfOutput";
+
+    CBlockIndex assigned;
+    assigned = original;
+    EXPECT_EQ(assigned.nodesVrfOutput, vrf) << "CBlockIndex operator= dropped nodesVrfOutput";
+}
+
 // Legacy PON entries score by the resident cached PON hash; an entry whose
 // header data has been pruned (pHeaderData == nullptr) must compare exactly
 // like an unpruned one, because the comparator may only touch resident fields.

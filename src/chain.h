@@ -296,22 +296,14 @@ public:
         delete pHeaderData;
     }
 
-    //! Copy constructor - deep copies pHeaderData
-    CBlockIndex(const CBlockIndex& other)
-        : phashBlock(other.phashBlock), pprev(other.pprev), pskip(other.pskip),
-          nHeight(other.nHeight), nFile(other.nFile), nDataPos(other.nDataPos),
-          nUndoPos(other.nUndoPos), nChainWork(other.nChainWork), nTx(other.nTx),
-          nChainTx(other.nChainTx), nStatus(other.nStatus),
-          nVersion(other.nVersion), nTime(other.nTime), nBits(other.nBits),
-          nSproutValue(other.nSproutValue), nChainSproutValue(other.nChainSproutValue),
-          nSaplingValue(other.nSaplingValue), nChainSaplingValue(other.nChainSaplingValue),
-          nCachedBranchId(other.nCachedBranchId), hashSproutAnchor(other.hashSproutAnchor),
-          hashFinalSproutRoot(other.hashFinalSproutRoot), hashPON(other.hashPON),
-          pHeaderData(nullptr), nSequenceId(other.nSequenceId)
+    //! Copy constructor. Delegates the member copy to operator= so there is a
+    //! single enumerated copy path: a resident field only has to be carried in
+    //! one place and cannot be silently dropped by two hand-written member lists
+    //! drifting out of sync (which previously lost nodesVrfOutput). pHeaderData
+    //! is deep-copied in operator=.
+    CBlockIndex(const CBlockIndex& other) : CBlockIndex()
     {
-        if (other.pHeaderData) {
-            pHeaderData = new HeaderData(*other.pHeaderData);
-        }
+        *this = other;
     }
 
     //! Assignment operator - deep copies pHeaderData
@@ -340,6 +332,7 @@ public:
             hashSproutAnchor = other.hashSproutAnchor;
             hashFinalSproutRoot = other.hashFinalSproutRoot;
             hashPON = other.hashPON;
+            nodesVrfOutput = other.nodesVrfOutput;
             nSequenceId = other.nSequenceId;
             delete pHeaderData;
             if (other.pHeaderData) {
