@@ -6912,6 +6912,13 @@ void UnloadBlockIndex()
     recentRejects.reset(NULL);
 
     if (g_blockIndexPool) {
+        // Heap-fallback entries (allocated when a chunk could not be mapped)
+        // live outside the pool and must be deleted individually; the pool's
+        // own entries are destructed in place by DestroyAll.
+        for (BlockMap::value_type& entry : mapBlockIndex) {
+            if (!g_blockIndexPool->Contains(entry.second))
+                delete entry.second;
+        }
         g_blockIndexPool->DestroyAll([](void* p) {
             static_cast<CBlockIndex*>(p)->~CBlockIndex();
         });
@@ -9390,6 +9397,13 @@ public:
     CMainCleanup() {}
     ~CMainCleanup() {
         if (g_blockIndexPool) {
+            // Heap-fallback entries (allocated when a chunk could not be
+            // mapped) live outside the pool and must be deleted individually;
+            // the pool's own entries are destructed in place by DestroyAll.
+            for (BlockMap::value_type& entry : mapBlockIndex) {
+                if (!g_blockIndexPool->Contains(entry.second))
+                    delete entry.second;
+            }
             g_blockIndexPool->DestroyAll([](void* p) {
                 static_cast<CBlockIndex*>(p)->~CBlockIndex();
             });
