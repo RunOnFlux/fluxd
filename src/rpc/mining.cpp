@@ -192,7 +192,7 @@ UniValue generate(const UniValue& params, bool fHelp)
     GetMainSignals().ScriptForMining(coinbaseScript);
 
     //throw an error if no script was provided
-    if (!coinbaseScript->reserveScript.size())
+    if (!coinbaseScript || !coinbaseScript->reserveScript.size())
         throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet or -mineraddress)");
 
     {   // Don't keep cs_main locked
@@ -673,7 +673,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         GetMainSignals().ScriptForMining(coinbaseScript);
 
         // Throw an error if no script was provided
-        if (!coinbaseScript->reserveScript.size())
+        if (!coinbaseScript || !coinbaseScript->reserveScript.size())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet or -mineraddress)");
 
         pblocktemplate = CreateNewBlock(Params(), coinbaseScript->reserveScript, &mapFluxnodePayouts);
