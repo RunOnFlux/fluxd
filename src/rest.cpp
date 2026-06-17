@@ -60,7 +60,7 @@ extern UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, 
 extern UniValue mempoolInfoToJSON();
 extern UniValue mempoolToJSON(bool fVerbose = false);
 extern void ScriptPubKeyToJSON(const CScript& scriptPubKey, UniValue& out, bool fIncludeHex);
-extern UniValue blockheaderToJSON(const CBlockIndex* blockindex);
+extern UniValue blockheaderToJSON(const CBlockIndex* blockindex, const CBlockHeader* fullHeaderOverride = nullptr, bool fHaveHeaderOverride = false);
 
 static bool RESTERR(HTTPRequest* req, enum HTTPStatusCode status, string message)
 {
@@ -144,18 +144,44 @@ static bool rest_headers(HTTPRequest* req,
     UniValue jsonHeaders(UniValue::VARR);
 
     if (rf == RF_JSON) {
-        // JSON is the inspection format (small counts; reads chainActive context
-        // per entry), so it is built under cs_main. The bulk binary/hex serving
-        // path below stays off cs_main for its disk reads.
-        LOCK(cs_main);
-        BlockMap::const_iterator it = mapBlockIndex.find(hash);
-        const CBlockIndex *pindex = (it != mapBlockIndex.end()) ? it->second : NULL;
-        long served = 0;
-        while (pindex != NULL && chainActive.Contains(pindex)) {
-            jsonHeaders.push_back(blockheaderToJSON(pindex));
-            if (++served == count)
-                break;
-            pindex = chainActive.Next(pindex);
+        // JSON, like the binary path, must not dereference pruned HeaderData off
+        // cs_main, nor hold cs_main across disk reads. Snapshot the index
+        // pointers + resident headers under the lock, note which need a disk
+        // top-up, rehydrate those lock-free, then build the JSON under the lock
+        // from the prefetched headers — so no disk I/O happens while it is held.
+        std::vector<const CBlockIndex*> vIndex;
+        std::vector<CBlockHeader> vHeaders;
+        std::vector<bool> vHave;
+        std::vector<size_t> vNeedDisk;
+        {
+            LOCK(cs_main);
+            BlockMap::const_iterator it = mapBlockIndex.find(hash);
+            const CBlockIndex *pindex = (it != mapBlockIndex.end()) ? it->second : NULL;
+            long served = 0;
+            while (pindex != NULL && chainActive.Contains(pindex)) {
+                vIndex.push_back(pindex);
+                vHeaders.push_back(pindex->GetBlockHeader());
+                const CBlockHeader& h = vHeaders.back();
+                bool resident = pindex->pHeaderData && !(h.IsPOW() && h.nSolution.empty());
+                vHave.push_back(resident);
+                if (!resident)
+                    vNeedDisk.push_back(vHeaders.size() - 1);
+                if (++served == count)
+                    break;
+                pindex = chainActive.Next(pindex);
+            }
+        }
+        for (size_t i : vNeedDisk) {
+            CBlockHeader diskHeader;
+            if (ReadBlockHeaderFromDisk(diskHeader, vIndex[i], Params().GetConsensus())) {
+                vHeaders[i] = diskHeader;
+                vHave[i] = true;
+            }   // else: keep the zeroed snapshot; blockheaderToJSON emits empty fields
+        }
+        {
+            LOCK(cs_main);
+            for (size_t i = 0; i < vIndex.size(); ++i)
+                jsonHeaders.push_back(blockheaderToJSON(vIndex[i], &vHeaders[i], vHave[i]));
         }
     } else {
         // Binary/hex is the bulk serving path. Snapshot the resident header

@@ -3579,17 +3579,19 @@ static bool DisconnectFluxnodeOnly(const CBlock& block, const CBlockIndex* pinde
     if (!p_fluxnodeCache)
         return error("%s: p_fluxnodeCache is null", __func__);
 
-    // During crash recovery every block we rewind must still have its undo
-    // record on disk. An absent record is ambiguous: the block may have changed
-    // no fluxnode state (none was ever written) or the record may have been
-    // pruned by CleanupOldFluxnodeData. Recovery cannot tell these apart, and a
-    // pruned record would make us silently under-rewind and corrupt the cache,
-    // so when fRequireUndoRecord is set we fail closed and demand -reindex. The
-    // live disconnect path rewinds only recent blocks whose records are never
-    // pruned, so it keeps tolerating an absent (legitimately empty) record.
-    if (fRequireUndoRecord && !pFluxnodeDB->ExistsBlockUndoFluxnodeData(block.GetHash()))
-        return error("%s: fluxnode undo record missing for block %s (height %d) — it may have been "
-                     "pruned beyond the recovery window; restart with -reindex",
+    // During crash recovery a missing undo record is ambiguous: the block may
+    // have changed no fluxnode state (none was ever written) or CleanupOldFluxnodeData
+    // may have pruned it. They can only be confused for a block old enough to
+    // have been pruned — at or below the retention cutoff (tip - ONE_WEEK_OF_BLOCK_COUNT).
+    // Above the cutoff the record was never pruned, so an absent one means the
+    // block was a no-op for fluxnode state; tolerate it (an empty rewind), as the
+    // live disconnect path does. At or below the cutoff we cannot tell pruned from
+    // empty and a pruned record would silently under-rewind, so fail closed to
+    // -reindex.
+    if (fRequireUndoRecord && !pFluxnodeDB->ExistsBlockUndoFluxnodeData(block.GetHash()) &&
+        pindex->nHeight <= chainActive.Height() - ONE_WEEK_OF_BLOCK_COUNT)
+        return error("%s: fluxnode undo record missing for block %s (height %d) at/below the "
+                     "retention cutoff — it may have been pruned; restart with -reindex",
                      __func__, block.GetHash().ToString(), pindex->nHeight);
 
     CFluxnodeTxBlockUndo fluxnodeBlockUndo;
@@ -8111,7 +8113,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         // the first such entry to keep a valid contiguous prefix — the peer
         // re-requests from there (and a persistent local read failure is its cue
         // to try another node) instead of receiving a malformed header.
-        size_t nServe = vHeaders.size();
+        const size_t nWalked = vHeaders.size();
+        size_t nServe = nWalked;
         for (const auto& entry : vNeedDisk) {
             CBlockHeader diskHeader;
             if (ReadBlockHeaderFromDisk(diskHeader, entry.second, chainparams.GetConsensus()))
@@ -8121,6 +8124,15 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         }
         if (nServe < vHeaders.size())
             vHeaders.resize(nServe);
+
+        // If the walk found blocks but the first one was unreadable, the batch is
+        // now empty. Don't send it: an empty headers/cmpheaders message means "end
+        // of chain — stop asking this peer", so the peer would drop us as a header
+        // source. Returning nothing lets it time out and retry elsewhere. (An empty
+        // batch because the walk found no blocks at all is a normal end-of-chain
+        // reply and is still sent below.)
+        if (vHeaders.empty() && nWalked > 0)
+            return true;
 
         if (useCompactHeaders) {
             // Compact headers for checkpointed blocks (saves bandwidth):
