@@ -123,7 +123,7 @@ class FluxNode:
         except OSError:
             return ""
 
-    async def stop(self) -> None:
+    async def _stop_process(self) -> None:
         if self._proc is not None:
             try:
                 if self._proc.returncode is None:
@@ -135,6 +135,18 @@ class FluxNode:
             except TimeoutError:
                 self._proc.terminate()
                 await self._proc.wait()
-        await self._session.close()
+            self._proc = None
         if self._stderr is not None:
             self._stderr.close()
+            self._stderr = None
+
+    async def restart(self, extra_args: list[str] | None = None) -> None:
+        """Restart the daemon on the same datadir, optionally replacing its args."""
+        await self._stop_process()
+        if extra_args is not None:
+            self.extra_args = list(extra_args)
+        await self.start()
+
+    async def stop(self) -> None:
+        await self._stop_process()
+        await self._session.close()
