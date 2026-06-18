@@ -1,0 +1,28 @@
+[project]
+name = "flux-qa"
+version = "0.1.0"
+description = "Flux fluxd RPC integration test suite (qa/rpc-tests)"
+readme = "README.md"
+authors = [{ name = "The Flux developers" }]
+requires-python = ">=3.12"
+dependencies = [
+    "pyzmq>=27.1.0",
+    "plyvel>=1.5.1",
+]
+
+[tool.uv]
+# A dependency environment for running the test scripts, not an installable
+# package.
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# pyupgrade (UP) mechanically flags the python2 idioms the suite is migrating
+# off; isort (I) keeps imports ordered.
+select = ["E", "F", "W", "I", "UP"]
+
+[tool.ty.environment]
+python-version = "3.12"
