@@ -26,3 +26,6 @@ select = ["E", "F", "W", "I", "UP"]
 
 [tool.ty.environment]
 python-version = "3.12"
+# Tests import test_framework as a top-level package; rpc-tests is the import
+# root they run from.
+extra-paths = ["rpc-tests"]
