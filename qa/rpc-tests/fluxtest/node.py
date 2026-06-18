@@ -98,12 +98,14 @@ class FluxNode:
                     )
                 await asyncio.sleep(0.25)
 
-    async def mine(self, count: int, interval: int = 600) -> list[str]:
+    async def mine(self, count: int, interval: int = 30) -> list[str]:
         """Mine ``count`` blocks with strictly increasing timestamps.
 
         Each block's time advances from the node's mocktime, kept ahead of the
         current tip, so blocks mined after adopting a peer's (later) chain stay
         valid. The per-node starting offset keeps independent chains divergent.
+        The interval is small so a long chain's tip stays within the
+        future-block window of a peer's (frozen) clock and can still be synced.
         """
         hashes: list[str] = []
         for _ in range(count):

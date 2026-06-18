@@ -10,6 +10,12 @@ from fluxtest.node import FluxNode
 
 NodeFactory = Callable[..., Awaitable[FluxNode]]
 
+# Pushing PON past the test makes regtest mine PoW blocks, whose coinbase pays
+# the wallet -- under PON the coinbase is redirected to the dev-fund address, so
+# the wallet cannot otherwise be funded by mining.
+POW_ARGS = ["-ponactivation=1000000"]
+COINBASE_MATURITY = 100
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
@@ -48,3 +54,11 @@ async def node_factory(fluxd_binary: str, tmp_path: Path) -> AsyncIterator[NodeF
 
     for node in nodes:
         await node.stop()
+
+
+@pytest_asyncio.fixture
+async def funded_node(node_factory: NodeFactory) -> FluxNode:
+    """A single PoW-mode regtest node with a matured, spendable balance."""
+    node = await node_factory(0, extra_args=POW_ARGS)
+    await node.mine(COINBASE_MATURITY + 1)  # mature block 1's coinbase
+    return node
