@@ -87,6 +87,21 @@ class FluxNode:
                     )
                 await asyncio.sleep(0.25)
 
+    async def mine(self, count: int, mocktime: int | None = None, interval: int = 600) -> list[str]:
+        """Mine ``count`` blocks and return their hashes.
+
+        When ``mocktime`` is given, each block is stamped with an increasing
+        time from that base, so two nodes started at different base times build
+        genuinely divergent chains. Regtest mining is otherwise deterministic
+        and two nodes produce byte-identical chains.
+        """
+        hashes: list[str] = []
+        for i in range(count):
+            if mocktime is not None:
+                await self.rpc.setmocktime(mocktime + i * interval)
+            hashes.extend(await self.rpc.generate(1))
+        return hashes
+
     def _read_stderr(self) -> str:
         try:
             return self._stderr_path.read_text().strip()
