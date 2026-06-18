@@ -504,6 +504,7 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-flushwallet", strprintf("Run a thread to flush wallet periodically (default: %u)", 1));
         strUsage += HelpMessageOpt("-stopafterblockimport", strprintf("Stop running after importing blocks from disk (default: %u)", 0));
         strUsage += HelpMessageOpt("-nuparams=hexBranchId:activationHeight", "Use given activation height for specified network upgrade (regtest-only)");
+        strUsage += HelpMessageOpt("-ponactivation=height", "Set the PON activation height (regtest-only); use a high value to mine PoW blocks that pay the wallet");
     }
     string debugCategories = "addrman, alert, bench, coindb, db, estimatefee, http, libevent, lock, mempool, net, partitioncheck, pow, proxy, prune, "
                              "rand, reindex, rpc, selectcoins, tor, zmq, zrpc, zrpcunsafe (implies zrpc)"; // Don't translate these
@@ -1212,6 +1213,22 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
                 return InitError(strprintf("Invalid network upgrade (%s)", vDeploymentParams[0]));
             }
         }
+    }
+
+    // Allow setting the PON activation height directly on regtest. PON shares a
+    // branch id with several earlier upgrades, so -nuparams cannot target it;
+    // this is the only way to push PON past a test (e.g. to mine PoW blocks
+    // that pay the wallet) or to activate it at a chosen height.
+    if (mapArgs.count("-ponactivation")) {
+        if (Params().NetworkIDString() != "regtest") {
+            return InitError("-ponactivation may only be set on regtest.");
+        }
+        int nPonActivationHeight;
+        if (!ParseInt32(mapArgs["-ponactivation"], &nPonActivationHeight)) {
+            return InitError(strprintf("Invalid -ponactivation height (%s)", mapArgs["-ponactivation"]));
+        }
+        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_PON, nPonActivationHeight);
+        LogPrintf("Setting PON activation height to %d\n", nPonActivationHeight);
     }
 
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
