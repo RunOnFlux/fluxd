@@ -7,6 +7,12 @@ import aiohttp
 
 from .rpc import FluxRPC, JSONRPCError
 
+# All nodes start with their clock frozen near this time so that mined chains
+# stay in a consistent era: a node will not download blocks for a chain whose
+# tip is far older than its own clock, so mixing a mocktime chain with a
+# real-time node breaks cross-node sync.
+DEFAULT_MOCKTIME = 1600000000
+
 
 class FluxNode:
     """A single regtest fluxd, started and stopped over asyncio."""
@@ -29,6 +35,9 @@ class FluxNode:
         self._proc: asyncio.subprocess.Process | None = None
         self._stderr_path = datadir / "node_stderr.log"
         self._stderr = None
+        # Per-node offset so independent chains diverge (regtest mining is
+        # otherwise deterministic and two nodes produce identical chains).
+        self._mocktime = DEFAULT_MOCKTIME + index
         self._session = aiohttp.ClientSession(
             headers={"Authorization": aiohttp.encode_basic_auth("rt", "rt")},
             timeout=aiohttp.ClientTimeout(total=600),
@@ -65,6 +74,8 @@ class FluxNode:
             *args, stdout=asyncio.subprocess.DEVNULL, stderr=self._stderr
         )
         await self._wait_for_rpc(timeout)
+        # Freeze the clock in a consistent era for deterministic, sync-able chains.
+        await self.rpc.setmocktime(self._mocktime)
 
     async def _wait_for_rpc(self, timeout: float) -> None:
         loop = asyncio.get_running_loop()
@@ -87,18 +98,22 @@ class FluxNode:
                     )
                 await asyncio.sleep(0.25)
 
-    async def mine(self, count: int, mocktime: int | None = None, interval: int = 600) -> list[str]:
-        """Mine ``count`` blocks and return their hashes.
+    async def mine(self, count: int, interval: int = 600) -> list[str]:
+        """Mine ``count`` blocks with strictly increasing timestamps.
 
-        When ``mocktime`` is given, each block is stamped with an increasing
-        time from that base, so two nodes started at different base times build
-        genuinely divergent chains. Regtest mining is otherwise deterministic
-        and two nodes produce byte-identical chains.
+        Each block's time advances from the node's mocktime, kept ahead of the
+        current tip, so blocks mined after adopting a peer's (later) chain stay
+        valid. The per-node starting offset keeps independent chains divergent.
         """
         hashes: list[str] = []
-        for i in range(count):
-            if mocktime is not None:
-                await self.rpc.setmocktime(mocktime + i * interval)
+        for _ in range(count):
+            besthash = await self.rpc.getbestblockhash()
+            tip_time = (await self.rpc.getblock(besthash))["time"]
+            # + index keeps this block distinct from another node's same-height
+            # block; without it a node re-mining over an invalidated block would
+            # deterministically reproduce that exact (rejected) block.
+            self._mocktime = max(self._mocktime, tip_time) + interval + self.index
+            await self.rpc.setmocktime(self._mocktime)
             hashes.extend(await self.rpc.generate(1))
         return hashes
 
