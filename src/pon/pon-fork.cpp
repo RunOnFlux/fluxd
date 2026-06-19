@@ -13,9 +13,13 @@
 bool IsPONActive(int nHeight)
 {
     int ponActivationHeight = GetPONActivationHeight();
-    
-    // PON is active if we're at or past the activation height
-    // and activation height is set (not NO_ACTIVATION_HEIGHT)
+
+    // NO_ACTIVATION_HEIGHT means PON never activates on this network.
+    if (ponActivationHeight == Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT) {
+        return false;
+    }
+
+    // PON is active once we are at or past the activation height.
     return nHeight >= ponActivationHeight;
 }
 
