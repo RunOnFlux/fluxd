@@ -505,6 +505,7 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-stopafterblockimport", strprintf("Stop running after importing blocks from disk (default: %u)", 0));
         strUsage += HelpMessageOpt("-nuparams=hexBranchId:activationHeight", "Use given activation height for specified network upgrade (regtest-only)");
         strUsage += HelpMessageOpt("-ponactivation=height", "Set the PON activation height (regtest-only); use a high value to mine PoW blocks that pay the wallet");
+        strUsage += HelpMessageOpt("-acadiaactivation=height", "Set the ACADIA upgrade activation height (regtest-only); activates Overwintered transactions so signing carries a consensus branch id");
     }
     string debugCategories = "addrman, alert, bench, coindb, db, estimatefee, http, libevent, lock, mempool, net, partitioncheck, pow, proxy, prune, "
                              "rand, reindex, rpc, selectcoins, tor, zmq, zrpc, zrpcunsafe (implies zrpc)"; // Don't translate these
@@ -1229,6 +1230,22 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         }
         UpdateNetworkUpgradeParameters(Consensus::UPGRADE_PON, nPonActivationHeight);
         LogPrintf("Setting PON activation height to %d\n", nPonActivationHeight);
+    }
+
+    // ACADIA shares its branch id with several other upgrades, so -nuparams
+    // cannot target it (the matcher stops at the first id match). This regtest
+    // flag activates ACADIA directly so createrawtransaction produces
+    // Overwintered transactions that carry a consensus branch id for signing.
+    if (mapArgs.count("-acadiaactivation")) {
+        if (Params().NetworkIDString() != "regtest") {
+            return InitError("-acadiaactivation may only be set on regtest.");
+        }
+        int nAcadiaActivationHeight;
+        if (!ParseInt32(mapArgs["-acadiaactivation"], &nAcadiaActivationHeight)) {
+            return InitError(strprintf("Invalid -acadiaactivation height (%s)", mapArgs["-acadiaactivation"]));
+        }
+        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, nAcadiaActivationHeight);
+        LogPrintf("Setting ACADIA activation height to %d\n", nAcadiaActivationHeight);
     }
 
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
