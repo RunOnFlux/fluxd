@@ -1200,14 +1200,38 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
                 return InitError(strprintf("Invalid nActivationHeight (%s)", vDeploymentParams[1]));
             }
             bool found = false;
+            // An upgrade can be selected by name (e.g. "PON"), by its UpgradeIndex
+            // enum value (e.g. "10"), or by branch id hex. Name and index target one
+            // upgrade unambiguously; the branch-id form is ambiguous because every
+            // post-Sprout Flux upgrade shares a branch id, so it resolves to the
+            // first match as before. Only treat the selector as an index when it
+            // parses fully as an integer, so a branch id like "5ba81b19" does not
+            // silently match a leading-digit index.
+            const std::string selector = ToLower(vDeploymentParams[0]);
+            int nSelectorIndex = -1;
+            if (!ParseInt32(vDeploymentParams[0], &nSelectorIndex)) {
+                nSelectorIndex = -1;
+            }
             // Exclude Base from upgrades
             for (auto i = Consensus::BASE_SPROUT + 1; i < Consensus::MAX_NETWORK_UPGRADES; ++i)
             {
-                if (vDeploymentParams[0].compare(HexInt(NetworkUpgradeInfo[i].nBranchId)) == 0) {
+                if (selector == ToLower(NetworkUpgradeInfo[i].strName) || nSelectorIndex == i) {
                     UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex(i), nActivationHeight);
                     found = true;
-                    LogPrintf("Setting network upgrade activation parameters for %s to height=%d\n", vDeploymentParams[0], nActivationHeight);
+                    LogPrintf("Setting network upgrade activation parameters for %s to height=%d\n", NetworkUpgradeInfo[i].strName, nActivationHeight);
                     break;
+                }
+            }
+            if (!found) {
+                // Branch-id form (ambiguous; first matching upgrade wins, as before).
+                for (auto i = Consensus::BASE_SPROUT + 1; i < Consensus::MAX_NETWORK_UPGRADES; ++i)
+                {
+                    if (vDeploymentParams[0].compare(HexInt(NetworkUpgradeInfo[i].nBranchId)) == 0) {
+                        UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex(i), nActivationHeight);
+                        found = true;
+                        LogPrintf("Setting network upgrade activation parameters for %s to height=%d\n", vDeploymentParams[0], nActivationHeight);
+                        break;
+                    }
                 }
             }
             if (!found) {
