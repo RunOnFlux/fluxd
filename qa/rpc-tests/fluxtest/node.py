@@ -142,6 +142,14 @@ class FluxNode:
             self._stderr.close()
             self._stderr = None
 
+    async def stop_daemon(self) -> None:
+        """Stop the daemon process but keep the datadir and RPC session open.
+
+        Lets a caller swap on-disk wallet/chain files between a stop and a fresh
+        start() -- something restart() cannot wrap around external file ops.
+        """
+        await self._stop_process()
+
     async def restart(self, extra_args: list[str] | None = None) -> None:
         """Restart the daemon on the same datadir, optionally replacing its args."""
         await self._stop_process()
