@@ -1,20 +1,22 @@
-"""A confirmed transaction is invalidated by a double-spend on a longer chain.
+"""A double-spend on a longer chain invalidates the original sends.
 
-Reproduces the classic accounting hazard: node0 spends two specific coinbase
-utxos to node1 in two ordinary transactions and confirms them in a block, while
-an isolated miner (node2) holds a conflicting transaction that spends the very
-same utxos. When node2 builds a strictly longer chain that includes its
-double-spend and the network re-converges, node0 re-orgs onto node2's chain.
+node0 spends two specific coinbase utxos to node1 in two ordinary transactions,
+while an isolated miner (node2) holds a conflicting transaction that spends the
+very same utxos. node2 builds a strictly longer chain that includes its
+double-spend; when the network re-converges, node0 adopts node2's chain.
 
-The two originally-confirmed transactions then report confirmations == -1
-(wallet-conflicted): their inputs were consumed by the double-spend instead.
-Balances follow the double-spend winning -- node1 receives the double-spend
-output, and the two original sends are wiped from node0's accounting.
+Both states of the original sends are exercised (parametrized): confirmed in a
+block first (the double-spend re-orgs them out) and left unconfirmed in the
+mempool (the double-spend's block conflicts them out). Either way the two sends
+are conflicted out of node0's mempool, node1 receives only the double-spend
+output, and the spent coinbases leave node0's accounting; a formerly-confirmed
+send is additionally retained as a wallet-conflicted (-1) entry.
 """
 
 import asyncio
 from decimal import Decimal
 
+import pytest
 from conftest import POW_ARGS, NodeFactory
 from fluxtest.network import connect_nodes_bi, sync_blocks
 from fluxtest.node import FluxNode
@@ -60,8 +62,9 @@ async def _signed_spend(node: FluxNode, utxos: list[dict], to_address: str) -> s
     return signed["hex"]
 
 
-async def test_confirmed_tx_conflicted_by_doublespend_on_longer_chain(
-    node_factory: NodeFactory,
+@pytest.mark.parametrize("confirm_originals", [True, False])
+async def test_doublespend_conflicts_original_sends(
+    node_factory: NodeFactory, confirm_originals: bool
 ) -> None:
     # node0 is the funded source, node1 the recipient, node2 the isolated
     # double-spend miner. All run in PoW mode so coinbases pay the wallet.
@@ -100,26 +103,31 @@ async def test_confirmed_tx_conflicted_by_doublespend_on_longer_chain(
 
     # On the node0/node1 side, send two ordinary transactions that spend the
     # SAME two coinbases (one each) to node1, conflicting with the double-spend.
-    tx1_hex = await _signed_spend(node0, [coin_a], node1_address)
-    tx2_hex = await _signed_spend(node0, [coin_b], node1_address)
-    txid1 = await node0.rpc.sendrawtransaction(tx1_hex)
-    txid2 = await node0.rpc.sendrawtransaction(tx2_hex)
-    tx1_amount = coin_a["amount"] - FEE
-    tx2_amount = coin_b["amount"] - FEE
+    txid1 = await node0.rpc.sendrawtransaction(await _signed_spend(node0, [coin_a], node1_address))
+    txid2 = await node0.rpc.sendrawtransaction(await _signed_spend(node0, [coin_b], node1_address))
 
-    # Confirm them in a block (the meaningful accounting case): both reach 1
-    # confirmation and node1 sees the two sends arrive.
-    await node0.mine(1)
-    await sync_blocks([node0, node1])
-
-    assert (await node0.rpc.gettransaction(txid1))["confirmations"] == 1
-    assert (await node0.rpc.gettransaction(txid2))["confirmations"] == 1
-    node1_received_confirmed = await node1.rpc.getreceivedbyaddress(node1_address)
-    assert node1_received_confirmed == tx1_amount + tx2_amount
+    if confirm_originals:
+        # Confirm the sends in a block first, so the double-spend must re-org out
+        # an already-confirmed transaction. node1 sees the two confirmed sends.
+        await node0.mine(1)
+        await sync_blocks([node0, node1])
+        assert (await node0.rpc.gettransaction(txid1))["confirmations"] == 1
+        assert (await node0.rpc.gettransaction(txid2))["confirmations"] == 1
+        expected = coin_a["amount"] + coin_b["amount"] - 2 * FEE
+        assert await node1.rpc.getreceivedbyaddress(node1_address) == expected
+    else:
+        # Leave the sends unconfirmed in node0's mempool, so the double-spend's
+        # block conflicts them out of the mempool rather than via a re-org. An
+        # unconfirmed raw spend that pays another party is not tracked as a node0
+        # wallet transaction, so it is observed through the mempool, not
+        # gettransaction. Nothing is confirmed yet, so node1 has received nothing.
+        mempool = set(await node0.rpc.getrawmempool())
+        assert {txid1, txid2} <= mempool
+        assert await node1.rpc.getreceivedbyaddress(node1_address) == Decimal(0)
 
     # Hand the double-spend to the isolated miner and have it bury the spend
-    # under a strictly longer chain than the node0/node1 side. node0/node1 are
-    # one block past the split; node2 mines three to win the re-org race.
+    # under a strictly longer chain than the node0/node1 side; mining three is
+    # enough to win in either case (node0/node1 are at most one block ahead).
     await node2.rpc.sendrawtransaction(doublespend_hex)
     await node2.mine(3)
     assert await node2.rpc.getblockcount() > await node0.rpc.getblockcount()
@@ -129,20 +137,21 @@ async def test_confirmed_tx_conflicted_by_doublespend_on_longer_chain(
     await connect_nodes_bi(node1, node2)
     await sync_blocks([node0, node1, node2])
 
-    # The two originally-confirmed sends are now wallet-conflicted: their inputs
-    # were consumed by the double-spend on the winning chain.
-    assert (await node0.rpc.gettransaction(txid1))["confirmations"] == -1
-    assert (await node0.rpc.gettransaction(txid2))["confirmations"] == -1
+    # The double-spend won: node1 received only its single output, and both
+    # original sends are gone from node0's mempool (conflicted out either way).
+    assert await node1.rpc.getreceivedbyaddress(node1_address) == doublespend_value
+    mempool = set(await node0.rpc.getrawmempool())
+    assert txid1 not in mempool
+    assert txid2 not in mempool
 
-    # node1 instead received the single double-spend output, and the two
-    # conflicted sends no longer count toward what node1 received.
-    node1_received_after = await node1.rpc.getreceivedbyaddress(node1_address)
-    assert node1_received_after == doublespend_value
-
-    # node0's wallet no longer credits the conflicted sends: their amounts drop
-    # out of the gettransaction accounting (negative = funds left node0).
-    assert (await node0.rpc.gettransaction(txid1))["amount"] < 0
-    assert (await node0.rpc.gettransaction(txid2))["amount"] < 0
+    if confirm_originals:
+        # A formerly-confirmed send is retained as a wallet-conflicted tx: its
+        # inputs were consumed by the double-spend, so it reports -1 and its
+        # amount drops out of node0's accounting (negative = funds left node0).
+        assert (await node0.rpc.gettransaction(txid1))["confirmations"] == -1
+        assert (await node0.rpc.gettransaction(txid2))["confirmations"] == -1
+        assert (await node0.rpc.gettransaction(txid1))["amount"] < 0
+        assert (await node0.rpc.gettransaction(txid2))["amount"] < 0
 
     # The two double-spent coinbases are no longer node0's to spend: the
     # double-spend consumed them on the winning chain.
