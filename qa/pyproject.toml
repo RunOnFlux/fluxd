@@ -10,6 +10,7 @@ dependencies = [
     "plyvel>=1.5.1",
     "pytest>=9.1.0",
     "pytest-asyncio>=1.4.0",
+    "python-qpid-proton>=0.40.0",
     "pyzmq>=27.1.0",
 ]
 

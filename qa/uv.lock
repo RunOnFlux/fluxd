@@ -208,6 +208,7 @@ dependencies = [
     { name = "plyvel" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "python-qpid-proton" },
     { name = "pyzmq" },
 ]
 
@@ -217,6 +218,7 @@ requires-dist = [
     { name = "plyvel", specifier = ">=1.5.1" },
     { name = "pytest", specifier = ">=9.1.0" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
+    { name = "python-qpid-proton", specifier = ">=0.40.0" },
     { name = "pyzmq", specifier = ">=27.1.0" },
 ]
 
@@ -592,6 +594,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/43/7c/d36d04db312ecf4298932ef77e6e4a9e8ad017906e24e34f0b0c361a2473/pytest_asyncio-1.4.0.tar.gz", hash = "sha256:c6c0d2259945122819f171a32ecea2c349ead889ee28176caaf492143424be42", size = 58514, upload-time = "2026-05-26T09:56:04.083Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/03/e2/08a497ef684b88559c9cc5f4ad53a37e7b99e727094a86d6ea32536d5d3c/pytest_asyncio-1.4.0-py3-none-any.whl", hash = "sha256:933ca923a23075a87fb7070c0ec272a6848489824d887c85c812670932835aa1", size = 16930, upload-time = "2026-05-26T09:56:02.576Z" },
+]
+
+[[package]]
+name = "python-qpid-proton"
+version = "0.40.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cffi" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d5/dd/e9e5066009517bdfee92374264a2b6794fa0987bfeddcbf4d2a08dccaf36/python_qpid_proton-0.40.0.tar.gz", hash = "sha256:7680d607cf6e9684f97bf5b2ba16cda7d8512aab9e4ff78f98d44a4644fc819a", size = 354215, upload-time = "2025-05-19T18:45:37.932Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/40/92/bc61052af9542accc0ea9fdebebe585f6b2f2d28588d952180d808972239/python_qpid_proton-0.40.0-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:fe56211c6dcc7ea1fb9d78a017208a4c08043cd901780b6602a74ff70f38bf1f", size = 324371, upload-time = "2025-05-19T20:12:39.224Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/dd/a82c1e377f08d62d83898c1aa9b39aef890e910f683fca6dc5242a123f6b/python_qpid_proton-0.40.0-cp313-cp313-win_amd64.whl", hash = "sha256:a19d8c71c908700ceb38f6cbc1eb4a039428570f96bfc2caeeafdfec804fb94f", size = 277376, upload-time = "2025-05-19T19:39:31.201Z" },
 ]
 
 [[package]]
