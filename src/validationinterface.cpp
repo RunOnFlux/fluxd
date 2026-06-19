@@ -11,6 +11,7 @@
 #include "primitives/block.h"
 #include "chain.h"
 #include "consensus/validation.h"
+#include "miner.h"
 
 #include <list>
 #include <unordered_map>
@@ -249,6 +250,14 @@ void CMainSignals::ScriptForMining(std::shared_ptr<CReserveScript>& script)
     m_internals->Iterate([&](CValidationInterface& callbacks) {
         callbacks.GetScriptForMining(script);
     });
+#ifdef ENABLE_MINING
+    // The wallet's GetScriptForMining returns nothing when -mineraddress is set,
+    // and with -disablewallet no interface is registered at all. In both cases the
+    // -mineraddress script must come from here so that mining honours -mineraddress.
+    if (!script || !script->reserveScript.size()) {
+        GetScriptForMinerAddress(script);
+    }
+#endif // ENABLE_MINING
 }
 
 void CMainSignals::BlockFound(const uint256 &hash)
