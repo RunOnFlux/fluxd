@@ -50,9 +50,11 @@ async def sync_mempools(nodes: list[FluxNode], timeout: float = 60) -> None:
     loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout
     while True:
-        pool = set(await nodes[0].rpc.getrawmempool())
-        if all(set(await node.rpc.getrawmempool()) == pool for node in nodes[1:]):
+        # Materialize the awaits first: an `await` inside a generator expression
+        # makes it an async generator, which all() cannot consume.
+        pools = [set(await node.rpc.getrawmempool()) for node in nodes]
+        if all(pool == pools[0] for pool in pools[1:]):
             return
         if loop.time() > deadline:
-            raise AssertionError(f"mempools did not sync within {timeout}s")
+            raise AssertionError(f"mempools did not sync within {timeout}s: {pools}")
         await asyncio.sleep(0.25)
