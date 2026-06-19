@@ -119,6 +119,27 @@ class FluxNode:
             hashes.extend(await self.rpc.generate(1))
         return hashes
 
+    async def advance_mocktime(self, seconds: int) -> int:
+        """Push this node's frozen clock forward by ``seconds`` and return it.
+
+        Keeps mine()'s clock source of truth in step, so callers can satisfy
+        time-gated daemon behaviour without real-time waiting.
+        """
+        self._mocktime += seconds
+        await self.rpc.setmocktime(self._mocktime)
+        return self._mocktime
+
+    async def set_mocktime_at_least(self, when: int) -> int:
+        """Pull this node's frozen clock up to at least ``when`` and return it.
+
+        Used to bring a non-mining node's clock up to a peer's tip time before
+        syncing a long chain, which the daemon would otherwise reject as
+        timed too far in the future.
+        """
+        self._mocktime = max(self._mocktime, when)
+        await self.rpc.setmocktime(self._mocktime)
+        return self._mocktime
+
     def _read_stderr(self) -> str:
         try:
             return self._stderr_path.read_text().strip()
