@@ -17,7 +17,9 @@ async def test_txoutproof(node_factory: NodeFactory) -> None:
     await node.mine(110)  # several mature coinbases to spend
     await sync_blocks([node, verifier])
 
-    utxos = await node.rpc.listunspent(1)
+    # Flux regtest coinbases carry P2SH fund outputs (foundation, swap-pool) that
+    # the wallet lists but cannot sign; spend only the wallet's own outputs.
+    utxos = [u for u in await node.rpc.listunspent(1) if u["spendable"]]
     assert len(utxos) >= 2
 
     async def spend(utxo: dict) -> str:
@@ -27,6 +29,7 @@ async def test_txoutproof(node_factory: NodeFactory) -> None:
             [{"txid": utxo["txid"], "vout": utxo["vout"]}], {address: amount}
         )
         signed = await node.rpc.signrawtransaction(rawtx)
+        assert signed["complete"] is True
         return await node.rpc.sendrawtransaction(signed["hex"])
 
     txid1 = await spend(utxos[0])
