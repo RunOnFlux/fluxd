@@ -21,21 +21,19 @@ mock proxy, which records and then drops them.
 """
 
 import asyncio
-import os
 import socket
 from collections.abc import Iterator
 
 import pytest
-from conftest import NodeFactory
+from conftest import NodeFactory, claim_free_port
 from fluxtest.node import FluxNode
 from socks5 import AddressType, Socks5Command, Socks5Configuration, Socks5Server
 
-# Per-process port bases keep concurrent test runs from colliding, mirroring
-# the legacy test's os.getpid()-derived ports.
-_PID_OFFSET = os.getpid() % 1000
-UNAUTH_PORT = 13000 + _PID_OFFSET
-AUTH_PORT = 14000 + _PID_OFFSET
-IPV6_PORT = 15000 + _PID_OFFSET
+# Distinct free ports from the shared allocator, so the mock proxies never
+# collide with a node's ports or with each other.
+UNAUTH_PORT = claim_free_port()
+AUTH_PORT = claim_free_port()
+IPV6_PORT = claim_free_port()
 
 # A short bound on the blocking queue read so a proxy that never receives the
 # expected CONNECT fails the test instead of hanging the suite.

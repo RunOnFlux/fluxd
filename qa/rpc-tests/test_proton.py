@@ -17,11 +17,10 @@ the received hex is already in getblockhash display order and compares directly.
 """
 
 import asyncio
-import os
 import threading
 
 import pytest
-from conftest import NodeFactory
+from conftest import NodeFactory, claim_free_port
 
 # qpid-proton ships no manylinux wheel, so it is installed only in the Linux run
 # environment; skip the whole module wherever it is unavailable (e.g. macOS lint).
@@ -88,9 +87,9 @@ class Server(MessagingHandler):
 
 async def test_amqp_publishes_block_and_tx_hashes(node_factory: NodeFactory) -> None:
     """The initial tip and each mined block each yield a hashblock and a hashtx."""
-    # Reuse the conftest per-process port base so concurrent runs do not collide.
-    port = 12000 + os.getpid() % 990 + 700
-    url = f"127.0.0.1:{port}"
+    # A free port from the shared allocator -- monotonic, so it is distinct from
+    # the node's own ports regardless of when the listener thread binds it.
+    url = f"127.0.0.1:{claim_free_port()}"
 
     # The listener terminates after one block hash and one coinbase txid for the
     # genesis tip plus every mined block.
