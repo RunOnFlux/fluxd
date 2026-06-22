@@ -34,6 +34,9 @@ testpaths = ["rpc-tests"]
 # Only collect converted pytest modules; legacy scripts (some still python2)
 # are named <feature>.py / <feature>_test.py and are skipped until migrated.
 python_files = ["test_*.py"]
+markers = [
+    "slow: minutes-long tests (e.g. block-file pruning needs >550MB of blocks); deselect with -m 'not slow'",
+]
 
 [tool.ty.environment]
 python-version = "3.12"
