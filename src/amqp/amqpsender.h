@@ -59,8 +59,15 @@ class AMQPSender : public proton::messaging_handler {
             throw std::runtime_error("amqp connection was terminated");
         }
 
+        // The connection is established asynchronously by the container thread
+        // and may be briefly inactive during startup or a transient reconnect.
+        // The message has already been queued, so leave it to be flushed from
+        // on_sendable once the connection is active rather than reporting a
+        // failure: the notification interface tears a notifier down permanently
+        // on a single failed send, which would silently stop all further
+        // notifications of that type for the life of the process.
         if (!conn_.active()) {
-            throw std::runtime_error("amqp connection is not active");
+            return;
         }
 
         while (messages_.size() > 0) {
