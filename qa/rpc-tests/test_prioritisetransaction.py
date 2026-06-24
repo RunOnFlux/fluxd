@@ -110,6 +110,13 @@ async def test_prioritisetransaction(node_factory: NodeFactory) -> None:
     relayfee = (await node0.rpc.getnetworkinfo())["relayfee"]
     fee_delta = int(3 * relayfee * COIN)
 
+    # node0's sends pay above the relay floor so that priority_tx_1 -- pinned to
+    # the floor below -- is strictly the lowest fee-rate transaction in node0's
+    # mempool. Without that gap priority_tx_1 sits at the very margin of node0's
+    # tiny block and is occasionally mined into it, which would defeat the
+    # node-local-prioritisation check.
+    await node0.rpc.settxfee(2 * relayfee)
+
     # Flood node0's mempool with small sends; an 11 kB block mines only ~50, so
     # the backlog dwarfs one block's capacity.
     flood_addr = await node1.rpc.getnewaddress()
@@ -141,6 +148,9 @@ async def test_prioritisetransaction(node_factory: NodeFactory) -> None:
 
     # A transaction prioritised only on node1 is local mempool state; node0's
     # template never sees the delta, so it should not be mined in node0's block.
+    # Pin it to the relay floor so node0 (no delta) reliably leaves it out, while
+    # node1's delta below still lifts it past node0's higher-fee filler sends.
+    await node1.rpc.settxfee(relayfee)
     priority_tx_1 = await node1.rpc.sendtoaddress(await node0.rpc.getnewaddress(), SEND_AMOUNT)
     await node1.rpc.prioritisetransaction(priority_tx_1, 1000, fee_delta)
     await sync_mempools([node0, node1])
