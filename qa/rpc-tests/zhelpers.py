@@ -97,6 +97,29 @@ async def get_coinbase_address(node: FluxNode, expected_utxos: int | None = None
     return matching[0]
 
 
+async def wait_for_received_notes(
+    node: FluxNode, zaddr: str, count: int, minconf: int = 0, timeout: float = 30
+) -> list[dict[str, Any]]:
+    """Poll z_listreceivedbyaddress until ``zaddr`` shows at least ``count`` notes.
+
+    A z_sendmany / z_shieldcoinbase operation reports success once its transaction
+    is built and broadcast, but the sending wallet takes a moment longer to
+    register the output note in its received-note view, so an immediate
+    z_listreceivedbyaddress can still be empty. This waits for that to settle.
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while True:
+        received = await node.rpc.z_listreceivedbyaddress(zaddr, minconf)
+        if len(received) >= count:
+            return received
+        if loop.time() > deadline:
+            raise AssertionError(
+                f"{zaddr} did not receive {count} note(s) within {timeout}s (got {len(received)})"
+            )
+        await asyncio.sleep(0.25)
+
+
 async def z_total(node: FluxNode) -> dict[str, Decimal]:
     """Return z_gettotalbalance as {transparent, private, total} Decimals."""
     bal = await node.rpc.z_gettotalbalance()
