@@ -87,8 +87,17 @@ async def get_coinbase_address(node: FluxNode, expected_utxos: int | None = None
     With no filter, returns the coinbase address holding the most spendable
     UTXOs. Each PoW-mode coinbase pays a fresh wallet address, so callers that
     need a known UTXO count must mine that many blocks first.
+
+    The spendable filter is required: listunspent also surfaces the matured
+    foundation P2SH coinbase outputs, which are ``generated`` but unspendable,
+    and returning one of those addresses makes a follow-up z_sendmany fail with
+    "no UTXOs found".
     """
-    addrs = [u["address"] for u in await node.rpc.listunspent() if u["generated"]]
+    addrs = [
+        u["address"]
+        for u in await node.rpc.listunspent()
+        if u["generated"] and u["spendable"]
+    ]
     assert addrs, "node has no spendable coinbase outputs"
     if expected_utxos is None:
         return max(set(addrs), key=addrs.count)
