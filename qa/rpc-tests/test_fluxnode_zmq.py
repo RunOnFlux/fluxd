@@ -12,10 +12,11 @@ On regtest no fluxnode start transactions exist, so every delta carries empty
 node sets, which makes the chain-spanning header and its hashes the thing under
 test -- cross-checked against getblockhash and getfluxnodesnapshot.
 
-Each sequence counter increments by one per message; the absolute starting value
-is not asserted because the very first notifications are gated by initial block
-download and the ZMQ slow-joiner. ``wait_until_live`` establishes a reliable
-stream before any assertion (see zmq_sub).
+Each sequence counter increments by one per message. The exact starting value is
+not asserted -- the first notifications are gated by initial block download and
+the ZMQ slow-joiner, and ``wait_until_live`` consumes an unknown few (see
+zmq_sub) -- but it must be small: a per-topic counter left uninitialized would
+start from a multi-billion garbage value, so the test guards against that.
 """
 
 import asyncio
@@ -307,6 +308,9 @@ async def test_message_sequencing(node_factory: NodeFactory) -> None:
 
         for topic, values in sequences.items():
             assert len(values) == blocks, f"{topic.decode()}: {values}"
+            # A small base, not the multi-billion value an uninitialized counter
+            # would emit.
+            assert values[0] < 100000, f"{topic.decode()} sequence base uninitialized: {values[0]}"
             assert values == list(range(values[0], values[0] + blocks)), (
                 f"{topic.decode()} not consecutive: {values}"
             )
