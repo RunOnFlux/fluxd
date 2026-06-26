@@ -145,6 +145,7 @@ def ser_char_vector(items: list[int]) -> bytes:
 class CAddress:
     def __init__(self) -> None:
         self.nServices = 1
+        self.nTime = 0  # carried only inside addr messages, not in version
         self.pchReserved = b"\x00" * 10 + b"\xff" * 2
         self.ip = "0.0.0.0"
         self.port = 0
@@ -702,10 +703,19 @@ class msg_addr:
         self.addrs: list[CAddress] = []
 
     def deserialize(self, f: io.BytesIO) -> None:
-        self.addrs = deser_vector(f, CAddress)
+        # Each entry is a 4-byte nTime followed by the timeless CAddress.
+        self.addrs = []
+        for _ in range(_deser_compact_size(f)):
+            addr = CAddress()
+            addr.nTime = struct.unpack("<I", f.read(4))[0]
+            addr.deserialize(f)
+            self.addrs.append(addr)
 
     def serialize(self) -> bytes:
-        return ser_vector(self.addrs)
+        r = _ser_compact_size(len(self.addrs))
+        for addr in self.addrs:
+            r += struct.pack("<I", addr.nTime) + addr.serialize()
+        return r
 
     def __repr__(self) -> str:
         return f"msg_addr(addrs={self.addrs!r})"
