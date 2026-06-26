@@ -17,8 +17,11 @@ import socket
 import struct
 import time
 from collections.abc import Callable
+from hashlib import blake2b
 from hashlib import sha256 as _sha256
 from typing import Any
+
+from .equihash import gbp_basic, gbp_validate, hash_nonce, zelcash_person
 
 OVERWINTER_PROTO_VERSION = 170003
 SPROUT_PROTO_VERSION = 170002
@@ -94,6 +97,11 @@ def uint256_from_str(s: bytes) -> int:
     for i in range(8):
         r += t[i] << (i * 32)
     return r
+
+
+def uint256_from_compact(c: int) -> int:
+    nbytes = (c >> 24) & 0xFF
+    return (c & 0xFFFFFF) << (8 * (nbytes - 3))
 
 
 def deser_vector(f: io.BytesIO, c: type) -> list:
@@ -505,7 +513,9 @@ class CBlockHeader:
 
     def calc_sha256(self) -> None:
         if self.sha256 is None:
-            r = self.serialize()
+            # The block hash is over the header only; serialize it explicitly so a
+            # CBlock subclass does not fold its transactions into the hash.
+            r = CBlockHeader.serialize(self)
             self.sha256 = uint256_from_str(hash256(r))
             self.hash = hash256(r)[::-1].hex()
 
@@ -544,6 +554,35 @@ class CBlock(CBlockHeader):
                 newhashes.append(hash256(hashes[i] + hashes[i2]))
             hashes = newhashes
         return uint256_from_str(hashes[0])
+
+    def _equihash_digest(self, n: int, k: int):
+        digest = blake2b(digest_size=(512 // n) * n // 8, person=zelcash_person(n, k))
+        digest.update(CBlockHeader.serialize(self)[:108])
+        return digest
+
+    def is_valid(self, n: int = 48, k: int = 5) -> bool:
+        """Validate the equihash solution.
+
+        Regtest CheckProofOfWork returns true unconditionally, so a regtest block
+        only needs a valid equihash solution, not a hash that meets the target.
+        """
+        digest = self._equihash_digest(n, k)
+        hash_nonce(digest, self.nNonce)
+        return gbp_validate(digest, bytes(self.nSolution), n, k)
+
+    def solve(self, n: int = 48, k: int = 5) -> None:
+        """Find a nonce whose equihash solution the daemon accepts on regtest."""
+        base = self._equihash_digest(n, k)
+        self.nNonce = 0
+        while True:
+            digest = base.copy()
+            hash_nonce(digest, self.nNonce)
+            solns = gbp_basic(digest, n, k)
+            if solns:
+                self.nSolution = list(solns[0])
+                self.rehash()
+                return
+            self.nNonce += 1
 
     def __repr__(self) -> str:
         return f"CBlock(hash={self.hash} vtx={self.vtx!r})"
