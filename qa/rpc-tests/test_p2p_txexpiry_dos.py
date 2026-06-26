@@ -14,7 +14,7 @@ from fluxtest.mininode import CTransaction, NodeConn, NodeConnCB, msg_tx
 from fluxtest.node import FluxNode
 from zhelpers import shielded_args
 
-PROTOCOL_VERSION = 170021  # at least the regtest ACADIA minimum of 170007
+PROTOCOL_VERSION = 170021  # at least the regtest ACADIA minimum of 170006
 TIP = 110  # the tip when the transaction is first sent; expiry is set to match
 
 
