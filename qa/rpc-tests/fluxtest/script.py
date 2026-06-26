@@ -6,6 +6,7 @@ pushes to script bytecode, matching the consensus encoding.
 """
 
 import struct
+from collections.abc import Iterable
 
 
 class CScriptOp(int):
@@ -89,10 +90,10 @@ class CScript(bytes):
             return CScriptOp.encode_op_pushdata(bytes(other))
         raise TypeError(f"cannot encode {other!r} in a script")
 
-    def __new__(cls, items: object = b"") -> "CScript":
+    def __new__(cls, items: "bytes | bytearray | Iterable[object]" = b"") -> "CScript":
         if isinstance(items, (bytes, bytearray)):
             return super().__new__(cls, bytes(items))
-        return super().__new__(cls, b"".join(cls._coerce(x) for x in items))  # type: ignore[union-attr]
+        return super().__new__(cls, b"".join(cls._coerce(x) for x in items))
 
     def __repr__(self) -> str:
         return f"CScript({bytes(self).hex()})"
