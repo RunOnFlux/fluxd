@@ -7,7 +7,7 @@ than the transaction. This drives the relay path with a mininode peer.
 
 Reframed for Flux: ACADIA is active (so transactions carry an expiry height) and
 PON is off (so mined coinbase funds the wallet); the mininode connects at a
-protocol version at least the regtest ACADIA minimum (170007). The expiring-soon
+protocol version at least the regtest ACADIA minimum (170006). The expiring-soon
 threshold is three blocks, as upstream, so the expiry heights track the tip.
 """
 
@@ -32,7 +32,7 @@ from fluxtest.node import FluxNode
 from fluxtest.rpc import JSONRPCError
 from zhelpers import shielded_args
 
-PROTOCOL_VERSION = 170021  # at least the regtest ACADIA minimum of 170007
+PROTOCOL_VERSION = 170021  # at least the regtest ACADIA minimum of 170006
 
 TIP = 110
 SOON_EXPIRY = TIP + 3  # within the 3-block threshold at the tip: rejected
