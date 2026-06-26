@@ -96,3 +96,27 @@ class CScript(bytes):
 
     def __repr__(self) -> str:
         return f"CScript({bytes(self).hex()})"
+
+
+_B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+_REGTEST_PUBKEY_PREFIX = bytes([0x1D, 0x25])
+_REGTEST_SCRIPT_PREFIX = bytes([0x1C, 0xBA])
+
+
+def _b58check_decode(s: str) -> bytes:
+    n = 0
+    for c in s:
+        n = n * 58 + _B58.index(c)
+    raw = (b"\x00" * (len(s) - len(s.lstrip("1")))) + n.to_bytes((n.bit_length() + 7) // 8, "big")
+    return raw[:-4]  # drop the four-byte checksum
+
+
+def script_for_address(addr: str) -> CScript:
+    """The scriptPubKey paying a base58 regtest t-address (P2PKH or P2SH)."""
+    payload = _b58check_decode(addr)
+    version, h160 = payload[:2], payload[2:]
+    if version == _REGTEST_PUBKEY_PREFIX:
+        return CScript([OP_DUP, OP_HASH160, h160, OP_EQUALVERIFY, OP_CHECKSIG])
+    if version == _REGTEST_SCRIPT_PREFIX:
+        return CScript([OP_HASH160, h160, OP_EQUAL])
+    raise ValueError(f"unsupported address version {version.hex()}")

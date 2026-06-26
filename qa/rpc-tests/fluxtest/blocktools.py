@@ -1,9 +1,9 @@
 """Helpers for building regtest blocks and transactions for the P2P tests."""
 
 from .mininode import COIN, CBlock, COutPoint, CTransaction, CTxIn, CTxOut
-from .script import OP_0, OP_EQUAL, OP_HASH160, CScript, CScriptNum
+from .script import OP_EQUAL, OP_HASH160, CScript, CScriptNum, script_for_address
 
-# The regtest founders/dev-fund P2SH that the coinbase must pay before the first
+# The regtest founders/dev-fund P2SH that the coinbase pays before the first
 # halving.
 _REGTEST_FOUNDERS = bytes(
     [0x67, 0x08, 0xE6, 0x67, 0x0D, 0xB0, 0xB9, 0x50, 0xDA, 0xC6,
@@ -11,12 +11,44 @@ _REGTEST_FOUNDERS = bytes(
 )  # fmt: skip
 REGTEST_HALVING_INTERVAL = 150
 
+# Regtest one-time exchange and foundation funding, both required in the coinbase
+# at exactly this height.
+_REGTEST_FUNDING_HEIGHT = 10
+_REGTEST_EXCHANGE = ("tmRucHD85zgSigtA4sJJBDbPkMUJDcw5XDE", 3000000 * COIN)
+_REGTEST_FOUNDATION = ("t2DFGpj2tciojsGKKrGVwQ92hUwAxWQQgJ9", 2500000 * COIN)
 
-def create_coinbase(height: int) -> CTransaction:
-    """An anyone-can-spend coinbase paying the founders reward before halving."""
+# Regtest swap-pool funding, required in the coinbase at heights 10, 20, 30, 40, 50.
+_REGTEST_SWAPPOOL = ("t2Dsexh4v5g2dpL2LLCsR1p9TshMm63jSBM", 2100000 * COIN)
+_REGTEST_SWAPPOOL_START = 10
+_REGTEST_SWAPPOOL_INTERVAL = 10
+_REGTEST_SWAPPOOL_MAX_TIMES = 5
+
+
+def _is_swappool_height(height: int) -> bool:
+    start, interval, times = (
+        _REGTEST_SWAPPOOL_START,
+        _REGTEST_SWAPPOOL_INTERVAL,
+        _REGTEST_SWAPPOOL_MAX_TIMES,
+    )
+    if not start <= height <= start + interval * times:
+        return False
+    return any(height == start + interval * i for i in range(times))
+
+
+def create_coinbase(height: int, extra: int = 0) -> CTransaction:
+    """An anyone-can-spend coinbase paying the founders reward before halving.
+
+    ``extra`` distinguishes otherwise-identical coinbases (e.g. competing blocks
+    at the same height) without disturbing the BIP34 height that leads the input
+    script.
+    """
     coinbase = CTransaction()
     coinbase.vin.append(
-        CTxIn(COutPoint(0, 0xFFFFFFFF), CScript([CScriptNum(height), OP_0]), 0xFFFFFFFF)
+        CTxIn(
+            COutPoint(0, 0xFFFFFFFF),
+            CScript([CScriptNum(height), CScriptNum(extra)]),
+            0xFFFFFFFF,
+        )
     )
     reward = (150 * COIN) >> (height // REGTEST_HALVING_INTERVAL)
     miner = CTxOut(reward, CScript())
@@ -25,7 +57,13 @@ def create_coinbase(height: int) -> CTransaction:
         founders_value = reward // 5
         miner.nValue = reward - founders_value
         founders = CTxOut(founders_value, CScript([OP_HASH160, _REGTEST_FOUNDERS, OP_EQUAL]))
-        coinbase.vout = [miner, founders]
+        coinbase.vout.append(founders)
+    if height == _REGTEST_FUNDING_HEIGHT:
+        for address, amount in (_REGTEST_EXCHANGE, _REGTEST_FOUNDATION):
+            coinbase.vout.append(CTxOut(amount, script_for_address(address)))
+    if _is_swappool_height(height):
+        address, amount = _REGTEST_SWAPPOOL
+        coinbase.vout.append(CTxOut(amount, script_for_address(address)))
     coinbase.calc_sha256()
     return coinbase
 
