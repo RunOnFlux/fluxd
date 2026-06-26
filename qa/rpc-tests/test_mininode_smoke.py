@@ -15,7 +15,9 @@ async def test_mininode_handshake(node_factory: NodeFactory) -> None:
     await cb.sync_with_ping()
     peers = await node.rpc.getpeerinfo()
     assert len(peers) == 1
-    # The node sanitizes the subversion string, stripping punctuation such as "-".
-    assert "mininodetester" in peers[0]["subver"]
+    # The node sanitizes the reported subversion with SAFE_CHARS_DEFAULT, which
+    # on Flux omits "-" (it allows alphanumerics and " .,;_/:?@()"), so the
+    # hyphens are dropped from /python-mininode-tester:0.0.1/.
+    assert peers[0]["subver"] == "/pythonmininodetester:0.0.1/"
 
     await conn.disconnect_node()
