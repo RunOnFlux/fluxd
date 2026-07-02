@@ -39,12 +39,6 @@ IPV6_PORT = claim_free_port()
 # expected CONNECT fails the test instead of hanging the suite.
 QUEUE_TIMEOUT = 30.0
 
-# The framework config sets connect=0 to keep nodes from redialing addrman
-# peers on their own; the daemon treats that "0" as a hostname to dial and,
-# with a proxy configured, keeps asking the proxy for it. Those CONNECTs are
-# harness noise, not addnode traffic, and the queue reader skips them.
-CONNECT_SENTINEL = "0"
-
 # Targets the daemon is asked to reach; the proxy reports back what it saw.
 IPV4_TARGET = "15.61.23.23"
 IPV4_PORT = 1234
@@ -78,16 +72,12 @@ async def _next_command(server: Socks5Server) -> Socks5Command:
 
     The proxy's queue read is blocking, so it runs in a worker thread to keep
     the event loop free; a handler that hit an error puts the exception on the
-    queue, which is re-raised here. CONNECTs for the connect=0 sentinel are
-    skipped.
+    queue, which is re-raised here.
     """
-    while True:
-        item = await asyncio.wait_for(asyncio.to_thread(server.queue.get), QUEUE_TIMEOUT)
-        if isinstance(item, Exception):
-            raise item
-        if item.addr in (CONNECT_SENTINEL, CONNECT_SENTINEL.encode()):
-            continue
-        return item
+    item = await asyncio.wait_for(asyncio.to_thread(server.queue.get), QUEUE_TIMEOUT)
+    if isinstance(item, Exception):
+        raise item
+    return item
 
 
 async def _expect_connect(
