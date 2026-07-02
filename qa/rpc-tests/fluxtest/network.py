@@ -32,6 +32,21 @@ async def connect_nodes_bi(a: FluxNode, b: FluxNode) -> None:
     await connect_nodes(b, a)
 
 
+async def bump_clocks(nodes: list[FluxNode]) -> None:
+    """Pull every node's clock up to the latest tip time across the set.
+
+    After an independent (partitioned) advance the chains' tips differ, and a
+    node only accepts a peer's longer chain once its own clock is at least as
+    late as that chain's tip time.
+    """
+    latest = 0
+    for node in nodes:
+        tip_time = (await node.rpc.getblock(await node.rpc.getbestblockhash()))["time"]
+        latest = max(latest, tip_time)
+    for node in nodes:
+        await node.set_mocktime_at_least(latest)
+
+
 async def sync_blocks(nodes: list[FluxNode], timeout: float = 60) -> None:
     """Wait until every node reports the same block count."""
     loop = asyncio.get_running_loop()
