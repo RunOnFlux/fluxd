@@ -6,8 +6,9 @@ and tests weren't explicitly disabled.
 
 There are two scripts for running tests:
 
-* ``qa/flux/full-test-suite.py``, to run the main test suite
-* ``qa/pull-tester/rpc-tests.sh``, to run the RPC tests.
+* ``qa/flux/full_test_suite.py``, to run the main test suite
+* ``uv run pytest rpc-tests/`` from the ``qa/`` directory, to run the RPC tests
+  (see ``qa/rpc-tests/README.md``).
 
 The main test suite uses two different testing frameworks. Tests using the Boost
 framework are under ``src/test/``; tests using the Google Test/Google Mock
