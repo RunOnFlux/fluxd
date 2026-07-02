@@ -13,7 +13,6 @@ min-difficulty rule keeps each at powLimit; mocktime is advanced to cover the
 """
 
 import pytest
-
 from conftest import POW_ARGS, NodeFactory
 from fluxtest.blocktools import create_block, create_coinbase
 from fluxtest.mininode import (
