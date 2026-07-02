@@ -10,7 +10,7 @@ over-reports unspent notes and omits the change field.
 from decimal import Decimal
 
 from conftest import NodeFactory
-from fluxtest.network import connect_nodes_bi, sync_blocks
+from fluxtest.network import connect_nodes_bi, sync_blocks, sync_mempools
 from zhelpers import shielded_args, wait_and_assert_operationid_status
 
 
@@ -34,6 +34,8 @@ async def test_change_indicator(node_factory: NodeFactory) -> None:
         taddr, [{"address": zaddr1, "amount": Decimal("1.0"), "memo": "c0ffee01"}], 1, 0
     )
     await wait_and_assert_operationid_status(node1, opid)
+    # Node 0 mines node 1's transaction: it must have relayed first.
+    await sync_mempools([node0, node1])
     await node0.mine(1)
     await sync_blocks([node0, node1])
 
@@ -49,6 +51,7 @@ async def test_change_indicator(node_factory: NodeFactory) -> None:
         zaddr1, [{"address": zaddr2, "amount": Decimal("0.6"), "memo": "c0ffee02"}], 1, 0
     )
     await wait_and_assert_operationid_status(node1, opid)
+    await sync_mempools([node0, node1])
     await node0.mine(1)
     await sync_blocks([node0, node1])
 
