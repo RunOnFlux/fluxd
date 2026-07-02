@@ -204,7 +204,6 @@ UniValue blockToDeltasJSON(const CBlock& block, const CBlockIndex* blockindex)
             if (IsValidDestination(dest)) {
                 delta.pushKV("address", EncodeDestination(dest));
             }
-            delta.pushKV("address", EncodeDestination(dest));
             delta.pushKV("satoshis", out.nValue);
             delta.pushKV("index", (int)k);
 

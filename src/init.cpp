@@ -416,7 +416,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-banscore=<n>", strprintf(_("Threshold for disconnecting misbehaving peers (default: %u)"), 100));
     strUsage += HelpMessageOpt("-bantime=<n>", strprintf(_("Number of seconds to keep misbehaving peers from reconnecting (default: %u)"), 86400));
     strUsage += HelpMessageOpt("-bind=<addr>", _("Bind to given address and always listen on it. Use [host]:port notation for IPv6"));
-    strUsage += HelpMessageOpt("-connect=<ip>", _("Connect only to the specified node(s)"));
+    strUsage += HelpMessageOpt("-connect=<ip>", _("Connect only to the specified node(s); -connect=0 disables automatic outbound connections"));
     strUsage += HelpMessageOpt("-discover", _("Discover own IP addresses (default: 1 when listening and no -externalip or -proxy)"));
     strUsage += HelpMessageOpt("-dns", _("Allow DNS lookups for -addnode, -seednode and -connect") + " " + _("(default: 1)"));
     strUsage += HelpMessageOpt("-dnsseed", _("Query for peer addresses via DNS lookup, if low on addresses (default: 1 unless -connect)"));
@@ -504,6 +504,8 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-flushwallet", strprintf("Run a thread to flush wallet periodically (default: %u)", 1));
         strUsage += HelpMessageOpt("-stopafterblockimport", strprintf("Stop running after importing blocks from disk (default: %u)", 0));
         strUsage += HelpMessageOpt("-nuparams=hexBranchId:activationHeight", "Use given activation height for specified network upgrade (regtest-only)");
+        strUsage += HelpMessageOpt("-ponactivation=height", "Set the PON activation height (regtest-only); use a high value to mine PoW blocks that pay the wallet");
+        strUsage += HelpMessageOpt("-acadiaactivation=height", "Set the ACADIA upgrade activation height (regtest-only); activates Overwintered transactions so signing carries a consensus branch id");
     }
     string debugCategories = "addrman, alert, bench, coindb, db, estimatefee, http, libevent, lock, mempool, net, partitioncheck, pow, proxy, prune, "
                              "rand, reindex, rpc, selectcoins, tor, zmq, zrpc, zrpcunsafe (implies zrpc)"; // Don't translate these
@@ -1198,20 +1200,76 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
                 return InitError(strprintf("Invalid nActivationHeight (%s)", vDeploymentParams[1]));
             }
             bool found = false;
+            // An upgrade can be selected by name (e.g. "PON"), by its UpgradeIndex
+            // enum value (e.g. "10"), or by branch id hex. Name and index target one
+            // upgrade unambiguously; the branch-id form is ambiguous because every
+            // post-Sprout Flux upgrade shares a branch id, so it resolves to the
+            // first match as before. Only treat the selector as an index when it
+            // parses fully as an integer, so a branch id like "5ba81b19" does not
+            // silently match a leading-digit index.
+            const std::string selector = ToLower(vDeploymentParams[0]);
+            int nSelectorIndex = -1;
+            if (!ParseInt32(vDeploymentParams[0], &nSelectorIndex)) {
+                nSelectorIndex = -1;
+            }
             // Exclude Base from upgrades
             for (auto i = Consensus::BASE_SPROUT + 1; i < Consensus::MAX_NETWORK_UPGRADES; ++i)
             {
-                if (vDeploymentParams[0].compare(HexInt(NetworkUpgradeInfo[i].nBranchId)) == 0) {
+                if (selector == ToLower(NetworkUpgradeInfo[i].strName) || nSelectorIndex == i) {
                     UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex(i), nActivationHeight);
                     found = true;
-                    LogPrintf("Setting network upgrade activation parameters for %s to height=%d\n", vDeploymentParams[0], nActivationHeight);
+                    LogPrintf("Setting network upgrade activation parameters for %s to height=%d\n", NetworkUpgradeInfo[i].strName, nActivationHeight);
                     break;
+                }
+            }
+            if (!found) {
+                // Branch-id form (ambiguous; first matching upgrade wins, as before).
+                for (auto i = Consensus::BASE_SPROUT + 1; i < Consensus::MAX_NETWORK_UPGRADES; ++i)
+                {
+                    if (vDeploymentParams[0].compare(HexInt(NetworkUpgradeInfo[i].nBranchId)) == 0) {
+                        UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex(i), nActivationHeight);
+                        found = true;
+                        LogPrintf("Setting network upgrade activation parameters for %s to height=%d\n", vDeploymentParams[0], nActivationHeight);
+                        break;
+                    }
                 }
             }
             if (!found) {
                 return InitError(strprintf("Invalid network upgrade (%s)", vDeploymentParams[0]));
             }
         }
+    }
+
+    // Allow setting the PON activation height directly on regtest. PON shares a
+    // branch id with several earlier upgrades, so -nuparams cannot target it;
+    // this is the only way to push PON past a test (e.g. to mine PoW blocks
+    // that pay the wallet) or to activate it at a chosen height.
+    if (mapArgs.count("-ponactivation")) {
+        if (Params().NetworkIDString() != "regtest") {
+            return InitError("-ponactivation may only be set on regtest.");
+        }
+        int nPonActivationHeight;
+        if (!ParseInt32(mapArgs["-ponactivation"], &nPonActivationHeight)) {
+            return InitError(strprintf("Invalid -ponactivation height (%s)", mapArgs["-ponactivation"]));
+        }
+        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_PON, nPonActivationHeight);
+        LogPrintf("Setting PON activation height to %d\n", nPonActivationHeight);
+    }
+
+    // ACADIA shares its branch id with several other upgrades, so -nuparams
+    // cannot target it (the matcher stops at the first id match). This regtest
+    // flag activates ACADIA directly so createrawtransaction produces
+    // Overwintered transactions that carry a consensus branch id for signing.
+    if (mapArgs.count("-acadiaactivation")) {
+        if (Params().NetworkIDString() != "regtest") {
+            return InitError("-acadiaactivation may only be set on regtest.");
+        }
+        int nAcadiaActivationHeight;
+        if (!ParseInt32(mapArgs["-acadiaactivation"], &nAcadiaActivationHeight)) {
+            return InitError(strprintf("Invalid -acadiaactivation height (%s)", mapArgs["-acadiaactivation"]));
+        }
+        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_ACADIA, nAcadiaActivationHeight);
+        LogPrintf("Setting ACADIA activation height to %d\n", nAcadiaActivationHeight);
     }
 
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log

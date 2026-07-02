@@ -1446,6 +1446,13 @@ void static ProcessOneShot()
 
 void ThreadOpenConnections()
 {
+    // -connect=0 means no automatic outbound connections at all: without this
+    // the "0" would be dialed as a hostname forever (and handed to the SOCKS
+    // proxy when one is configured).
+    if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() == 1 &&
+        mapMultiArgs["-connect"][0] == "0")
+        return;
+
     // Connect to specific addresses
     if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0)
     {
