@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 from conftest import NodeFactory
-from fluxtest.network import connect_nodes_bi, sync_blocks
+from fluxtest.network import connect_nodes_bi, sync_blocks, sync_mempools
 from zhelpers import (
     shielded_args,
     wait_and_assert_operationid_status,
@@ -51,6 +51,8 @@ async def test_list_received(node_factory: NodeFactory, pool: str) -> None:
     assert received[0]["change"] is False
     assert received[0]["memo"] == MY_MEMO
 
+    # Node 0 mines node 1's transaction: it must have relayed first.
+    await sync_mempools([node0, node1])
     await node0.mine(1)
     await sync_blocks([node0, node1])
     # Once confirmed the same note shows under the default one-confirmation filter.
@@ -65,6 +67,7 @@ async def test_list_received(node_factory: NodeFactory, pool: str) -> None:
     zaddr2 = await node1.rpc.z_getnewaddress(pool)
     opid = await node1.rpc.z_sendmany(zaddr1, [{"address": zaddr2, "amount": Decimal("0.6")}])
     txid = await wait_and_assert_operationid_status(node1, opid)
+    await sync_mempools([node0, node1])
     await node0.mine(1)
     await sync_blocks([node0, node1])
 

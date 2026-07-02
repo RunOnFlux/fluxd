@@ -46,6 +46,13 @@ class FluxNode:
 
     def _write_conf(self) -> None:
         self.datadir.mkdir(parents=True, exist_ok=True)
+        # connect=0 keeps the open-connections thread off addrman, so a node
+        # never spontaneously redials a peer it learned earlier: tests isolate
+        # nodes by restarting them, and a completed addnode-onetry handshake
+        # lands the peer in addrman (persisted in peers.dat), which would let
+        # an "isolated" node reconnect on its own. Explicit addnode-onetry
+        # wiring is unaffected, and listen=1 overrides the listen=0 that
+        # setting -connect otherwise implies, so inbound still works.
         (self.datadir / "flux.conf").write_text(
             "regtest=1\n"
             "showmetrics=0\n"
@@ -54,6 +61,8 @@ class FluxNode:
             f"port={self.p2p_port}\n"
             f"rpcport={self.rpc_port}\n"
             "listenonion=0\n"
+            "connect=0\n"
+            "listen=1\n"
         )
 
     async def start(self, timeout: float = 60) -> None:
