@@ -31,8 +31,8 @@ select = ["E", "F", "W", "I", "UP"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["rpc-tests"]
-# Only collect converted pytest modules; legacy scripts (some still python2)
-# are named <feature>.py / <feature>_test.py and are skipped until migrated.
+# Only test_*.py modules are tests; other .py files alongside them are shared
+# support modules (zhelpers, socks5, zmq_sub, ...), not collectable scripts.
 python_files = ["test_*.py"]
 markers = [
     "slow: minutes-long tests (e.g. block-file pruning needs >550MB of blocks); deselect with -m 'not slow'",
@@ -40,6 +40,6 @@ markers = [
 
 [tool.ty.environment]
 python-version = "3.12"
-# Tests import test_framework as a top-level package; rpc-tests is the import
-# root they run from.
+# Tests import fluxtest, conftest and the shared helper modules as top-level
+# names; rpc-tests is the import root they run from.
 extra-paths = ["rpc-tests"]
