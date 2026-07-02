@@ -1,0 +1,45 @@
+[project]
+name = "flux-qa"
+version = "0.1.0"
+description = "Flux fluxd RPC integration test suite (qa/rpc-tests)"
+readme = "README.md"
+authors = [{ name = "The Flux developers" }]
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.14.1",
+    "plyvel>=1.5.1",
+    "pytest>=9.1.0",
+    "pytest-asyncio>=1.4.0",
+    "python-qpid-proton>=0.40.0",
+    "pyzmq>=27.1.0",
+]
+
+[tool.uv]
+# A dependency environment for running the test scripts, not an installable
+# package.
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# pyupgrade (UP) mechanically flags the python2 idioms the suite is migrating
+# off; isort (I) keeps imports ordered.
+select = ["E", "F", "W", "I", "UP"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["rpc-tests"]
+# Only test_*.py modules are tests; other .py files alongside them are shared
+# support modules (zhelpers, socks5, zmq_sub, ...), not collectable scripts.
+python_files = ["test_*.py"]
+markers = [
+    "slow: minutes-long tests (e.g. block-file pruning needs >550MB of blocks); deselect with -m 'not slow'",
+]
+
+[tool.ty.environment]
+python-version = "3.12"
+# Tests import fluxtest, conftest and the shared helper modules as top-level
+# names; rpc-tests is the import root they run from.
+extra-paths = ["rpc-tests"]
