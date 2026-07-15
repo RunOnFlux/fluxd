@@ -9,6 +9,7 @@
 #include "main.h"
 #include "primitives/transaction.h"
 #include "consensus/validation.h"
+#include "fluxnode/fluxnode.h"
 #include "utiltest.h"
 
 extern ZCJoinSplit* params;
@@ -138,6 +139,35 @@ TEST(checktransaction_tests, bad_txns_vout_empty) {
     MockCValidationState state;
     EXPECT_CALL(state, DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty", false)).Times(1);
     CheckTransactionWithoutProofVerification(tx, state);
+}
+
+// A fluxnode confirm tx whose signatures are stripped or corrupted must have its failure
+// reported as corruption-possible. The operator and benchmark signatures are excluded from the
+// tx hash (SER_GETHASH), so they are not committed to the txid or, transitively, to the block
+// hash: a relaying peer can strip them without changing either hash. If such a failure were
+// reported as an ordinary invalidity, the block-connect paths would permanently mark the honest
+// block hash BLOCK_FAILED_VALID, letting a peer poison a victim into permanently rejecting a
+// valid block. The two flags asserted here are what those paths consult to instead reject only
+// this copy, penalize the sender, and leave the index/txid re-requestable.
+TEST(checktransaction_tests, FluxnodeConfirmSignatureFailureIsCorruptionPossible) {
+    SelectParams(CBaseChainParams::MAIN);
+
+    CMutableTransaction mtx;
+    mtx.nVersion = FLUXNODE_TX_VERSION;
+    mtx.nType = FLUXNODE_CONFIRM_TX_TYPE;
+    mtx.collateralIn = COutPoint(uint256S("0000000000000000000000000000000000000000000000000000000000000001"), 0);
+    mtx.nUpdateType = INITIAL_CONFIRM;
+    mtx.benchmarkTier = CUMULUS;
+    mtx.ip = "1.2.3.4";
+    // Signatures left empty, modelling a peer that stripped them in transit.
+
+    CTransaction tx(mtx);
+
+    CValidationState state;
+    EXPECT_FALSE(CheckTransactionWithoutProofVerification(tx, state));
+    EXPECT_EQ(state.GetRejectReason(), "bad-txns-fluxnode-tx-invalid-signature");
+    EXPECT_TRUE(state.CorruptionPossible());
+    EXPECT_TRUE(state.IsFluxnodeTxSignatureFailure());
 }
 
 TEST(checktransaction_tests, BadTxnsOversize) {
