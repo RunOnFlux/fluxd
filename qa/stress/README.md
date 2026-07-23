@@ -12,7 +12,7 @@ recovery, resident fork-choice) — not just the steady state the soak covers.
 | 4 | Arena eviction under hard memory pressure (no OOM, no swap) | `memory_pressure.sh` | mainnet node (operator) |
 | 5 | Init transient + arena `O_TRUNC`/rebuild lifecycle | `restart_storm.sh` | mainnet node (operator) |
 | 6 | Wallet rescan/merkle checks against pruned headers | `wallet_rescan.sh` | wallet node (operator) |
-| 7 | Mixed legacy-PON / VRF fork choice on pruned entries | gtest (`test_pon.cpp`, see below) | gtest |
+| 7 | PON fork choice on pruned entries | gtest (`test_pon.cpp`, see below) | gtest |
 | 8 | Fresh-peer IBD served entirely by patched nodes (block + header disk reads at sustained rate) | `ibd_sync.sh` | spare host → fleet |
 
 ## Notes per test
@@ -27,7 +27,7 @@ current version so checkpointed history arrives as `cmpheaders`
 (2000/batch, solution omitted). Every header is parsed per its version's
 wire format and validated: non-zero merkle root and chain continuity via
 hashPrevBlock everywhere; PoW non-zero nonce (+ non-empty solution in
-legacy mode); PON non-empty block signature; PON-VRF non-zero VRF output.
+legacy mode); PON non-empty block signature.
 The serving node must stay responsive (the script interleaves `ping`
 round-trip timing as a stall probe).
 
@@ -66,13 +66,13 @@ Restarts with `-rescan` and asserts zero transactions report `conflicted`
 afterwards (the M3 failure shape: merkle checks against zeroed pruned
 roots marked every confirmed tx conflicted).
 
-**7 — mixed fork choice** is covered at the gtest level
-(`src/gtest/test_pon.cpp`: `MixedVersionForkChoice*`,
-`ForkChoicePrunedEntries*`): producing real PON/VRF blocks in regtest
+**7 — fork choice** is covered at the gtest level
+(`src/gtest/test_pon.cpp`: `ForkChoice*`,
+`ForkChoicePrunedEntries*`): producing real PON blocks in regtest
 requires staked fluxnode infrastructure, but the comparator itself is a pure
-function of resident index fields — the gtests pit legacy entries (cached
-`hashPON`, `pHeaderData` deliberately null to model a pruned entry) against
-VRF entries and assert determinism, antisymmetry, and that comparison never
+function of resident index fields — the gtests compare entries scored by the
+cached `hashPON` (with `pHeaderData` deliberately null to model a pruned
+entry) and assert determinism, antisymmetry, and that comparison never
 touches prunable data.
 
 **8 — ibd_sync.sh** (spare host with disk; build server works). Fresh

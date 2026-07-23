@@ -179,10 +179,10 @@ namespace {
                 if (cmp < 0) {
                     return false; // A preferred (lower score), A wins
                 }
-                if (ponHashA > ponHashB) {
-                    return true;  // B has better (lower) hash, B wins
+                if (cmp > 0) {
+                    return true;  // B preferred (lower score), B wins
                 }
-                // If hashes are equal, fall through to sequence ID
+                // Undecided (equal scores): fall through to sequence ID
             }
 
             // ... then by earliest time received, ...
