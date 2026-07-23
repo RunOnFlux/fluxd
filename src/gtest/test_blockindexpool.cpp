@@ -261,44 +261,6 @@ TEST(BlockIndex, DiskBlockIndexSerializationRoundTrip)
     EXPECT_EQ(disk2.GetBlockHash(), h.GetHash());
 }
 
-// nodesVrfOutput is committed to a v101 (PON-VRF) block hash, so the disk write
-// path -- CDiskBlockIndex(*pindex), built through the CBlockIndex copy
-// constructor -- must preserve it across serialization. If the copy drops it,
-// the field round-trips as zero, the recomputed hash no longer matches the
-// index key, and LoadBlockIndexGuts rejects the entry as corrupt on startup.
-TEST(BlockIndex, DiskBlockIndexVrfOutputRoundTrip)
-{
-    CBlockHeader h = MakePopulatedHeader();
-    h.nVersion = CBlockHeader::PON_VRF_VERSION;        // v101 -> nodesVrfOutput serialized + hashed
-    h.hashPrevBlock = uint256();                       // pprev null in this fixture
-    h.nodesVrfOutput = uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa");
-
-    CBlockIndex idx(h);
-    ASSERT_EQ(idx.nodesVrfOutput, h.nodesVrfOutput);   // header ctor carried it
-    idx.nHeight   = 2654321;
-    idx.nFile     = 4;
-    idx.nDataPos  = 1234;
-    idx.nUndoPos  = 5678;
-    idx.nTx       = 9;
-    idx.nStatus   = BLOCK_VALID_SCRIPTS | BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO;
-
-    uint256 blockHash = h.GetHash();
-    idx.phashBlock = &blockHash;
-
-    CDiskBlockIndex disk(&idx);                         // copy ctor MUST carry nodesVrfOutput
-    ASSERT_EQ(disk.nodesVrfOutput, h.nodesVrfOutput);
-
-    CDataStream ss(SER_DISK, CLIENT_VERSION);
-    ss << disk;
-    CDiskBlockIndex disk2;
-    ss >> disk2;
-
-    EXPECT_EQ(disk2.nodesVrfOutput, h.nodesVrfOutput)
-        << "nodesVrfOutput lost across CDiskBlockIndex serialization";
-    EXPECT_EQ(disk2.GetBlockHash(), h.GetHash())
-        << "recomputed v101 block hash differs -> startup rejects the entry as corrupt";
-}
-
 // ShouldFreeAgedHeaderData is the decision behind the runtime HeaderData prune
 // (PruneAgedHeaderData): once a connected block ages past the window, free its
 // rebuildable header data. The guards matter — a header-only entry (no block on

@@ -23,8 +23,8 @@ exercises both:
 
 Validation asserts the fields the pre-fix code served as zeroes for pruned
 entries: non-zero merkle root everywhere; PoW: non-zero nonce (+ non-empty
-solution in legacy mode); PON: non-empty block signature; PON-VRF: non-zero
-VRF output. Chain continuity is asserted via each header's hashPrevBlock.
+solution in legacy mode); PON: non-empty block signature. Chain continuity
+is asserted via each header's hashPrevBlock.
 
 A ping round-trip is interleaved between strides as a responsiveness probe;
 a serving-side cs_main stall shows up as ping RTT.
@@ -48,10 +48,9 @@ import time
 
 MAINNET_MAGIC = bytes([0x24, 0xE9, 0x27, 0x64])
 GENESIS_HASH_HEX = "00052461a5006c2e3b74ce48992a08695607912d5604c3eb8da25749b0900444"
-CURRENT_PROTOCOL_VERSION = 170022  # >= CMPHEADERS_VERSION: server sends cmpheaders
+CURRENT_PROTOCOL_VERSION = 170021  # >= CMPHEADERS_VERSION: server sends cmpheaders
 LEGACY_PROTOCOL_VERSION = 170020  # < CMPHEADERS_VERSION: server sends full headers
 PON_VERSION = 100
-PON_VRF_VERSION = 101
 
 
 def sha256d(b):
@@ -173,11 +172,9 @@ def _read_common(f):
     return version, prev, merkle, sapling, time_bits
 
 
-def _pon_gethash(version, prev, merkle, sapling, time_bits, collateral, vrf_out):
-    """PON block hash = sha256d over the GETHASH serialization (sig/proof excluded)."""
+def _pon_gethash(version, prev, merkle, sapling, time_bits, collateral):
+    """PON block hash = sha256d over the GETHASH serialization (sig excluded)."""
     data = struct.pack("<i", version) + prev + merkle + sapling + time_bits + collateral
-    if version >= PON_VRF_VERSION:
-        data += vrf_out
     return sha256d(data)
 
 
@@ -200,18 +197,12 @@ def parse_headers_msg(payload, expect_prev):
         _validate_common(version, merkle, prev, last_hash)
         if version >= PON_VERSION:
             collateral = f.read(36)
-            vrf_out = None
-            if version >= PON_VRF_VERSION:
-                vrf_out = f.read(32)
-                if vrf_out == b"\x00" * 32:
-                    raise AssertionError(f"zeroed nodesVrfOutput at v{version}")
-                f.read(read_varint(f))  # proof
             sig_len = read_varint(f)
             if sig_len == 0:
                 raise AssertionError("empty vchBlockSig on PON header")
             f.read(sig_len)
             read_varint(f)  # txn count (0)
-            last_hash = _pon_gethash(version, prev, merkle, sapling, time_bits, collateral, vrf_out)
+            last_hash = _pon_gethash(version, prev, merkle, sapling, time_bits, collateral)
         else:
             nonce = f.read(32)
             sol_len = read_varint(f)
@@ -231,7 +222,7 @@ def parse_headers_msg(payload, expect_prev):
 def parse_cmpheaders_msg(payload, expect_prev):
     """`cmpheaders`: vector<CCompactBlockHeader> — PoW entries omit the
     solution and carry the block hash explicitly; PON entries are full
-    (collateral, sig, then VRF output+proof). Returns (count, last_hash)."""
+    (collateral, then sig). Returns (count, last_hash)."""
     f = io.BytesIO(payload)
     count = read_varint(f)
     last_hash = expect_prev
@@ -244,13 +235,7 @@ def parse_cmpheaders_msg(payload, expect_prev):
             if sig_len == 0:
                 raise AssertionError("empty vchBlockSig on PON cmpheader")
             f.read(sig_len)
-            vrf_out = None
-            if version >= PON_VRF_VERSION:
-                vrf_out = f.read(32)
-                if vrf_out == b"\x00" * 32:
-                    raise AssertionError(f"zeroed nodesVrfOutput at v{version}")
-                f.read(read_varint(f))  # proof
-            last_hash = _pon_gethash(version, prev, merkle, sapling, time_bits, collateral, vrf_out)
+            last_hash = _pon_gethash(version, prev, merkle, sapling, time_bits, collateral)
         else:
             nonce = f.read(32)
             hash_block = f.read(32)

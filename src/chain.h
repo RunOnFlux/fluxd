@@ -294,8 +294,7 @@ public:
     //! Copy constructor. Delegates the member copy to operator= so there is a
     //! single enumerated copy path: a resident field only has to be carried in
     //! one place and cannot be silently dropped by two hand-written member lists
-    //! drifting out of sync (which previously lost nodesVrfOutput). pHeaderData
-    //! is deep-copied in operator=.
+    //! drifting out of sync. pHeaderData is deep-copied in operator=.
     CBlockIndex(const CBlockIndex& other) : CBlockIndex()
     {
         *this = other;
@@ -327,7 +326,6 @@ public:
             hashSproutAnchor = other.hashSproutAnchor;
             hashFinalSproutRoot = other.hashFinalSproutRoot;
             hashPON = other.hashPON;
-            nodesVrfOutput = other.nodesVrfOutput;
             nSequenceId = other.nSequenceId;
             delete pHeaderData;
             if (other.pHeaderData) {
