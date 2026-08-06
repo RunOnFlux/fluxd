@@ -3,8 +3,11 @@ work/
 built/
 sources/
 config.site
-x86_64*
-i686*
-mips*
-arm*
-aarch64*
+# Per-host install prefixes, e.g. depends/aarch64-apple-darwin/. Anchored to
+# this directory and restricted to directories: unanchored, these match at any
+# depth, so "arm*" also swallowed files such as patches/bdb/arm64-mutex.patch.
+/x86_64*/
+/i686*/
+/mips*/
+/arm*/
+/aarch64*/
