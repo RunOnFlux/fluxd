@@ -1,0 +1,35 @@
+--- a/src/dbinc/mutex_int.h	2026-08-06 09:35:19
++++ b/src/dbinc/mutex_int.h	2026-08-06 09:35:38
+@@ -522,20 +522,18 @@
+ 
+ #ifdef LOAD_ACTUAL_MUTEX_CODE
+ /* gcc/arm: 0 is clear, 1 is set. */
+-#define	MUTEX_SET(tsl) ({						\
+-	register tsl_t __r, __old;					\
+-	__asm__ volatile(						\
+-		"ldxr	%w1, [%3]\n\t"					\
+-		"stxr	%w0, %w2, [%3]\n\t"				\
+-		"orr	%w0, %w0, %w1\n\t"				\
+-		"neg	%w0, %w0\n\t"					\
+-	    : "=&r" (__r), "=r" (__old)					\
+-	    : "r" (1), "r" (tsl)					\
+-	    );								\
+-	__r & 1;							\
+-})
+-
+-#define	MUTEX_UNSET(tsl)	(*(volatile tsl_t *)(tsl) = 0)
++/*
++ * The hand-written ldxr/stxr sequence that shipped here returned the
++ * complement of the documented result: the "orr/neg" pair leaves bit 0 set
++ * exactly when the store-exclusive failed or the mutex was already held, so
++ * MUTEX_SET() reported success for a contended mutex and failure for a free
++ * one. It also never retried a spuriously failed stxr and left the exclusive
++ * monitor armed on the early-out path. Use the compiler's atomic exchange
++ * instead; it lowers to a correct LL/SC (or LSE CAS) sequence and keeps the
++ * acquire/release ordering these macros are required to provide.
++ */
++#define	MUTEX_SET(tsl)	(__atomic_exchange_n((tsl), 1, __ATOMIC_ACQUIRE) == 0)
++#define	MUTEX_UNSET(tsl)	__atomic_store_n((tsl), 0, __ATOMIC_RELEASE)
+ #define	MUTEX_INIT(tsl)		(MUTEX_UNSET(tsl), 0)
+ #define	MUTEX_MEMBAR(x) \
+ 	({ __asm__ volatile ("dsb sy"); })

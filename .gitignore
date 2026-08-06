@@ -16,6 +16,9 @@ src/flux-cli
 src/flux-gtest
 src/flux-tx
 
+# Output of zcutil/buildmac.sh
+mac-binaries/
+
 *fluxTest.pk
 *fluxTest.vk
 

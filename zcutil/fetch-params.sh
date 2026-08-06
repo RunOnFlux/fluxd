@@ -16,8 +16,28 @@ SAPLING_SPROUT_GROTH16_NAME='sprout-groth16.params'
 DOWNLOAD_URL="https://download.runonflux.io/downloads"
 IPFS_HASH="/ipfs/QmXRHVGLQBiKwvNq7c2vPxAKz1zRVmMYbmt7G5TQss7tY7"
 
-SHA256CMD="$(command -v sha256sum || echo shasum)"
-SHA256ARGS="$(command -v sha256sum >/dev/null || echo '-a 256')"
+# Pick a checksum tool that can verify a list of digests fed on stdin, which is
+# how this script calls it below. Recent macOS ships a BSD sha256sum whose -c
+# only accepts file operands, so merely finding "sha256sum" on PATH is not
+# enough -- probe the candidates for the behaviour we actually need.
+SHA256CMD=''
+SHA256ARGS=''
+for candidate in 'sha256sum:' 'shasum:-a 256'; do
+    cmd="${candidate%%:*}"
+    args="${candidate#*:}"
+    command -v "$cmd" >/dev/null || continue
+    if echo 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /dev/null' |
+       "$cmd" $args -c >/dev/null 2>&1; then
+        SHA256CMD="$cmd"
+        SHA256ARGS="$args"
+        break
+    fi
+done
+
+if [ -z "$SHA256CMD" ]; then
+    echo "error: no usable sha256 checksum tool found (need GNU sha256sum or shasum)" >&2
+    exit 1
+fi
 
 WGETCMD="$(command -v wget || echo '')"
 IPFSCMD="$(command -v ipfs || echo '')"

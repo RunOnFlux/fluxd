@@ -1,5 +1,13 @@
-build_darwin_CC:=$(shell xcrun -f clang)
-build_darwin_CXX:=$(shell xcrun -f clang++)
+# `xcrun -f clang` resolves to the real compiler inside XcodeDefault.xctoolchain,
+# not the /usr/bin/clang shim. The shim is what normally exports SDKROOT before
+# exec'ing the compiler; invoked directly the driver does not locate the macOS
+# SDK on its own, so the link step fails with "ld: library 'System' not found".
+# Every package built for the build machine (native_*) uses these, so pin the
+# sysroot explicitly rather than relying on the shim's environment.
+darwin_SDK_PATH:=$(shell xcrun --show-sdk-path)
+
+build_darwin_CC:=$(shell xcrun -f clang) -isysroot $(darwin_SDK_PATH)
+build_darwin_CXX:=$(shell xcrun -f clang++) -isysroot $(darwin_SDK_PATH)
 build_darwin_AR:=$(shell xcrun -f ar)
 build_darwin_RANLIB:=$(shell xcrun -f ranlib)
 build_darwin_STRIP:=$(shell xcrun -f strip)
@@ -16,8 +24,8 @@ build_darwin_DOWNLOAD = curl --location --fail --connect-timeout $(DOWNLOAD_CONN
 darwin_TARGET=$(subst aarch64,arm64,$(firstword $(subst -, ,$(canonical_host))))-apple-darwin
 
 #darwin host on darwin builder. overrides darwin host preferences.
-darwin_CC:=$(shell xcrun -f clang) -target $(darwin_TARGET) -mmacosx-version-min=$(OSX_MIN_VERSION) --sysroot $(shell xcrun --show-sdk-path)
-darwin_CXX:=$(shell xcrun -f clang++) -target $(darwin_TARGET) -mmacosx-version-min=$(OSX_MIN_VERSION) -stdlib=libc++ --sysroot $(shell xcrun --show-sdk-path)
+darwin_CC:=$(shell xcrun -f clang) -target $(darwin_TARGET) -mmacosx-version-min=$(OSX_MIN_VERSION) -isysroot $(darwin_SDK_PATH)
+darwin_CXX:=$(shell xcrun -f clang++) -target $(darwin_TARGET) -mmacosx-version-min=$(OSX_MIN_VERSION) -stdlib=libc++ -isysroot $(darwin_SDK_PATH)
 darwin_AR:=$(shell xcrun -f ar)
 darwin_RANLIB:=$(shell xcrun -f ranlib)
 darwin_STRIP:=$(shell xcrun -f strip)
