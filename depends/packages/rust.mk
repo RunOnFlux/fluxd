@@ -1,3 +1,15 @@
+# Map a GCC canonical host to a Rust target.
+#   $(1) package name (for the $(1)_rust_target_<host> overrides)
+#   $(2) canonical host
+#   $(3) host OS
+# If no explicit override is present we assume the two are identical, except on
+# Darwin/FreeBSD where the canonical host carries an OS version suffix that Rust
+# targets do not. The CPU is preserved, so aarch64-apple-darwin24 maps to
+# aarch64-apple-darwin and x86_64-apple-darwin14 to x86_64-apple-darwin.
+define rust_target
+$(if $($(1)_rust_target_$(2)),$($(1)_rust_target_$(2)),$(if $(findstring darwin,$(3)),$(firstword $(subst -, ,$(2)))-apple-darwin,$(if $(findstring freebsd,$(3)),$(firstword $(subst -, ,$(2)))-unknown-freebsd,$(2))))
+endef
+
 ifeq ($(host_os),mingw32)
 package=rust
 $(package)_version=1.32.0
@@ -60,30 +72,37 @@ package=rust
 # can check this with `rustc --version -v`.
 $(package)_version=1.64.0
 $(package)_download_path=https://static.rust-lang.org/dist
+# The compiler tarball is always for the *build* machine, so it is selected by
+# $(build_arch)/$(build_os) rather than by the host we are targeting.
 $(package)_file_name_linux=rust-$($(package)_version)-x86_64-unknown-linux-gnu.tar.gz
 $(package)_sha256_hash_linux=a893977f238291370ab96726a74b6b9ae854dc75fbf5730954d901a93843bf9b
 $(package)_file_name_darwin=rust-$($(package)_version)-x86_64-apple-darwin.tar.gz
 $(package)_sha256_hash_darwin=b6003d49fb857ff8dc105a3ccba98b851cd3e7d874005acb92284fd1113adc0d
 $(package)_file_name_freebsd=rust-$($(package)_version)-x86_64-unknown-freebsd.tar.gz
 $(package)_sha256_hash_freebsd=f188a9a7f947d559add5aa7b5aa218d9c5177237eb9ea62109347f0f1464e3a2
-$(package)_file_name_aarch64_linux=rust-$($(package)_version)-aarch64-unknown-linux-gnu.tar.gz
-$(package)_sha256_hash_aarch64_linux=7d8860572431bd4ee1b9cd0cd77cf7ff29fdd5b91ed7c92a820f872de6ced558
+
+# funcs.mk only ever consults $(package)_file_name_$(host_os), so the aarch64
+# tarballs are substituted in wholesale when the build machine is 64-bit ARM
+# (Apple Silicon, or an ARM Linux box).
+ifeq ($(build_arch),aarch64)
+$(package)_file_name_linux=rust-$($(package)_version)-aarch64-unknown-linux-gnu.tar.gz
+$(package)_sha256_hash_linux=7d8860572431bd4ee1b9cd0cd77cf7ff29fdd5b91ed7c92a820f872de6ced558
+$(package)_file_name_darwin=rust-$($(package)_version)-aarch64-apple-darwin.tar.gz
+$(package)_sha256_hash_darwin=e1a37dc5991304716e260144311fd291d8fb514042e45c244c582b3454477038
+endif
 
 # Mapping from GCC canonical hosts to Rust targets
-# If a mapping is not present, we assume they are identical, unless $host_os is
-# "darwin", in which case we assume x86_64-apple-darwin.
+# If a mapping is not present, we assume they are identical, except that Darwin
+# and FreeBSD hosts carry an OS version suffix that Rust targets do not.
 $(package)_rust_target_x86_64-pc-linux-gnu=x86_64-unknown-linux-gnu
 $(package)_rust_target_x86_64-w64-mingw32=x86_64-pc-windows-gnu
 
 # Mapping from Rust targets to SHA-256 hashes
 $(package)_rust_std_sha256_hash_aarch64-unknown-linux-gnu=2b425658f84793d5bbf00ce545f410ec6454add202cce27a718d81e0233e7007
+$(package)_rust_std_sha256_hash_aarch64-apple-darwin=808d3b83211e45cabdf59a19a72565e13d45bba79053ae8210d51eb05500e5fb
 $(package)_rust_std_sha256_hash_x86_64-apple-darwin=eb2f7c51f63973765f01efe509ccd2f26345d4bf0d77695adb4198a0899ae648
 $(package)_rust_std_sha256_hash_x86_64-pc-windows-gnu=dcf87f97432adf7228e907b551d9b73f1ab16f79dc5da0724a227b7ffdaf57b4
 $(package)_rust_std_sha256_hash_x86_64-unknown-freebsd=c91edba781ba56f35f2dba56a268d41866ea9bb5f6ffb9d342635f66b836898b
-
-define rust_target
-$(if $($(1)_rust_target_$(2)),$($(1)_rust_target_$(2)),$(if $(findstring darwin,$(3)),x86_64-apple-darwin,$(if $(findstring freebsd,$(3)),x86_64-unknown-freebsd,$(2))))
-endef
 
 ifneq ($(canonical_host),$(build))
 $(package)_rust_target=$(call rust_target,$(package),$(canonical_host),$(host_os))
