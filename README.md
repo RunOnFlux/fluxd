@@ -6,7 +6,7 @@
 
 ### Key Features
 
-- **PoUW v2 (Proof of Useful Work)**: Also known as PON (Proof of Nodes), activated at block 2,020,000 - see the [whitepaper](https://jetpack2_38080.app.runonflux.io/ipfs/QmW3TNPx5Ru3u3UhXf8GqyVNS3avSsttqjamhF395qe17M)
+- **PoUW v2 (Proof of Useful Work)**: Also known as PON (Proof of Nodes), activated at block 2,020,000 - specified in the [PoUW v2 whitepaper](https://github.com/RunOnFlux/whitepaper-pouw) and described as deployed in the [current whitepaper](https://github.com/RunOnFlux/fluxwhitepaper)
 - **FluxNode Network**: Incentivized node operators power the decentralized cloud infrastructure at [cloud.runonflux.com](https://cloud.runonflux.com/)
 - **Arcane OS**: Distributed operating system built on Flux infrastructure
 - **LWMA3 Difficulty Algorithm**: Provides smooth difficulty adjustments
@@ -71,7 +71,8 @@ For setup instructions, visit the [Flux documentation](https://docs.runonflux.co
 - **Website**: [runonflux.io](https://runonflux.io/)
 - **Decentralized Cloud**: [cloud.runonflux.com](https://cloud.runonflux.com/)
 - **Block Explorer**: [explorer.runonflux.io](https://explorer.runonflux.io/)
-- **PoUW v2 Whitepaper**: [View whitepaper](https://jetpack2_38080.app.runonflux.io/ipfs/QmW3TNPx5Ru3u3UhXf8GqyVNS3avSsttqjamhF395qe17M)
+- **Whitepaper**: [Flux v9: A Decentralized Cloud for Autonomous Compute](https://github.com/RunOnFlux/fluxwhitepaper) ([PDF](https://raw.githubusercontent.com/RunOnFlux/fluxwhitepaper/master/FluxWhitepaper-Combined.pdf)) - the current technical description of the network
+- **PoUW v2 Whitepaper**: [Proof of Node consensus](https://github.com/RunOnFlux/whitepaper-pouw) - prior art for the consensus layer, superseded by the above
 
 ## Community & Support
 
