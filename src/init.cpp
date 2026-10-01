@@ -1647,6 +1647,11 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
             fLoaded = true;
         } while(false);
 
+        if (fRequestShutdown) {
+            LogPrintf("Shutdown requested. Exiting.\n");
+            return false;
+        }
+
         if (!fLoaded) {
             // first suggest a reindex
             if (!fReset) {

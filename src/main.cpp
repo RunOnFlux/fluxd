@@ -6044,7 +6044,9 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
 bool static LoadBlockIndexDB()
 {
     const CChainParams& chainparams = Params();
-    if (!pblocktree->LoadBlockIndexGuts(InsertBlockIndex))
+    // Loading takes minutes; a requested shutdown cuts it short. Nothing has
+    // been marked for writing yet, so the shutdown's flush writes nothing.
+    if (!pblocktree->LoadBlockIndexGuts(InsertBlockIndex, ShutdownRequested))
         return false;
 
 
@@ -6058,6 +6060,8 @@ bool static LoadBlockIndexDB()
     sort(vSortedByHeight.begin(), vSortedByHeight.end());
     for (const auto& [height, pindex] : vSortedByHeight)
     {
+        if (ShutdownRequested())
+            return false;
         pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) + GetBlockProof(*pindex);
         // We can link the chain of blocks for which we've received transactions at some point.
         // Pruned nodes may have deleted the block.
@@ -6180,6 +6184,8 @@ bool static LoadBlockIndexDB()
     // Fill in-memory data
     for (const auto& [hash, pindex] : mapBlockIndex)
     {
+        if (ShutdownRequested())
+            return false;
         // - This relationship will always be true even if pprev has multiple
         //   children, because hashSproutAnchor is technically a property of pprev,
         //   not its children.
