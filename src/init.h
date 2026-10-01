@@ -26,6 +26,8 @@ extern ZCJoinSplit* pfluxParams;
 
 void StartShutdown();
 bool ShutdownRequested();
+/** True once SIGTERM or SIGINT has asked fluxd to stop. */
+bool ShutdownSignalled();
 /** Interrupt threads */
 void Interrupt(std::vector<std::thread>& threadGroup);
 void Shutdown();

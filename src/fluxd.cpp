@@ -197,15 +197,17 @@ bool AppInit(int argc, char* argv[])
     if (!fRet)
     {
         Interrupt(threadGroup);
-        // for (auto& t : threadGroup) { if (t.joinable()) t.join(); }; was left out intentionally here, because we didn't re-test all of
-        // the startup-failure cases to make sure they don't result in a hang due to some
-        // thread-blocking-waiting-for-another-thread-during-startup case
+        // Joining could hang on a thread waiting for another during startup, so
+        // the threads are left to end with the process. A std::thread destroyed
+        // while still joinable calls std::terminate, so each is detached.
+        for (auto& t : threadGroup) { if (t.joinable()) t.detach(); }
     } else {
         WaitForShutdown(&threadGroup);
     }
     Shutdown();
 
-    return fRet;
+    // A stop signalled during startup is a requested exit, not a failed start.
+    return fRet || ShutdownSignalled();
 }
 #include "fuzz.h"
 #ifdef ZCASH_FUZZ

@@ -33,7 +33,7 @@
 
 std::string CRPCFluxnodeCache::filter = "";
 int64_t CRPCFluxnodeCache::nHeight = -1;
-UniValue CRPCFluxnodeCache::list = NullUniValue;
+UniValue CRPCFluxnodeCache::list(UniValue::VNULL);
 
 // Scan blockchain to find a fluxnode transaction for a given collateral outpoint
 // that contains the keys we need (collateralPubkey, pubKey, P2SHRedeemScript)
