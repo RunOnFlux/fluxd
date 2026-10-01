@@ -206,7 +206,8 @@ bool AppInit(int argc, char* argv[])
     }
     Shutdown();
 
-    return fRet;
+    // A stop signalled during startup is a requested exit, not a failed start.
+    return fRet || ShutdownSignalled();
 }
 #include "fuzz.h"
 #ifdef ZCASH_FUZZ

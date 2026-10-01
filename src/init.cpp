@@ -146,6 +146,7 @@ CClientUIInterface uiInterface; // Declared but not defined in ui_interface.h
 //
 
 std::atomic<bool> fRequestShutdown(false);
+std::atomic<bool> fShutdownSignalled(false);
 
 void StartShutdown()
 {
@@ -154,6 +155,10 @@ void StartShutdown()
 bool ShutdownRequested()
 {
     return fRequestShutdown;
+}
+bool ShutdownSignalled()
+{
+    return fShutdownSignalled;
 }
 
 class CCoinsViewErrorCatcher : public CCoinsViewBacked
@@ -323,6 +328,7 @@ void Shutdown()
  */
 void HandleSIGTERM(int)
 {
+    fShutdownSignalled = true;
     fRequestShutdown = true;
 }
 
