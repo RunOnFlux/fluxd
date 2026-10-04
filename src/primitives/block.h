@@ -29,6 +29,7 @@ public:
     static const int32_t CURRENT_VERSION=4;
     // PON blocks use version 100 - high enough that POW miners won't accidentally use it
     static const int32_t PON_VERSION = 100;
+    static const int32_t PON_VRF_VERSION = 101;   // PON + VRF leader election (anti-grind)
     int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
@@ -43,6 +44,9 @@ public:
     // PON fields (version >= 100)
     COutPoint nodesCollateral;     // The UTXO used as collateral
     std::vector<unsigned char> vchBlockSig;  // Signature proving ownership
+    // PON-VRF fields (version >= PON_VRF_VERSION): ECVRF-SECP256K1-SHA256-TAI
+    uint256 nodesVrfOutput;                   // y: VRF lottery value, compared to target
+    std::vector<unsigned char> nodesVrfProof; // pi: 81-byte VRF proof
 
     CBlockHeader()
     {
@@ -64,10 +68,21 @@ public:
         if (nVersion >= PON_VERSION) {
             // PON block
             READWRITE(nodesCollateral);
-            
-            // Exclude signature when computing hash for signing (SER_GETHASH)
-            // This prevents circular dependency when signing the block
+
+            // PON-VRF: the VRF OUTPUT (y) is committed to the block hash (and so is
+            // signed and immutable). y is deterministic given (operator key, epoch seed),
+            // so committing it is not grindable. It is also the deterministic fork-choice
+            // tie-breaker (lowest y wins), so CBlockIndex stores it.
+            if (nVersion >= PON_VRF_VERSION) {
+                READWRITE(nodesVrfOutput);
+            }
+
+            // Excluded from the block hash (like the signature, below): the VRF proof is
+            // self-validating against the committed output, so it need not be committed.
             if (!(s.GetType() & SER_GETHASH)) {
+                if (nVersion >= PON_VRF_VERSION) {
+                    READWRITE(nodesVrfProof);
+                }
                 READWRITE(vchBlockSig);
             }
         } else {
@@ -89,6 +104,8 @@ public:
         nSolution.clear();
         nodesCollateral.SetNull();
         vchBlockSig.clear();
+        nodesVrfOutput.SetNull();
+        nodesVrfProof.clear();
     }
     
     // Helper functions for PON
@@ -238,6 +255,13 @@ public:
             // PON block - include all data (already compact)
             READWRITE(nodesCollateral);
             READWRITE(vchBlockSig);
+            // PON-VRF: the VRF output is committed to the block hash, so it MUST be carried
+            // here or the receiver recomputes the wrong hash (-> "non-continuous cmpheaders").
+            // The proof is included too, mirroring vchBlockSig (full header data).
+            if (nVersion >= PON_VRF_VERSION) {
+                READWRITE(nodesVrfOutput);
+                READWRITE(nodesVrfProof);
+            }
         } else {
             // POW block - include nNonce but OMIT nSolution
             // The large Equihash solution is not needed for checkpointed blocks

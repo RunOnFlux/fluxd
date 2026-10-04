@@ -397,6 +397,8 @@ libbitcoin_common_a_SOURCES = \
   core_read.cpp \
   core_write.cpp \
   hash.cpp \
+  crypto/ecvrf.cpp \
+  crypto/ecvrf.h \
   key.cpp \
   key_io.cpp \
   keystore.cpp \

@@ -17,6 +17,9 @@ class CValidationState;
 // Check if PON is activated at a given height (hard cutoff)
 bool IsPONActive(int nHeight);
 
+// Check if PON VRF leader election is activated at a given height
+bool IsPONVRFActive(int nHeight);
+
 // Get the next work required based on POW or PON (switches at activation)
 unsigned int GetNextWorkRequiredByFork(const CBlockIndex* pindexLast, 
                                        const CBlockHeader* pblock,

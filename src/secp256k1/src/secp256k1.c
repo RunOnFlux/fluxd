@@ -5,6 +5,9 @@
  **********************************************************************/
 
 #include "include/secp256k1.h"
+#ifdef ENABLE_MODULE_VRF
+# include "include/secp256k1_vrf.h"
+#endif
 
 #include "util.h"
 #include "num_impl.h"
@@ -581,4 +584,13 @@ int secp256k1_ec_pubkey_combine(const secp256k1_context* ctx, secp256k1_pubkey *
 
 #ifdef ENABLE_MODULE_RECOVERY
 # include "modules/recovery/main_impl.h"
+#endif
+
+#ifdef ENABLE_MODULE_VRF
+/* helper used by the VRF module (mirrors aergo/secp256k1-vrf); bundled lib lacks it */
+static SECP256K1_INLINE void buffer_append(unsigned char *buf, unsigned int *offset, const void *data, unsigned int len) {
+    memcpy(buf + *offset, data, len);
+    *offset += len;
+}
+# include "modules/vrf/main_impl.h"
 #endif
