@@ -149,11 +149,13 @@ download-one: check-sources $(all_sources)
 
 download-osx:
 	@$(MAKE) -s HOST=x86_64-apple-darwin11 download-one
+download-osx-arm:
+	@$(MAKE) -s HOST=aarch64-apple-darwin download-one
 download-linux:
 	@$(MAKE) -s HOST=x86_64-unknown-linux-gnu download-one
 download-win:
 	@$(MAKE) -s HOST=x86_64-w64-mingw32 download-one
-download: download-osx download-linux download-win
+download: download-osx download-osx-arm download-linux download-win
 
 # Clean targets
 clean:
@@ -177,4 +179,4 @@ distclean: clean-all
 	rm -rf $(base_download_dir)
 	rm -rf $(SOURCES_PATH)
 
-.PHONY: install cached download-one download-osx download-linux download-win download check-packages check-sources clean clean-all distclean
+.PHONY: install cached download-one download-osx download-osx-arm download-linux download-win download check-packages check-sources clean clean-all distclean

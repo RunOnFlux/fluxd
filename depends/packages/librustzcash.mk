@@ -11,7 +11,10 @@ $(package)_dependencies+=$(rust_crates)
 $(package)_patches=cargo.config 0001-Start-using-cargo-clippy-for-CI.patch remove-dev-dependencies.diff
 endif
 
-$(package)_rust_target=$(if $(rust_rust_target_$(canonical_host)),$(rust_rust_target_$(canonical_host)),$(canonical_host))
+# Use the same host -> Rust target mapping as the compiler package, so that e.g.
+# aarch64-apple-darwin24 resolves to the aarch64-apple-darwin Rust target rather
+# than being passed through verbatim.
+$(package)_rust_target=$(call rust_target,rust,$(canonical_host),$(host_os))
 
 ifeq ($(host_os),mingw32)
 $(package)_library_file=target/x86_64-pc-windows-gnu/release/rustzcash.lib

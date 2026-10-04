@@ -27,7 +27,17 @@ fi
 # Allow overrides to $BUILD and $HOST for porters. Most users will not need it.
 #   BUILD=i686-pc-linux-gnu ./zcutil/build.sh
 if [[ -z "${BUILD-}" ]]; then
-    BUILD="$(./depends/config.guess)"
+    # config.guess derives the Darwin CPU from `uname -p`, which reports plain
+    # "arm" on Apple Silicon. That canonicalises to 32-bit ARM, so derive the
+    # triple from `uname -m` instead and let config.sub canonicalise it.
+    if [[ "$(uname -s)" = 'Darwin' ]]; then
+        case "$(uname -m)" in
+            arm64|aarch64) BUILD='aarch64-apple-darwin' ;;
+            *)             BUILD='x86_64-apple-darwin' ;;
+        esac
+    else
+        BUILD="$(./depends/config.guess)"
+    fi
 fi
 if [[ -z "${HOST-}" ]]; then
     HOST="$BUILD"
