@@ -103,5 +103,9 @@ ld -v
 
 HOST="$HOST" BUILD="$BUILD" NO_PROTON="$PROTON_ARG" "$MAKE" "$@" -C ./depends/ V=1
 ./autogen.sh
+# Statically link libstdc++ and libgcc so binaries don't depend on the build
+# host's GCC libstdc++.so.6 version (e.g. GLIBCXX_3.4.29 from gcc-11 isn't
+# available on stock Ubuntu 20.04, which only ships GLIBCXX_3.4.28).
+LDFLAGS="${LDFLAGS:-} -static-libstdc++ -static-libgcc" \
 CONFIG_SITE="$PWD/depends/$HOST/share/config.site" ./configure "$HARDENING_ARG" "$LCOV_ARG" "$TEST_ARG" "$MINING_ARG" "$PROTON_ARG" $CONFIGURE_FLAGS CXXFLAGS='-g'
 "$MAKE" "$@" V=1
