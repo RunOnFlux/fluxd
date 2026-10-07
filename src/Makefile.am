@@ -177,6 +177,7 @@ BITCOIN_CORE_H = \
   rpc/server.h \
   rpc/register.h \
   scheduler.h \
+  sdnotify.h \
   script/interpreter.h \
   script/script.h \
   script/script_error.h \
@@ -430,6 +431,7 @@ libbitcoin_util_a_SOURCES = \
   compat/strnlen.cpp \
   random.cpp \
   rpc/protocol.cpp \
+  sdnotify.cpp \
   support/cleanse.cpp \
   sync.cpp \
   uint256.cpp \

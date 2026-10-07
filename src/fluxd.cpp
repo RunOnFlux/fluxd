@@ -10,6 +10,7 @@
 #include "main.h"
 #include "noui.h"
 #include "scheduler.h"
+#include "sdnotify.h"
 #include "util.h"
 #include "httpserver.h"
 #include "httprpc.h"
@@ -162,6 +163,13 @@ bool AppInit(int argc, char* argv[])
         }
 #ifndef WIN32
         fDaemon = GetBoolArg("-daemon", false);
+        if (fDaemon && SystemdNotifyEnabled())
+        {
+            // The supervisor watches this process; a forked child could not
+            // report readiness to it.
+            fprintf(stdout, "Flux server starting in the foreground for systemd\n");
+            fDaemon = false;
+        }
         if (fDaemon)
         {
             fprintf(stdout, "Flux server starting\n");

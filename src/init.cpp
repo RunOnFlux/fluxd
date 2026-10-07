@@ -37,6 +37,7 @@
 #include "script/standard.h"
 #include "script/sigcache.h"
 #include "scheduler.h"
+#include "sdnotify.h"
 #include "txdb.h"
 #include "torcontrol.h"
 #include "ui_interface.h"
@@ -225,6 +226,7 @@ void Interrupt(std::vector<std::thread>& threadGroup)
 void Shutdown()
 {
     LogPrintf("%s: In progress...\n", __func__);
+    SystemdNotify("STOPPING=1");
     static CCriticalSection cs_Shutdown;
     TRY_LOCK(cs_Shutdown, lockShutdown);
     if (!lockShutdown)
@@ -922,6 +924,9 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 
     LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
     LogPrintf("Zelcash version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
+
+    // Every init phase is the supervisor's STATUS line until READY=1 at the end of Step 12.
+    uiInterface.InitMessage.connect(SystemdNotifyStatus);
 
     // when specifying an explicit binding address, you want to listen on it
     // even when -connect or -proxy is specified
@@ -2144,6 +2149,7 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     // ********************************************************* Step 12: finished
 
     SetRPCWarmupFinished();
+    SystemdNotify("READY=1");
     uiInterface.InitMessage(_("Done loading"));
 
 #ifdef ENABLE_WALLET
