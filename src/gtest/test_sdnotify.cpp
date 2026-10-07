@@ -6,6 +6,9 @@
 
 #include "sdnotify.h"
 
+#ifndef WIN32
+
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -110,3 +113,5 @@ TEST(SystemdNotify, FailsWhenNothingListens)
     EXPECT_FALSE(SystemdNotifyTo("", "READY=1"));
     EXPECT_FALSE(SystemdNotifyTo(path, ""));
 }
+
+#endif // WIN32
