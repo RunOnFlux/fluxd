@@ -44,10 +44,8 @@ IPV4_TARGET = "15.61.23.23"
 IPV4_PORT = 1234
 IPV6_TARGET = "1233:3432:2434:2343:3234:2345:6546:4534"
 IPV6_TARGET_PORT = 5443
-# A v2 (OnionCat, 16-char) onion address -- the only form master's
-# CNetAddr::SetSpecial accepts (it requires a 10-byte decode). Swap to a 56-char
-# v3 address once BIP155/torv3 lands on master, where v2 is dropped.
-ONION_TARGET = "bitcoinostk4e4re.onion"
+# A v3 (56-char) onion address; v2 onions are not accepted.
+ONION_TARGET = "pg6mmjiyjmcrsslvykfwnntlaru7p5svn6y2ymmju6nubxndf4pscryd.onion"
 ONION_TARGET_PORT = 8333
 DNS_TARGET = "node.noumenon"
 DNS_TARGET_PORT = 8333
