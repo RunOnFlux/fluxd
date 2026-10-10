@@ -2119,6 +2119,19 @@ void RelayTransaction(const CTransaction& tx, const CDataStream& ss)
     }
 }
 
+/** Whether inventory is announced to this peer: one at or above the network's minimum version. */
+static bool RelaysInventoryTo(const CNode* pnode)
+{
+    switch (Params().NetworkID()) {
+    case CBaseChainParams::MAIN:
+        return pnode->nVersion >= MIN_PEER_PROTO_VERSION;
+    case CBaseChainParams::TESTNET:
+        return pnode->nVersion >= MIN_PEER_PROTO_VERSION_TESTNET;
+    default:
+        return false;
+    }
+}
+
 void RelayFluxnodeTx(const CInv& inv)
 {
     LOCK(cs_vNodes);
@@ -2126,7 +2139,7 @@ void RelayFluxnodeTx(const CInv& inv)
                 {
                     if((pnode->nServices==NODE_BLOOM_WITHOUT_ZN) && inv.IsFluxnodeType())continue;
 
-                    if ((Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION) || (Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION_TESTNET))
+                    if (RelaysInventoryTo(pnode))
                         pnode->PushInventory(inv);
                 }
 }
@@ -2138,7 +2151,7 @@ void RelayInv(const CInv& inv)
     {
         if((pnode->nServices==NODE_BLOOM_WITHOUT_ZN) && inv.IsFluxnodeType())continue;
 
-        if ((Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION) || (Params().NetworkID() == CBaseChainParams::MAIN && pnode->nVersion >= MIN_PEER_PROTO_VERSION_TESTNET))
+        if (RelaysInventoryTo(pnode))
             pnode->PushInventory(inv);
     }
 }
