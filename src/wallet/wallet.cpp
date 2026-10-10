@@ -3814,6 +3814,32 @@ DBErrors CWallet::LoadWallet(bool& fFirstRunRet)
         return nLoadWalletRet;
     fFirstRunRet = !vchDefaultKey.IsValid();
 
+    // A rescan (e.g. after z_importkey) persists each note's witness deque via
+    // CWalletTx::WriteToDisk, but nWitnessCacheSize is persisted only by
+    // SetBestChain, which a rescan does not call. A node restarted between the
+    // two reloads a stale, smaller nWitnessCacheSize alongside the larger note
+    // witness deques, which trips the nWitnessCacheSize >= witnesses.size()
+    // assertion in IncrementNoteWitnesses on the next connected block. The
+    // witnesses themselves are correct, so restore the invariant by raising the
+    // counter to the largest reloaded witness deque; the spendable (front)
+    // witness is left untouched, and a healthy wallet (where the two are
+    // persisted together by SetBestChain) is unaffected.
+    {
+        LOCK(cs_wallet);
+        size_t nMaxWitnesses = 0;
+        for (const auto& itemWtx : mapWallet) {
+            for (const auto& itemNd : itemWtx.second.mapSaplingNoteData)
+                nMaxWitnesses = std::max(nMaxWitnesses, itemNd.second.witnesses.size());
+            for (const auto& itemNd : itemWtx.second.mapSproutNoteData)
+                nMaxWitnesses = std::max(nMaxWitnesses, itemNd.second.witnesses.size());
+        }
+        if ((int64_t)nMaxWitnesses > nWitnessCacheSize) {
+            LogPrintf("LoadWallet: repairing witness cache size %d -> %d\n",
+                      nWitnessCacheSize, nMaxWitnesses);
+            nWitnessCacheSize = nMaxWitnesses;
+        }
+    }
+
     uiInterface.LoadWallet(this);
 
     return DB_LOAD_OK;
