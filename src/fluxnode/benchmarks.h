@@ -24,6 +24,8 @@ public:
 
 bool FindBenchmarkPath(std::string filename, std::string file_path );
 std::string GetBenchCliPath();
+/** Whether a signature fluxbench returned with this status may be used for a confirmation. */
+bool BenchmarkStatusSignable(const std::string& status);
 /** fluxbench-cli with the network flag and, when -fluxbenchsocket is set, that socket. */
 std::string BenchCliCommand();
 std::string GetBenchDaemonPath();

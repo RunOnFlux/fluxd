@@ -110,6 +110,13 @@ static std::string ShellQuote(const std::string& word)
     return quoted + "'";
 }
 
+bool BenchmarkStatusSignable(const std::string& status)
+{
+    // fluxbench reports passed/bypassed for a labnet signature made without the FluxOS code-hash
+    // list or a measurement cycle; every node still verifies the signature itself.
+    return status == "complete" || (Params().NetworkID() == CBaseChainParams::LABNET && status == "passed/bypassed");
+}
+
 std::string BenchCliCommand()
 {
     std::string cmd = GetBenchCliPath() + BenchNetworkFlag();
@@ -272,7 +279,7 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
 
         if (signedresponse.exists("status")) {
             UniValue status = signedresponse["status"];
-            if (status.get_str() != "complete") {
+            if (!BenchmarkStatusSignable(status.get_str())) {
                 error = "Benchmarking hasn't completed, please wait until benchmarking has completed. Current status : " + status.get_str();
                 return false;
             }

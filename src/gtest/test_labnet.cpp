@@ -167,3 +167,16 @@ TEST_F(LabNet, FluxbenchIsToldTheNetwork)
     EXPECT_EQ(BenchCliCommand().find("-testnet "), std::string::npos);
     EXPECT_EQ(BenchCliCommand().find("-labnet "), std::string::npos);
 }
+
+TEST_F(LabNet, BypassedSignaturesOnlyOnLabnet)
+{
+    EXPECT_TRUE(BenchmarkStatusSignable("complete"));
+    EXPECT_TRUE(BenchmarkStatusSignable("passed/bypassed"));
+    EXPECT_FALSE(BenchmarkStatusSignable("failed"));
+
+    SelectParams(CBaseChainParams::TESTNET);
+    EXPECT_FALSE(BenchmarkStatusSignable("passed/bypassed"));
+    SelectParams(CBaseChainParams::MAIN);
+    EXPECT_TRUE(BenchmarkStatusSignable("complete"));
+    EXPECT_FALSE(BenchmarkStatusSignable("passed/bypassed"));
+}
