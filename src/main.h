@@ -557,6 +557,14 @@ public:
 /** Find the last common block between the parameter chain and a locator. */
 CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& locator);
 
+/**
+ * The blocks whose compact headers answer a getheaders from pstart: up to nLimit, ending at
+ * hashStop, and only below nLatestCheckpoint — a receiver refuses a compact header at or past the
+ * last checkpoint, and asks again for the rest as regular headers.
+ */
+std::vector<const CBlockIndex*> CompactHeaderBlocks(const CChain& chain, const CBlockIndex* pstart,
+                                                    const uint256& hashStop, int nLatestCheckpoint, int nLimit);
+
 /** Mark a block as invalid. */
 bool InvalidateBlock(CValidationState& state, const CChainParams& chainparams, CBlockIndex *pindex);
 
