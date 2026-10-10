@@ -505,3 +505,75 @@ TEST_F(PONTest, POWBlockHeaderSerialization) {
     EXPECT_EQ(powBlock2.nNonce, powBlock.nNonce);
     EXPECT_EQ(powBlock2.nSolution, powBlock.nSolution);
 }
+
+// --- Deterministic PON fork choice (ComparePonForkChoice) ------------------------------
+// This is the convergence guarantee: competing same-height PON blocks must resolve to the
+// same winner on every node (lowest cached PON hash), regardless of arrival order.
+//
+// Entries score by the resident cached PON hash; an entry whose header data has
+// been pruned (pHeaderData == nullptr) must compare exactly like an unpruned
+// one, because the comparator may only touch resident fields.
+
+static CBlockIndex MakeLegacyPonIndex(int height, const uint256& ponHash) {
+    CBlockIndex idx;                       // SetNull(): pHeaderData == nullptr (pruned shape)
+    idx.nVersion = CBlockHeader::PON_VERSION;
+    idx.nHeight = height;
+    idx.hashPON = ponHash;
+    return idx;
+}
+
+TEST_F(PONTest, ForkChoiceLowestHashWins) {
+    CBlockIndex a = MakeLegacyPonIndex(100, uint256S("0x1111111111111111111111111111111111111111111111111111111111111111"));
+    CBlockIndex b = MakeLegacyPonIndex(100, uint256S("0x2222222222222222222222222222222222222222222222222222222222222222"));
+
+    // Whichever hash is lower by uint256 ordering must be preferred (negative result).
+    // (The exact ordering direction is irrelevant to convergence; determinism is.)
+    bool aLower = (a.hashPON < b.hashPON);
+    EXPECT_EQ(ComparePonForkChoice(&a, &b) < 0, aLower);
+    EXPECT_EQ(ComparePonForkChoice(&a, &b) > 0, !aLower);
+}
+
+TEST_F(PONTest, ForkChoiceAntisymmetricAndDeterministic) {
+    CBlockIndex a = MakeLegacyPonIndex(100, uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa"));
+    CBlockIndex b = MakeLegacyPonIndex(100, uint256S("0x00000000000000000000000000000000000000000000000000000000000000bb"));
+
+    int ab = ComparePonForkChoice(&a, &b);
+    // Antisymmetry: swapping arguments flips the sign — so all nodes agree on the winner.
+    EXPECT_EQ(ab, -ComparePonForkChoice(&b, &a));
+    // Determinism: same inputs always give the same result.
+    EXPECT_EQ(ab, ComparePonForkChoice(&a, &b));
+    EXPECT_NE(ab, 0); // distinct hashes are decided, never a tie
+}
+
+TEST_F(PONTest, ForkChoiceEqualHashUndecided) {
+    uint256 same = uint256S("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+    CBlockIndex a = MakeLegacyPonIndex(100, same);
+    CBlockIndex b = MakeLegacyPonIndex(100, same);
+    // Identical PON hash -> no decision; caller falls back to first-seen.
+    EXPECT_EQ(ComparePonForkChoice(&a, &b), 0);
+}
+
+TEST_F(PONTest, ForkChoicePrunedEntriesMatchUnpruned) {
+    const uint256 hashA = uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa");
+    const uint256 hashB = uint256S("0x00000000000000000000000000000000000000000000000000000000000000bb");
+
+    // Pruned pair (no header data at all)
+    CBlockIndex prunedA = MakeLegacyPonIndex(100, hashA);
+    CBlockIndex prunedB = MakeLegacyPonIndex(100, hashB);
+    ASSERT_EQ(prunedA.pHeaderData, nullptr);
+    int pruned = ComparePonForkChoice(&prunedA, &prunedB);
+
+    // Same pair with header data present (and deliberately mismatched, to
+    // prove the comparator ignores it)
+    CBlockIndex fullA = MakeLegacyPonIndex(100, hashA);
+    CBlockIndex fullB = MakeLegacyPonIndex(100, hashB);
+    fullA.AllocateHeaderData();
+    fullB.AllocateHeaderData();
+    int full = ComparePonForkChoice(&fullA, &fullB);
+
+    EXPECT_EQ(pruned, full);
+    EXPECT_LT(pruned, 0);
+
+    fullA.FreeHeaderData();
+    fullB.FreeHeaderData();
+}

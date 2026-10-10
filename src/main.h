@@ -37,6 +37,7 @@
 #include <map>
 #include <set>
 #include <stdint.h>
+#include <atomic>
 #include <string>
 #include <utility>
 #include <vector>
@@ -165,6 +166,9 @@ extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
 typedef std::unordered_map<uint256, CBlockIndex*, BlockHasher> BlockMap;
 extern BlockMap mapBlockIndex;
+
+class CBlockIndexPool;
+extern CBlockIndexPool* g_blockIndexPool;
 extern uint64_t nLastBlockTx;
 extern uint64_t nLastBlockSize;
 extern const std::string strMessageMagic;
@@ -199,6 +203,10 @@ extern bool fTimestampIndex;
 extern bool fIsBareMultisigStd;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;
+// Set once RecoverFluxnodeCache has reconciled the fluxnode DB sync marker
+// with the chainstate at startup. Until then, flushes must not force-write
+// the marker or they would erase the crash evidence recovery reads.
+extern std::atomic<bool> fFluxnodeCacheRecovered;
 // TODO: remove this flag by structuring our code such that
 // it is unneeded for testing
 extern bool fCoinbaseEnforcedProtectionEnabled;
@@ -506,6 +514,26 @@ bool GetTimestampIndex(unsigned int high, unsigned int low, bool fActiveOnly,
 bool WriteBlockToDisk(const CBlock& block, CDiskBlockPos& pos, const CMessageHeader::MessageStartChars& messageStart);
 bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus::Params& consensusParams);
 bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus::Params& consensusParams);
+/** Read only the CBlockHeader prefix of a block at its data position — no
+ * transaction deserialization and no proof recheck (validated at accept).
+ * Fails if the reconstructed hash does not match the index entry. */
+bool ReadBlockHeaderFromDisk(CBlockHeader& header, const CBlockIndex* pindex, const Consensus::Params& consensusParams);
+/** Return a complete block header for serving over P2P/RPC, transparently
+ * re-reading from disk (header prefix only) when the in-memory header data
+ * was pruned on a fluxnode, or when nSolution was omitted for a
+ * compact-stored block. Returns true whenever the header FIELDS are valid —
+ * including a resident header whose omitted nSolution could not be completed
+ * from disk. Returns false (header holding the zeroed in-memory view) only
+ * when the entry is pruned and the disk read fails; callers decide whether
+ * that is acceptable (P2P best-effort) or an error (RPC). */
+bool GetFullBlockHeader(CBlockHeader& header, const CBlockIndex* pindex, const Consensus::Params& consensusParams);
+
+/** Decide whether a block index entry that has aged nBelowTip blocks below the
+ *  active tip should have its rebuildable header data freed: fluxnode-only, only
+ *  past the prune window, and only when the block data is on disk (so it can be
+ *  rebuilt from there) and the header data is actually resident. Pure predicate
+ *  behind the runtime HeaderData prune; the load-time prune frees everything. */
+bool ShouldFreeAgedHeaderData(bool fIsFluxnode, int nBelowTip, int nWindow, bool fHasBlockData, bool fHasHeaderData);
 
 /** Functions for validating blocks and updating the block tree */
 
@@ -545,6 +573,12 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
  * witness caches should be cleared in order to handle an intended long rewind.
  */
 bool RewindBlockIndex(const CChainParams& chainparams, bool& clearWitnessCaches);
+
+/** Recover fluxnode cache after unclean shutdown.
+ *  Compares the persisted FluxnodeSyncState to the chain tip. If they
+ *  diverge, disconnects and reconnects the stale blocks so the fluxnode
+ *  cache is rebuilt through the normal ConnectBlock path. */
+bool RecoverFluxnodeCache(const CChainParams& chainparams);
 
 /** RAII wrapper for VerifyDB: Verify consistency of the block and coin databases */
 class CVerifyDB {

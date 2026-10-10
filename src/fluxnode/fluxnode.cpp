@@ -1561,55 +1561,19 @@ bool FluxnodeCache::GetDelegates(const COutPoint& outpoint, CFluxnodeDelegates& 
     return false;
 }
 
-void FluxnodeCache::DumpFluxnodeCache()
+void FluxnodeCache::PersistToDisk(const CBlockIndex* pTip, bool fForce)
 {
     LOCK(cs);
-    bool found = false;
-    for (auto item : setDirtyOutPoint) {
-        found = false;
-        if (mapStartTxTracker.count(item)) {
-            found = true;
-            pFluxnodeDB->WriteFluxnodeCacheData(mapStartTxTracker.at(item));
-        } else if (mapStartTxDOSTracker.count(item)) {
-            found = true;
-            pFluxnodeDB->WriteFluxnodeCacheData(mapStartTxDOSTracker.at(item));
-        } else if (mapConfirmedFluxnodeData.count(item)) {
-            found = true;
-            pFluxnodeDB->WriteFluxnodeCacheData(mapConfirmedFluxnodeData.at(item));
-        }
+    // fForce writes the sync-state marker (and any dirty data) even when the
+    // dirty sets are empty — recovery uses it to repair a stale marker, which
+    // must not silently no-op just because the cache is clean.
+    if (!fForce && setDirtyOutPoint.empty() && mapDirtyDelegateWrites.empty() && setDirtyDelegateErases.empty())
+        return;
 
-        if (!found) {
-            pFluxnodeDB->EraseFluxnodeCacheData(item);
-        }
-    }
-
-    // Write dirty delegates to database
-    for (const auto& item : mapDirtyDelegateWrites) {
-        pFluxnodeDB->WriteFluxnodeDelegates(item.first, item.second);
-    }
-
-    for (const auto& outpoint : setDirtyDelegateErases) {
-        pFluxnodeDB->EraseFluxnodeDelegate(outpoint);
-    }
-
-    // Clear dirty tracking structures after successful database write
-    // Failure to clear these causes memory leak as they accumulate indefinitely
-    setDirtyOutPoint.clear();
-    mapDirtyDelegateWrites.clear();
-    setDirtyDelegateErases.clear();
-}
-
-void FluxnodeCache::DumpFluxnodeCache(const uint256& bestBlockHash, int nBestBlockHeight)
-{
-    LOCK(cs);
-
-    // Use a batch for atomic writes - this ensures all fluxnode data and the sync state
-    // are written together. If crash occurs, either all writes succeed or none do.
     CDBBatch batch(*pFluxnodeDB);
 
-    bool found = false;
     for (const auto& item : setDirtyOutPoint) {
-        found = false;
+        bool found = false;
         if (mapStartTxTracker.count(item)) {
             found = true;
             pFluxnodeDB->WriteBatchFluxnodeData(batch, mapStartTxTracker.at(item));
@@ -1626,7 +1590,6 @@ void FluxnodeCache::DumpFluxnodeCache(const uint256& bestBlockHash, int nBestBlo
         }
     }
 
-    // Write dirty delegates to batch
     for (const auto& item : mapDirtyDelegateWrites) {
         pFluxnodeDB->WriteBatchDelegates(batch, item.first, item.second);
     }
@@ -1635,22 +1598,17 @@ void FluxnodeCache::DumpFluxnodeCache(const uint256& bestBlockHash, int nBestBlo
         pFluxnodeDB->EraseBatchDelegates(batch, outpoint);
     }
 
-    // Write the sync state marker - this records what block height the fluxnode
-    // cache is synced to. Used for crash recovery detection at startup.
-    FluxnodeSyncState syncState(bestBlockHash, nBestBlockHeight);
-    pFluxnodeDB->WriteBatchSyncState(batch, syncState);
+    if (pTip) {
+        FluxnodeSyncState syncState(pTip->GetBlockHash(), pTip->nHeight);
+        pFluxnodeDB->WriteBatchSyncState(batch, syncState);
+    }
 
-    // Commit the batch atomically with sync for durability
     if (pFluxnodeDB->WriteBatch(batch, true)) {
-        // Only clear dirty tracking structures after successful database write
         setDirtyOutPoint.clear();
         mapDirtyDelegateWrites.clear();
         setDirtyDelegateErases.clear();
-
-        LogPrint("dfluxnode", "DumpFluxnodeCache: Synced to block %s at height %d\n",
-                 bestBlockHash.ToString(), nBestBlockHeight);
     } else {
-        LogPrintf("ERROR: DumpFluxnodeCache: Failed to write batch to database\n");
+        LogPrintf("ERROR: PersistToDisk: Failed to write batch to database\n");
     }
 }
 

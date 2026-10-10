@@ -60,7 +60,7 @@ extern UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, 
 extern UniValue mempoolInfoToJSON();
 extern UniValue mempoolToJSON(bool fVerbose = false);
 extern void ScriptPubKeyToJSON(const CScript& scriptPubKey, UniValue& out, bool fIncludeHex);
-extern UniValue blockheaderToJSON(const CBlockIndex* blockindex);
+extern UniValue blockheaderToJSON(const CBlockIndex* blockindex, const CBlockHeader* fullHeaderOverride = nullptr, bool fHaveHeaderOverride = false);
 
 static bool RESTERR(HTTPRequest* req, enum HTTPStatusCode status, string message)
 {
@@ -136,23 +136,90 @@ static bool rest_headers(HTTPRequest* req,
     if (!ParseHashStr(hashStr, hash))
         return RESTERR(req, HTTP_BAD_REQUEST, "Invalid hash: " + hashStr);
 
-    std::vector<const CBlockIndex *> headers;
-    headers.reserve(count);
-    {
-        LOCK(cs_main);
-        BlockMap::const_iterator it = mapBlockIndex.find(hash);
-        const CBlockIndex *pindex = (it != mapBlockIndex.end()) ? it->second : NULL;
-        while (pindex != NULL && chainActive.Contains(pindex)) {
-            headers.push_back(pindex);
-            if (headers.size() == (unsigned long)count)
-                break;
-            pindex = chainActive.Next(pindex);
-        }
-    }
-
+    // The CBlockIndex pointers are never freed at runtime, but the prunable
+    // HeaderData they reference (merkle root, solution, ...) IS freed by the
+    // validation thread (ConnectTip -> PruneAgedHeaderData), so it must not be
+    // dereferenced outside cs_main.
     CDataStream ssHeader(SER_NETWORK, PROTOCOL_VERSION);
-    for (const CBlockIndex *pindex : headers) {
-        ssHeader << pindex->GetBlockHeader();
+    UniValue jsonHeaders(UniValue::VARR);
+
+    if (rf == RF_JSON) {
+        // JSON, like the binary path, must not dereference pruned HeaderData off
+        // cs_main, nor hold cs_main across disk reads. Snapshot the index
+        // pointers + resident headers under the lock, note which need a disk
+        // top-up, rehydrate those lock-free, then build the JSON under the lock
+        // from the prefetched headers — so no disk I/O happens while it is held.
+        std::vector<const CBlockIndex*> vIndex;
+        std::vector<CBlockHeader> vHeaders;
+        std::vector<bool> vHave;
+        std::vector<size_t> vNeedDisk;
+        {
+            LOCK(cs_main);
+            BlockMap::const_iterator it = mapBlockIndex.find(hash);
+            const CBlockIndex *pindex = (it != mapBlockIndex.end()) ? it->second : NULL;
+            long served = 0;
+            while (pindex != NULL && chainActive.Contains(pindex)) {
+                vIndex.push_back(pindex);
+                vHeaders.push_back(pindex->GetBlockHeader());
+                const CBlockHeader& h = vHeaders.back();
+                bool resident = pindex->pHeaderData && !(h.IsPOW() && h.nSolution.empty());
+                vHave.push_back(resident);
+                if (!resident)
+                    vNeedDisk.push_back(vHeaders.size() - 1);
+                if (++served == count)
+                    break;
+                pindex = chainActive.Next(pindex);
+            }
+        }
+        for (size_t i : vNeedDisk) {
+            CBlockHeader diskHeader;
+            if (ReadBlockHeaderFromDisk(diskHeader, vIndex[i], Params().GetConsensus())) {
+                vHeaders[i] = diskHeader;
+                vHave[i] = true;
+            }   // else: keep the zeroed snapshot; blockheaderToJSON emits empty fields
+        }
+        {
+            LOCK(cs_main);
+            for (size_t i = 0; i < vIndex.size(); ++i)
+                jsonHeaders.push_back(blockheaderToJSON(vIndex[i], &vHeaders[i], vHave[i]));
+        }
+    } else {
+        // Binary/hex is the bulk serving path. Snapshot the resident header
+        // fields under cs_main, then rehydrate any pruned entries from disk
+        // lock-free (ReadBlockHeaderFromDisk touches no HeaderData) so cs_main is
+        // not held across the slow disk reads. Mirrors the getheaders handler.
+        std::vector<CBlockHeader> vHeaders;
+        std::vector<std::pair<size_t, const CBlockIndex*>> vNeedDisk;
+        {
+            LOCK(cs_main);
+            BlockMap::const_iterator it = mapBlockIndex.find(hash);
+            const CBlockIndex *pindex = (it != mapBlockIndex.end()) ? it->second : NULL;
+            long served = 0;
+            while (pindex != NULL && chainActive.Contains(pindex)) {
+                vHeaders.push_back(pindex->GetBlockHeader());
+                const CBlockHeader& h = vHeaders.back();
+                if (!pindex->pHeaderData || (h.IsPOW() && h.nSolution.empty()))
+                    vNeedDisk.emplace_back(vHeaders.size() - 1, pindex);
+                if (++served == count)
+                    break;
+                pindex = chainActive.Next(pindex);
+            }
+        }
+        // Lock-free rehydration. A pruned/incomplete entry whose disk read fails
+        // cannot be served (zeroed merkle root / missing solution); truncate the
+        // batch there rather than emitting a malformed header.
+        size_t nServe = vHeaders.size();
+        for (const auto& entry : vNeedDisk) {
+            CBlockHeader diskHeader;
+            if (ReadBlockHeaderFromDisk(diskHeader, entry.second, Params().GetConsensus()))
+                vHeaders[entry.first] = diskHeader;
+            else if (entry.first < nServe)
+                nServe = entry.first;
+        }
+        if (nServe < vHeaders.size())
+            vHeaders.resize(nServe);
+        for (const CBlockHeader& header : vHeaders)
+            ssHeader << header;
     }
 
     switch (rf) {
@@ -170,10 +237,6 @@ static bool rest_headers(HTTPRequest* req,
         return true;
     }
     case RF_JSON: {
-        UniValue jsonHeaders(UniValue::VARR);
-        for (const CBlockIndex *pindex : headers) {
-            jsonHeaders.push_back(blockheaderToJSON(pindex));
-        }
         string strJSON = jsonHeaders.write() + "\n";
         req->WriteHeader("Content-Type", "application/json");
         req->WriteReply(HTTP_OK, strJSON);

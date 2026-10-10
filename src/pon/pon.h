@@ -29,6 +29,12 @@ uint32_t GetSlotNumber(int64_t timestamp, int64_t genesisTimestamp, const Consen
 // Get next PON work required (difficulty adjustment)
 unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast);
 
+// Deterministic equal-work fork-choice tie-break for PON blocks.
+// Returns <0 if a is preferred (wins the tie), >0 if b is preferred, 0 if undecided
+// (caller falls back to first-seen). Blocks compare by the PON hash cached on the
+// index entry (a resident field, valid even after header-data pruning); lower wins.
+int ComparePonForkChoice(const CBlockIndex* a, const CBlockIndex* b);
+
 // Validate PON block header (using only header data - for headers-first sync)
 // This validates:
 // 1. Block version indicates PON
