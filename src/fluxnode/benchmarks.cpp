@@ -39,7 +39,18 @@ Benchmarks benchmarks;
 bool fFluxStartedBench = false;
 std::string strPath = "";
 
-std::string strTestnetSring = "-testnet ";
+/** The network flag fluxbench needs to match this node's network. */
+static std::string BenchNetworkFlag()
+{
+    switch (Params().NetworkID()) {
+    case CBaseChainParams::TESTNET:
+        return "-testnet ";
+    case CBaseChainParams::LABNET:
+        return "-labnet ";
+    default:
+        return "";
+    }
+}
 
 std::string GetSelfPath()
 {
@@ -101,9 +112,7 @@ static std::string ShellQuote(const std::string& word)
 
 std::string BenchCliCommand()
 {
-    std::string cmd = GetBenchCliPath();
-    if (GetBoolArg("-testnet", false))
-        cmd += strTestnetSring;
+    std::string cmd = GetBenchCliPath() + BenchNetworkFlag();
 
     const std::string socket = GetArg("-fluxbenchsocket", "");
     if (!socket.empty()) {
@@ -201,10 +210,7 @@ bool IsFluxBenchdRunning()
 
 void StartFluxBenchd()
 {
-    std::string testnet = "";
-    if (GetBoolArg("-testnet", false))
-        testnet = strTestnetSring;
-    RunCommand(GetBenchDaemonPath() + testnet + "&");
+    RunCommand(GetBenchDaemonPath() + BenchNetworkFlag() + "&");
     MilliSleep(4000);
     fFluxStartedBench = true;
     LogPrintf("Benchmark Started\n");

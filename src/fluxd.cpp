@@ -139,7 +139,7 @@ bool AppInit(int argc, char* argv[])
         }
         // Check for -testnet or -regtest parameter (Params() calls are only valid after this clause)
         if (!SelectParamsFromCommandLine()) {
-            fprintf(stderr, "Error: Invalid combination of -regtest and -testnet.\n");
+            fprintf(stderr, "Error: Use at most one of -regtest, -testnet and -labnet.\n");
             return false;
         }
 

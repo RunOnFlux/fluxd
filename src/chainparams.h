@@ -259,6 +259,12 @@ bool SelectParamsFromCommandLine();
 
 
 /**
+ * Sets labnet's emergency public key (hex, compressed) and derives labnet's message start from
+ * it, so each lab's key defines its own network. False with `strError` for an invalid key.
+ */
+bool SetLabNetKey(const std::string& strPubKey, std::string& strError);
+
+/**
  * Allows modifying the network upgrade regtest parameters.
  */
 void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight);

@@ -2126,6 +2126,7 @@ static bool RelaysInventoryTo(const CNode* pnode)
     case CBaseChainParams::MAIN:
         return pnode->nVersion >= MIN_PEER_PROTO_VERSION;
     case CBaseChainParams::TESTNET:
+    case CBaseChainParams::LABNET:
         return pnode->nVersion >= MIN_PEER_PROTO_VERSION_TESTNET;
     default:
         return false;
