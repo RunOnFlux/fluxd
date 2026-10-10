@@ -543,6 +543,7 @@ std::string HelpMessage(HelpMessageMode mode)
     // strUsage += HelpMessageOpt("-shrinkdebugfile", _("Shrink debug.log file on client startup (default: 1 when no -debug)"));
     strUsage += HelpMessageOpt("-testnet", _("Use the test network"));
     strUsage += HelpMessageOpt("-labnet", _("Use the lab network"));
+    strUsage += HelpMessageOpt("-labnetkey=<pubkey>", _("labnet: the lab's emergency public key (compressed, hex); it defines the lab's network"));
 
     strUsage += HelpMessageGroup(_("Node relay options:"));
     strUsage += HelpMessageOpt("-datacarrier", strprintf(_("Relay and mine data carrier transactions (default: %u)"), 1));
@@ -902,6 +903,18 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 
     // ********************************************************* Step 2: parameter interactions
     const CChainParams& chainparams = Params();
+
+    // A labnet is defined by its lab's key: the emergency key that mints its blocks, and the magic
+    // bytes derived from it, so two labs never share a chain. Set before anything reads the magic.
+    if (chainparams.NetworkID() == CBaseChainParams::LABNET) {
+        if (GetArg("-labnetkey", "").empty())
+            return InitError(_("-labnet needs -labnetkey=<the lab's public key>"));
+        std::string strLabNetKeyError;
+        if (!SetLabNetKey(GetArg("-labnetkey", ""), strLabNetKeyError))
+            return InitError(strprintf(_("-labnetkey: %s"), strLabNetKeyError));
+    } else if (mapArgs.count("-labnetkey")) {
+        return InitError(_("-labnetkey is only allowed with -labnet"));
+    }
 
     // Set this early so that experimental features are correctly enabled/disabled
     fExperimentalMode = GetBoolArg("-experimentalfeatures", false);

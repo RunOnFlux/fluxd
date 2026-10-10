@@ -4,7 +4,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
+#include "hash.h"
 #include "key_io.h"
+#include "pubkey.h"
 #include "main.h"
 #include "crypto/equihash.h"
 
@@ -536,7 +538,8 @@ static CTestNetParams testNetParams;
 /**
  * labnet: the lab's private network. Mainnet's rules on testnet's address prefixes, with every
  * upgrade active from height 1 and PoN from height 2; block 1 is the premine, and blocks are minted
- * by confirmed fluxnodes or, when none mints, by an emergency block signed with a lab key.
+ * by confirmed fluxnodes or, when none mints, by an emergency block signed with the lab's key.
+ * Each lab defines its own labnet with -labnetkey (SetLabNetKey).
  */
 class CLabNetParams : public CChainParams {
 public:
@@ -599,6 +602,7 @@ public:
         eh_epoch_2 = eh48_5;
         eh_epoch_3 = eh48_5;
 
+        // Replaced by SetLabNetKey: a lab's magic comes from its key.
         pchMessageStart[0] = 0xbf;
         pchMessageStart[1] = 0xc6;
         pchMessageStart[2] = 0x6e;
@@ -682,12 +686,33 @@ public:
         vecP2SHPublicKeys.resize(1);
         vecP2SHPublicKeys[0] = std::make_pair("0461169d8b79f8539c17a72cf7d3306e314cf9ddf4595196e1ed46641517e1af6f7b666c58e93a4440dde463879070e913e6788419b3f10e21fb5abeeb3a472da9", 0);
 
-        // Emergency blocks mint when no fluxnode does; one signature from either lab key.
-        vecEmergencyPublicKeys.resize(2);
-        vecEmergencyPublicKeys[0] = "036fb1722c93444bc06daffaacc58c38e9e9c17b7fb2758486c26d13160e4eb4aa";
-        vecEmergencyPublicKeys[1] = "020483178bc32818eb9922b68ac0771fe95136a6edf746016125270cfc2111fd5a";
+        // Emergency blocks mint when no fluxnode does, signed by the lab's own key: SetLabNetKey
+        // sets it from -labnetkey at startup, with the magic bytes derived from it.
         emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
         nEmergencyMinSignatures = 1;
+    }
+
+    bool SetLabNetKey(const std::string& strPubKey, std::string& strError)
+    {
+        if (!IsHex(strPubKey)) {
+            strError = "not a hex public key";
+            return false;
+        }
+        const std::vector<unsigned char> vch = ParseHex(strPubKey);
+        const CPubKey key(vch.begin(), vch.end());
+        if (!key.IsFullyValid() || !key.IsCompressed()) {
+            strError = "not a valid compressed public key";
+            return false;
+        }
+        vecEmergencyPublicKeys = {HexStr(key.begin(), key.end())};
+        nEmergencyMinSignatures = 1;
+
+        static const std::string tag = "labnet";
+        std::vector<unsigned char> preimage(tag.begin(), tag.end());
+        preimage.insert(preimage.end(), key.begin(), key.end());
+        const uint256 h = Hash(preimage.begin(), preimage.end());
+        memcpy(pchMessageStart, h.begin(), sizeof(pchMessageStart));
+        return true;
     }
 };
 static CLabNetParams labNetParams;
@@ -969,6 +994,11 @@ CScript CChainParams::GetFoundersRewardScriptAtHeight(int nHeight) const {
 std::string CChainParams::GetFoundersRewardAddressAtIndex(int i) const {
     assert(i >= 0 && i < vFoundersRewardAddress.size());
     return vFoundersRewardAddress[i];
+}
+
+bool SetLabNetKey(const std::string& strPubKey, std::string& strError)
+{
+    return labNetParams.SetLabNetKey(strPubKey, strError);
 }
 
 void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)

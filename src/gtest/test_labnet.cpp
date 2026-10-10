@@ -16,12 +16,21 @@
 #include "pon/pon-fork.h"
 #include "random.h"
 #include "util.h"
+#include "utilstrencodings.h"
 
 namespace {
 
 class LabNet : public ::testing::Test {
 protected:
-    void SetUp() override { SelectParams(CBaseChainParams::LABNET); }
+    CKey labKey;
+    void SetUp() override
+    {
+        SelectParams(CBaseChainParams::LABNET);
+        labKey.MakeNewKey(true);
+        const CPubKey pub = labKey.GetPubKey();
+        std::string error;
+        ASSERT_TRUE(SetLabNetKey(HexStr(pub.begin(), pub.end()), error)) << error;
+    }
     void TearDown() override
     {
         mapArgs.erase("-labnet");
@@ -90,11 +99,8 @@ TEST_F(LabNet, CompactHeadersAreNeverUsed)
     EXPECT_EQ(Checkpoints::GetTotalBlocksEstimate(Params().Checkpoints()), 0);
 }
 
-TEST_F(LabNet, EmergencyBlocksNeedALabKey)
+static CBlockHeader EmergencyHeader()
 {
-    EXPECT_EQ(Params().GetEmergencyMinSignatures(), 1);
-    EXPECT_EQ(Params().GetEmergencyPublicKeys().size(), 2u);
-
     CBlockHeader block;
     block.nVersion = CBlockHeader::PON_VERSION;
     block.hashPrevBlock = GetRandHash();
@@ -103,14 +109,52 @@ TEST_F(LabNet, EmergencyBlocksNeedALabKey)
     block.nBits = 0x1e0ffff0;
     block.nodesCollateral.hash = Params().GetEmergencyCollateralHash();
     block.nodesCollateral.n = 0;
+    return block;
+}
 
-    // Unsigned, and signed by a key that is not a lab emergency key.
-    EXPECT_FALSE(ValidateEmergencyBlockSignatures(block));
-    CKey other;
-    other.MakeNewKey(true);
+TEST_F(LabNet, EmergencyBlocksAreSignedByTheLabKey)
+{
+    EXPECT_EQ(Params().GetEmergencyMinSignatures(), 1);
+    ASSERT_EQ(Params().GetEmergencyPublicKeys().size(), 1u);
+
     std::string error;
-    ASSERT_TRUE(CreateEmergencyBlock(block, {other}, error)) << error;
-    EXPECT_FALSE(ValidateEmergencyBlockSignatures(block));
+    CBlockHeader block = EmergencyHeader();
+    EXPECT_FALSE(ValidateEmergencyBlockSignatures(block)) << "unsigned";
+    ASSERT_TRUE(CreateEmergencyBlock(block, {labKey}, error)) << error;
+    EXPECT_TRUE(ValidateEmergencyBlockSignatures(block)) << "signed by the lab key";
+
+    CBlockHeader other = EmergencyHeader();
+    CKey otherKey;
+    otherKey.MakeNewKey(true);
+    ASSERT_TRUE(CreateEmergencyBlock(other, {otherKey}, error)) << error;
+    EXPECT_FALSE(ValidateEmergencyBlockSignatures(other)) << "signed by another key";
+
+    // The lab's signature means nothing on another network.
+    SelectParams(CBaseChainParams::TESTNET);
+    EXPECT_FALSE(ValidateEmergencyBlockSignatures(block)) << "on testnet";
+    SelectParams(CBaseChainParams::MAIN);
+    EXPECT_FALSE(ValidateEmergencyBlockSignatures(block)) << "on mainnet";
+}
+
+TEST_F(LabNet, EachKeyIsItsOwnNetwork)
+{
+    unsigned char first[4];
+    memcpy(first, Params().MessageStart(), 4);
+
+    CKey second;
+    second.MakeNewKey(true);
+    const CPubKey pub = second.GetPubKey();
+    std::string error;
+    ASSERT_TRUE(SetLabNetKey(HexStr(pub.begin(), pub.end()), error)) << error;
+    EXPECT_NE(memcmp(first, Params().MessageStart(), 4), 0) << "two labs, two magics";
+    EXPECT_EQ(Params().GetEmergencyPublicKeys()[0], HexStr(pub.begin(), pub.end()));
+
+    EXPECT_FALSE(SetLabNetKey("zz", error));
+    CKey uncompressed;
+    uncompressed.MakeNewKey(false);
+    const CPubKey u = uncompressed.GetPubKey();
+    EXPECT_FALSE(SetLabNetKey(HexStr(u.begin(), u.end()), error)) << "uncompressed";
+    EXPECT_FALSE(SetLabNetKey(std::string(66, '0'), error)) << "not a point";
 }
 
 TEST_F(LabNet, FluxbenchIsToldTheNetwork)
