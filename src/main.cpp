@@ -1789,11 +1789,21 @@ bool CheckTransactionWithoutProofVerification(const CTransaction& tx, CValidatio
         }
 
         if (!CheckFluxnodeTxSignatures(tx)) {
-            // Signature is not committed to txid (excluded via SER_GETHASH), so signature failures
-            // should not blacklist by txid - another peer may send valid signature for same txid
+            // The operator and benchmark signatures are excluded from the tx hash (SER_GETHASH),
+            // so they are not committed to the txid or, transitively, to the block hash. A relaying
+            // peer can therefore strip or corrupt them without changing either hash. Two consequences
+            // must be defended against:
+            //   - Relay: do not blacklist the txid on a signature failure - another peer may carry a
+            //     validly-signed copy of the same txid (recentRejects carve-out keys off this flag).
+            //   - Block: do not permanently mark the block hash invalid on a signature failure -
+            //     otherwise a peer racing an honest block relay can poison the victim's index and
+            //     make it permanently reject the honest block hash. Set corruptionIn=true so the
+            //     block-connect paths reject this copy and penalize the sender without marking the
+            //     index, allowing an honestly-signed copy to be re-requested and accepted. This
+            //     mirrors the vchBlockSig/PON-block-signature handling in ContextualCheckBlock.
             state.SetFluxnodeTxSignatureFailure();
             return state.DoS(10, error("CheckTransaction(): Is Fluxnode Tx, invalid signatures"),
-                             REJECT_INVALID, "bad-txns-fluxnode-tx-invalid-signature");
+                             REJECT_INVALID, "bad-txns-fluxnode-tx-invalid-signature", true);
         }
 
         if (tx.nType == FLUXNODE_CONFIRM_TX_TYPE) {
