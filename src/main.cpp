@@ -869,6 +869,18 @@ void UnregisterNodeSignals(CNodeSignals& nodeSignals)
     nodeSignals.FinalizeNode.disconnect(&FinalizeNode);
 }
 
+std::vector<const CBlockIndex*> CompactHeaderBlocks(const CChain& chain, const CBlockIndex* pstart,
+                                                    const uint256& hashStop, int nLatestCheckpoint, int nLimit)
+{
+    std::vector<const CBlockIndex*> vBlocks;
+    for (const CBlockIndex* pindex = pstart; pindex && pindex->nHeight < nLatestCheckpoint; pindex = chain.Next(pindex)) {
+        vBlocks.push_back(pindex);
+        if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
+            break;
+    }
+    return vBlocks;
+}
+
 CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& locator)
 {
     // Find the first block the caller has in the main chain
@@ -7629,21 +7641,16 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             // Send compact headers for checkpointed blocks (saves bandwidth)
             // POW blocks: omit nSolution (~1344 bytes saved per header)
             // PON blocks: include all data (already compact)
-            vector<CCompactBlockHeader> vCompactHeaders;
-
             // Increase limit for compact headers since they're smaller
             // 2000 headers: POW = 280KB, PON = 482KB (well under MAX_PROTOCOL_MESSAGE_LENGTH)
-            int nLimit = 2000;
+            const int nLimit = 2000;
 
             LogPrint("net", "getheaders (compact) %d to %s from peer=%d\n",
                      pindex->nHeight, hashStop.ToString(), pfrom->id);
 
-            for (; pindex; pindex = chainActive.Next(pindex))
-            {
-                vCompactHeaders.push_back(CCompactBlockHeader(pindex->GetBlockHeader()));
-                if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
-                    break;
-            }
+            vector<CCompactBlockHeader> vCompactHeaders;
+            for (const CBlockIndex* pblock : CompactHeaderBlocks(chainActive, pindex, hashStop, latestCheckpoint, nLimit))
+                vCompactHeaders.push_back(CCompactBlockHeader(pblock->GetBlockHeader()));
             pfrom->PushMessage("cmpheaders", vCompactHeaders);
         } else {
             // Send regular headers (peer doesn't support compact, or blocks not checkpointed)
