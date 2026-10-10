@@ -180,6 +180,17 @@ class FluxNode:
         """
         await self._stop_process()
 
+    async def kill(self) -> None:
+        """Kill the daemon with SIGKILL, as a crash: it gets no chance to flush or shut down."""
+        if self._proc is not None:
+            if self._proc.returncode is None:
+                self._proc.kill()
+            await self._proc.wait()
+            self._proc = None
+        if self._stderr is not None:
+            self._stderr.close()
+            self._stderr = None
+
     async def restart(self, extra_args: list[str] | None = None) -> None:
         """Restart the daemon on the same datadir, optionally replacing its args."""
         await self._stop_process()
