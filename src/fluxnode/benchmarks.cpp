@@ -86,6 +86,35 @@ std::string GetBenchCliPath()
 
 }
 
+/** Single-quotes a word for /bin/sh. */
+static std::string ShellQuote(const std::string& word)
+{
+    std::string quoted = "'";
+    for (char c : word) {
+        if (c == '\'')
+            quoted += "'\\''";
+        else
+            quoted += c;
+    }
+    return quoted + "'";
+}
+
+std::string BenchCliCommand()
+{
+    std::string cmd = GetBenchCliPath();
+    if (GetBoolArg("-testnet", false))
+        cmd += strTestnetSring;
+
+    const std::string socket = GetArg("-fluxbenchsocket", "");
+    if (!socket.empty()) {
+        // The cli reads its conf from -datadir and refuses a datadir that does not exist; fluxd's
+        // own datadir always exists, and fluxbench.conf is optional there.
+        cmd += "-rpcunixsocket=" + ShellQuote(socket) + " ";
+        cmd += "-datadir=" + ShellQuote(GetDataDir(false).string()) + " ";
+    }
+    return cmd;
+}
+
 std::string GetBenchDaemonPath()
 {
     // The space at the end is so parameters can be added easily
@@ -155,11 +184,7 @@ std::vector<std::string> split (std::string s, std::string delimiter) {
 
 bool IsFluxBenchdRunning()
 {
-    std::string testnet = "";
-    if (GetBoolArg("-testnet", false))
-        testnet = strTestnetSring;
-
-    std::string strBenchmarkStatus = GetStdoutFromCommand(GetBenchCliPath() + testnet + "getstatus true", false, true);
+    std::string strBenchmarkStatus = GetStdoutFromCommand(BenchCliCommand() + "getstatus true", false, true);
 
     UniValue response;
     response.read(strBenchmarkStatus);
@@ -188,20 +213,13 @@ void StartFluxBenchd()
 
 void StopFluxBenchd()
 {
-    std::string testnet = "";
-    if (GetBoolArg("-testnet", false))
-        testnet = strTestnetSring;
-    int value = std::system(std::string(GetBenchCliPath() + testnet + "stop").c_str());
+    int value = std::system(std::string(BenchCliCommand() + "stop").c_str());
 }
 
 std::string GetBenchmarks()
 {
-    std::string testnet = "";
-    if (GetBoolArg("-testnet", false))
-        testnet = strTestnetSring;
-
     if (IsFluxBenchdRunning()) {
-        std::string strBenchmarkStatus = GetStdoutFromCommand(GetBenchCliPath() + testnet + "getbenchmarks");
+        std::string strBenchmarkStatus = GetStdoutFromCommand(BenchCliCommand() + "getbenchmarks");
 
         return strBenchmarkStatus;
     }
@@ -211,12 +229,8 @@ std::string GetBenchmarks()
 
 std::string GetFluxBenchdStatus()
 {
-    std::string testnet = "";
-    if (GetBoolArg("-testnet", false))
-        testnet = strTestnetSring;
-
     if (IsFluxBenchdRunning()) {
-        std::string strBenchmarkStatus = GetStdoutFromCommand(GetBenchCliPath() + testnet + "getstatus");
+        std::string strBenchmarkStatus = GetStdoutFromCommand(BenchCliCommand() + "getstatus");
 
         return strBenchmarkStatus;
     }
@@ -241,15 +255,11 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
         return true;
     }
 
-    std::string testnet = "";
-    if (GetBoolArg("-testnet", false))
-        testnet = strTestnetSring;
-
     if (IsFluxBenchdRunning()) {
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         ss << tx;
         std::string txHexStr = HexStr(ss.begin(), ss.end());
-        std::string response = GetStdoutFromCommand(GetBenchCliPath() + testnet + "signfluxnodetransaction " + txHexStr, true);
+        std::string response = GetStdoutFromCommand(BenchCliCommand() + "signfluxnodetransaction " + txHexStr, true);
 
         UniValue signedresponse;
         signedresponse.read(response);

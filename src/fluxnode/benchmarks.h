@@ -24,6 +24,8 @@ public:
 
 bool FindBenchmarkPath(std::string filename, std::string file_path );
 std::string GetBenchCliPath();
+/** fluxbench-cli with the network flag and, when -fluxbenchsocket is set, that socket. */
+std::string BenchCliCommand();
 std::string GetBenchDaemonPath();
 std::string GetSelfPath();
 
