@@ -52,6 +52,20 @@ public:
 static CBaseRegTestParams regTestParams;
 
 /*
+ * labnet: the lab's private network
+ */
+class CBaseLabNetParams : public CBaseChainParams
+{
+public:
+    CBaseLabNetParams()
+    {
+        nRPCPort = 36124;
+        strDataDir = "labnet";
+    }
+};
+static CBaseLabNetParams labNetParams;
+
+/*
  * Unit test
  */
 class CBaseUnitTestParams : public CBaseMainParams
@@ -84,6 +98,9 @@ void SelectBaseParams(CBaseChainParams::Network network)
     case CBaseChainParams::REGTEST:
         pCurrentBaseParams = &regTestParams;
         break;
+    case CBaseChainParams::LABNET:
+        pCurrentBaseParams = &labNetParams;
+        break;
     default:
         assert(false && "Unimplemented network");
         return;
@@ -94,13 +111,16 @@ CBaseChainParams::Network NetworkIdFromCommandLine()
 {
     bool fRegTest = GetBoolArg("-regtest", false);
     bool fTestNet = GetBoolArg("-testnet", false);
+    bool fLabNet = GetBoolArg("-labnet", false);
 
-    if (fTestNet && fRegTest)
+    if (int(fTestNet) + int(fRegTest) + int(fLabNet) > 1)
         return CBaseChainParams::MAX_NETWORK_TYPES;
     if (fRegTest)
         return CBaseChainParams::REGTEST;
     if (fTestNet)
         return CBaseChainParams::TESTNET;
+    if (fLabNet)
+        return CBaseChainParams::LABNET;
     return CBaseChainParams::MAIN;
 }
 

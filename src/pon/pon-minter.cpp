@@ -135,12 +135,11 @@ void PONMinter(const CChainParams& chainparams)
                 } while (true);
             }
 
-            // Check if we're an active fluxnode (on mainnet)
-            bool isMainnet = (chainparams.NetworkIDString() == "main");
+            // Only testnet and regtest mint without a confirmed fluxnode
+            bool fBypassNet = chainparams.NetworkIDString() == "test" || chainparams.NetworkIDString() == "regtest";
 
             if (!g_fluxnodeCache.CheckIfConfirmed(activeFluxnode.deterministicOutPoint)) {
-                // For testnet/regtest, allow bypass mode
-                if (isMainnet) {
+                if (!fBypassNet) {
                     MilliSleep(10000);
                     continue;
                 }
@@ -179,7 +178,7 @@ void PONMinter(const CChainParams& chainparams)
             // Get our collateral
             COutPoint collateral = activeFluxnode.deterministicOutPoint;
 
-            if (collateral.IsNull() && !isMainnet) {
+            if (collateral.IsNull() && fBypassNet) {
                 // Use test bypass collateral
                 collateral.hash = uint256S("0x544553544e4f4400000000000000000000000000000000000000000000000000");
                 collateral.n = 0;

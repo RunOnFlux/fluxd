@@ -7147,7 +7147,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         uint64_t nNonce = 1;
         vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
         if ((Params().NetworkID() == CBaseChainParams::MAIN && pfrom->nVersion < MIN_PEER_PROTO_VERSION)
-         || (Params().NetworkID() == CBaseChainParams::TESTNET && pfrom->nVersion < MIN_PEER_PROTO_VERSION_TESTNET))
+         || (Params().NetworkID() == CBaseChainParams::TESTNET && pfrom->nVersion < MIN_PEER_PROTO_VERSION_TESTNET)
+         || (Params().NetworkID() == CBaseChainParams::LABNET && pfrom->nVersion < MIN_PEER_PROTO_VERSION_TESTNET))
         {
             // disconnect from peers older than this proto version
             LogPrintf("peer=%d using obsolete version %i; disconnecting\n", pfrom->id, pfrom->nVersion);

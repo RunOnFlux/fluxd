@@ -20,6 +20,7 @@ public:
         MAIN,
         TESTNET,
         REGTEST,
+        LABNET,
 
         MAX_NETWORK_TYPES
     };
@@ -44,8 +45,8 @@ const CBaseChainParams& BaseParams();
 void SelectBaseParams(CBaseChainParams::Network network);
 
 /**
- * Looks for -regtest or -testnet and returns the appropriate Network ID.
- * Returns MAX_NETWORK_TYPES if an invalid combination is given.
+ * Looks for -regtest, -testnet or -labnet and returns the appropriate Network ID.
+ * Returns MAX_NETWORK_TYPES if more than one is given.
  */
 CBaseChainParams::Network NetworkIdFromCommandLine();
 

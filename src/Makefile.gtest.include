@@ -61,6 +61,7 @@ flux_gtest_SOURCES += \
 	gtest/test_tautology.cpp \
 	gtest/test_cmpheaders.cpp \
 	gtest/test_benchcli.cpp \
+	gtest/test_labnet.cpp \
 	gtest/test_deprecation.cpp \
 	gtest/test_sdnotify.cpp \
 	gtest/test_equihash.cpp \

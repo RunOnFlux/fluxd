@@ -534,6 +534,165 @@ public:
 static CTestNetParams testNetParams;
 
 /**
+ * labnet: the lab's private network. Mainnet's rules on testnet's address prefixes, with every
+ * upgrade active from height 1 and PoN from height 2; block 1 is the premine, and blocks are minted
+ * by confirmed fluxnodes or, when none mints, by an emergency block signed with a lab key.
+ */
+class CLabNetParams : public CChainParams {
+public:
+    CLabNetParams() {
+        strNetworkID = "labnet";
+        strCurrencyUnits = "LABFLUX";
+        bip44CoinType = 1;
+        consensus.fCoinbaseMustBeProtected = true;
+        consensus.nSubsidySlowStartInterval = 1;
+        consensus.nSubsidyHalvingInterval = 655350;
+        consensus.nMajorityEnforceBlockUpgrade = 51;
+        consensus.nMajorityRejectBlockOutdated = 75;
+        consensus.nMajorityWindow = 400;
+        consensus.powLimit = uint256S("0effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        consensus.nDigishieldAveragingWindow = 17;
+        assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nDigishieldAveragingWindow);
+        consensus.nDigishieldMaxAdjustDown = 32;
+        consensus.nDigishieldMaxAdjustUp = 16;
+        consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
+        consensus.nPowTargetSpacing = 60;
+
+        consensus.ponLimit = uint256S("0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        consensus.ponStartLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        consensus.nPonTargetSpacing = 30;
+        consensus.nPonDifficultyWindow = 60;
+
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
+        Consensus::NetworkUpgrade::ALWAYS_ACTIVE;
+        consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
+        Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_LWMA].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::UPGRADE_LWMA].nActivationHeight = 1;
+        consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nProtocolVersion = 170002;
+        consensus.vUpgrades[Consensus::UPGRADE_EQUI144_5].nActivationHeight = 1;
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nProtocolVersion = 170007;
+        consensus.vUpgrades[Consensus::UPGRADE_ACADIA].nActivationHeight = 1;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nProtocolVersion = 170012;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMIOOKA].nActivationHeight = 1;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nProtocolVersion = 170016;
+        consensus.vUpgrades[Consensus::UPGRADE_KAMATA].nActivationHeight = 1;
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nProtocolVersion = 170017;
+        consensus.vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight = 1;
+        consensus.vUpgrades[Consensus::UPGRADE_HALVING].nProtocolVersion = 170018;
+        consensus.vUpgrades[Consensus::UPGRADE_HALVING].nActivationHeight = 1;
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nProtocolVersion = 170019;
+        consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight = 1;
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
+        consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight = 2;
+
+        consensus.nPONInitialSubsidy = 14;
+        consensus.nPONSubsidyReductionInterval = 1051200;
+        consensus.nPONMaxReductions = 20;
+
+        consensus.nZawyLWMAAveragingWindow = 60;
+        consensus.eh_epoch_fade_length = 10;
+
+        eh_epoch_1 = eh48_5;
+        eh_epoch_2 = eh48_5;
+        eh_epoch_3 = eh48_5;
+
+        pchMessageStart[0] = 0xbf;
+        pchMessageStart[1] = 0xc6;
+        pchMessageStart[2] = 0x6e;
+        pchMessageStart[3] = 0xce;
+        vAlertPubKey = ParseHex("044452cc59421a674199f5fe8fbb60212e24539507a71394240d28f4c5f750db25a65f998149ce42e84a2a7feb6f73811d1f307d05ab754b0703fa8e5895ca34b3");
+        nDefaultPort = 36125;
+        nPruneAfterHeight = 1000;
+
+        genesis = CreateGenesisBlock(
+            1791590400,
+            uint256S("0x000000000000000000000000000000000000000000000000000000000000005a"),
+            ParseHex("0037c3b8f0f3d8a474084268dbc136d055740a43ca79c1f745369c28de4ef3a734b2bfa5"),
+            0x2007ffff, 4, 0);
+        consensus.hashGenesisBlock = genesis.GetHash();
+        assert(consensus.hashGenesisBlock == uint256S("0x016f588e1198a803b5c8f30c012e7b73ac7b4f890722ba9160f193a9488aaac5"));
+        assert(genesis.hashMerkleRoot == uint256S("0x94c7aed6b2c67f1718006684bfc3b92081a2f19d59075691b189160d6f3aa13a"));
+
+        vFixedSeeds.clear();
+        vSeeds.clear();
+
+        // testnet's prefixes: "tm" and "t2" addresses, keys beginning "9" or "c"
+        base58Prefixes[PUBKEY_ADDRESS]     = {0x1D,0x25};
+        base58Prefixes[SCRIPT_ADDRESS]     = {0x1C,0xBA};
+        base58Prefixes[SECRET_KEY]         = {0xEF};
+        base58Prefixes[EXT_PUBLIC_KEY]     = {0x04,0x35,0x87,0xCF};
+        base58Prefixes[EXT_SECRET_KEY]     = {0x04,0x35,0x83,0x94};
+        base58Prefixes[ZCPAYMENT_ADDRRESS] = {0x16,0xB6};
+        base58Prefixes[ZCVIEWING_KEY]      = {0xA8,0xAC,0x0C};
+        base58Prefixes[ZCSPENDING_KEY]     = {0xAC,0x08};
+
+        bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "ztestacadia";
+        bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviewtestacadia";
+        bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivktestacadia";
+        bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-test";
+
+        fMiningRequiresPeers = false;
+        fDefaultConsistencyChecks = false;
+        fRequireStandard = true;
+        fMineBlocksOnDemand = false;
+        fTestnetToBeDeprecatedFieldRPC = true;
+
+        networkID = CBaseChainParams::Network::LABNET;
+        nStartFluxnodePaymentsHeight = 1;
+
+        // The private key is a file on lab machines; fluxbench reads it on labnet only.
+        vecBenchmarkingPublicKeys.resize(1);
+        vecBenchmarkingPublicKeys[0] = std::make_pair("0420f516efa688a164b8620084c1f680553b1fbfdd862dce5f5c628c94e2e1740bc7748b8e1f93c7252727613c74bd19e935fe9e944a358a13f2ef1d41b7d9c4b9", 0);
+
+        checkpointData = (CCheckpointData) {
+            {
+                {0, consensus.hashGenesisBlock},
+            },
+            1791590400,
+            0,
+            2880
+        };
+
+        // Funding paid at a fixed height: height 0 is never paid, so labnet pays none.
+        strExchangeFundingAddress = "tmMePZbzeVEF18g2GBF4KMzQKSVBM8Mer9F";
+        nExchangeFundingHeight = 0;
+        nExchangeFundingAmount = 0;
+        strFoundationFundingAddress = "tmMePZbzeVEF18g2GBF4KMzQKSVBM8Mer9F";
+        nFoundationFundingHeight = 0;
+        nFoundationFundingAmount = 0;
+        strSwapPoolAddress = "tmMePZbzeVEF18g2GBF4KMzQKSVBM8Mer9F";
+        nSwapPoolStartHeight = 0;
+        nSwapPoolAmount = 0;
+        nSwapPoolInterval = 1;
+        nSwapPoolMaxTimes = 0;
+
+        strDevFundAddress = "tmMePZbzeVEF18g2GBF4KMzQKSVBM8Mer9F";
+
+        // Only the current collateral amounts: 1000, 12500, 40000.
+        nBeginCumulusTransition = 0;
+        nEndCumulusTransition = 0;
+        nBeginNimbusTransition = 0;
+        nEndNimbusTransition = 0;
+        nBeginStratusTransition = 0;
+        nEndStratusTransition = 0;
+
+        vecP2SHPublicKeys.resize(1);
+        vecP2SHPublicKeys[0] = std::make_pair("0461169d8b79f8539c17a72cf7d3306e314cf9ddf4595196e1ed46641517e1af6f7b666c58e93a4440dde463879070e913e6788419b3f10e21fb5abeeb3a472da9", 0);
+
+        // Emergency blocks mint when no fluxnode does; one signature from either lab key.
+        vecEmergencyPublicKeys.resize(2);
+        vecEmergencyPublicKeys[0] = "036fb1722c93444bc06daffaacc58c38e9e9c17b7fb2758486c26d13160e4eb4aa";
+        vecEmergencyPublicKeys[1] = "020483178bc32818eb9922b68ac0771fe95136a6edf746016125270cfc2111fd5a";
+        emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
+        nEmergencyMinSignatures = 1;
+    }
+};
+static CLabNetParams labNetParams;
+
+/**
  * Regression test
  */
 class CRegTestParams : public CChainParams {
@@ -749,6 +908,8 @@ CChainParams &Params(CBaseChainParams::Network network) {
             return testNetParams;
         case CBaseChainParams::REGTEST:
             return regTestParams;
+        case CBaseChainParams::LABNET:
+            return labNetParams;
         default:
             assert(false && "Unimplemented network");
             return mainParams;

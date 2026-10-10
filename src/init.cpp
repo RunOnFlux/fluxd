@@ -542,6 +542,7 @@ std::string HelpMessage(HelpMessageMode mode)
     }
     // strUsage += HelpMessageOpt("-shrinkdebugfile", _("Shrink debug.log file on client startup (default: 1 when no -debug)"));
     strUsage += HelpMessageOpt("-testnet", _("Use the test network"));
+    strUsage += HelpMessageOpt("-labnet", _("Use the lab network"));
 
     strUsage += HelpMessageGroup(_("Node relay options:"));
     strUsage += HelpMessageOpt("-datacarrier", strprintf(_("Relay and mine data carrier transactions (default: %u)"), 1));
@@ -1172,7 +1173,8 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     if (GetBoolArg("-peerbloomfilters", true))
         nLocalServices |= NODE_BLOOM;
 
-    nMaxTipAge = GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
+    // A lab chain stopped for days restarts without initial block download.
+    nMaxTipAge = GetArg("-maxtipage", Params().NetworkID() == CBaseChainParams::LABNET ? 10 * 365 * 24 * 60 * 60 : DEFAULT_MAX_TIP_AGE);
 
 #ifdef ENABLE_MINING
     if (mapArgs.count("-mineraddress")) {
@@ -2194,15 +2196,14 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 
     // Start PON minter if this is an active fluxnode or if explicitly enabled for testing
     bool fPONMinter = GetBoolArg("-ponminter", false);
-    bool isMainnet = (chainparams.NetworkIDString() == "main");
     bool isRegtest = (chainparams.NetworkIDString() == "regtest");
-    
-    // Only allow -ponminter flag on testnet, not mainnet or regtest
-    if (fPONMinter && isMainnet) {
-        return InitError(_("Error: -ponminter flag is only allowed on testnet"));
-    }
+
+    // Only allow -ponminter flag on testnet
     if (fPONMinter && isRegtest) {
         return InitError(_("Error: -ponminter flag is not allowed on regtest. Use 'generate' RPC command instead"));
+    }
+    if (fPONMinter && chainparams.NetworkIDString() != "test") {
+        return InitError(_("Error: -ponminter flag is only allowed on testnet"));
     }
     
     if (fFluxnode || fPONMinter) {
