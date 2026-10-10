@@ -5,12 +5,28 @@
 #include <gtest/gtest.h>
 
 #include "flux/Address.hpp"
+#include "wallet/db.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #include "util.h"
 
 #include <chrono>
 #include <filesystem>
+
+// The Write*DirectToDb tests below each drive a real on-disk wallet in its own
+// temporary datadir. The global BerkeleyDB environment (bitdb) opens once and
+// CDBEnv::Open no-ops afterward, so without resetting it between tests every
+// wallet would land in the first test's environment and accumulate state until
+// one test trips it. Close the previous environment (freeing its handles), hand
+// out a fresh DbEnv handle, and point the datadir at this test's directory so
+// the wallet DB initializes here.
+static void UseFreshWalletEnv(const std::filesystem::path& datadir)
+{
+    bitdb.Close();
+    bitdb.Reset();
+    mapArgs["-datadir"] = datadir.string();
+    ClearDatadirCache();
+}
 
 /**
  * This test covers Sapling methods on CWallet
@@ -225,7 +241,7 @@ TEST(wallet_zkeys_tests, write_zkey_direct_to_db) {
     std::filesystem::path pathTemp = std::filesystem::temp_directory_path() /
         ("test_zkeys_db_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(pathTemp);
-    mapArgs["-datadir"] = pathTemp.string();
+    UseFreshWalletEnv(pathTemp);
 
     bool fFirstRun;
     CWallet wallet("wallet.dat");
@@ -298,7 +314,7 @@ TEST(wallet_zkeys_tests, WriteViewingKeyDirectToDB) {
     std::filesystem::path pathTemp = std::filesystem::temp_directory_path() /
         ("test_viewing_key_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(pathTemp);
-    mapArgs["-datadir"] = pathTemp.string();
+    UseFreshWalletEnv(pathTemp);
 
     bool fFirstRun;
     CWallet wallet("wallet-vkey.dat");
@@ -344,7 +360,7 @@ TEST(wallet_zkeys_tests, write_cryptedzkey_direct_to_db) {
     std::filesystem::path pathTemp = std::filesystem::temp_directory_path() /
         ("test_crypted_zkey_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(pathTemp);
-    mapArgs["-datadir"] = pathTemp.string();
+    UseFreshWalletEnv(pathTemp);
 
     bool fFirstRun;
     CWallet wallet("wallet_crypted.dat");
@@ -419,7 +435,7 @@ TEST(wallet_zkeys_tests, WriteCryptedSaplingZkeyDirectToDb) {
     std::filesystem::path pathTemp = std::filesystem::temp_directory_path() /
         ("test_sapling_crypted_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(pathTemp);
-    mapArgs["-datadir"] = pathTemp.string();
+    UseFreshWalletEnv(pathTemp);
 
     bool fFirstRun;
     CWallet wallet("wallet_crypted_sapling.dat");

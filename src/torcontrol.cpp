@@ -10,11 +10,17 @@
 #include "net.h"
 #include "util.h"
 #include "crypto/hmac_sha256.h"
+#include "sync.h"
+
+#include <sodium.h>
 
 #include <vector>
 #include <deque>
 #include <set>
 #include <stdlib.h>
+#ifndef WIN32
+#include <sys/stat.h>
+#endif
 
 #include <functional>
 #include <boost/signals2/signal.hpp>
@@ -397,7 +403,36 @@ static bool WriteBinaryFile(const std::string &filename, const std::string &data
         return false;
     }
     fclose(f);
+#ifndef WIN32
+    // Restrict permissions to owner-only — this file may contain secret
+    // key material (e.g., the ed25519 onion seed).
+    chmod(filename.c_str(), 0600);
+#endif
     return true;
+}
+
+/****** Tor hidden service ed25519 key cache ********/
+
+static CCriticalSection cs_torkey;
+static bool fTorKeyAvailable = false;
+static unsigned char torEd25519SK[crypto_sign_SECRETKEYBYTES]; // 64
+static unsigned char torEd25519PK[crypto_sign_PUBLICKEYBYTES]; // 32
+static std::string strTorServiceID;
+
+bool GetTorServiceEd25519Key(unsigned char sk[64], unsigned char pk[32])
+{
+    LOCK(cs_torkey);
+    if (!fTorKeyAvailable)
+        return false;
+    memcpy(sk, torEd25519SK, crypto_sign_SECRETKEYBYTES);
+    memcpy(pk, torEd25519PK, crypto_sign_PUBLICKEYBYTES);
+    return true;
+}
+
+std::string GetTorServiceID()
+{
+    LOCK(cs_torkey);
+    return strTorServiceID;
 }
 
 /****** Bitcoin specific TorController implementation ********/
@@ -465,8 +500,20 @@ TorController::TorController(struct event_base* baseIn, const std::string& targe
     // Read service private key if cached
     std::pair<bool,std::string> pkf = ReadBinaryFile(GetPrivateKeyFile());
     if (pkf.first) {
-        LogPrint("tor", "tor: Reading cached private key from %s\n", GetPrivateKeyFile());
         private_key = pkf.second;
+        // A valid cached key is exactly the 32-byte ed25519 seed. Anything else
+        // (a truncated/corrupt write, or a legacy "ED25519-V3:<base64>" file)
+        // would be read out of bounds at the fixed 32-byte uses below and cached
+        // as a garbage keypair; discard it and let auth_cb regenerate the seed.
+        if (private_key.size() != crypto_sign_ed25519_SEEDBYTES) {
+            LogPrintf("tor: Ignoring malformed cached onion key %s (%u bytes, expected %u); regenerating\n",
+                      GetPrivateKeyFile(), (unsigned)private_key.size(),
+                      (unsigned)crypto_sign_ed25519_SEEDBYTES);
+            sodium_memzero(private_key.data(), private_key.size());
+            private_key.clear();
+        } else {
+            LogPrint("tor", "tor: Reading cached private key from %s\n", GetPrivateKeyFile());
+        }
     }
 }
 
@@ -479,6 +526,13 @@ TorController::~TorController()
     if (service.IsValid()) {
         RemoveLocal(service);
     }
+    // Securely erase any key material still held in the member string.
+    // std::string does not guarantee zeroing on destruction, and may leave
+    // copies in freed heap memory after reallocation.
+    if (!private_key.empty()) {
+        sodium_memzero(&private_key[0], private_key.size());
+        private_key.clear();
+    }
 }
 
 void TorController::add_onion_cb(TorControlConnection& conn, const TorControlReply& reply)
@@ -490,8 +544,6 @@ void TorController::add_onion_cb(TorControlConnection& conn, const TorControlRep
             std::map<std::string,std::string>::iterator i;
             if ((i = m.find("ServiceID")) != m.end())
                 service_id = i->second;
-            if ((i = m.find("PrivateKey")) != m.end())
-                private_key = i->second;
         }
         if (service_id.empty()) {
             LogPrintf("tor: Error parsing ADD_ONION parameters:\n");
@@ -502,14 +554,15 @@ void TorController::add_onion_cb(TorControlConnection& conn, const TorControlRep
         }
 
         service = CService(service_id+".onion", GetListenPort(), false);
-        LogPrintf("tor: Got service ID %s, advertizing service %s\n", service_id, service.ToString());
-        if (WriteBinaryFile(GetPrivateKeyFile(), private_key)) {
-            LogPrint("tor", "tor: Cached service private key to %s\n", GetPrivateKeyFile());
-        } else {
-            LogPrintf("tor: Error writing service private key to %s\n", GetPrivateKeyFile());
-        }
+        LogPrintf("tor: Got service ID %s, advertizing service %s\n",
+                  service_id, service.ToString());
         AddLocal(service, LOCAL_MANUAL);
-        // ... onion requested - keep connection open
+
+        {
+            LOCK(cs_torkey);
+            strTorServiceID = service_id;
+            // fTorKeyAvailable was already set in auth_cb before ADD_ONION
+        }
     } else if (reply.code == 510) { // 510 Unrecognized command
         LogPrintf("tor: Add onion failed with unrecognized command (You probably need to upgrade Tor)\n");
     } else {
@@ -526,18 +579,67 @@ void TorController::auth_cb(TorControlConnection& conn, const TorControlReply& r
         // if -onion isn't set to something else.
         if (GetArg("-onion", "") == "") {
             proxyType addrOnion = proxyType(CService("127.0.0.1", 9050), true);
-            SetProxy(NET_TOR, addrOnion);
-            SetLimited(NET_TOR, false);
+            SetProxy(NET_ONION, addrOnion);
+            SetLimited(NET_ONION, false);
         }
 
-        // Finally - now create the service
-        if (private_key.empty()) // No private key, generate one
-            private_key = "NEW:RSA1024"; // Explicitly request RSA1024 - see issue #9214
-        // Request hidden service, redirect port.
-        // Note that the 'virtual' port doesn't have to be the same as our internal port, but this is just a convenient
-        // choice.  TODO; refactor the shutdown sequence some day.
-        conn.Command(strprintf("ADD_ONION %s Port=%i,127.0.0.1:%i", private_key, GetListenPort(), GetListenPort()),
+        // Finally - now create the service.
+        //
+        // We store the raw 32-byte ed25519 seed as the authoritative key.
+        // This lets us sign with libsodium (which needs the seed) and
+        // derive Tor's expanded format on the fly for ADD_ONION.
+        if (private_key.empty()) {
+            unsigned char seed[crypto_sign_ed25519_SEEDBYTES];
+            randombytes_buf(seed, sizeof(seed));
+            private_key.assign(reinterpret_cast<char*>(seed), sizeof(seed));
+            if (WriteBinaryFile(GetPrivateKeyFile(),
+                    std::string(reinterpret_cast<char*>(seed), sizeof(seed)))) {
+                LogPrint("tor", "tor: Generated and cached new onion seed\n");
+            } else {
+                LogPrintf("tor: Error writing onion seed to %s\n",
+                          GetPrivateKeyFile());
+            }
+            sodium_memzero(seed, sizeof(seed));
+        }
+
+        // Expand seed to Tor's ADD_ONION format
+        unsigned char expanded[64];
+        crypto_hash_sha512(expanded,
+            reinterpret_cast<const unsigned char*>(private_key.data()), 32);
+        expanded[0]  &= 248;
+        expanded[31] &= 127;
+        expanded[31] |= 64;
+        std::string torKey = "ED25519-V3:" +
+            EncodeBase64(std::string(reinterpret_cast<char*>(expanded), 64));
+        sodium_memzero(expanded, sizeof(expanded));
+
+        // Cache the libsodium keypair for torauth signing
+        {
+            LOCK(cs_torkey);
+            crypto_sign_seed_keypair(torEd25519PK, torEd25519SK,
+                reinterpret_cast<const unsigned char*>(private_key.data()));
+            fTorKeyAvailable = true;
+        }
+
+        // Advertise the standard P2P port on the onion, but forward it to the
+        // dedicated local port bound only for hidden-service traffic, so inbound
+        // onion peers are identified by which socket they arrive on rather than by
+        // a 127.0.0.1 heuristic. Fall back to the P2P port if no dedicated bind is
+        // active (connectivity preserved, without the deterministic onion tag).
+        unsigned short onionTarget = GetOnionLocalPort();
+        if (onionTarget == 0)
+            onionTarget = GetListenPort();
+        conn.Command(strprintf("ADD_ONION %s Port=%i,127.0.0.1:%i",
+            torKey, GetListenPort(), onionTarget),
             [this](TorControlConnection& conn, const TorControlReply& reply) { add_onion_cb(conn, reply); });
+
+        // Erase key material now that ADD_ONION has been dispatched.
+        // The libsodium keypair is cached in the global torEd25519SK/PK;
+        // we no longer need the seed in private_key.
+        if (!private_key.empty()) {
+            sodium_memzero(private_key.data(), private_key.size());
+            private_key.clear();
+        }
     } else {
         LogPrintf("tor: Authentication failed\n");
     }
@@ -726,7 +828,10 @@ void TorController::Reconnect()
 
 std::string TorController::GetPrivateKeyFile()
 {
-    return (GetDataDir() / "onion_private_key").string();
+    // The v2 key file ("onion_private_key") from the pre-BIP155 era is intentionally
+    // not migrated: TORv2 was removed from the live Tor network in 2021 and the key
+    // material cannot be reused for a v3 service.
+    return (GetDataDir() / "onion_v3_private_key").string();
 }
 
 void TorController::reconnect_cb(evutil_socket_t fd, short what, void *arg)
@@ -777,6 +882,14 @@ void StopTorControl()
         torControlThread.join();
         event_base_free(gBase);
         gBase = 0;
+    }
+    // Securely erase the cached ed25519 keypair so it does not persist
+    // in process memory after shutdown.
+    {
+        LOCK(cs_torkey);
+        sodium_memzero(torEd25519SK, sizeof(torEd25519SK));
+        sodium_memzero(torEd25519PK, sizeof(torEd25519PK));
+        fTorKeyAvailable = false;
     }
 }
 

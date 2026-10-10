@@ -21,7 +21,37 @@ BOOST_AUTO_TEST_CASE(netbase_networks)
     BOOST_CHECK(CNetAddr("::1").GetNetwork()                                    == NET_UNROUTABLE);
     BOOST_CHECK(CNetAddr("8.8.8.8").GetNetwork()                                == NET_IPV4);
     BOOST_CHECK(CNetAddr("2001::8888").GetNetwork()                             == NET_IPV6);
-    BOOST_CHECK(CNetAddr("FD87:D87E:EB43:edb1:8e4:3588:e546:35ca").GetNetwork() == NET_TOR);
+    // The OnionCat v2 IPv6-prefix test was removed when TORv2 support was dropped.
+
+    // TORv3 .onion address (BIP155 / rend-spec-v3). Test vector borrowed from
+    // Bitcoin Core's net_tests.cpp; the 32-byte ed25519 pubkey is
+    //   53cd5648488c4707914182655b7664034e09e66f7e8cbf1084e654eb56c5bd88
+    {
+        CNetAddr torv3;
+        BOOST_CHECK(torv3.SetSpecial("kpgvmscirrdqpekbqjsvw5teanhatztpp2gl6eee4zkowvwfxwenqaid.onion"));
+        BOOST_CHECK(torv3.IsTor());
+        BOOST_CHECK(torv3.IsValid());
+        BOOST_CHECK(torv3.IsRoutable());
+        BOOST_CHECK_EQUAL(torv3.GetNetwork(), NET_ONION);
+        BOOST_CHECK_EQUAL(torv3.ToStringIP(),
+                          "kpgvmscirrdqpekbqjsvw5teanhatztpp2gl6eee4zkowvwfxwenqaid.onion");
+    }
+
+    // A 16-character (TORv2) .onion string must be rejected — TORv2 is dropped.
+    {
+        CNetAddr v2;
+        BOOST_CHECK(!v2.SetSpecial("5wyqrzbvrdsumnok.onion"));
+        BOOST_CHECK(!v2.IsTor());
+    }
+
+    // A v3 string with a corrupted checksum must be rejected. Take the valid
+    // address above and flip a single base32 character inside the checksum/version
+    // tail (the last 8 chars cover bytes 32..34 — checksum + version).
+    {
+        CNetAddr bad;
+        BOOST_CHECK(!bad.SetSpecial("kpgvmscirrdqpekbqjsvw5teanhatztpp2gl6eee4zkowvwfxwenqaie.onion"));
+        BOOST_CHECK(!bad.IsTor());
+    }
 }
 
 BOOST_AUTO_TEST_CASE(netbase_properties)
@@ -40,7 +70,7 @@ BOOST_AUTO_TEST_CASE(netbase_properties)
     BOOST_CHECK(CNetAddr("2001:10::").IsRFC4843());
     BOOST_CHECK(CNetAddr("FE80::").IsRFC4862());
     BOOST_CHECK(CNetAddr("64:FF9B::").IsRFC6052());
-    BOOST_CHECK(CNetAddr("FD87:D87E:EB43:edb1:8e4:3588:e546:35ca").IsTor());
+    // OnionCat v2 .IsTor() check removed — TORv3 has its own tests in Phase 3.
     BOOST_CHECK(CNetAddr("127.0.0.1").IsLocal());
     BOOST_CHECK(CNetAddr("::1").IsLocal());
     BOOST_CHECK(CNetAddr("8.8.8.8").IsRoutable());
@@ -92,17 +122,6 @@ BOOST_AUTO_TEST_CASE(netbase_lookupnumeric)
     BOOST_CHECK(TestParse("[::]:8333", "[::]:8333"));
     BOOST_CHECK(TestParse("[127.0.0.1]", "127.0.0.1:65535"));
     BOOST_CHECK(TestParse(":::", ""));
-}
-
-BOOST_AUTO_TEST_CASE(onioncat_test)
-{
-    // values from https://web.archive.org/web/20121122003543/http://www.cypherpunk.at/onioncat/wiki/OnionCat
-    CNetAddr addr1("5wyqrzbvrdsumnok.onion");
-    CNetAddr addr2("FD87:D87E:EB43:edb1:8e4:3588:e546:35ca");
-    BOOST_CHECK(addr1 == addr2);
-    BOOST_CHECK(addr1.IsTor());
-    BOOST_CHECK(addr1.ToStringIP() == "5wyqrzbvrdsumnok.onion");
-    BOOST_CHECK(addr1.IsRoutable());
 }
 
 BOOST_AUTO_TEST_CASE(subnet_test)
@@ -158,7 +177,8 @@ BOOST_AUTO_TEST_CASE(netbase_getgroup)
     BOOST_CHECK(CNetAddr("64:FF9B::102:304").GetGroup() == boost::assign::list_of((unsigned char)NET_IPV4)(1)(2)); // RFC6052
     BOOST_CHECK(CNetAddr("2002:102:304:9999:9999:9999:9999:9999").GetGroup() == boost::assign::list_of((unsigned char)NET_IPV4)(1)(2)); // RFC3964
     BOOST_CHECK(CNetAddr("2001:0:9999:9999:9999:9999:FEFD:FCFB").GetGroup() == boost::assign::list_of((unsigned char)NET_IPV4)(1)(2)); // RFC4380
-    BOOST_CHECK(CNetAddr("FD87:D87E:EB43:edb1:8e4:3588:e546:35ca").GetGroup() == boost::assign::list_of((unsigned char)NET_TOR)(239)); // Tor
+    // OnionCat v2 GetGroup test removed — TORv3 group is single-element {NET_ONION};
+    // see netbase.cpp CNetAddr::GetGroup() and Phase 3 tests for verification.
     BOOST_CHECK(CNetAddr("2001:470:abcd:9999:9999:9999:9999:9999").GetGroup() == boost::assign::list_of((unsigned char)NET_IPV6)(32)(1)(4)(112)(175)); //he.net
     BOOST_CHECK(CNetAddr("2001:2001:9999:9999:9999:9999:9999:9999").GetGroup() == boost::assign::list_of((unsigned char)NET_IPV6)(32)(1)(32)(1)); //IPv6
 }
