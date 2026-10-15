@@ -336,9 +336,9 @@ bool IsLocal(const CService& addr)
 static CCriticalSection cs_decidedAddress;
 static DecidedAddressInfo decidedAddress;
 
-bool DecideAddress(const std::vector<PeerAddressReport>& reports, bool fAllowNonRoutable, CNetAddr& addrOut, int& nPeersOut)
+bool DecideAddress(const std::vector<PeerAddressReport>& reports, bool fAllowNonRoutable, const CNetAddr& addrIncumbent, CNetAddr& addrOut, int& nPeersOut)
 {
-    // address -> (reporters, id of its newest reporter); pairs compare by count, then recency
+    // address -> (reporters, id of its newest reporter)
     std::map<CNetAddr, std::pair<int, NodeId>> tally;
     for (const PeerAddressReport& report : reports) {
         if (!report.addrLocal.IsIPv4() || !report.addrLocal.IsValid())
@@ -350,10 +350,18 @@ bool DecideAddress(const std::vector<PeerAddressReport>& reports, bool fAllowNon
         entry.second = std::max(entry.second, report.nodeId);
     }
 
+    // Most reporters first; among equals the incumbent, then the newest reporter.
     const std::pair<const CNetAddr, std::pair<int, NodeId>>* best = nullptr;
     for (const auto& candidate : tally) {
-        if (!best || candidate.second > best->second)
-            best = &candidate;
+        if (best && candidate.second.first < best->second.first)
+            continue;
+        if (best && candidate.second.first == best->second.first) {
+            if (best->first == addrIncumbent)
+                continue;
+            if (candidate.first != addrIncumbent && candidate.second.second < best->second.second)
+                continue;
+        }
+        best = &candidate;
     }
     if (!best || best->second.first < Params().DecidedAddressMinPeers())
         return false;
@@ -375,11 +383,12 @@ void UpdateDecidedAddress()
         reports.push_back({pnode->GetId(), pnode->addrLocal});
     }
 
+    LOCK(cs_decidedAddress);
     CNetAddr addr;
     int nPeers = 0;
-    const bool fFound = DecideAddress(reports, Params().NetworkIDString() == "regtest", addr, nPeers);
+    const CNetAddr addrIncumbent = decidedAddress.IsSet() ? decidedAddress.address : CNetAddr();
+    const bool fFound = DecideAddress(reports, Params().NetworkIDString() == "regtest", addrIncumbent, addr, nPeers);
 
-    LOCK(cs_decidedAddress);
     if (fFound != decidedAddress.IsSet() || (fFound && addr != decidedAddress.address)) {
         decidedAddress.address = fFound ? addr : CNetAddr();
         decidedAddress.nChanged = GetTime();

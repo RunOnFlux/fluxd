@@ -60,12 +60,12 @@ TEST(DecidedAddress, MajorityWins)
                             {5, "1.2.3.4"}, {8, "5.6.7.8"}, {7, "1.2.3.4"}});
     CNetAddr addr;
     int nPeers = 0;
-    ASSERT_TRUE(DecideAddress(reports, false, addr, nPeers));
+    ASSERT_TRUE(DecideAddress(reports, false, CNetAddr(), addr, nPeers));
     EXPECT_EQ(addr.ToStringIP(), "1.2.3.4");
     EXPECT_EQ(nPeers, 4);
 }
 
-TEST(DecidedAddress, TieGoesToNewestPeer)
+TEST(DecidedAddress, TieWithoutIncumbentGoesToNewestPeer)
 {
     SelectParams(CBaseChainParams::MAIN);
     CNetAddr addr;
@@ -74,15 +74,55 @@ TEST(DecidedAddress, TieGoesToNewestPeer)
     // 5.6.7.8's newest reporter (id 6) connected after 1.2.3.4's (id 5).
     auto reports = Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}, {3, "5.6.7.8"}, {4, "5.6.7.8"},
                             {5, "1.2.3.4"}, {6, "5.6.7.8"}});
-    ASSERT_TRUE(DecideAddress(reports, false, addr, nPeers));
+    ASSERT_TRUE(DecideAddress(reports, false, CNetAddr(), addr, nPeers));
     EXPECT_EQ(addr.ToStringIP(), "5.6.7.8");
     EXPECT_EQ(nPeers, 3);
 
     // Same tally, newest reporter swapped: the other address wins.
     reports = Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}, {3, "5.6.7.8"}, {4, "5.6.7.8"},
                        {9, "1.2.3.4"}, {6, "5.6.7.8"}});
-    ASSERT_TRUE(DecideAddress(reports, false, addr, nPeers));
+    ASSERT_TRUE(DecideAddress(reports, false, CNetAddr(), addr, nPeers));
     EXPECT_EQ(addr.ToStringIP(), "1.2.3.4");
+
+    // An incumbent outside the leaders does not hold the tie: the newest reporter decides.
+    reports = Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}, {3, "5.6.7.8"}, {4, "5.6.7.8"},
+                       {5, "1.2.3.4"}, {6, "5.6.7.8"}, {7, "9.9.9.9"}});
+    ASSERT_TRUE(DecideAddress(reports, false, Addr("9.9.9.9"), addr, nPeers));
+    EXPECT_EQ(addr.ToStringIP(), "5.6.7.8");
+}
+
+TEST(DecidedAddress, IncumbentKeepsTie)
+{
+    SelectParams(CBaseChainParams::MAIN);
+    CNetAddr addr;
+    int nPeers = 0;
+
+    // The newest reporter (id 6) backs 5.6.7.8; the incumbent 1.2.3.4 stays, whichever
+    // side of it the challenger sorts.
+    auto reports = Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}, {3, "5.6.7.8"}, {4, "5.6.7.8"},
+                            {5, "1.2.3.4"}, {6, "5.6.7.8"}});
+    ASSERT_TRUE(DecideAddress(reports, false, Addr("1.2.3.4"), addr, nPeers));
+    EXPECT_EQ(addr.ToStringIP(), "1.2.3.4");
+    EXPECT_EQ(nPeers, 3);
+    reports = Reports({{1, "5.6.7.8"}, {2, "5.6.7.8"}, {3, "1.2.3.4"}, {4, "1.2.3.4"},
+                       {5, "5.6.7.8"}, {6, "1.2.3.4"}});
+    ASSERT_TRUE(DecideAddress(reports, false, Addr("5.6.7.8"), addr, nPeers));
+    EXPECT_EQ(addr.ToStringIP(), "5.6.7.8");
+
+    // Through UpdateDecidedAddress: three newer peers for another address tie the
+    // decided one and do not move it; a fourth does.
+    SetMockTime(1700000400);
+    UpdateWithPeers({});
+    UpdateWithPeers({"1.2.3.4", "1.2.3.4", "1.2.3.4"});
+    ASSERT_EQ(DecidedAddress().address.ToStringIP(), "1.2.3.4");
+    UpdateWithPeers({"1.2.3.4", "1.2.3.4", "1.2.3.4", "5.6.7.8", "5.6.7.8", "5.6.7.8"});
+    EXPECT_EQ(DecidedAddress().address.ToStringIP(), "1.2.3.4");
+    EXPECT_EQ(DecidedAddress().nChanged, 1700000400);
+    UpdateWithPeers({"1.2.3.4", "1.2.3.4", "1.2.3.4", "5.6.7.8", "5.6.7.8", "5.6.7.8", "5.6.7.8"});
+    EXPECT_EQ(DecidedAddress().address.ToStringIP(), "5.6.7.8");
+
+    UpdateWithPeers({});
+    SetMockTime(0);
 }
 
 TEST(DecidedAddress, MainnetNeedsThreeAgreeing)
@@ -91,11 +131,11 @@ TEST(DecidedAddress, MainnetNeedsThreeAgreeing)
     ASSERT_EQ(Params().DecidedAddressMinPeers(), 3);
     CNetAddr addr;
     int nPeers = 0;
-    EXPECT_FALSE(DecideAddress(Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}}), false, addr, nPeers));
+    EXPECT_FALSE(DecideAddress(Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}}), false, CNetAddr(), addr, nPeers));
     EXPECT_FALSE(DecideAddress(Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}, {3, "5.6.7.8"}, {4, "5.6.7.8"},
-                                        {5, "9.9.9.9"}}), false, addr, nPeers));
-    EXPECT_FALSE(DecideAddress({}, false, addr, nPeers));
-    ASSERT_TRUE(DecideAddress(Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}, {3, "1.2.3.4"}}), false, addr, nPeers));
+                                        {5, "9.9.9.9"}}), false, CNetAddr(), addr, nPeers));
+    EXPECT_FALSE(DecideAddress({}, false, CNetAddr(), addr, nPeers));
+    ASSERT_TRUE(DecideAddress(Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}, {3, "1.2.3.4"}}), false, CNetAddr(), addr, nPeers));
     EXPECT_EQ(nPeers, 3);
 }
 
@@ -110,10 +150,10 @@ TEST(DecidedAddress, OneSufficesOnTestnetLabnetAndRegtest)
     ASSERT_EQ(Params().DecidedAddressMinPeers(), 1);
     CNetAddr addr;
     int nPeers = 0;
-    ASSERT_TRUE(DecideAddress(Reports({{1, "1.2.3.4"}}), false, addr, nPeers));
+    ASSERT_TRUE(DecideAddress(Reports({{1, "1.2.3.4"}}), false, CNetAddr(), addr, nPeers));
     EXPECT_EQ(addr.ToStringIP(), "1.2.3.4");
     EXPECT_EQ(nPeers, 1);
-    EXPECT_FALSE(DecideAddress({}, false, addr, nPeers));
+    EXPECT_FALSE(DecideAddress({}, false, CNetAddr(), addr, nPeers));
     SelectParams(CBaseChainParams::MAIN);
 }
 
@@ -122,20 +162,20 @@ TEST(DecidedAddress, OnlyRoutableIPv4Counts)
     SelectParams(CBaseChainParams::MAIN);
     CNetAddr addr;
     int nPeers = 0;
-    EXPECT_FALSE(DecideAddress(Reports({{1, "2001:4860::8888"}, {2, "2001:4860::8888"}, {3, "2001:4860::8888"}}), false, addr, nPeers));
-    EXPECT_FALSE(DecideAddress(Reports({{1, "10.0.0.1"}, {2, "10.0.0.1"}, {3, "10.0.0.1"}}), false, addr, nPeers));
-    EXPECT_FALSE(DecideAddress(Reports({{1, "192.168.1.1"}, {2, "192.168.1.1"}, {3, "192.168.1.1"}}), false, addr, nPeers));
-    EXPECT_FALSE(DecideAddress(Reports({{1, "127.0.0.1"}, {2, "127.0.0.1"}, {3, "127.0.0.1"}}), false, addr, nPeers));
+    EXPECT_FALSE(DecideAddress(Reports({{1, "2001:4860::8888"}, {2, "2001:4860::8888"}, {3, "2001:4860::8888"}}), false, CNetAddr(), addr, nPeers));
+    EXPECT_FALSE(DecideAddress(Reports({{1, "10.0.0.1"}, {2, "10.0.0.1"}, {3, "10.0.0.1"}}), false, CNetAddr(), addr, nPeers));
+    EXPECT_FALSE(DecideAddress(Reports({{1, "192.168.1.1"}, {2, "192.168.1.1"}, {3, "192.168.1.1"}}), false, CNetAddr(), addr, nPeers));
+    EXPECT_FALSE(DecideAddress(Reports({{1, "127.0.0.1"}, {2, "127.0.0.1"}, {3, "127.0.0.1"}}), false, CNetAddr(), addr, nPeers));
     // What a peer behind or reached through a proxy reports.
-    EXPECT_FALSE(DecideAddress(Reports({{1, "0.0.0.0"}, {2, "0.0.0.0"}, {3, "0.0.0.0"}}), false, addr, nPeers));
-    EXPECT_FALSE(DecideAddress(Reports({{1, "0.0.0.0"}, {2, "0.0.0.0"}, {3, "0.0.0.0"}}), true, addr, nPeers));
-    EXPECT_FALSE(DecideAddress(Reports({{1, "2001:4860::8888"}, {2, "2001:4860::8888"}, {3, "2001:4860::8888"}}), true, addr, nPeers));
+    EXPECT_FALSE(DecideAddress(Reports({{1, "0.0.0.0"}, {2, "0.0.0.0"}, {3, "0.0.0.0"}}), false, CNetAddr(), addr, nPeers));
+    EXPECT_FALSE(DecideAddress(Reports({{1, "0.0.0.0"}, {2, "0.0.0.0"}, {3, "0.0.0.0"}}), true, CNetAddr(), addr, nPeers));
+    EXPECT_FALSE(DecideAddress(Reports({{1, "2001:4860::8888"}, {2, "2001:4860::8888"}, {3, "2001:4860::8888"}}), true, CNetAddr(), addr, nPeers));
 
     // Filtered reports do not count towards a routable address either.
-    EXPECT_FALSE(DecideAddress(Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}, {3, "10.0.0.1"}, {4, "2001:4860::8888"}}), false, addr, nPeers));
+    EXPECT_FALSE(DecideAddress(Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}, {3, "10.0.0.1"}, {4, "2001:4860::8888"}}), false, CNetAddr(), addr, nPeers));
 
     // Regtest admits loopback.
-    ASSERT_TRUE(DecideAddress(Reports({{1, "127.0.0.1"}, {2, "127.0.0.1"}, {3, "127.0.0.1"}}), true, addr, nPeers));
+    ASSERT_TRUE(DecideAddress(Reports({{1, "127.0.0.1"}, {2, "127.0.0.1"}, {3, "127.0.0.1"}}), true, CNetAddr(), addr, nPeers));
     EXPECT_EQ(addr.ToStringIP(), "127.0.0.1");
 }
 
@@ -146,7 +186,7 @@ TEST(DecidedAddress, LyingPeerOutvoted)
     auto reports = Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}, {3, "1.2.3.4"}, {4, "6.6.6.6"}});
     CNetAddr addr;
     int nPeers = 0;
-    ASSERT_TRUE(DecideAddress(reports, false, addr, nPeers));
+    ASSERT_TRUE(DecideAddress(reports, false, CNetAddr(), addr, nPeers));
     EXPECT_EQ(addr.ToStringIP(), "1.2.3.4");
     EXPECT_EQ(nPeers, 3);
 }

@@ -87,12 +87,13 @@ async def test_new_majority_changes_the_address(node_factory: NodeFactory) -> No
     await connect_reporting(node, "1.2.3.4", PEERS)
     assert (await wait_decided(node, "1.2.3.4", PEERS))["changed"] == first
 
-    # Three peers for the new address tie the old one; the tie goes to the newest peer.
-    second = await node.advance_mocktime(10)
+    # Three newer peers for another address tie the decided one, which keeps its place.
+    await node.advance_mocktime(10)
     await connect_reporting(node, "5.6.7.8", PEERS)
-    assert (await wait_decided(node, "5.6.7.8", PEERS))["changed"] == second
+    assert len(await node.rpc.getpeerinfo()) == 2 * PEERS
+    assert await decided(node) == {"address": "1.2.3.4", "peers": PEERS, "changed": first}
 
-    # A fourth peer for the old address takes the majority back.
-    third = await node.advance_mocktime(10)
-    await connect_reporting(node, "1.2.3.4", 1)
-    assert (await wait_decided(node, "1.2.3.4", PEERS + 1))["changed"] == third
+    # A fourth peer for the new address gives it the majority.
+    second = await node.advance_mocktime(10)
+    await connect_reporting(node, "5.6.7.8", 1)
+    assert (await wait_decided(node, "5.6.7.8", PEERS + 1))["changed"] == second
