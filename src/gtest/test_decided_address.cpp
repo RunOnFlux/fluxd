@@ -3,7 +3,7 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 // The node's decided address: the IPv4 address its peers report, taken by
-// majority with at least DECIDED_ADDRESS_MIN_PEERS behind it, and the early
+// majority with at least the chain's DecidedAddressMinPeers() behind it, and the early
 // confirm that carries a change of it to the chain.
 
 #include <gtest/gtest.h>
@@ -54,6 +54,7 @@ void UpdateWithPeers(const std::vector<const char*>& addrs)
 
 TEST(DecidedAddress, MajorityWins)
 {
+    SelectParams(CBaseChainParams::MAIN);
     // The minority holds the newest peer (id 8); the count decides first.
     auto reports = Reports({{1, "1.2.3.4"}, {2, "5.6.7.8"}, {3, "1.2.3.4"}, {4, "5.6.7.8"},
                             {5, "1.2.3.4"}, {8, "5.6.7.8"}, {7, "1.2.3.4"}});
@@ -66,6 +67,7 @@ TEST(DecidedAddress, MajorityWins)
 
 TEST(DecidedAddress, TieGoesToNewestPeer)
 {
+    SelectParams(CBaseChainParams::MAIN);
     CNetAddr addr;
     int nPeers = 0;
 
@@ -83,8 +85,10 @@ TEST(DecidedAddress, TieGoesToNewestPeer)
     EXPECT_EQ(addr.ToStringIP(), "1.2.3.4");
 }
 
-TEST(DecidedAddress, FewerThanThreeAgreeingGivesNone)
+TEST(DecidedAddress, MainnetNeedsThreeAgreeing)
 {
+    SelectParams(CBaseChainParams::MAIN);
+    ASSERT_EQ(Params().DecidedAddressMinPeers(), 3);
     CNetAddr addr;
     int nPeers = 0;
     EXPECT_FALSE(DecideAddress(Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}}), false, addr, nPeers));
@@ -92,11 +96,30 @@ TEST(DecidedAddress, FewerThanThreeAgreeingGivesNone)
                                         {5, "9.9.9.9"}}), false, addr, nPeers));
     EXPECT_FALSE(DecideAddress({}, false, addr, nPeers));
     ASSERT_TRUE(DecideAddress(Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}, {3, "1.2.3.4"}}), false, addr, nPeers));
-    EXPECT_EQ(nPeers, DECIDED_ADDRESS_MIN_PEERS);
+    EXPECT_EQ(nPeers, 3);
+}
+
+TEST(DecidedAddress, OneSufficesOnTestnetLabnetAndRegtest)
+{
+    SelectParams(CBaseChainParams::TESTNET);
+    EXPECT_EQ(Params().DecidedAddressMinPeers(), 1);
+    SelectParams(CBaseChainParams::LABNET);
+    EXPECT_EQ(Params().DecidedAddressMinPeers(), 1);
+
+    SelectParams(CBaseChainParams::REGTEST);
+    ASSERT_EQ(Params().DecidedAddressMinPeers(), 1);
+    CNetAddr addr;
+    int nPeers = 0;
+    ASSERT_TRUE(DecideAddress(Reports({{1, "1.2.3.4"}}), false, addr, nPeers));
+    EXPECT_EQ(addr.ToStringIP(), "1.2.3.4");
+    EXPECT_EQ(nPeers, 1);
+    EXPECT_FALSE(DecideAddress({}, false, addr, nPeers));
+    SelectParams(CBaseChainParams::MAIN);
 }
 
 TEST(DecidedAddress, OnlyRoutableIPv4Counts)
 {
+    SelectParams(CBaseChainParams::MAIN);
     CNetAddr addr;
     int nPeers = 0;
     EXPECT_FALSE(DecideAddress(Reports({{1, "2001:4860::8888"}, {2, "2001:4860::8888"}, {3, "2001:4860::8888"}}), false, addr, nPeers));
@@ -118,6 +141,7 @@ TEST(DecidedAddress, OnlyRoutableIPv4Counts)
 
 TEST(DecidedAddress, LyingPeerOutvoted)
 {
+    SelectParams(CBaseChainParams::MAIN);
     // The newest peer lies; the honest majority stands.
     auto reports = Reports({{1, "1.2.3.4"}, {2, "1.2.3.4"}, {3, "1.2.3.4"}, {4, "6.6.6.6"}});
     CNetAddr addr;
