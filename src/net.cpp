@@ -355,7 +355,7 @@ bool DecideAddress(const std::vector<PeerAddressReport>& reports, bool fAllowNon
         if (!best || candidate.second > best->second)
             best = &candidate;
     }
-    if (!best || best->second.first < DECIDED_ADDRESS_MIN_PEERS)
+    if (!best || best->second.first < Params().DecidedAddressMinPeers())
         return false;
 
     addrOut = best->first;

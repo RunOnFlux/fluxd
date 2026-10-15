@@ -75,7 +75,7 @@ void ActiveFluxnode::ManageDeterministricFluxnode()
     if (strDecidedHost.empty()) {
         if (nLastNoAddressHeight != nHeight) {
             nLastNoAddressHeight = nHeight;
-            LogPrintf("Fluxnode confirm due on height: %s for outpoint: %s, but fewer than %d peers agree on this node's address; not sending\n", nHeight, activeFluxnode.deterministicOutPoint.ToString(), DECIDED_ADDRESS_MIN_PEERS);
+            LogPrintf("Fluxnode confirm due on height: %s for outpoint: %s, but fewer than %d peers agree on this node's address; not sending\n", nHeight, activeFluxnode.deterministicOutPoint.ToString(), Params().DecidedAddressMinPeers());
         }
         return;
     }
