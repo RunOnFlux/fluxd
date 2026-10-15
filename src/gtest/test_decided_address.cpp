@@ -385,6 +385,7 @@ TEST(DecidedAddress, PortFileMalformedIsAbsent)
     }
 
     // A path that is not a readable file.
+    std::filesystem::remove(file.path);
     std::filesystem::create_directories(file.path);
     EXPECT_FALSE(file.Read().IsSet());
     EXPECT_FALSE(file.Read(true).IsSet());
