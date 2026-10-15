@@ -405,8 +405,8 @@ TEST(DecidedAddress, PortFileAbsentDefaultsOnlyWhereAllowed)
 
 TEST(DecidedAddress, ConfirmIpNeedsHostAndPort)
 {
-    if (std::filesystem::exists(FLUXOS_PORT_FILE))
-        GTEST_SKIP() << FLUXOS_PORT_FILE << " exists on this host";
+    // Runs where no FluxOS has published its port.
+    ASSERT_FALSE(std::filesystem::exists(FLUXOS_PORT_FILE)) << FLUXOS_PORT_FILE << " exists on this host";
 
     std::string strIp, strMissing;
 
