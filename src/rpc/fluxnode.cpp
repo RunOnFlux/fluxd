@@ -1864,6 +1864,11 @@ UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
                 "  \"pubkey\": \"key\",                     (string) Fluxnode public key used for message broadcasting\n"
                 "  \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode has been active\n"
                 "  \"lastpaid\": ttt,                       (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode was last paid\n"
+                "  \"decided_address\": {                   (object) this node's public address as its peers report it (see getnetworkinfo)\n"
+                "    \"address\": \"a.b.c.d\",              (string) empty if none\n"
+                "    \"peers\": n,                          (numeric) connected peers reporting it\n"
+                "    \"changed\": ttt                       (numeric) unix time it last changed\n"
+                "  }\n"
                 "}\n"
 
                 "\nExamples:\n" +
@@ -1918,6 +1923,7 @@ UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
             info.pushKV("amount", FormatMoney(data.nCollateral));
         }
     }
+    info.pushKV("decided_address", DecidedAddressToJSON());
 
     return info;
 }
