@@ -219,11 +219,13 @@ struct DecidedAddressInfo {
 };
 
 /** The IPv4 address reported by the most peers, when at least
- *  Params().DecidedAddressMinPeers() report it. A tie goes to the address whose newest
- *  reporter connected last. Only routable addresses count unless
- *  fAllowNonRoutable (regtest, where every peer is on loopback). Returns false,
- *  leaving the outputs untouched, when no address qualifies. */
-bool DecideAddress(const std::vector<PeerAddressReport>& reports, bool fAllowNonRoutable, CNetAddr& addrOut, int& nPeersOut);
+ *  Params().DecidedAddressMinPeers() report it. On a tie addrIncumbent, the
+ *  address currently decided (a default CNetAddr when none), keeps its place if
+ *  it is among the leaders; otherwise the address whose newest reporter
+ *  connected last wins. Only routable addresses count unless fAllowNonRoutable
+ *  (regtest, where every peer is on loopback). Returns false, leaving the
+ *  outputs untouched, when no address qualifies. */
+bool DecideAddress(const std::vector<PeerAddressReport>& reports, bool fAllowNonRoutable, const CNetAddr& addrIncumbent, CNetAddr& addrOut, int& nPeersOut);
 
 /** Recompute the decided address from every connected peer, inbound and
  *  outbound. Caller holds cs_vNodes. Called when a peer's version arrives and
