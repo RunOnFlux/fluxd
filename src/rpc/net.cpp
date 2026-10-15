@@ -15,6 +15,7 @@
 #include "util.h"
 #include "version.h"
 #include "deprecation.h"
+#include "fluxnode/fluxnode.h"
 
 
 #include <univalue.h>
@@ -449,6 +450,16 @@ UniValue DecidedAddressToJSON()
     return obj;
 }
 
+UniValue FluxOSPortToJSON()
+{
+    const FluxOSPortInfo info = FluxOSPort();
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("port", info.IsSet() ? UniValue(info.nPort) : NullUniValue);
+    obj.pushKV("source", info.strSource);
+    obj.pushKV("reason", info.strReason);
+    return obj;
+}
+
 UniValue getnetworkinfo(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -486,6 +497,11 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
             "    \"peers\": n,                          (numeric) connected peers reporting it; 0 if none\n"
             "    \"changed\": ttt                       (numeric) unix time it last changed, including to or from none; 0 if never decided\n"
             "  }\n"
+            "  \"fluxos_port\": {                       (object) the port FluxOS publishes in " FLUXOS_PORT_FILE ", read now\n"
+            "    \"port\": n,                           (numeric) apiPort, 1-65535; null if absent\n"
+            "    \"source\": \"file\",                    (string) \"file\", \"default\" (regtest with no file: 16127) or \"none\"\n"
+            "    \"reason\": \"...\"                      (string) why the port is absent, or where it came from\n"
+            "  }\n"
             "  \"warnings\": \"...\"                    (string) any network warnings (such as alert messages) \n"
             "}\n"
             "\nExamples:\n"
@@ -518,6 +534,7 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
     }
     obj.pushKV("localaddresses", localAddresses);
     obj.pushKV("decided_address", DecidedAddressToJSON());
+    obj.pushKV("fluxos_port", FluxOSPortToJSON());
     obj.pushKV("warnings",       GetWarnings("statusbar"));
     return obj;
 }

@@ -175,6 +175,8 @@ extern CAmount AmountFromValue(const UniValue& value);
 extern UniValue ValueFromAmount(const CAmount& amount);
 /** The decided address (net.h DecidedAddress) as reported by getnetworkinfo and getfluxnodestatus. */
 extern UniValue DecidedAddressToJSON();
+/** FluxOS's published port (fluxnode.h FluxOSPort) as reported by getnetworkinfo and getfluxnodestatus. */
+extern UniValue FluxOSPortToJSON();
 extern double GetDifficulty(const CBlockIndex* blockindex = NULL);
 extern double GetNetworkDifficulty(const CBlockIndex* blockindex = NULL);
 extern std::string HelpRequiringPassphrase();

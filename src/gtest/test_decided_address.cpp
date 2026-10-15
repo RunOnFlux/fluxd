@@ -3,18 +3,23 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 // The node's decided address: the IPv4 address its peers report, taken by
-// majority with at least the chain's DecidedAddressMinPeers() behind it, and the early
-// confirm that carries a change of it to the chain.
+// majority with at least the chain's DecidedAddressMinPeers() behind it; the
+// port FluxOS publishes; and the confirm ip made of the two, sent early when it
+// changes.
 
 #include <gtest/gtest.h>
 
 #include "chainparams.h"
+#include "fluxnode/activefluxnode.h"
 #include "fluxnode/fluxnode.h"
 #include "net.h"
 #include "netbase.h"
 #include "utiltime.h"
 
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <unistd.h>
 #include <vector>
 
 namespace {
@@ -251,16 +256,26 @@ TEST(DecidedAddress, IpChangeConfirmDue)
 {
     const int nMin = FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1;
 
-    // Same host, with or without a port in the record: nothing to carry.
+    // The ip the confirm would carry is the record's: nothing to carry.
     EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4", 100, "1.2.3.4", 100 + 400));
-    EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4:16137", 100, "1.2.3.4", 100 + 400));
-    // No decided address: nothing to carry.
+    EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4:16137", 100, "1.2.3.4:16137", 100 + 400));
+    // No confirm ip: nothing to carry.
     EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4", 100, "", 100 + 400));
 
-    // A changed host is due once the chain accepts an address change.
-    EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4:16137", 100, "5.6.7.8", 100 + nMin - 1));
-    EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4:16137", 100, "5.6.7.8", 100 + nMin));
+    // A changed host, same port, is due once the chain accepts an address change.
+    EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4:16137", 100, "5.6.7.8:16137", 100 + nMin - 1));
+    EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4:16137", 100, "5.6.7.8:16137", 100 + nMin));
+    EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4", 100, "5.6.7.8", 100 + nMin));
     EXPECT_TRUE(IpChangeConfirmDue("", 100, "5.6.7.8", 100 + nMin));
+
+    // A changed port, same host, is a change too, to or from the default.
+    EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4:16137", 100, "1.2.3.4:16147", 100 + nMin));
+    EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4:16137", 100, "1.2.3.4", 100 + nMin));
+    EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4", 100, "1.2.3.4:16137", 100 + nMin));
+    EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4", 100, "1.2.3.4:16137", 100 + nMin - 1));
+
+    // Both changed.
+    EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4:16137", 100, "5.6.7.8:16147", 100 + nMin));
 }
 
 TEST(DecidedAddress, CacheReportsIpChangeConfirm)
@@ -281,8 +296,144 @@ TEST(DecidedAddress, CacheReportsIpChangeConfirm)
     EXPECT_FALSE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 - 2, "5.6.7.8"));
     EXPECT_TRUE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 - 1, "5.6.7.8"));
     EXPECT_FALSE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + 400, "1.2.3.4"));
+    EXPECT_TRUE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + 400, "1.2.3.4:16137"));
     // The cadence alone does not report an address change as due.
     EXPECT_FALSE(cache.CheckIfNeedsNextConfirm(out, nLast + FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1));
     // A node that is not confirmed is never due.
     EXPECT_FALSE(cache.CheckIfNeedsIpChangeConfirm(COutPoint(uint256S("02"), 0), nLast + 400, "5.6.7.8"));
+}
+
+namespace {
+
+// A port file in a fresh temporary directory, removed with the object.
+class PortFile
+{
+public:
+    PortFile()
+    {
+        dir = std::filesystem::temp_directory_path() / strprintf("flux-port-%d-%d", getpid(), counter++);
+        std::filesystem::create_directories(dir);
+        path = (dir / "fluxos.json").string();
+    }
+    ~PortFile() { std::filesystem::remove_all(dir); }
+    void Write(const std::string& content)
+    {
+        std::ofstream(path, std::ios::trunc) << content;
+    }
+    FluxOSPortInfo Read(bool fDefaultWhenMissing = false) const { return ReadFluxOSPort(path, fDefaultWhenMissing); }
+
+    std::filesystem::path dir;
+    std::string path;
+
+private:
+    static inline int counter = 0;
+};
+
+} // namespace
+
+TEST(DecidedAddress, PortFileParsed)
+{
+    PortFile file;
+    file.Write(R"({"apiPort": 16137, "apiPortHttps": 16138, "uiPort": 16136})");
+    FluxOSPortInfo info = file.Read();
+    EXPECT_EQ(info.nPort, 16137);
+    EXPECT_EQ(info.strSource, "file");
+
+    // Only apiPort matters; the bounds are inclusive.
+    file.Write(R"({"apiPort": 1})");
+    EXPECT_EQ(file.Read().nPort, 1);
+    file.Write(R"({"apiPort": 65535, "uiPort": "x"})");
+    EXPECT_EQ(file.Read().nPort, 65535);
+    file.Write(R"({"apiPort": 16127})");
+    EXPECT_EQ(file.Read(true).nPort, 16127);
+    EXPECT_EQ(file.Read(true).strSource, "file");
+}
+
+TEST(DecidedAddress, PortFileMalformedIsAbsent)
+{
+    PortFile file;
+    const std::vector<std::string> malformed = {
+        "",
+        "not json",
+        R"({"apiPort": 16127)",
+        "[16127]",
+        "16127",
+        "{}",
+        R"({"apiport": 16127})",
+        R"({"apiPort": null})",
+        R"({"apiPort": "16127"})",
+        R"({"apiPort": true})",
+        R"({"apiPort": 16127.5})",
+        R"({"apiPort": 1.6127e4})",
+        R"({"apiPort": 0})",
+        R"({"apiPort": -1})",
+        R"({"apiPort": 65536})",
+        R"({"apiPort": 99999999999999999999})",
+        R"({"apiPort": {"port": 16127}})",
+        std::string(R"({"apiPort": 16127, "pad": ")") + std::string(5000, 'x') + R"("})",
+    };
+    for (const std::string& content : malformed) {
+        file.Write(content);
+        // Even where an absent file would default, a file that is there and wrong is absent.
+        for (bool fDefault : {false, true}) {
+            const FluxOSPortInfo info = file.Read(fDefault);
+            EXPECT_FALSE(info.IsSet()) << content;
+            EXPECT_EQ(info.nPort, 0) << content;
+            EXPECT_EQ(info.strSource, "none") << content;
+            EXPECT_FALSE(info.strReason.empty()) << content;
+        }
+    }
+
+    // A path that is not a readable file.
+    std::filesystem::create_directories(file.path);
+    EXPECT_FALSE(file.Read().IsSet());
+    EXPECT_FALSE(file.Read(true).IsSet());
+}
+
+TEST(DecidedAddress, PortFileAbsentDefaultsOnlyWhereAllowed)
+{
+    PortFile file;
+    FluxOSPortInfo info = file.Read(false);
+    EXPECT_FALSE(info.IsSet());
+    EXPECT_EQ(info.strSource, "none");
+    EXPECT_NE(info.strReason.find("absent"), std::string::npos);
+
+    info = file.Read(true);
+    EXPECT_EQ(info.nPort, FLUXOS_DEFAULT_PORT);
+    EXPECT_EQ(info.strSource, "default");
+}
+
+TEST(DecidedAddress, ConfirmIpNeedsHostAndPort)
+{
+    if (std::filesystem::exists(FLUXOS_PORT_FILE))
+        GTEST_SKIP() << FLUXOS_PORT_FILE << " exists on this host";
+
+    std::string strIp, strMissing;
+
+    // Mainnet: the port file is absent, so the port is.
+    SelectParams(CBaseChainParams::MAIN);
+    UpdateWithPeers({});
+    EXPECT_FALSE(GetConfirmIp(strIp, strMissing));
+    EXPECT_NE(strMissing.find("no decided address"), std::string::npos) << strMissing;
+    EXPECT_NE(strMissing.find("no FluxOS port"), std::string::npos) << strMissing;
+
+    UpdateWithPeers({"1.2.3.4", "1.2.3.4", "1.2.3.4"});
+    EXPECT_FALSE(GetConfirmIp(strIp, strMissing));
+    EXPECT_EQ(strMissing.find("no decided address"), std::string::npos) << strMissing;
+    EXPECT_NE(strMissing.find("no FluxOS port"), std::string::npos) << strMissing;
+
+    // Regtest: an absent port file reads as the default port, so the host alone decides.
+    SelectParams(CBaseChainParams::REGTEST);
+    UpdateWithPeers({});
+    EXPECT_FALSE(GetConfirmIp(strIp, strMissing));
+    EXPECT_NE(strMissing.find("no decided address"), std::string::npos) << strMissing;
+    EXPECT_EQ(strMissing.find("no FluxOS port"), std::string::npos) << strMissing;
+
+    UpdateWithPeers({"1.2.3.4"});
+    strMissing.clear();
+    ASSERT_TRUE(GetConfirmIp(strIp, strMissing)) << strMissing;
+    EXPECT_EQ(strIp, "1.2.3.4");
+
+    UpdateWithPeers({});
+    SelectParams(CBaseChainParams::MAIN);
 }
