@@ -9,11 +9,16 @@ suite does not run; its logic is covered by the DecidedAddress gtests.
 """
 
 import asyncio
+import os
+import shutil
+from pathlib import Path
 from typing import Any
 
+import pytest
 from conftest import POW_ARGS, NodeFactory
 from fluxtest.mininode import NodeConn, NodeConnCB
 from fluxtest.node import FluxNode
+from fluxtest.rpc import JSONRPCError
 
 PEERS = 3
 
@@ -106,3 +111,58 @@ async def test_regtest_reads_the_default_fluxos_port(node_factory: NodeFactory) 
     assert port["port"] == 16127
     assert port["source"] == "default"
     assert "/run/fluxos/fluxos.json" in port["reason"]
+
+
+def fluxnode_binary(fluxd_binary: str, bindir: Path) -> str:
+    """fluxd in a directory beside stand-in fluxbenchd and fluxbench-cli, which
+    fluxnode mode requires to exist; the stand-ins answer nothing."""
+    bindir.mkdir()
+    binary = bindir / "fluxd"
+    try:
+        os.link(fluxd_binary, binary)
+    except OSError:
+        shutil.copy2(fluxd_binary, binary)
+    for name in ("fluxbenchd", "fluxbench-cli"):
+        stub = bindir / name
+        stub.write_text("#!/bin/sh\nexit 1\n")
+        stub.chmod(0o755)
+    return str(binary)
+
+
+async def test_confirm_rpc_needs_the_decided_address(
+    node_factory: NodeFactory, fluxd_binary: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    node = await node_factory(0, extra_args=[*POW_ARGS, "-txindex"])
+    wif = await node.rpc.dumpprivkey(await node.rpc.getnewaddress())
+
+    # fluxnode mode with fluxbench left to its manager, as on ArcaneOS.
+    monkeypatch.setenv("UNMANAGED_FLUXBENCHD", "1")
+    node.binary = fluxnode_binary(fluxd_binary, tmp_path / "bin")
+    await node.restart(
+        [
+            *POW_ARGS,
+            "-txindex",
+            "-zelnode",
+            f"-zelnodeprivkey={wif}",
+            "-zelnodeoutpoint=" + "ab" * 32,
+            "-zelnodeindex=0",
+        ]
+    )
+
+    # The port reads as regtest's default; no peer reports an address.
+    info = await node.rpc.getnetworkinfo()
+    assert info["fluxos_port"]["port"] == 16127
+    assert info["decided_address"]["address"] == ""
+    with pytest.raises(JSONRPCError) as missing:
+        await node.rpc.createconfirmationtransaction()
+    assert "No confirmation sent" in str(missing.value)
+    assert "no decided address" in str(missing.value)
+    assert "no FluxOS port" not in str(missing.value)
+
+    # With an address decided the RPC goes on to build and sign; the stand-in
+    # fluxbench refuses to countersign, so it still sends nothing.
+    await connect_reporting(node, "1.2.3.4", 1)
+    await wait_decided(node, "1.2.3.4", 1)
+    with pytest.raises(JSONRPCError) as unsigned:
+        await node.rpc.createconfirmationtransaction()
+    assert "No confirmation sent" not in str(unsigned.value)
