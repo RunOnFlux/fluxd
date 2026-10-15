@@ -249,9 +249,9 @@ TEST(DecidedAddress, ChangedTimeMovesOnlyWithTheAddress)
     SetMockTime(0);
 }
 
-TEST(DecidedAddress, ConfirmIpCarriesNonDefaultPort)
+TEST(DecidedAddress, ConfirmIpCarriesThePort)
 {
-    EXPECT_EQ(FluxnodeConfirmIp("1.2.3.4", FLUXOS_DEFAULT_PORT), "1.2.3.4");
+    EXPECT_EQ(FluxnodeConfirmIp("1.2.3.4", FLUXOS_DEFAULT_PORT), "1.2.3.4:16127");
     EXPECT_EQ(FluxnodeConfirmIp("1.2.3.4", 16137), "1.2.3.4:16137");
 }
 
@@ -259,8 +259,10 @@ TEST(DecidedAddress, IpChangeConfirmDue)
 {
     const int nMin = FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1;
 
-    // The ip the confirm would carry is the record's: nothing to carry.
-    EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4", 100, "1.2.3.4", 100 + 400));
+    // The ip the confirm would carry is the record's: nothing to carry. A record
+    // that names no port is the host at 16127.
+    EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4:16127", 100, "1.2.3.4:16127", 100 + 400));
+    EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4", 100, "1.2.3.4:16127", 100 + 400));
     EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4:16137", 100, "1.2.3.4:16137", 100 + 400));
     // No confirm ip: nothing to carry.
     EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4", 100, "", 100 + 400));
@@ -268,12 +270,12 @@ TEST(DecidedAddress, IpChangeConfirmDue)
     // A changed host, same port, is due once the chain accepts an address change.
     EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4:16137", 100, "5.6.7.8:16137", 100 + nMin - 1));
     EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4:16137", 100, "5.6.7.8:16137", 100 + nMin));
-    EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4", 100, "5.6.7.8", 100 + nMin));
-    EXPECT_TRUE(IpChangeConfirmDue("", 100, "5.6.7.8", 100 + nMin));
+    EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4", 100, "5.6.7.8:16127", 100 + nMin));
+    EXPECT_TRUE(IpChangeConfirmDue("", 100, "5.6.7.8:16127", 100 + nMin));
 
     // A changed port, same host, is a change too, to or from the default.
     EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4:16137", 100, "1.2.3.4:16147", 100 + nMin));
-    EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4:16137", 100, "1.2.3.4", 100 + nMin));
+    EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4:16137", 100, "1.2.3.4:16127", 100 + nMin));
     EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4", 100, "1.2.3.4:16137", 100 + nMin));
     EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4", 100, "1.2.3.4:16137", 100 + nMin - 1));
 
@@ -296,9 +298,10 @@ TEST(DecidedAddress, CacheReportsIpChangeConfirm)
     cache.mapConfirmedFluxnodeData[out] = data;
 
     // The tip is p_nHeight; the confirm lands in the block after it.
-    EXPECT_FALSE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 - 2, "5.6.7.8"));
-    EXPECT_TRUE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 - 1, "5.6.7.8"));
-    EXPECT_FALSE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + 400, "1.2.3.4"));
+    EXPECT_FALSE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 - 2, "5.6.7.8:16127"));
+    EXPECT_TRUE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 - 1, "5.6.7.8:16127"));
+    // The record names no port: it is the host at 16127, so the same address is not a change.
+    EXPECT_FALSE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + 400, "1.2.3.4:16127"));
     EXPECT_TRUE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + 400, "1.2.3.4:16137"));
     // The cadence alone does not report an address change as due.
     EXPECT_FALSE(cache.CheckIfNeedsNextConfirm(out, nLast + FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1));
@@ -460,7 +463,7 @@ TEST(DecidedAddress, ConfirmIpNeedsHostAndPort)
     UpdateWithPeers({"1.2.3.4"});
     strMissing.clear();
     ASSERT_TRUE(GetConfirmIp(strIp, strMissing)) << strMissing;
-    EXPECT_EQ(strIp, "1.2.3.4");
+    EXPECT_EQ(strIp, "1.2.3.4:16127");
 
     UpdateWithPeers({});
     SelectParams(CBaseChainParams::MAIN);
