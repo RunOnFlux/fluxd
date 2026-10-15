@@ -254,11 +254,29 @@ bool WriteDecidedAddressFile(const std::filesystem::path& dir, const DecidedAddr
 bool RemoveDecidedAddressFile(const std::filesystem::path& dir, std::string& strError);
 
 /** Publish to dir now and on every later change of the decided address or the
- *  peers behind it. A failed write is logged as an error and otherwise ignored. */
+ *  number of peers behind it. A failed write is logged as an error
+ *  (DecidedAddressWriteLog) and otherwise ignored. */
 void StartPublishingDecidedAddress(const std::filesystem::path& dir);
 
 /** Stop publishing and remove the file; a failed removal is logged and ignored. */
 void StopPublishingDecidedAddress();
+
+/** Whether the decided address is being published: only between Start and Stop,
+ *  which a daemon calls only in fluxnode mode, beside the services that read it. */
+bool IsPublishingDecidedAddress();
+
+/** Which outcomes of publishing are logged: the first failure for a reason, and
+ *  the first success after failures. A write is attempted on every change, so a
+ *  failure that persists would otherwise log on every peer connect. */
+class DecidedAddressWriteLog
+{
+public:
+    /** The line to log for this write's outcome, or "" for none. */
+    std::string Outcome(bool fWritten, const std::string& strError);
+
+private:
+    std::string strFailing; // the reason of the failure last logged; "" while writes succeed
+};
 
 class CNodeStats
 {

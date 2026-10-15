@@ -597,3 +597,43 @@ TEST(DecidedAddress, FileRemoval)
     // Already gone: not a failure.
     EXPECT_TRUE(RemoveDecidedAddressFile(tmp.path, strError)) << strError;
 }
+
+TEST(DecidedAddress, FileWriteFailureLoggedOnce)
+{
+    DecidedAddressWriteLog log;
+    int nLogged = 0;
+    for (int i = 0; i < 10; i++)
+        nLogged += !log.Outcome(false, "cannot create /run/fluxd: Permission denied").empty();
+    EXPECT_EQ(nLogged, 1);
+
+    // A success after failures logs once; later successes log nothing.
+    nLogged = 0;
+    for (int i = 0; i < 3; i++)
+        nLogged += !log.Outcome(true, "").empty();
+    EXPECT_EQ(nLogged, 1);
+
+    // Successes alone log nothing; a new failure, and a different reason, each log once.
+    DecidedAddressWriteLog fresh;
+    EXPECT_TRUE(fresh.Outcome(true, "").empty());
+    EXPECT_FALSE(fresh.Outcome(false, "reason a").empty());
+    EXPECT_TRUE(fresh.Outcome(false, "reason a").empty());
+    EXPECT_FALSE(fresh.Outcome(false, "reason b").empty());
+}
+
+TEST(DecidedAddress, PublisherInertUnlessStarted)
+{
+    SelectParams(CBaseChainParams::MAIN);
+    ASSERT_FALSE(IsPublishingDecidedAddress());
+    ASSERT_FALSE(std::filesystem::exists(DecidedAddressFileDir() / DECIDED_ADDRESS_FILE));
+
+    UpdateWithPeers({"1.2.3.4", "1.2.3.4", "1.2.3.4"});
+    UpdateWithPeers({});
+    EXPECT_FALSE(IsPublishingDecidedAddress());
+    EXPECT_FALSE(std::filesystem::exists(DecidedAddressFileDir() / DECIDED_ADDRESS_FILE));
+
+    TempDir tmp;
+    StartPublishingDecidedAddress(tmp.path);
+    EXPECT_TRUE(IsPublishingDecidedAddress());
+    StopPublishingDecidedAddress();
+    EXPECT_FALSE(IsPublishingDecidedAddress());
+}
