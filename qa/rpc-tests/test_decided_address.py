@@ -1,5 +1,6 @@
 """The node's decided address: the IPv4 address its peers report in their version
-messages, taken by majority once at least three peers agree.
+messages, taken by majority once enough peers agree: three on mainnet, one on
+regtest.
 
 Each mininode peer reports an address of its choosing as the version message's
 addrMe. Regtest admits any valid IPv4, so the addresses need not be routable.
@@ -14,7 +15,7 @@ from conftest import POW_ARGS, NodeFactory
 from fluxtest.mininode import NodeConn, NodeConnCB
 from fluxtest.node import FluxNode
 
-MIN_PEERS = 3
+PEERS = 3
 
 
 async def connect_reporting(node: FluxNode, addr_me: str, count: int) -> list[NodeConn]:
@@ -52,8 +53,8 @@ async def test_three_peers_decide_the_address(node_factory: NodeFactory) -> None
     assert await decided(node) == {"address": "", "peers": 0, "changed": 0}
 
     now = await node.advance_mocktime(10)
-    conns = await connect_reporting(node, "1.2.3.4", MIN_PEERS)
-    info = await wait_decided(node, "1.2.3.4", MIN_PEERS)
+    conns = await connect_reporting(node, "1.2.3.4", PEERS)
+    info = await wait_decided(node, "1.2.3.4", PEERS)
     assert info["changed"] == now
 
     for conn in conns:
@@ -61,32 +62,37 @@ async def test_three_peers_decide_the_address(node_factory: NodeFactory) -> None
     await wait_decided(node, "", 0)
 
 
-async def test_two_peers_are_not_enough(node_factory: NodeFactory) -> None:
+async def test_one_peer_suffices_on_regtest(node_factory: NodeFactory) -> None:
     node = await node_factory(0, extra_args=POW_ARGS)
-    await connect_reporting(node, "1.2.3.4", MIN_PEERS - 1)
-    await connect_reporting(node, "5.6.7.8", 1)
+    # No peer reports an address: none is decided.
+    assert await decided(node) == {"address": "", "peers": 0, "changed": 0}
+
+    await connect_reporting(node, "1.2.3.4", 1)
+    await wait_decided(node, "1.2.3.4", 1)
+
+    # Two peers for another address outvote the one.
+    await connect_reporting(node, "5.6.7.8", 2)
+    await wait_decided(node, "5.6.7.8", 2)
     peers = await node.rpc.getpeerinfo()
-    assert len(peers) == MIN_PEERS
     assert sorted(p["addrlocal"].rsplit(":", 1)[0] for p in peers) == [
         "1.2.3.4",
-        "1.2.3.4",
+        "5.6.7.8",
         "5.6.7.8",
     ]
-    assert await decided(node) == {"address": "", "peers": 0, "changed": 0}
 
 
 async def test_new_majority_changes_the_address(node_factory: NodeFactory) -> None:
     node = await node_factory(0, extra_args=POW_ARGS)
     first = await node.advance_mocktime(10)
-    await connect_reporting(node, "1.2.3.4", MIN_PEERS)
-    assert (await wait_decided(node, "1.2.3.4", MIN_PEERS))["changed"] == first
+    await connect_reporting(node, "1.2.3.4", PEERS)
+    assert (await wait_decided(node, "1.2.3.4", PEERS))["changed"] == first
 
     # Three peers for the new address tie the old one; the tie goes to the newest peer.
     second = await node.advance_mocktime(10)
-    await connect_reporting(node, "5.6.7.8", MIN_PEERS)
-    assert (await wait_decided(node, "5.6.7.8", MIN_PEERS))["changed"] == second
+    await connect_reporting(node, "5.6.7.8", PEERS)
+    assert (await wait_decided(node, "5.6.7.8", PEERS))["changed"] == second
 
     # A fourth peer for the old address takes the majority back.
     third = await node.advance_mocktime(10)
     await connect_reporting(node, "1.2.3.4", 1)
-    assert (await wait_decided(node, "1.2.3.4", MIN_PEERS + 1))["changed"] == third
+    assert (await wait_decided(node, "1.2.3.4", PEERS + 1))["changed"] == third
