@@ -419,6 +419,7 @@ DecidedAddressInfo DecidedAddress()
 
 // The directory the decided address is published in; unset while not publishing.
 static std::optional<std::filesystem::path> decidedAddressDir;
+static DecidedAddressWriteLog decidedAddressWriteLog;
 
 std::filesystem::path DecidedAddressFileDir()
 {
@@ -489,8 +490,34 @@ static void PublishDecidedAddressLocked()
     if (!decidedAddressDir)
         return;
     std::string strError;
-    if (!WriteDecidedAddressFile(*decidedAddressDir, decidedAddress, getpid(), strError))
-        error("%s: decided address not published: %s", __func__, strError);
+    const bool fWritten = WriteDecidedAddressFile(*decidedAddressDir, decidedAddress, getpid(), strError);
+    const std::string strLine = decidedAddressWriteLog.Outcome(fWritten, strError);
+    if (strLine.empty())
+        return;
+    if (fWritten)
+        LogPrintf("%s\n", strLine);
+    else
+        error("%s", strLine);
+}
+
+std::string DecidedAddressWriteLog::Outcome(bool fWritten, const std::string& strError)
+{
+    if (fWritten) {
+        if (strFailing.empty())
+            return "";
+        strFailing.clear();
+        return "Decided address published again";
+    }
+    if (strError == strFailing)
+        return "";
+    strFailing = strError;
+    return "Decided address not published: " + strError;
+}
+
+bool IsPublishingDecidedAddress()
+{
+    LOCK(cs_decidedAddress);
+    return decidedAddressDir.has_value();
 }
 
 void StartPublishingDecidedAddress(const std::filesystem::path& dir)
