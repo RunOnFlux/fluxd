@@ -159,8 +159,8 @@ async def test_confirm_rpc_needs_the_decided_address(
     assert "no decided address" in str(missing.value)
     assert "no FluxOS port" not in str(missing.value)
 
-    # With an address decided the RPC goes on to build and sign; the stand-in
-    # fluxbench refuses to countersign, so it still sends nothing.
+    # With an address decided the RPC goes on to build the confirm; the made-up
+    # collateral has no fluxnode record, so signing fails and nothing is sent.
     await connect_reporting(node, "1.2.3.4", 1)
     await wait_decided(node, "1.2.3.4", 1)
     with pytest.raises(JSONRPCError) as unsigned:
