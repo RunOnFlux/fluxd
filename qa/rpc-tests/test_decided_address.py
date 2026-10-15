@@ -97,3 +97,12 @@ async def test_new_majority_changes_the_address(node_factory: NodeFactory) -> No
     second = await node.advance_mocktime(10)
     await connect_reporting(node, "5.6.7.8", 1)
     assert (await wait_decided(node, "5.6.7.8", PEERS + 1))["changed"] == second
+
+
+async def test_regtest_reads_the_default_fluxos_port(node_factory: NodeFactory) -> None:
+    # No FluxOS runs here, so /run/fluxos/fluxos.json is absent and regtest assumes 16127.
+    node = await node_factory(0, extra_args=POW_ARGS)
+    port = (await node.rpc.getnetworkinfo())["fluxos_port"]
+    assert port["port"] == 16127
+    assert port["source"] == "default"
+    assert "/run/fluxos/fluxos.json" in port["reason"]

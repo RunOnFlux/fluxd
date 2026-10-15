@@ -63,7 +63,7 @@ public:
     void ManageDeterministricFluxnode();
 
     bool BuildDeterministicStartTx(std::string strKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, CMutableTransaction& mutTransaction);
-    void BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType);
+    void BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType, const std::string& strIp = "");
     bool SignDeterministicStartTx(CMutableTransaction& mutableTransaction, std::string& errorMessage);
     bool SignDeterministicConfirmTx(CMutableTransaction& mutableTransaction, std::string& errorMessage);
 
@@ -73,10 +73,15 @@ public:
 
     int nLastTriedToConfirm;
 
-    // The decided address an early confirm was last sent for: one attempt per address change
-    std::string strEarlyConfirmHost;
+    // The ip an early confirm was last sent for: one attempt per address change
+    std::string strEarlyConfirmIp;
 
-    // The last height at which a due confirm was held back for want of a decided address
-    int nLastNoAddressHeight = -1;
+    // The last height at which a due confirm was held back for want of its ip
+    int nLastNoConfirmIpHeight = -1;
 };
+
+/** The ip a confirm carries: the decided address (net.h DecidedAddress) and
+ *  FluxOS's published port (FluxOSPort), in FluxnodeConfirmIp's form. False,
+ *  with strMissing naming whichever is absent, while either is. */
+bool GetConfirmIp(std::string& strIp, std::string& strMissing);
 #endif //ZELCASHNODES_ACTIVEFLUXNODE_H
