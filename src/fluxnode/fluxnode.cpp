@@ -18,6 +18,12 @@
 #include "fluxnode/fluxnodecachedb.h"
 #include "primitives/transaction.h"
 #include "pon/pon-fork.h"
+#include "utilstrencodings.h"
+
+#include <univalue.h>
+
+#include <filesystem>
+#include <fstream>
 
 FluxnodeCache g_fluxnodeCache;
 FluxNodeDelta g_fluxnodeDelta;
@@ -687,7 +693,7 @@ bool FluxnodeCache::CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_n
     return false;
 }
 
-bool FluxnodeCache::CheckIfNeedsIpChangeConfirm(const COutPoint& out, const int& p_nHeight, const std::string& strDecidedHost)
+bool FluxnodeCache::CheckIfNeedsIpChangeConfirm(const COutPoint& out, const int& p_nHeight, const std::string& strConfirmIp)
 {
     LOCK(cs);
 
@@ -699,7 +705,7 @@ bool FluxnodeCache::CheckIfNeedsIpChangeConfirm(const COutPoint& out, const int&
     if (it == mapConfirmedFluxnodeData.end())
         return false;
 
-    return IpChangeConfirmDue(it->second.ip, it->second.nLastConfirmedBlockHeight, strDecidedHost, nBlockHeight);
+    return IpChangeConfirmDue(it->second.ip, it->second.nLastConfirmedBlockHeight, strConfirmIp, nBlockHeight);
 }
 
 std::string FluxnodeConfirmIp(const std::string& strHost, int nFluxOSPort)
@@ -709,18 +715,83 @@ std::string FluxnodeConfirmIp(const std::string& strHost, int nFluxOSPort)
     return strprintf("%s:%d", strHost, nFluxOSPort);
 }
 
-bool IpChangeConfirmDue(const std::string& strRecordIp, int nLastConfirmedHeight, const std::string& strDecidedHost, int nBlockHeight)
+bool IpChangeConfirmDue(const std::string& strRecordIp, int nLastConfirmedHeight, const std::string& strConfirmIp, int nBlockHeight)
 {
-    if (strDecidedHost.empty())
-        return false;
-
-    int nPort = 0;
-    std::string strRecordHost;
-    SplitHostPort(strRecordIp, nPort, strRecordHost);
-    if (strRecordHost == strDecidedHost)
+    if (strConfirmIp.empty() || strConfirmIp == strRecordIp)
         return false;
 
     return nBlockHeight - nLastConfirmedHeight >= FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1;
+}
+
+FluxOSPortInfo ReadFluxOSPort(const std::string& strPath, bool fDefaultWhenMissing)
+{
+    FluxOSPortInfo info;
+    info.strSource = "none";
+
+    std::error_code ec;
+    const bool fExists = std::filesystem::exists(strPath, ec);
+    if (ec) {
+        info.strReason = strprintf("%s unreadable: %s", strPath, ec.message());
+        return info;
+    }
+    if (!fExists) {
+        if (fDefaultWhenMissing) {
+            info.nPort = FLUXOS_DEFAULT_PORT;
+            info.strSource = "default";
+            info.strReason = strprintf("%s absent; regtest assumes %d", strPath, FLUXOS_DEFAULT_PORT);
+        } else {
+            info.strReason = strprintf("%s absent: FluxOS has not published its port", strPath);
+        }
+        return info;
+    }
+
+    // The file holds three small fields; anything larger is not FluxOS's.
+    static const std::streamsize MAX_SIZE = 4096;
+    std::ifstream file(strPath);
+    std::string strJson;
+    if (file) {
+        strJson.resize(MAX_SIZE + 1);
+        file.read(&strJson[0], MAX_SIZE + 1);
+        strJson.resize(file.gcount());
+    }
+    if (!file && !file.eof()) {
+        info.strReason = strprintf("%s unreadable", strPath);
+        return info;
+    }
+    if ((std::streamsize)strJson.size() > MAX_SIZE) {
+        info.strReason = strprintf("%s larger than %d bytes", strPath, MAX_SIZE);
+        return info;
+    }
+
+    UniValue json;
+    if (!json.read(strJson) || !json.isObject()) {
+        info.strReason = strprintf("%s is not a JSON object", strPath);
+        return info;
+    }
+    const UniValue& port = find_value(json, "apiPort");
+    if (port.isNull()) {
+        info.strReason = strprintf("%s has no apiPort", strPath);
+        return info;
+    }
+    int64_t nPort = 0;
+    if (!port.isNum() || !ParseInt64(port.getValStr(), &nPort)) {
+        info.strReason = strprintf("apiPort in %s is not an integer", strPath);
+        return info;
+    }
+    if (nPort < 1 || nPort > 65535) {
+        info.strReason = strprintf("apiPort %d in %s is outside 1-65535", nPort, strPath);
+        return info;
+    }
+
+    info.nPort = (int)nPort;
+    info.strSource = "file";
+    info.strReason = strprintf("read from %s", strPath);
+    return info;
+}
+
+FluxOSPortInfo FluxOSPort()
+{
+    return ReadFluxOSPort(FLUXOS_PORT_FILE, Params().NetworkIDString() == "regtest");
 }
 
 FluxnodeCacheData FluxnodeCache::GetFluxnodeData(const CTransaction& tx)

@@ -1869,6 +1869,11 @@ UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
                 "    \"peers\": n,                          (numeric) connected peers reporting it\n"
                 "    \"changed\": ttt                       (numeric) unix time it last changed\n"
                 "  }\n"
+                "  \"fluxos_port\": {                       (object) the port FluxOS publishes (see getnetworkinfo)\n"
+                "    \"port\": n,                           (numeric) null if absent\n"
+                "    \"source\": \"file\",                    (string) \"file\", \"default\" or \"none\"\n"
+                "    \"reason\": \"...\"                      (string) why the port is absent, or where it came from\n"
+                "  }\n"
                 "}\n"
 
                 "\nExamples:\n" +
@@ -1924,6 +1929,7 @@ UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
         }
     }
     info.pushKV("decided_address", DecidedAddressToJSON());
+    info.pushKV("fluxos_port", FluxOSPortToJSON());
 
     return info;
 }
