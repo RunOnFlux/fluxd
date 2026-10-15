@@ -710,14 +710,17 @@ bool FluxnodeCache::CheckIfNeedsIpChangeConfirm(const COutPoint& out, const int&
 
 std::string FluxnodeConfirmIp(const std::string& strHost, int nFluxOSPort)
 {
-    if (nFluxOSPort == FLUXOS_DEFAULT_PORT)
-        return strHost;
     return strprintf("%s:%d", strHost, nFluxOSPort);
 }
 
 bool IpChangeConfirmDue(const std::string& strRecordIp, int nLastConfirmedHeight, const std::string& strConfirmIp, int nBlockHeight)
 {
-    if (strConfirmIp.empty() || strConfirmIp == strRecordIp)
+    if (strConfirmIp.empty())
+        return false;
+    const std::string strRecordHostPort =
+        (strRecordIp.empty() || strRecordIp.find(':') != std::string::npos) ? strRecordIp
+                                                                             : FluxnodeConfirmIp(strRecordIp, FLUXOS_DEFAULT_PORT);
+    if (strConfirmIp == strRecordHostPort)
         return false;
 
     return nBlockHeight - nLastConfirmedHeight >= FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1;
