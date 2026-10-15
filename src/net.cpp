@@ -32,7 +32,11 @@
 #endif
 
 #include <filesystem>
+#include <fstream>
 #include <string_view>
+#include <unistd.h>
+
+#include <univalue.h>
 #include <condition_variable>
 #include <mutex>
 #include <condition_variable>
@@ -336,6 +340,8 @@ bool IsLocal(const CService& addr)
 static CCriticalSection cs_decidedAddress;
 static DecidedAddressInfo decidedAddress;
 
+static void PublishDecidedAddressLocked();
+
 bool DecideAddress(const std::vector<PeerAddressReport>& reports, bool fAllowNonRoutable, const CNetAddr& addrIncumbent, CNetAddr& addrOut, int& nPeersOut)
 {
     // address -> (reporters, id of its newest reporter)
@@ -389,18 +395,120 @@ void UpdateDecidedAddress()
     const CNetAddr addrIncumbent = decidedAddress.IsSet() ? decidedAddress.address : CNetAddr();
     const bool fFound = DecideAddress(reports, Params().NetworkIDString() == "regtest", addrIncumbent, addr, nPeers);
 
+    bool fChanged = false;
     if (fFound != decidedAddress.IsSet() || (fFound && addr != decidedAddress.address)) {
         decidedAddress.address = fFound ? addr : CNetAddr();
         decidedAddress.nChanged = GetTime();
         LogPrintf("Decided address: %s (%d peers)\n", fFound ? addr.ToStringIP() : "none", fFound ? nPeers : 0);
+        fChanged = true;
     }
-    decidedAddress.nPeers = fFound ? nPeers : 0;
+    if (decidedAddress.nPeers != (fFound ? nPeers : 0)) {
+        decidedAddress.nPeers = fFound ? nPeers : 0;
+        fChanged = true;
+    }
+
+    if (fChanged)
+        PublishDecidedAddressLocked();
 }
 
 DecidedAddressInfo DecidedAddress()
 {
     LOCK(cs_decidedAddress);
     return decidedAddress;
+}
+
+// The directory the decided address is published in; unset while not publishing.
+static std::optional<std::filesystem::path> decidedAddressDir;
+
+std::filesystem::path DecidedAddressFileDir()
+{
+    if (Params().NetworkIDString() == "regtest")
+        return GetDataDir(false) / "run";
+    return DECIDED_ADDRESS_DIR;
+}
+
+bool WriteDecidedAddressFile(const std::filesystem::path& dir, const DecidedAddressInfo& info, int64_t nPid, std::string& strError)
+{
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("address", info.IsSet() ? info.address.ToStringIP() : "");
+    obj.pushKV("peers", info.nPeers);
+    obj.pushKV("changed", info.nChanged);
+    obj.pushKV("pid", nPid);
+
+    std::error_code ec;
+    if (!std::filesystem::is_directory(dir, ec)) {
+        if (!std::filesystem::create_directories(dir, ec) || ec) {
+            strError = strprintf("cannot create %s: %s", dir.string(), ec ? ec.message() : "not a directory");
+            return false;
+        }
+        std::filesystem::permissions(dir, std::filesystem::perms(0755), ec);
+    }
+
+    // Written beside the final name and renamed over it, so a reader sees the old file or the new one.
+    const std::filesystem::path path = dir / DECIDED_ADDRESS_FILE;
+    const std::filesystem::path tmp = dir / strprintf(".%s.%d.tmp", DECIDED_ADDRESS_FILE, nPid);
+    {
+        std::ofstream file(tmp, std::ios::out | std::ios::trunc);
+        file << obj.write() << "\n";
+        file.close();
+        if (!file) {
+            std::filesystem::remove(tmp, ec);
+            strError = strprintf("cannot write %s", tmp.string());
+            return false;
+        }
+    }
+    std::filesystem::permissions(tmp, std::filesystem::perms(0644), ec);
+    if (ec) {
+        strError = strprintf("cannot make %s world-readable: %s", tmp.string(), ec.message());
+        std::filesystem::remove(tmp, ec);
+        return false;
+    }
+    std::filesystem::rename(tmp, path, ec);
+    if (ec) {
+        strError = strprintf("cannot rename %s to %s: %s", tmp.string(), path.string(), ec.message());
+        std::filesystem::remove(tmp, ec);
+        return false;
+    }
+    return true;
+}
+
+bool RemoveDecidedAddressFile(const std::filesystem::path& dir, std::string& strError)
+{
+    std::error_code ec;
+    std::filesystem::remove(dir / DECIDED_ADDRESS_FILE, ec);
+    if (ec) {
+        strError = strprintf("cannot remove %s: %s", (dir / DECIDED_ADDRESS_FILE).string(), ec.message());
+        return false;
+    }
+    return true;
+}
+
+static void PublishDecidedAddressLocked()
+{
+    AssertLockHeld(cs_decidedAddress);
+    if (!decidedAddressDir)
+        return;
+    std::string strError;
+    if (!WriteDecidedAddressFile(*decidedAddressDir, decidedAddress, getpid(), strError))
+        error("%s: decided address not published: %s", __func__, strError);
+}
+
+void StartPublishingDecidedAddress(const std::filesystem::path& dir)
+{
+    LOCK(cs_decidedAddress);
+    decidedAddressDir = dir;
+    PublishDecidedAddressLocked();
+}
+
+void StopPublishingDecidedAddress()
+{
+    LOCK(cs_decidedAddress);
+    if (!decidedAddressDir)
+        return;
+    std::string strError;
+    if (!RemoveDecidedAddressFile(*decidedAddressDir, strError))
+        LogPrintf("%s: %s\n", __func__, strError);
+    decidedAddressDir.reset();
 }
 
 /** check whether a given network is one we can probably connect to */

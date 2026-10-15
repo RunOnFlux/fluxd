@@ -16,9 +16,12 @@
 #include "netbase.h"
 #include "utiltime.h"
 
+#include <univalue.h>
+
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <unistd.h>
 #include <vector>
 
@@ -437,4 +440,160 @@ TEST(DecidedAddress, ConfirmIpNeedsHostAndPort)
 
     UpdateWithPeers({});
     SelectParams(CBaseChainParams::MAIN);
+}
+
+namespace {
+
+// A fresh temporary directory, removed with the object.
+class TempDir
+{
+public:
+    TempDir()
+    {
+        path = std::filesystem::temp_directory_path() / strprintf("flux-decided-%d-%d", getpid(), counter++);
+        std::filesystem::create_directories(path);
+    }
+    ~TempDir() { std::filesystem::remove_all(path); }
+
+    std::filesystem::path path;
+
+private:
+    static inline int counter = 0;
+};
+
+UniValue ReadJson(const std::filesystem::path& path)
+{
+    std::ifstream file(path);
+    std::string str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    UniValue json;
+    EXPECT_TRUE(json.read(str)) << str;
+    return json;
+}
+
+std::vector<std::string> Entries(const std::filesystem::path& dir)
+{
+    std::vector<std::string> names;
+    for (const auto& entry : std::filesystem::directory_iterator(dir))
+        names.push_back(entry.path().filename().string());
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+} // namespace
+
+TEST(DecidedAddress, FileWrittenWithItsFourFields)
+{
+    TempDir tmp;
+    // The directory is created when absent.
+    const std::filesystem::path dir = tmp.path / "fluxd";
+
+    DecidedAddressInfo info;
+    info.address = Addr("178.79.183.164");
+    info.nPeers = 14;
+    info.nChanged = 1792067007;
+    std::string strError;
+    ASSERT_TRUE(WriteDecidedAddressFile(dir, info, 12345, strError)) << strError;
+
+    // Written by rename: the final name and nothing else.
+    EXPECT_EQ(Entries(dir), std::vector<std::string>{DECIDED_ADDRESS_FILE});
+    const UniValue json = ReadJson(dir / DECIDED_ADDRESS_FILE);
+    ASSERT_TRUE(json.isObject());
+    EXPECT_EQ(json.size(), 4u);
+    EXPECT_EQ(find_value(json, "address").get_str(), "178.79.183.164");
+    EXPECT_EQ(find_value(json, "peers").get_int(), 14);
+    EXPECT_EQ(find_value(json, "changed").get_int64(), 1792067007);
+    EXPECT_EQ(find_value(json, "pid").get_int(), 12345);
+
+    using std::filesystem::perms;
+    EXPECT_EQ(std::filesystem::status(dir / DECIDED_ADDRESS_FILE).permissions() & perms::all, perms(0644));
+    EXPECT_EQ(std::filesystem::status(dir).permissions() & perms::all, perms(0755));
+
+    // Nothing decided: an empty address, no peers, never changed.
+    ASSERT_TRUE(WriteDecidedAddressFile(dir, DecidedAddressInfo(), 12345, strError)) << strError;
+    const UniValue none = ReadJson(dir / DECIDED_ADDRESS_FILE);
+    EXPECT_EQ(find_value(none, "address").get_str(), "");
+    EXPECT_EQ(find_value(none, "peers").get_int(), 0);
+    EXPECT_EQ(find_value(none, "changed").get_int64(), 0);
+    EXPECT_EQ(Entries(dir), std::vector<std::string>{DECIDED_ADDRESS_FILE});
+}
+
+TEST(DecidedAddress, FileReplacesAMalformedOne)
+{
+    TempDir tmp;
+    std::ofstream(tmp.path / DECIDED_ADDRESS_FILE) << "{not json";
+
+    DecidedAddressInfo info;
+    info.address = Addr("1.2.3.4");
+    info.nPeers = 3;
+    info.nChanged = 1700000000;
+    std::string strError;
+    ASSERT_TRUE(WriteDecidedAddressFile(tmp.path, info, 7, strError)) << strError;
+    EXPECT_EQ(find_value(ReadJson(tmp.path / DECIDED_ADDRESS_FILE), "address").get_str(), "1.2.3.4");
+    EXPECT_EQ(Entries(tmp.path), std::vector<std::string>{DECIDED_ADDRESS_FILE});
+}
+
+TEST(DecidedAddress, FileWriteFailureReportedNotThrown)
+{
+    TempDir tmp;
+    // The directory's path is a regular file.
+    const std::filesystem::path dir = tmp.path / "notadir";
+    std::ofstream(dir) << "x";
+
+    std::string strError;
+    bool fWritten = true;
+    EXPECT_NO_THROW(fWritten = WriteDecidedAddressFile(dir, DecidedAddressInfo(), 7, strError));
+    EXPECT_FALSE(fWritten);
+    EXPECT_FALSE(strError.empty());
+
+    // Publishing there logs and carries on.
+    EXPECT_NO_THROW(StartPublishingDecidedAddress(dir));
+    EXPECT_NO_THROW(StopPublishingDecidedAddress());
+    EXPECT_EQ(Entries(tmp.path), std::vector<std::string>{"notadir"});
+}
+
+TEST(DecidedAddress, FilePublishedOnChangeAndRemovedOnStop)
+{
+    SelectParams(CBaseChainParams::MAIN);
+    TempDir tmp;
+    SetMockTime(1700000500);
+    UpdateWithPeers({});
+
+    // At start: nothing decided yet.
+    StartPublishingDecidedAddress(tmp.path);
+    UniValue json = ReadJson(tmp.path / DECIDED_ADDRESS_FILE);
+    EXPECT_EQ(find_value(json, "address").get_str(), "");
+    EXPECT_EQ(find_value(json, "pid").get_int(), getpid());
+
+    UpdateWithPeers({"1.2.3.4", "1.2.3.4", "1.2.3.4"});
+    json = ReadJson(tmp.path / DECIDED_ADDRESS_FILE);
+    EXPECT_EQ(find_value(json, "address").get_str(), "1.2.3.4");
+    EXPECT_EQ(find_value(json, "peers").get_int(), 3);
+    EXPECT_EQ(find_value(json, "changed").get_int64(), 1700000500);
+
+    // A peer more behind the same address is published too.
+    UpdateWithPeers({"1.2.3.4", "1.2.3.4", "1.2.3.4", "1.2.3.4"});
+    EXPECT_EQ(find_value(ReadJson(tmp.path / DECIDED_ADDRESS_FILE), "peers").get_int(), 4);
+
+    UpdateWithPeers({});
+    EXPECT_EQ(find_value(ReadJson(tmp.path / DECIDED_ADDRESS_FILE), "address").get_str(), "");
+
+    StopPublishingDecidedAddress();
+    EXPECT_TRUE(Entries(tmp.path).empty());
+
+    // Once stopped, a change writes nothing.
+    UpdateWithPeers({"1.2.3.4", "1.2.3.4", "1.2.3.4"});
+    EXPECT_TRUE(Entries(tmp.path).empty());
+    UpdateWithPeers({});
+    SetMockTime(0);
+}
+
+TEST(DecidedAddress, FileRemoval)
+{
+    TempDir tmp;
+    std::string strError;
+    ASSERT_TRUE(WriteDecidedAddressFile(tmp.path, DecidedAddressInfo(), 7, strError)) << strError;
+    EXPECT_TRUE(RemoveDecidedAddressFile(tmp.path, strError)) << strError;
+    EXPECT_TRUE(Entries(tmp.path).empty());
+    // Already gone: not a failure.
+    EXPECT_TRUE(RemoveDecidedAddressFile(tmp.path, strError)) << strError;
 }

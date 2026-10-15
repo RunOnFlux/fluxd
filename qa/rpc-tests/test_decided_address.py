@@ -9,6 +9,7 @@ suite does not run; its logic is covered by the DecidedAddress gtests.
 """
 
 import asyncio
+import json
 import os
 import shutil
 from pathlib import Path
@@ -53,18 +54,35 @@ async def wait_decided(
         await asyncio.sleep(0.1)
 
 
+def published(node: FluxNode) -> dict[str, Any]:
+    """The decided address fluxd publishes; on regtest under <datadir>/run."""
+    content = (node.datadir / "run" / "fluxd.json").read_text()
+    print(f"fluxd.json: {content.strip()}")
+    return json.loads(content)
+
+
 async def test_three_peers_decide_the_address(node_factory: NodeFactory) -> None:
     node = await node_factory(0, extra_args=POW_ARGS)
+    assert node._proc is not None
+    pid = node._proc.pid
     assert await decided(node) == {"address": "", "peers": 0, "changed": 0}
+    assert published(node) == {"address": "", "peers": 0, "changed": 0, "pid": pid}
 
     now = await node.advance_mocktime(10)
     conns = await connect_reporting(node, "1.2.3.4", PEERS)
     info = await wait_decided(node, "1.2.3.4", PEERS)
     assert info["changed"] == now
+    assert published(node) == {"address": "1.2.3.4", "peers": PEERS, "changed": now, "pid": pid}
 
     for conn in conns:
         await conn.disconnect_node()
     await wait_decided(node, "", 0)
+    assert published(node)["address"] == ""
+    assert published(node)["peers"] == 0
+
+    # A clean stop removes the file.
+    await node.stop_daemon()
+    assert not (node.datadir / "run" / "fluxd.json").exists()
 
 
 async def test_one_peer_suffices_on_regtest(node_factory: NodeFactory) -> None:

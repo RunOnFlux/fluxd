@@ -235,6 +235,31 @@ void UpdateDecidedAddress();
 /** The current decided address. */
 DecidedAddressInfo DecidedAddress();
 
+/** fluxd publishes its decided address for fluxbench and FluxOS to read, in
+ *  DECIDED_ADDRESS_FILE under DecidedAddressFileDir(), as
+ *  {"address": "a.b.c.d" or "", "peers": n, "changed": unix time or 0, "pid": n}.
+ *  Nothing in fluxd reads it. */
+#define DECIDED_ADDRESS_DIR "/run/fluxd"
+#define DECIDED_ADDRESS_FILE "fluxd.json"
+
+/** DECIDED_ADDRESS_DIR; on regtest <datadir>/run, where the qa suite reads it. */
+std::filesystem::path DecidedAddressFileDir();
+
+/** Write info to dir/DECIDED_ADDRESS_FILE, world-readable, through a temporary
+ *  file in dir renamed over it; dir is created 0755 if absent. False, with
+ *  strError, on any failure, leaving no temporary file behind. */
+bool WriteDecidedAddressFile(const std::filesystem::path& dir, const DecidedAddressInfo& info, int64_t nPid, std::string& strError);
+
+/** Remove dir/DECIDED_ADDRESS_FILE; an absent file is not a failure. */
+bool RemoveDecidedAddressFile(const std::filesystem::path& dir, std::string& strError);
+
+/** Publish to dir now and on every later change of the decided address or the
+ *  peers behind it. A failed write is logged as an error and otherwise ignored. */
+void StartPublishingDecidedAddress(const std::filesystem::path& dir);
+
+/** Stop publishing and remove the file; a failed removal is logged and ignored. */
+void StopPublishingDecidedAddress();
+
 class CNodeStats
 {
 public:
