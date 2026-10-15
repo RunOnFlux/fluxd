@@ -54,8 +54,9 @@ void UpdateWithPeers(const std::vector<const char*>& addrs)
 
 TEST(DecidedAddress, MajorityWins)
 {
+    // The minority holds the newest peer (id 8); the count decides first.
     auto reports = Reports({{1, "1.2.3.4"}, {2, "5.6.7.8"}, {3, "1.2.3.4"}, {4, "5.6.7.8"},
-                            {5, "1.2.3.4"}, {6, "5.6.7.8"}, {7, "1.2.3.4"}});
+                            {5, "1.2.3.4"}, {8, "5.6.7.8"}, {7, "1.2.3.4"}});
     CNetAddr addr;
     int nPeers = 0;
     ASSERT_TRUE(DecideAddress(reports, false, addr, nPeers));
