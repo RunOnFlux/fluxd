@@ -2233,7 +2233,9 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
             LogPrintf("Tor hidden service not started: dedicated onion bind unavailable.\n");
     }
 
-    StartPublishingDecidedAddress(DecidedAddressFileDir());
+    // Its readers, fluxbench and FluxOS, run only beside a fluxnode.
+    if (fFluxnode)
+        StartPublishingDecidedAddress(DecidedAddressFileDir());
     StartNode(threadGroup, scheduler);
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected

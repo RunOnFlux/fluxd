@@ -61,17 +61,72 @@ def published(node: FluxNode) -> dict[str, Any]:
     return json.loads(content)
 
 
+def fluxnode_binary(fluxd_binary: str, bindir: Path) -> str:
+    """fluxd in a directory beside stand-in fluxbenchd and fluxbench-cli, which
+    fluxnode mode requires to exist; the stand-ins answer nothing."""
+    bindir.mkdir()
+    binary = bindir / "fluxd"
+    try:
+        os.link(fluxd_binary, binary)
+    except OSError:
+        shutil.copy2(fluxd_binary, binary)
+    for name in ("fluxbenchd", "fluxbench-cli"):
+        stub = bindir / name
+        stub.write_text("#!/bin/sh\nexit 1\n")
+        stub.chmod(0o755)
+    return str(binary)
+
+
+async def start_fluxnode(
+    node_factory: NodeFactory, fluxd_binary: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> FluxNode:
+    """A regtest daemon in fluxnode mode (-zelnode), with fluxbench left to its
+    manager as on ArcaneOS and a made-up collateral."""
+    node = await node_factory(0, extra_args=[*POW_ARGS, "-txindex"])
+    wif = await node.rpc.dumpprivkey(await node.rpc.getnewaddress())
+    monkeypatch.setenv("UNMANAGED_FLUXBENCHD", "1")
+    node.binary = fluxnode_binary(fluxd_binary, tmp_path / "bin")
+    await node.restart(
+        [
+            *POW_ARGS,
+            "-txindex",
+            "-zelnode",
+            f"-zelnodeprivkey={wif}",
+            "-zelnodeoutpoint=" + "ab" * 32,
+            "-zelnodeindex=0",
+        ]
+    )
+    return node
+
+
 async def test_three_peers_decide_the_address(node_factory: NodeFactory) -> None:
     node = await node_factory(0, extra_args=POW_ARGS)
-    assert node._proc is not None
-    pid = node._proc.pid
     assert await decided(node) == {"address": "", "peers": 0, "changed": 0}
-    assert published(node) == {"address": "", "peers": 0, "changed": 0, "pid": pid}
 
     now = await node.advance_mocktime(10)
     conns = await connect_reporting(node, "1.2.3.4", PEERS)
     info = await wait_decided(node, "1.2.3.4", PEERS)
     assert info["changed"] == now
+
+    for conn in conns:
+        await conn.disconnect_node()
+    await wait_decided(node, "", 0)
+
+    # Not a fluxnode: nothing is published.
+    assert not (node.datadir / "run").exists()
+
+
+async def test_fluxnode_publishes_the_decided_address(
+    node_factory: NodeFactory, fluxd_binary: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    node = await start_fluxnode(node_factory, fluxd_binary, tmp_path, monkeypatch)
+    assert node._proc is not None
+    pid = node._proc.pid
+    assert published(node) == {"address": "", "peers": 0, "changed": 0, "pid": pid}
+
+    now = await node.advance_mocktime(10)
+    conns = await connect_reporting(node, "1.2.3.4", PEERS)
+    await wait_decided(node, "1.2.3.4", PEERS)
     assert published(node) == {"address": "1.2.3.4", "peers": PEERS, "changed": now, "pid": pid}
 
     for conn in conns:
@@ -131,41 +186,10 @@ async def test_regtest_reads_the_default_fluxos_port(node_factory: NodeFactory) 
     assert "/run/fluxos/fluxos.json" in port["reason"]
 
 
-def fluxnode_binary(fluxd_binary: str, bindir: Path) -> str:
-    """fluxd in a directory beside stand-in fluxbenchd and fluxbench-cli, which
-    fluxnode mode requires to exist; the stand-ins answer nothing."""
-    bindir.mkdir()
-    binary = bindir / "fluxd"
-    try:
-        os.link(fluxd_binary, binary)
-    except OSError:
-        shutil.copy2(fluxd_binary, binary)
-    for name in ("fluxbenchd", "fluxbench-cli"):
-        stub = bindir / name
-        stub.write_text("#!/bin/sh\nexit 1\n")
-        stub.chmod(0o755)
-    return str(binary)
-
-
 async def test_confirm_rpc_needs_the_decided_address(
     node_factory: NodeFactory, fluxd_binary: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    node = await node_factory(0, extra_args=[*POW_ARGS, "-txindex"])
-    wif = await node.rpc.dumpprivkey(await node.rpc.getnewaddress())
-
-    # fluxnode mode with fluxbench left to its manager, as on ArcaneOS.
-    monkeypatch.setenv("UNMANAGED_FLUXBENCHD", "1")
-    node.binary = fluxnode_binary(fluxd_binary, tmp_path / "bin")
-    await node.restart(
-        [
-            *POW_ARGS,
-            "-txindex",
-            "-zelnode",
-            f"-zelnodeprivkey={wif}",
-            "-zelnodeoutpoint=" + "ab" * 32,
-            "-zelnodeindex=0",
-        ]
-    )
+    node = await start_fluxnode(node_factory, fluxd_binary, tmp_path, monkeypatch)
 
     # The port reads as regtest's default; no peer reports an address.
     info = await node.rpc.getnetworkinfo()
