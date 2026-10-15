@@ -424,6 +424,8 @@ UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
         throw runtime_error(
                 "createconfirmationtransaction\n"
                 "\nCreate a new confirmation transaction, tries to get fluxbench to sign it. Broadcasts it.\n"
+                "Its ip is this node's decided address with the port FluxOS publishes (see getnetworkinfo);\n"
+                "while either is absent nothing is sent and the error names which.\n"
 
                 "\nResult:\n"
                 "    \"status\": \"xxxx\",    (string) \"Successfully Sent\" or \"Fail to send\"\n"
@@ -435,10 +437,14 @@ UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
 
     if (!fFluxnode) throw JSONRPCError(RPC_INVALID_REQUEST, "This is not a Flux Node");
 
+    std::string strIp, strMissing;
+    if (!GetConfirmIp(strIp, strMissing))
+        throw JSONRPCError(RPC_MISC_ERROR, strprintf("No confirmation sent: %s", strMissing));
+
     std::string errorMessage;
     CMutableTransaction mutTx;
 
-    activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::UPDATE_CONFIRM);
+    activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::UPDATE_CONFIRM, strIp);
 
     if (!activeFluxnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
         throw JSONRPCError(RPC_VERIFY_ERROR, strprintf("Failed to sign new confirmation transaction: %s\n", errorMessage));

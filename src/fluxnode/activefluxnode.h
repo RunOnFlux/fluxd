@@ -63,7 +63,7 @@ public:
     void ManageDeterministricFluxnode();
 
     bool BuildDeterministicStartTx(std::string strKey, std::string strTxHash, std::string strOutputIndex, std::string& errorMessage, CMutableTransaction& mutTransaction);
-    void BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType, const std::string& strIp = "");
+    void BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType, const std::string& strIp);
     bool SignDeterministicStartTx(CMutableTransaction& mutableTransaction, std::string& errorMessage);
     bool SignDeterministicConfirmTx(CMutableTransaction& mutableTransaction, std::string& errorMessage);
 
