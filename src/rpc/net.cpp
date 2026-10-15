@@ -439,6 +439,16 @@ UniValue getdeprecationinfo(const UniValue& params, bool fHelp)
     return obj;
 }
 
+UniValue DecidedAddressToJSON()
+{
+    const DecidedAddressInfo info = DecidedAddress();
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("address", info.IsSet() ? info.address.ToStringIP() : "");
+    obj.pushKV("peers", info.nPeers);
+    obj.pushKV("changed", info.nChanged);
+    return obj;
+}
+
 UniValue getnetworkinfo(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -471,6 +481,11 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
             "  }\n"
             "  ,...\n"
             "  ]\n"
+            "  \"decided_address\": {                   (object) this node's public address as its peers report it\n"
+            "    \"address\": \"a.b.c.d\",              (string) the IPv4 address at least 3 peers report, the most reported; empty if none\n"
+            "    \"peers\": n,                          (numeric) connected peers reporting it; 0 if none\n"
+            "    \"changed\": ttt                       (numeric) unix time it last changed, including to or from none; 0 if never decided\n"
+            "  }\n"
             "  \"warnings\": \"...\"                    (string) any network warnings (such as alert messages) \n"
             "}\n"
             "\nExamples:\n"
@@ -502,6 +517,7 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
         }
     }
     obj.pushKV("localaddresses", localAddresses);
+    obj.pushKV("decided_address", DecidedAddressToJSON());
     obj.pushKV("warnings",       GetWarnings("statusbar"));
     return obj;
 }
