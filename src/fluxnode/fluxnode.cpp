@@ -778,8 +778,9 @@ FluxOSPortInfo ReadFluxOSPort(const std::string& strPath, bool fDefaultWhenMissi
         info.strReason = strprintf("apiPort in %s is not an integer", strPath);
         return info;
     }
-    if (nPort < 1 || nPort > 65535) {
-        info.strReason = strprintf("apiPort %d in %s is outside 1-65535", nPort, strPath);
+    if (!IsFluxOSApiPort(nPort)) {
+        info.strReason = strprintf("apiPort %d in %s is not a fluxnode API port (%d-%d in steps of 10)",
+                                   nPort, strPath, FLUXOS_DEFAULT_PORT, FLUXOS_DEFAULT_PORT + 70);
         return info;
     }
 

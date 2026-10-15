@@ -342,11 +342,12 @@ TEST(DecidedAddress, PortFileParsed)
     EXPECT_EQ(info.nPort, 16137);
     EXPECT_EQ(info.strSource, "file");
 
-    // Only apiPort matters; the bounds are inclusive.
-    file.Write(R"({"apiPort": 1})");
-    EXPECT_EQ(file.Read().nPort, 1);
-    file.Write(R"({"apiPort": 65535, "uiPort": "x"})");
-    EXPECT_EQ(file.Read().nPort, 65535);
+    // Only apiPort matters; every fluxnode API port reads.
+    for (int nPort = FLUXOS_DEFAULT_PORT; nPort <= FLUXOS_DEFAULT_PORT + 70; nPort += 10) {
+        file.Write(strprintf(R"({"apiPort": %d, "uiPort": "x"})", nPort));
+        EXPECT_EQ(file.Read().nPort, nPort) << nPort;
+        EXPECT_EQ(file.Read().strSource, "file") << nPort;
+    }
     file.Write(R"({"apiPort": 16127})");
     EXPECT_EQ(file.Read(true).nPort, 16127);
     EXPECT_EQ(file.Read(true).strSource, "file");
@@ -372,6 +373,14 @@ TEST(DecidedAddress, PortFileMalformedIsAbsent)
         R"({"apiPort": -1})",
         R"({"apiPort": 65536})",
         R"({"apiPort": 99999999999999999999})",
+        // Valid TCP ports that no fluxnode's FluxOS serves on.
+        R"({"apiPort": 1})",
+        R"({"apiPort": 65535})",
+        R"({"apiPort": 16117})",
+        R"({"apiPort": 16126})",
+        R"({"apiPort": 16128})",
+        R"({"apiPort": 16132})",
+        R"({"apiPort": 16207})",
         R"({"apiPort": {"port": 16127}})",
         std::string(R"({"apiPort": 16127, "pad": ")") + std::string(5000, 'x') + R"("})",
     };
@@ -392,6 +401,21 @@ TEST(DecidedAddress, PortFileMalformedIsAbsent)
     std::filesystem::create_directories(file.path);
     EXPECT_FALSE(file.Read().IsSet());
     EXPECT_FALSE(file.Read(true).IsSet());
+}
+
+TEST(DecidedAddress, FluxOSApiPortsAreTheEight)
+{
+    for (int nPort = FLUXOS_DEFAULT_PORT; nPort <= FLUXOS_DEFAULT_PORT + 70; nPort += 10) {
+        EXPECT_TRUE(IsFluxOSApiPort(nPort)) << nPort;
+        EXPECT_FALSE(IsFluxOSApiPort(nPort - 1)) << nPort - 1;
+        EXPECT_FALSE(IsFluxOSApiPort(nPort + 1)) << nPort + 1;
+    }
+    EXPECT_FALSE(IsFluxOSApiPort(FLUXOS_DEFAULT_PORT - 10));
+    EXPECT_FALSE(IsFluxOSApiPort(FLUXOS_DEFAULT_PORT + 80));
+    EXPECT_FALSE(IsFluxOSApiPort(0));
+    EXPECT_FALSE(IsFluxOSApiPort(-1));
+    EXPECT_FALSE(IsFluxOSApiPort(65535));
+    EXPECT_FALSE(IsFluxOSApiPort(99999999999999LL));
 }
 
 TEST(DecidedAddress, PortFileAbsentDefaultsOnlyWhereAllowed)

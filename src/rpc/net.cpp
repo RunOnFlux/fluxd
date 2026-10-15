@@ -498,7 +498,7 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
             "    \"changed\": ttt                       (numeric) unix time it last changed, including to or from none; 0 if never decided\n"
             "  }\n"
             "  \"fluxos_port\": {                       (object) the port FluxOS publishes in " FLUXOS_PORT_FILE ", read now\n"
-            "    \"port\": n,                           (numeric) apiPort, 1-65535; null if absent\n"
+            "    \"port\": n,                           (numeric) apiPort, one of 16127-16197 in steps of 10; null if absent\n"
             "    \"source\": \"file\",                    (string) \"file\", \"default\" (regtest with no file: 16127) or \"none\"\n"
             "    \"reason\": \"...\"                      (string) why the port is absent, or where it came from\n"
             "  }\n"
