@@ -562,6 +562,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-gen", strprintf(_("Generate coins (default: %u)"), 0));
     strUsage += HelpMessageOpt("-genproclimit=<n>", strprintf(_("Set the number of threads for coin generation if enabled (-1 = all cores, default: %d)"), 1));
     strUsage += HelpMessageOpt("-fluxbenchsocket=<path>", _("Reach fluxbench over this Unix socket (an absolute path); fluxbench-cli otherwise uses its TCP port"));
+    strUsage += HelpMessageOpt("-fluxport=<port>", strprintf(_("The port FluxOS serves on, carried in this fluxnode's confirmations as fluxbench's -fluxport is (default: %u)"), FLUXOS_DEFAULT_PORT));
     strUsage += HelpMessageOpt("-ponminter", _("Enable PON minting for testing (testnet only, allows minting without being a fluxnode, default: false)"));
     strUsage += HelpMessageOpt("-equihashsolver=<name>", _("Specify the Equihash solver to be used if enabled (default: \"default\")"));
     strUsage += HelpMessageOpt("-mineraddress=<addr>", _("Send mined coins to a specific single address"));

@@ -687,6 +687,42 @@ bool FluxnodeCache::CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_n
     return false;
 }
 
+bool FluxnodeCache::CheckIfNeedsIpChangeConfirm(const COutPoint& out, const int& p_nHeight, const std::string& strDecidedHost)
+{
+    LOCK(cs);
+
+    const int nBlockHeight = p_nHeight + 1;
+    if (!NetworkUpgradeActive(nBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_FLUX))
+        return false;
+
+    auto it = mapConfirmedFluxnodeData.find(out);
+    if (it == mapConfirmedFluxnodeData.end())
+        return false;
+
+    return IpChangeConfirmDue(it->second.ip, it->second.nLastConfirmedBlockHeight, strDecidedHost, nBlockHeight);
+}
+
+std::string FluxnodeConfirmIp(const std::string& strHost, int nFluxOSPort)
+{
+    if (nFluxOSPort == FLUXOS_DEFAULT_PORT)
+        return strHost;
+    return strprintf("%s:%d", strHost, nFluxOSPort);
+}
+
+bool IpChangeConfirmDue(const std::string& strRecordIp, int nLastConfirmedHeight, const std::string& strDecidedHost, int nBlockHeight)
+{
+    if (strDecidedHost.empty())
+        return false;
+
+    int nPort = 0;
+    std::string strRecordHost;
+    SplitHostPort(strRecordIp, nPort, strRecordHost);
+    if (strRecordHost == strDecidedHost)
+        return false;
+
+    return nBlockHeight - nLastConfirmedHeight >= FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1;
+}
+
 FluxnodeCacheData FluxnodeCache::GetFluxnodeData(const CTransaction& tx)
 {
     return GetFluxnodeData(tx.collateralIn);

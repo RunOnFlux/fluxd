@@ -3,11 +3,13 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 // The node's decided address: the IPv4 address its peers report, taken by
-// majority with at least DECIDED_ADDRESS_MIN_PEERS behind it.
+// majority with at least DECIDED_ADDRESS_MIN_PEERS behind it, and the early
+// confirm that carries a change of it to the chain.
 
 #include <gtest/gtest.h>
 
 #include "chainparams.h"
+#include "fluxnode/fluxnode.h"
 #include "net.h"
 #include "netbase.h"
 #include "utiltime.h"
@@ -172,4 +174,50 @@ TEST(DecidedAddress, ChangedTimeMovesOnlyWithTheAddress)
 
     UpdateWithPeers({});
     SetMockTime(0);
+}
+
+TEST(DecidedAddress, ConfirmIpCarriesNonDefaultPort)
+{
+    EXPECT_EQ(FluxnodeConfirmIp("1.2.3.4", FLUXOS_DEFAULT_PORT), "1.2.3.4");
+    EXPECT_EQ(FluxnodeConfirmIp("1.2.3.4", 16137), "1.2.3.4:16137");
+}
+
+TEST(DecidedAddress, IpChangeConfirmDue)
+{
+    const int nMin = FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1;
+
+    // Same host, with or without a port in the record: nothing to carry.
+    EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4", 100, "1.2.3.4", 100 + 400));
+    EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4:16137", 100, "1.2.3.4", 100 + 400));
+    // No decided address: nothing to carry.
+    EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4", 100, "", 100 + 400));
+
+    // A changed host is due once the chain accepts an address change.
+    EXPECT_FALSE(IpChangeConfirmDue("1.2.3.4:16137", 100, "5.6.7.8", 100 + nMin - 1));
+    EXPECT_TRUE(IpChangeConfirmDue("1.2.3.4:16137", 100, "5.6.7.8", 100 + nMin));
+    EXPECT_TRUE(IpChangeConfirmDue("", 100, "5.6.7.8", 100 + nMin));
+}
+
+TEST(DecidedAddress, CacheReportsIpChangeConfirm)
+{
+    SelectParams(CBaseChainParams::MAIN);
+    const int nFluxHeight = Params().GetConsensus().vUpgrades[Consensus::UPGRADE_FLUX].nActivationHeight;
+    const int nLast = nFluxHeight + 1000;
+
+    FluxnodeCache cache;
+    COutPoint out(uint256S("01"), 0);
+    FluxnodeCacheData data;
+    data.collateralIn = out;
+    data.ip = "1.2.3.4";
+    data.nLastConfirmedBlockHeight = nLast;
+    cache.mapConfirmedFluxnodeData[out] = data;
+
+    // The tip is p_nHeight; the confirm lands in the block after it.
+    EXPECT_FALSE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 - 2, "5.6.7.8"));
+    EXPECT_TRUE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 - 1, "5.6.7.8"));
+    EXPECT_FALSE(cache.CheckIfNeedsIpChangeConfirm(out, nLast + 400, "1.2.3.4"));
+    // The cadence alone does not report an address change as due.
+    EXPECT_FALSE(cache.CheckIfNeedsNextConfirm(out, nLast + FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1));
+    // A node that is not confirmed is never due.
+    EXPECT_FALSE(cache.CheckIfNeedsIpChangeConfirm(COutPoint(uint256S("02"), 0), nLast + 400, "5.6.7.8"));
 }
