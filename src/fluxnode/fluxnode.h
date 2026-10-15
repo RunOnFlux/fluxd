@@ -42,6 +42,14 @@
 // FluxOS's usual API port: a confirm's ip omits it, and regtest, where no FluxOS runs, assumes it
 #define FLUXOS_DEFAULT_PORT 16127
 
+// The API ports a fluxnode's FluxOS serves on: FLUXOS_DEFAULT_PORT and the seven above it in steps
+// of ten, one per node on a shared host. A confirm carries no other port, and fluxbench countersigns
+// no other.
+inline bool IsFluxOSApiPort(int64_t nPort)
+{
+    return nPort >= FLUXOS_DEFAULT_PORT && nPort <= FLUXOS_DEFAULT_PORT + 70 && (nPort - FLUXOS_DEFAULT_PORT) % 10 == 0;
+}
+
 // Where FluxOS publishes the ports it has bound, {"apiPort": n, ...}; it removes the file on a clean stop
 #define FLUXOS_PORT_FILE "/run/fluxos/fluxos.json"
 
@@ -539,15 +547,16 @@ bool IpChangeConfirmDue(const std::string& strRecordIp, int nLastConfirmedHeight
 
 /** The port FluxOS publishes, as a confirm carries it. */
 struct FluxOSPortInfo {
-    int nPort = 0;          // 1-65535 while IsSet()
+    int nPort = 0;          // a fluxnode API port (IsFluxOSApiPort) while IsSet()
     std::string strSource;  // "file", "default" (regtest with no file) or "none"
     std::string strReason;  // why the port is absent, or where it came from
     bool IsSet() const { return nPort > 0; }
 };
 
-/** Read FluxOS's apiPort from the JSON file at strPath: an integer in 1-65535,
- *  other fields ignored. Anything else (no file, unreadable, malformed, no
- *  apiPort, not an integer, out of range) is absent, except that with
+/** Read FluxOS's apiPort from the JSON file at strPath: an integer that is a
+ *  fluxnode API port (IsFluxOSApiPort), other fields ignored. Anything else (no
+ *  file, unreadable, malformed, no apiPort, not an integer, not such a port) is
+ *  absent, except that with
  *  fDefaultWhenMissing a file that does not exist reads as FLUXOS_DEFAULT_PORT. */
 FluxOSPortInfo ReadFluxOSPort(const std::string& strPath, bool fDefaultWhenMissing);
 
