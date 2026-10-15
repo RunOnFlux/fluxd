@@ -72,5 +72,11 @@ public:
     void EnforceActiveFluxNodeTxVersion();
 
     int nLastTriedToConfirm;
+
+    // The decided address an early confirm was last sent for: one attempt per address change
+    std::string strEarlyConfirmHost;
+
+    // The last height at which a due confirm was held back for want of a decided address
+    int nLastNoAddressHeight = -1;
 };
 #endif //ZELCASHNODES_ACTIVEFLUXNODE_H

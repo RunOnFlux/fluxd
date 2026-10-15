@@ -39,6 +39,9 @@
 #define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V3 500 // PON activation - targeting 30 second blocks
 #define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 5
 
+// The port FluxOS serves on unless -fluxport says otherwise; a confirm's ip omits it
+#define FLUXOS_DEFAULT_PORT 16127
+
 // Maximum ip address size in fluxnode confirm transaction
 #define FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V1 40
 #define FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V2 60
@@ -466,6 +469,10 @@ public:
     bool InDoSTracker(const COutPoint& out);
     bool InConfirmTracker(const COutPoint& out);
     bool CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_nHeight);
+    /** Whether the confirmed node at out must confirm before its cadence to carry
+     *  strDecidedHost: it differs from the host the node's record holds and the
+     *  chain accepts an address change in the block after p_nHeight. */
+    bool CheckIfNeedsIpChangeConfirm(const COutPoint& out, const int& p_nHeight, const std::string& strDecidedHost);
 
     bool GetNextPayment(CTxDestination& dest, int nTier, COutPoint& p_fluxnodeOut, bool fFluxnodeDBRebuild = false);
 
@@ -516,5 +523,15 @@ bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet);
 bool IsFluxnodeTransactionsActive();
 
 bool IsTestnetBenchmarkBypassActive();
+
+/** The ip field of a confirm: strHost, with ":<port>" appended unless nFluxOSPort
+ *  is FLUXOS_DEFAULT_PORT. fluxbench writes the same form when it countersigns. */
+std::string FluxnodeConfirmIp(const std::string& strHost, int nFluxOSPort);
+
+/** Whether a node whose record holds strRecordIp, last confirmed at
+ *  nLastConfirmedHeight, may confirm an address change to strDecidedHost in
+ *  block nBlockHeight: the hosts differ and FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1
+ *  blocks have passed. */
+bool IpChangeConfirmDue(const std::string& strRecordIp, int nLastConfirmedHeight, const std::string& strDecidedHost, int nBlockHeight);
 
 #endif //ZELCASHNODES_FLUXNODE_H

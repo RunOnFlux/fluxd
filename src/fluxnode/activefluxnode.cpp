@@ -29,8 +29,12 @@ void ActiveFluxnode::ManageDeterministricFluxnode()
     // Get the current height
     int nHeight = chainActive.Height();
 
+    const DecidedAddressInfo decided = DecidedAddress();
+    const std::string strDecidedHost = decided.IsSet() ? decided.address.ToStringIP() : "";
+
     // Check if fluxnode is currently in the start list, if so we will be building the Initial Confirm Transaction
     // If the fluxnode is already confirmed check to see if it needs to be re confirmed, if so, Create the Update Transaction
+    int nUpdateType;
     if (g_fluxnodeCache.InStartTracker(activeFluxnode.deterministicOutPoint)) {
         // Check if we currently have a tx with the same vin in our mempool
         // If we do, Resend the wallet transactions to our peers
@@ -43,18 +47,40 @@ void ActiveFluxnode::ManageDeterministricFluxnode()
 
         // If we don't have one in our mempool. That means it is time to confirm the fluxnode
         if (nHeight - nLastTriedToConfirm > 3) { // Only try this every couple blocks
-            activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::INITIAL_CONFIRM);
+            nUpdateType = FluxnodeUpdateType::INITIAL_CONFIRM;
             LogPrintf("Fluxnode found in start tracker. Creating Initial Confirm Transactions %s\n", activeFluxnode.deterministicOutPoint.ToString());
         } else {
             return;
         }
     } else if (g_fluxnodeCache.CheckIfNeedsNextConfirm(activeFluxnode.deterministicOutPoint, nHeight)) {
-        activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::UPDATE_CONFIRM);
+        nUpdateType = FluxnodeUpdateType::UPDATE_CONFIRM;
         LogPrintf("Time to Confirm Fluxnode reached, Creating Update Confirm Transaction on height: %s for outpoint: %s\n", nHeight, activeFluxnode.deterministicOutPoint.ToString());
+    } else if (!strDecidedHost.empty() && strDecidedHost != strEarlyConfirmHost &&
+               g_fluxnodeCache.CheckIfNeedsIpChangeConfirm(activeFluxnode.deterministicOutPoint, nHeight, strDecidedHost)) {
+        // A confirm for this outpoint already in the mempool (FluxOS sends one through
+        // createconfirmationtransaction when it sees the change) takes the one slot the
+        // mempool holds per node; this check runs again once it is mined.
+        if (mempool.mapFluxnodeTxMempool.count(activeFluxnode.deterministicOutPoint)) {
+            LogPrintf("Decided address %s differs from the record, but a confirm for %s is already in the mempool\n", strDecidedHost, activeFluxnode.deterministicOutPoint.ToString());
+            return;
+        }
+        strEarlyConfirmHost = strDecidedHost;
+        nUpdateType = FluxnodeUpdateType::UPDATE_CONFIRM;
+        LogPrintf("Decided address changed to %s, Creating Update Confirm Transaction on height: %s for outpoint: %s\n", strDecidedHost, nHeight, activeFluxnode.deterministicOutPoint.ToString());
     } else {
         LogPrintf("Fluxnode found nothing to do on height: %s for outpoint: %s\n", nHeight, activeFluxnode.deterministicOutPoint.ToString());
         return;
     }
+
+    if (strDecidedHost.empty()) {
+        if (nLastNoAddressHeight != nHeight) {
+            nLastNoAddressHeight = nHeight;
+            LogPrintf("Fluxnode confirm due on height: %s for outpoint: %s, but fewer than %d peers agree on this node's address; not sending\n", nHeight, activeFluxnode.deterministicOutPoint.ToString(), DECIDED_ADDRESS_MIN_PEERS);
+        }
+        return;
+    }
+
+    activeFluxnode.BuildDeterministicConfirmTx(mutTx, nUpdateType);
 
     if (activeFluxnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
         CReserveKey reservekey(pwalletMain);
@@ -404,6 +430,11 @@ void ActiveFluxnode::BuildDeterministicConfirmTx(CMutableTransaction& mutTransac
     mutTransaction.nType = FLUXNODE_CONFIRM_TX_TYPE;
     mutTransaction.collateralIn = deterministicOutPoint;
     mutTransaction.nUpdateType = nUpdateType;
+
+    // fluxbench overwrites ip with its own value when it countersigns a version 5 or 6 confirm
+    const DecidedAddressInfo decided = DecidedAddress();
+    if (decided.IsSet())
+        mutTransaction.ip = FluxnodeConfirmIp(decided.address.ToStringIP(), GetArg("-fluxport", FLUXOS_DEFAULT_PORT));
 }
 
 void ActiveFluxnode::EnforceActiveFluxNodeTxVersion()
