@@ -333,6 +333,67 @@ bool IsLocal(const CService& addr)
     return mapLocalHost.count(addr) > 0;
 }
 
+static CCriticalSection cs_decidedAddress;
+static DecidedAddressInfo decidedAddress;
+
+bool DecideAddress(const std::vector<PeerAddressReport>& reports, bool fAllowNonRoutable, CNetAddr& addrOut, int& nPeersOut)
+{
+    // address -> (reporters, id of its newest reporter); pairs compare by count, then recency
+    std::map<CNetAddr, std::pair<int, NodeId>> tally;
+    for (const PeerAddressReport& report : reports) {
+        if (!report.addrLocal.IsIPv4() || !report.addrLocal.IsValid())
+            continue;
+        if (!fAllowNonRoutable && !report.addrLocal.IsRoutable())
+            continue;
+        auto& entry = tally.try_emplace(report.addrLocal, 0, report.nodeId).first->second;
+        entry.first++;
+        entry.second = std::max(entry.second, report.nodeId);
+    }
+
+    const std::pair<const CNetAddr, std::pair<int, NodeId>>* best = nullptr;
+    for (const auto& candidate : tally) {
+        if (!best || candidate.second > best->second)
+            best = &candidate;
+    }
+    if (!best || best->second.first < DECIDED_ADDRESS_MIN_PEERS)
+        return false;
+
+    addrOut = best->first;
+    nPeersOut = best->second.first;
+    return true;
+}
+
+void UpdateDecidedAddress()
+{
+    AssertLockHeld(cs_vNodes);
+
+    std::vector<PeerAddressReport> reports;
+    reports.reserve(vNodes.size());
+    for (const CNode* pnode : vNodes) {
+        if (pnode->fDisconnect || !pnode->addrLocal.IsValid())
+            continue;
+        reports.push_back({pnode->GetId(), pnode->addrLocal});
+    }
+
+    CNetAddr addr;
+    int nPeers = 0;
+    const bool fFound = DecideAddress(reports, Params().NetworkIDString() == "regtest", addr, nPeers);
+
+    LOCK(cs_decidedAddress);
+    if (fFound != decidedAddress.IsSet() || (fFound && addr != decidedAddress.address)) {
+        decidedAddress.address = fFound ? addr : CNetAddr();
+        decidedAddress.nChanged = GetTime();
+        LogPrintf("Decided address: %s (%d peers)\n", fFound ? addr.ToStringIP() : "none", fFound ? nPeers : 0);
+    }
+    decidedAddress.nPeers = fFound ? nPeers : 0;
+}
+
+DecidedAddressInfo DecidedAddress()
+{
+    LOCK(cs_decidedAddress);
+    return decidedAddress;
+}
+
 /** check whether a given network is one we can probably connect to */
 bool IsReachable(enum Network net)
 {
@@ -471,7 +532,9 @@ void CNode::PushVersion()
     int nBestHeight = g_signals.GetHeight().get_value_or(0);
 
     int64_t nTime = (fInbound ? GetAdjustedTime() : GetTime());
-    CAddress addrYou = (addr.IsRoutable() && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0",0)));
+    // On regtest every peer is on loopback; reporting it lets peers decide their address there.
+    const bool fReportable = addr.IsRoutable() || (Params().NetworkIDString() == "regtest" && addr.IsValid());
+    CAddress addrYou = (fReportable && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0",0)));
     CAddress addrMe = GetLocalAddress(&addr);
     GetRandBytes((unsigned char*)&nLocalHostNonce, sizeof(nLocalHostNonce));
     if (fLogIPs)
@@ -1092,6 +1155,7 @@ void ThreadSocketHandler()
             LOCK(cs_vNodes);
             // Disconnect unused nodes
             vector<CNode*> vNodesCopy = vNodes;
+            bool fRemoved = false;
             for (CNode* pnode : vNodesCopy)
             {
                 if (pnode->fDisconnect ||
@@ -1110,8 +1174,11 @@ void ThreadSocketHandler()
                     if (pnode->fNetworkNode || pnode->fInbound)
                         pnode->Release();
                     vNodesDisconnected.push_back(pnode);
+                    fRemoved = true;
                 }
             }
+            if (fRemoved)
+                UpdateDecidedAddress();
         }
         {
             // Delete disconnected nodes

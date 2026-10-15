@@ -203,6 +203,39 @@ struct LocalServiceInfo {
 extern CCriticalSection cs_mapLocalHost;
 extern std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
 
+/** The fewest peers that must report one address before the node takes it as its own. */
+static const int DECIDED_ADDRESS_MIN_PEERS = 3;
+
+/** One connected peer's view of this node's address: the addrMe of its version message. */
+struct PeerAddressReport {
+    NodeId nodeId;      // node ids rise with connection order: a higher id connected later
+    CNetAddr addrLocal;
+};
+
+/** The node's own public address as its peers report it. Nothing the operator
+ *  configures reaches it: -externalip governs only what the node advertises. */
+struct DecidedAddressInfo {
+    CNetAddr address;     // meaningful only while IsSet()
+    int nPeers = 0;       // connected peers reporting address; 0 while none
+    int64_t nChanged = 0; // when address last changed, including to or from none; 0 if never decided
+    bool IsSet() const { return nPeers > 0; }
+};
+
+/** The IPv4 address reported by the most peers, when at least
+ *  DECIDED_ADDRESS_MIN_PEERS report it. A tie goes to the address whose newest
+ *  reporter connected last. Only routable addresses count unless
+ *  fAllowNonRoutable (regtest, where every peer is on loopback). Returns false,
+ *  leaving the outputs untouched, when no address qualifies. */
+bool DecideAddress(const std::vector<PeerAddressReport>& reports, bool fAllowNonRoutable, CNetAddr& addrOut, int& nPeersOut);
+
+/** Recompute the decided address from every connected peer, inbound and
+ *  outbound. Caller holds cs_vNodes. Called when a peer's version arrives and
+ *  when peers are removed. */
+void UpdateDecidedAddress();
+
+/** The current decided address. */
+DecidedAddressInfo DecidedAddress();
+
 class CNodeStats
 {
 public:
