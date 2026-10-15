@@ -535,14 +535,15 @@ bool IsFluxnodeTransactionsActive();
 
 bool IsTestnetBenchmarkBypassActive();
 
-/** The ip field of a confirm: strHost, with ":<port>" appended unless nFluxOSPort
- *  is FLUXOS_DEFAULT_PORT. fluxbench writes the same form when it countersigns. */
+/** The ip field of a confirm: "strHost:nFluxOSPort", the port always present.
+ *  fluxbench countersigns this form only. */
 std::string FluxnodeConfirmIp(const std::string& strHost, int nFluxOSPort);
 
 /** Whether a node whose record holds strRecordIp, last confirmed at
  *  nLastConfirmedHeight, may confirm an address change to strConfirmIp (the
  *  whole ip a confirm would carry, host and port) in block nBlockHeight: the two
- *  differ and FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 blocks have passed. */
+ *  differ and FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 blocks have passed.
+ *  A record that names no port is the host at FLUXOS_DEFAULT_PORT. */
 bool IpChangeConfirmDue(const std::string& strRecordIp, int nLastConfirmedHeight, const std::string& strConfirmIp, int nBlockHeight);
 
 /** The port FluxOS publishes, as a confirm carries it. */
