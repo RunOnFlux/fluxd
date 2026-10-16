@@ -25,7 +25,9 @@ PEERS = 3
 
 
 async def connect_reporting(node: FluxNode, addr_me: str, count: int) -> list[NodeConn]:
-    """Open ``count`` peers that each report the node at ``addr_me``."""
+    """Open ``count`` peers that each report the node at ``addr_me``. The caller
+    keeps the returned connections for as long as the peers must stay: a
+    connection that is garbage-collected closes."""
     conns = []
     for _ in range(count):
         cb = NodeConnCB()
@@ -150,11 +152,11 @@ async def test_one_peer_suffices_on_regtest(node_factory: NodeFactory) -> None:
     # No peer reports an address: none is decided.
     assert await decided(node) == {"address": "", "peers": 0, "changed": 0}
 
-    await connect_reporting(node, "1.2.3.4", 1)
+    conns = await connect_reporting(node, "1.2.3.4", 1)
     await wait_decided(node, "1.2.3.4", 1)
 
     # Two peers for another address outvote the one.
-    await connect_reporting(node, "5.6.7.8", 2)
+    conns += await connect_reporting(node, "5.6.7.8", 2)
     await wait_decided(node, "5.6.7.8", 2)
     peers = await node.rpc.getpeerinfo()
     assert sorted(p["addrlocal"].rsplit(":", 1)[0] for p in peers) == [
@@ -167,18 +169,18 @@ async def test_one_peer_suffices_on_regtest(node_factory: NodeFactory) -> None:
 async def test_new_majority_changes_the_address(node_factory: NodeFactory) -> None:
     node = await node_factory(0, extra_args=POW_ARGS)
     first = await node.advance_mocktime(10)
-    await connect_reporting(node, "1.2.3.4", PEERS)
+    conns = await connect_reporting(node, "1.2.3.4", PEERS)
     assert (await wait_decided(node, "1.2.3.4", PEERS))["changed"] == first
 
     # Three newer peers for another address tie the decided one, which keeps its place.
     await node.advance_mocktime(10)
-    await connect_reporting(node, "5.6.7.8", PEERS)
+    conns += await connect_reporting(node, "5.6.7.8", PEERS)
     assert len(await node.rpc.getpeerinfo()) == 2 * PEERS
     assert await decided(node) == {"address": "1.2.3.4", "peers": PEERS, "changed": first}
 
     # A fourth peer for the new address gives it the majority.
     second = await node.advance_mocktime(10)
-    await connect_reporting(node, "5.6.7.8", 1)
+    conns += await connect_reporting(node, "5.6.7.8", 1)
     assert (await wait_decided(node, "5.6.7.8", PEERS + 1))["changed"] == second
 
 
@@ -208,7 +210,7 @@ async def test_confirm_rpc_needs_the_decided_address(
 
     # With an address decided the RPC goes on to build the confirm; the made-up
     # collateral has no fluxnode record, so signing fails and nothing is sent.
-    await connect_reporting(node, "1.2.3.4", 1)
+    conns = await connect_reporting(node, "1.2.3.4", 1)
     await wait_decided(node, "1.2.3.4", 1)
     with pytest.raises(JSONRPCError) as unsigned:
         await node.rpc.createconfirmationtransaction()
