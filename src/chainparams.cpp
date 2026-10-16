@@ -566,7 +566,8 @@ public:
         consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
         consensus.nPowTargetSpacing = 60;
 
-        consensus.ponLimit = uint256S("0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        // ~1/2 chance minimum: labnet runs about 16 nodes, and at 1/16 a third of slots would have no eligible node
+        consensus.ponLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.ponStartLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPonTargetSpacing = 30;
         consensus.nPonDifficultyWindow = 60;
