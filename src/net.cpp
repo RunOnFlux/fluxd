@@ -395,20 +395,13 @@ void UpdateDecidedAddress()
     const CNetAddr addrIncumbent = decidedAddress.IsSet() ? decidedAddress.address : CNetAddr();
     const bool fFound = DecideAddress(reports, Params().NetworkIDString() == "regtest", addrIncumbent, addr, nPeers);
 
-    bool fChanged = false;
+    decidedAddress.nPeers = fFound ? nPeers : 0;
     if (fFound != decidedAddress.IsSet() || (fFound && addr != decidedAddress.address)) {
         decidedAddress.address = fFound ? addr : CNetAddr();
         decidedAddress.nChanged = GetTime();
-        LogPrintf("Decided address: %s (%d peers)\n", fFound ? addr.ToStringIP() : "none", fFound ? nPeers : 0);
-        fChanged = true;
-    }
-    if (decidedAddress.nPeers != (fFound ? nPeers : 0)) {
-        decidedAddress.nPeers = fFound ? nPeers : 0;
-        fChanged = true;
-    }
-
-    if (fChanged)
+        LogPrintf("Decided address: %s (%d peers)\n", fFound ? addr.ToStringIP() : "none", decidedAddress.nPeers);
         PublishDecidedAddressLocked();
+    }
 }
 
 DecidedAddressInfo DecidedAddress()
@@ -432,8 +425,6 @@ bool WriteDecidedAddressFile(const std::filesystem::path& dir, const DecidedAddr
 {
     UniValue obj(UniValue::VOBJ);
     obj.pushKV("address", info.IsSet() ? info.address.ToStringIP() : "");
-    obj.pushKV("peers", info.nPeers);
-    obj.pushKV("changed", info.nChanged);
     obj.pushKV("pid", nPid);
 
     std::error_code ec;

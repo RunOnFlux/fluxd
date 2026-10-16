@@ -122,18 +122,23 @@ async def test_fluxnode_publishes_the_decided_address(
     node = await start_fluxnode(node_factory, fluxd_binary, tmp_path, monkeypatch)
     assert node._proc is not None
     pid = node._proc.pid
-    assert published(node) == {"address": "", "peers": 0, "changed": 0, "pid": pid}
+    assert published(node) == {"address": "", "pid": pid}
 
-    now = await node.advance_mocktime(10)
     conns = await connect_reporting(node, "1.2.3.4", PEERS)
     await wait_decided(node, "1.2.3.4", PEERS)
-    assert published(node) == {"address": "1.2.3.4", "peers": PEERS, "changed": now, "pid": pid}
+    assert published(node) == {"address": "1.2.3.4", "pid": pid}
+
+    # A peer more behind the same address leaves the file as it is.
+    path = node.datadir / "run" / "fluxd.json"
+    path.write_text("untouched")
+    conns += await connect_reporting(node, "1.2.3.4", 1)
+    await wait_decided(node, "1.2.3.4", PEERS + 1)
+    assert path.read_text() == "untouched"
 
     for conn in conns:
         await conn.disconnect_node()
     await wait_decided(node, "", 0)
-    assert published(node)["address"] == ""
-    assert published(node)["peers"] == 0
+    assert published(node) == {"address": "", "pid": pid}
 
     # A clean stop removes the file.
     await node.stop_daemon()
