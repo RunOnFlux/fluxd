@@ -39,6 +39,20 @@
 #define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_V3 500 // PON activation - targeting 30 second blocks
 #define FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 5
 
+// FluxOS's usual API port: a confirm's ip omits it, and regtest, where no FluxOS runs, assumes it
+#define FLUXOS_DEFAULT_PORT 16127
+
+// The API ports a fluxnode's FluxOS serves on: FLUXOS_DEFAULT_PORT and the seven above it in steps
+// of ten, one per node on a shared host. A confirm carries no other port, and fluxbench countersigns
+// no other.
+inline bool IsFluxOSApiPort(int64_t nPort)
+{
+    return nPort >= FLUXOS_DEFAULT_PORT && nPort <= FLUXOS_DEFAULT_PORT + 70 && (nPort - FLUXOS_DEFAULT_PORT) % 10 == 0;
+}
+
+// Where FluxOS publishes the ports it has bound, {"apiPort": n, ...}; it removes the file on a clean stop
+#define FLUXOS_PORT_FILE "/run/fluxos/fluxos.json"
+
 // Maximum ip address size in fluxnode confirm transaction
 #define FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V1 40
 #define FLUXNODE_CONFIRM_TX_IP_ADDRESS_SIZE_V2 60
@@ -466,6 +480,10 @@ public:
     bool InDoSTracker(const COutPoint& out);
     bool InConfirmTracker(const COutPoint& out);
     bool CheckIfNeedsNextConfirm(const COutPoint& out, const int& p_nHeight);
+    /** Whether the confirmed node at out must confirm before its cadence to carry
+     *  strConfirmIp (host and port): it differs from the ip the node's record
+     *  holds and the chain accepts an address change in the block after p_nHeight. */
+    bool CheckIfNeedsIpChangeConfirm(const COutPoint& out, const int& p_nHeight, const std::string& strConfirmIp);
 
     bool GetNextPayment(CTxDestination& dest, int nTier, COutPoint& p_fluxnodeOut, bool fFluxnodeDBRebuild = false);
 
@@ -516,5 +534,34 @@ bool GetKeysForP2SHFluxNode(CPubKey& pubKeyRet, CKey& keyRet);
 bool IsFluxnodeTransactionsActive();
 
 bool IsTestnetBenchmarkBypassActive();
+
+/** The ip field of a confirm: "strHost:nFluxOSPort", the port always present.
+ *  fluxbench countersigns this form only. */
+std::string FluxnodeConfirmIp(const std::string& strHost, int nFluxOSPort);
+
+/** Whether a node whose record holds strRecordIp, last confirmed at
+ *  nLastConfirmedHeight, may confirm an address change to strConfirmIp (the
+ *  whole ip a confirm would carry, host and port) in block nBlockHeight: the two
+ *  differ and FLUXNODE_CONFIRM_UPDATE_MIN_HEIGHT_IP_CHANGE_V1 blocks have passed.
+ *  A record that names no port is the host at FLUXOS_DEFAULT_PORT. */
+bool IpChangeConfirmDue(const std::string& strRecordIp, int nLastConfirmedHeight, const std::string& strConfirmIp, int nBlockHeight);
+
+/** The port FluxOS publishes, as a confirm carries it. */
+struct FluxOSPortInfo {
+    int nPort = 0;          // a fluxnode API port (IsFluxOSApiPort) while IsSet()
+    std::string strSource;  // "file", "default" (regtest with no file) or "none"
+    std::string strReason;  // why the port is absent, or where it came from
+    bool IsSet() const { return nPort > 0; }
+};
+
+/** Read FluxOS's apiPort from the JSON file at strPath: an integer that is a
+ *  fluxnode API port (IsFluxOSApiPort), other fields ignored. Anything else (no
+ *  file, unreadable, malformed, no apiPort, not an integer, not such a port) is
+ *  absent, except that with
+ *  fDefaultWhenMissing a file that does not exist reads as FLUXOS_DEFAULT_PORT. */
+FluxOSPortInfo ReadFluxOSPort(const std::string& strPath, bool fDefaultWhenMissing);
+
+/** FluxOS's published port now: FLUXOS_PORT_FILE, defaulting on regtest only. */
+FluxOSPortInfo FluxOSPort();
 
 #endif //ZELCASHNODES_FLUXNODE_H
