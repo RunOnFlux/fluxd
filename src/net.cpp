@@ -395,8 +395,9 @@ void UpdateDecidedAddress()
     const CNetAddr addrIncumbent = decidedAddress.IsSet() ? decidedAddress.address : CNetAddr();
     const bool fFound = DecideAddress(reports, Params().NetworkIDString() == "regtest", addrIncumbent, addr, nPeers);
 
+    const bool fChanged = fFound != decidedAddress.IsSet() || (fFound && addr != decidedAddress.address);
     decidedAddress.nPeers = fFound ? nPeers : 0;
-    if (fFound != decidedAddress.IsSet() || (fFound && addr != decidedAddress.address)) {
+    if (fChanged) {
         decidedAddress.address = fFound ? addr : CNetAddr();
         decidedAddress.nChanged = GetTime();
         LogPrintf("Decided address: %s (%d peers)\n", fFound ? addr.ToStringIP() : "none", decidedAddress.nPeers);
