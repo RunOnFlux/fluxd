@@ -237,8 +237,9 @@ DecidedAddressInfo DecidedAddress();
 
 /** fluxd publishes its decided address for fluxbench and FluxOS to read, in
  *  DECIDED_ADDRESS_FILE under DecidedAddressFileDir(), as
- *  {"address": "a.b.c.d" or "", "peers": n, "changed": unix time or 0, "pid": n}.
- *  Nothing in fluxd reads it. */
+ *  {"address": "a.b.c.d" or "", "pid": n}: what a reader acts on, so a peer
+ *  connecting or leaving does not rewrite it; the peer count and the time of the
+ *  last change are in the RPC. Nothing in fluxd reads it. */
 #define DECIDED_ADDRESS_DIR "/run/fluxd"
 #define DECIDED_ADDRESS_FILE "fluxd.json"
 
@@ -253,9 +254,8 @@ bool WriteDecidedAddressFile(const std::filesystem::path& dir, const DecidedAddr
 /** Remove dir/DECIDED_ADDRESS_FILE; an absent file is not a failure. */
 bool RemoveDecidedAddressFile(const std::filesystem::path& dir, std::string& strError);
 
-/** Publish to dir now and on every later change of the decided address or the
- *  number of peers behind it. A failed write is logged as an error
- *  (DecidedAddressWriteLog) and otherwise ignored. */
+/** Publish to dir now and on every later change of the decided address. A failed
+ *  write is logged as an error (DecidedAddressWriteLog) and otherwise ignored. */
 void StartPublishingDecidedAddress(const std::filesystem::path& dir);
 
 /** Stop publishing and remove the file; a failed removal is logged and ignored. */
