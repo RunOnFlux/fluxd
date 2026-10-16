@@ -488,10 +488,15 @@ private:
     static inline int counter = 0;
 };
 
-UniValue ReadJson(const std::filesystem::path& path)
+std::string ReadText(const std::filesystem::path& path)
 {
     std::ifstream file(path);
-    std::string str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    return std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+}
+
+UniValue ReadJson(const std::filesystem::path& path)
+{
+    const std::string str = ReadText(path);
     UniValue json;
     EXPECT_TRUE(json.read(str)) << str;
     return json;
@@ -508,7 +513,7 @@ std::vector<std::string> Entries(const std::filesystem::path& dir)
 
 } // namespace
 
-TEST(DecidedAddress, FileWrittenWithItsFourFields)
+TEST(DecidedAddress, FileWrittenWithAddressAndPid)
 {
     TempDir tmp;
     // The directory is created when absent.
@@ -525,22 +530,19 @@ TEST(DecidedAddress, FileWrittenWithItsFourFields)
     EXPECT_EQ(Entries(dir), std::vector<std::string>{DECIDED_ADDRESS_FILE});
     const UniValue json = ReadJson(dir / DECIDED_ADDRESS_FILE);
     ASSERT_TRUE(json.isObject());
-    EXPECT_EQ(json.size(), 4u);
+    EXPECT_EQ(json.size(), 2u);
     EXPECT_EQ(find_value(json, "address").get_str(), "178.79.183.164");
-    EXPECT_EQ(find_value(json, "peers").get_int(), 14);
-    EXPECT_EQ(find_value(json, "changed").get_int64(), 1792067007);
     EXPECT_EQ(find_value(json, "pid").get_int(), 12345);
 
     using std::filesystem::perms;
     EXPECT_EQ(std::filesystem::status(dir / DECIDED_ADDRESS_FILE).permissions() & perms::all, perms(0644));
     EXPECT_EQ(std::filesystem::status(dir).permissions() & perms::all, perms(0755));
 
-    // Nothing decided: an empty address, no peers, never changed.
+    // Nothing decided: an empty address.
     ASSERT_TRUE(WriteDecidedAddressFile(dir, DecidedAddressInfo(), 12345, strError)) << strError;
     const UniValue none = ReadJson(dir / DECIDED_ADDRESS_FILE);
+    EXPECT_EQ(none.size(), 2u);
     EXPECT_EQ(find_value(none, "address").get_str(), "");
-    EXPECT_EQ(find_value(none, "peers").get_int(), 0);
-    EXPECT_EQ(find_value(none, "changed").get_int64(), 0);
     EXPECT_EQ(Entries(dir), std::vector<std::string>{DECIDED_ADDRESS_FILE});
 }
 
@@ -594,12 +596,13 @@ TEST(DecidedAddress, FilePublishedOnChangeAndRemovedOnStop)
     UpdateWithPeers({"1.2.3.4", "1.2.3.4", "1.2.3.4"});
     json = ReadJson(tmp.path / DECIDED_ADDRESS_FILE);
     EXPECT_EQ(find_value(json, "address").get_str(), "1.2.3.4");
-    EXPECT_EQ(find_value(json, "peers").get_int(), 3);
-    EXPECT_EQ(find_value(json, "changed").get_int64(), 1700000500);
 
-    // A peer more behind the same address is published too.
+    // A peer more or fewer behind the same address leaves the file as it is.
+    std::ofstream(tmp.path / DECIDED_ADDRESS_FILE) << "untouched";
     UpdateWithPeers({"1.2.3.4", "1.2.3.4", "1.2.3.4", "1.2.3.4"});
-    EXPECT_EQ(find_value(ReadJson(tmp.path / DECIDED_ADDRESS_FILE), "peers").get_int(), 4);
+    UpdateWithPeers({"1.2.3.4", "1.2.3.4", "1.2.3.4"});
+    EXPECT_EQ(ReadText(tmp.path / DECIDED_ADDRESS_FILE), "untouched");
+    EXPECT_EQ(DecidedAddress().nPeers, 3);
 
     UpdateWithPeers({});
     EXPECT_EQ(find_value(ReadJson(tmp.path / DECIDED_ADDRESS_FILE), "address").get_str(), "");
