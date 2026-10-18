@@ -194,6 +194,23 @@ unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
     return newTarget.GetCompact();
 }
 
+int ComparePonForkChoice(const CBlockIndex* a, const CBlockIndex* b)
+{
+    // PON blocks compare by the PON hash cached on the index entry; lower wins.
+    // The score is a resident field: recomputing it from GetBlockHeader() would
+    // hash a zeroed nodesCollateral once the entry's header data has been
+    // pruned, and the score would change when header data is restored —
+    // mutating a comparator key in place for entries already inside
+    // setBlockIndexCandidates.
+    const uint256& scoreA = a->hashPON;
+    const uint256& scoreB = b->hashPON;
+
+    if (scoreA < scoreB) return -1;  // a preferred
+    if (scoreA > scoreB) return 1;   // b preferred
+    return 0;                         // undecided -> caller falls back to first-seen
+}
+
+
 bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPrev,
                             const Consensus::Params& params)
 {

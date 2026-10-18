@@ -260,6 +260,7 @@ libbitcoin_server_a_SOURCES = \
   asyncrpcqueue.cpp \
   blockencodings.cpp \
   bloom.cpp \
+  blockindexpool.cpp \
   chain.cpp \
   checkpoints.cpp \
   deprecation.cpp \
@@ -472,6 +473,7 @@ fluxd_SOURCES += fluxd-res.rc
 endif
 
 fluxd_LDADD = \
+  $(JEMALLOC_LIBS) \
   $(LIBBITCOIN_SERVER) \
   $(LIBBITCOIN_WALLET) \
   $(LIBBITCOIN_COMMON) \
