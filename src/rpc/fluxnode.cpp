@@ -424,6 +424,8 @@ UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
         throw runtime_error(
                 "createconfirmationtransaction\n"
                 "\nCreate a new confirmation transaction, tries to get fluxbench to sign it. Broadcasts it.\n"
+                "Its ip is this node's decided address with the port FluxOS publishes (see getnetworkinfo);\n"
+                "while either is absent nothing is sent and the error names which.\n"
 
                 "\nResult:\n"
                 "    \"status\": \"xxxx\",    (string) \"Successfully Sent\" or \"Fail to send\"\n"
@@ -435,10 +437,14 @@ UniValue createconfirmationtransaction(const UniValue& params, bool fHelp)
 
     if (!fFluxnode) throw JSONRPCError(RPC_INVALID_REQUEST, "This is not a Flux Node");
 
+    std::string strIp, strMissing;
+    if (!GetConfirmIp(strIp, strMissing))
+        throw JSONRPCError(RPC_MISC_ERROR, strprintf("No confirmation sent: %s", strMissing));
+
     std::string errorMessage;
     CMutableTransaction mutTx;
 
-    activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::UPDATE_CONFIRM);
+    activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::UPDATE_CONFIRM, strIp);
 
     if (!activeFluxnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
         throw JSONRPCError(RPC_VERIFY_ERROR, strprintf("Failed to sign new confirmation transaction: %s\n", errorMessage));
@@ -1864,6 +1870,16 @@ UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
                 "  \"pubkey\": \"key\",                     (string) Fluxnode public key used for message broadcasting\n"
                 "  \"activesince\": ttt,                    (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode has been active\n"
                 "  \"lastpaid\": ttt,                       (numeric) The time in seconds since epoch (Jan 1 1970 GMT) fluxnode was last paid\n"
+                "  \"decided_address\": {                   (object) this node's public address as its peers report it (see getnetworkinfo)\n"
+                "    \"address\": \"a.b.c.d\",              (string) empty if none\n"
+                "    \"peers\": n,                          (numeric) connected peers reporting it\n"
+                "    \"changed\": ttt                       (numeric) unix time it last changed\n"
+                "  }\n"
+                "  \"fluxos_port\": {                       (object) the port FluxOS publishes (see getnetworkinfo)\n"
+                "    \"port\": n,                           (numeric) null if absent\n"
+                "    \"source\": \"file\",                    (string) \"file\", \"default\" or \"none\"\n"
+                "    \"reason\": \"...\"                      (string) why the port is absent, or where it came from\n"
+                "  }\n"
                 "}\n"
 
                 "\nExamples:\n" +
@@ -1918,6 +1934,8 @@ UniValue getfluxnodestatus (const UniValue& params, bool fHelp, string cmdname)
             info.pushKV("amount", FormatMoney(data.nCollateral));
         }
     }
+    info.pushKV("decided_address", DecidedAddressToJSON());
+    info.pushKV("fluxos_port", FluxOSPortToJSON());
 
     return info;
 }

@@ -163,6 +163,9 @@ public:
     const uint256& GetEmergencyCollateralHash() const { return emergencyCollateralHash; }
     int GetEmergencyMinSignatures() const { return nEmergencyMinSignatures; }
 
+    /** The fewest connected peers that must report one address before the node takes it as its own. */
+    int DecidedAddressMinPeers() const { return nDecidedAddressMinPeers; }
+
 
 protected:
     CChainParams() {}
@@ -237,6 +240,8 @@ protected:
     std::vector<std::string> vecEmergencyPublicKeys;
     uint256 emergencyCollateralHash;
     int nEmergencyMinSignatures = 2; // Require 2-of-N signatures
+
+    int nDecidedAddressMinPeers = 3;
 };
 
 /**

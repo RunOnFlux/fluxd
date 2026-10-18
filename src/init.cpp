@@ -254,6 +254,7 @@ void Shutdown()
     StopPONMinter();
     // StopNode() is now called in Interrupt() before joining threads to release semaphores
     StopTorControl();
+    StopPublishingDecidedAddress();
 
     UnregisterNodeSignals(GetNodeSignals());
 
@@ -2232,6 +2233,9 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
             LogPrintf("Tor hidden service not started: dedicated onion bind unavailable.\n");
     }
 
+    // Its readers, fluxbench and FluxOS, run only beside a fluxnode.
+    if (fFluxnode)
+        StartPublishingDecidedAddress(DecidedAddressFileDir());
     StartNode(threadGroup, scheduler);
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected

@@ -203,6 +203,81 @@ struct LocalServiceInfo {
 extern CCriticalSection cs_mapLocalHost;
 extern std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
 
+/** One connected peer's view of this node's address: the addrMe of its version message. */
+struct PeerAddressReport {
+    NodeId nodeId;      // node ids rise with connection order: a higher id connected later
+    CNetAddr addrLocal;
+};
+
+/** The node's own public address as its peers report it. Nothing the operator
+ *  configures reaches it: -externalip governs only what the node advertises. */
+struct DecidedAddressInfo {
+    CNetAddr address;     // meaningful only while IsSet()
+    int nPeers = 0;       // connected peers reporting address; 0 while none
+    int64_t nChanged = 0; // when address last changed, including to or from none; 0 if never decided
+    bool IsSet() const { return nPeers > 0; }
+};
+
+/** The IPv4 address reported by the most peers, when at least
+ *  Params().DecidedAddressMinPeers() report it. On a tie addrIncumbent, the
+ *  address currently decided (a default CNetAddr when none), keeps its place if
+ *  it is among the leaders; otherwise the address whose newest reporter
+ *  connected last wins. Only routable addresses count unless fAllowNonRoutable
+ *  (regtest, where every peer is on loopback). Returns false, leaving the
+ *  outputs untouched, when no address qualifies. */
+bool DecideAddress(const std::vector<PeerAddressReport>& reports, bool fAllowNonRoutable, const CNetAddr& addrIncumbent, CNetAddr& addrOut, int& nPeersOut);
+
+/** Recompute the decided address from every connected peer, inbound and
+ *  outbound. Caller holds cs_vNodes. Called when a peer's version arrives and
+ *  when peers are removed. */
+void UpdateDecidedAddress();
+
+/** The current decided address. */
+DecidedAddressInfo DecidedAddress();
+
+/** fluxd publishes its decided address for fluxbench and FluxOS to read, in
+ *  DECIDED_ADDRESS_FILE under DecidedAddressFileDir(), as
+ *  {"address": "a.b.c.d" or "", "pid": n}: what a reader acts on, so a peer
+ *  connecting or leaving does not rewrite it; the peer count and the time of the
+ *  last change are in the RPC. Nothing in fluxd reads it. */
+#define DECIDED_ADDRESS_DIR "/run/fluxd"
+#define DECIDED_ADDRESS_FILE "fluxd.json"
+
+/** DECIDED_ADDRESS_DIR; on regtest <datadir>/run, where the qa suite reads it. */
+std::filesystem::path DecidedAddressFileDir();
+
+/** Write info to dir/DECIDED_ADDRESS_FILE, world-readable, through a temporary
+ *  file in dir renamed over it; dir is created 0755 if absent. False, with
+ *  strError, on any failure, leaving no temporary file behind. */
+bool WriteDecidedAddressFile(const std::filesystem::path& dir, const DecidedAddressInfo& info, int64_t nPid, std::string& strError);
+
+/** Remove dir/DECIDED_ADDRESS_FILE; an absent file is not a failure. */
+bool RemoveDecidedAddressFile(const std::filesystem::path& dir, std::string& strError);
+
+/** Publish to dir now and on every later change of the decided address. A failed
+ *  write is logged as an error (DecidedAddressWriteLog) and otherwise ignored. */
+void StartPublishingDecidedAddress(const std::filesystem::path& dir);
+
+/** Stop publishing and remove the file; a failed removal is logged and ignored. */
+void StopPublishingDecidedAddress();
+
+/** Whether the decided address is being published: only between Start and Stop,
+ *  which a daemon calls only in fluxnode mode, beside the services that read it. */
+bool IsPublishingDecidedAddress();
+
+/** Which outcomes of publishing are logged: the first failure for a reason, and
+ *  the first success after failures. A write is attempted on every change, so a
+ *  failure that persists would otherwise log on every peer connect. */
+class DecidedAddressWriteLog
+{
+public:
+    /** The line to log for this write's outcome, or "" for none. */
+    std::string Outcome(bool fWritten, const std::string& strError);
+
+private:
+    std::string strFailing; // the reason of the failure last logged; "" while writes succeed
+};
+
 class CNodeStats
 {
 public:

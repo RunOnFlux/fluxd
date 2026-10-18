@@ -32,7 +32,11 @@
 #endif
 
 #include <filesystem>
+#include <fstream>
 #include <string_view>
+#include <unistd.h>
+
+#include <univalue.h>
 #include <condition_variable>
 #include <mutex>
 #include <condition_variable>
@@ -333,6 +337,199 @@ bool IsLocal(const CService& addr)
     return mapLocalHost.count(addr) > 0;
 }
 
+static CCriticalSection cs_decidedAddress;
+static DecidedAddressInfo decidedAddress;
+
+static void PublishDecidedAddressLocked();
+
+bool DecideAddress(const std::vector<PeerAddressReport>& reports, bool fAllowNonRoutable, const CNetAddr& addrIncumbent, CNetAddr& addrOut, int& nPeersOut)
+{
+    // address -> (reporters, id of its newest reporter)
+    std::map<CNetAddr, std::pair<int, NodeId>> tally;
+    for (const PeerAddressReport& report : reports) {
+        if (!report.addrLocal.IsIPv4() || !report.addrLocal.IsValid())
+            continue;
+        if (!fAllowNonRoutable && !report.addrLocal.IsRoutable())
+            continue;
+        auto& entry = tally.try_emplace(report.addrLocal, 0, report.nodeId).first->second;
+        entry.first++;
+        entry.second = std::max(entry.second, report.nodeId);
+    }
+
+    // Most reporters first; among equals the incumbent, then the newest reporter.
+    const std::pair<const CNetAddr, std::pair<int, NodeId>>* best = nullptr;
+    for (const auto& candidate : tally) {
+        if (best && candidate.second.first < best->second.first)
+            continue;
+        if (best && candidate.second.first == best->second.first) {
+            if (best->first == addrIncumbent)
+                continue;
+            if (candidate.first != addrIncumbent && candidate.second.second < best->second.second)
+                continue;
+        }
+        best = &candidate;
+    }
+    if (!best || best->second.first < Params().DecidedAddressMinPeers())
+        return false;
+
+    addrOut = best->first;
+    nPeersOut = best->second.first;
+    return true;
+}
+
+void UpdateDecidedAddress()
+{
+    AssertLockHeld(cs_vNodes);
+
+    std::vector<PeerAddressReport> reports;
+    reports.reserve(vNodes.size());
+    for (const CNode* pnode : vNodes) {
+        if (pnode->fDisconnect || !pnode->addrLocal.IsValid())
+            continue;
+        reports.push_back({pnode->GetId(), pnode->addrLocal});
+    }
+
+    LOCK(cs_decidedAddress);
+    CNetAddr addr;
+    int nPeers = 0;
+    const CNetAddr addrIncumbent = decidedAddress.IsSet() ? decidedAddress.address : CNetAddr();
+    const bool fFound = DecideAddress(reports, Params().NetworkIDString() == "regtest", addrIncumbent, addr, nPeers);
+
+    const bool fChanged = fFound != decidedAddress.IsSet() || (fFound && addr != decidedAddress.address);
+    decidedAddress.nPeers = fFound ? nPeers : 0;
+    if (fChanged) {
+        decidedAddress.address = fFound ? addr : CNetAddr();
+        decidedAddress.nChanged = GetTime();
+        LogPrintf("Decided address: %s (%d peers)\n", fFound ? addr.ToStringIP() : "none", decidedAddress.nPeers);
+        PublishDecidedAddressLocked();
+    }
+}
+
+DecidedAddressInfo DecidedAddress()
+{
+    LOCK(cs_decidedAddress);
+    return decidedAddress;
+}
+
+// The directory the decided address is published in; unset while not publishing.
+static std::optional<std::filesystem::path> decidedAddressDir;
+static DecidedAddressWriteLog decidedAddressWriteLog;
+
+std::filesystem::path DecidedAddressFileDir()
+{
+    if (Params().NetworkIDString() == "regtest")
+        return GetDataDir(false) / "run";
+    return DECIDED_ADDRESS_DIR;
+}
+
+bool WriteDecidedAddressFile(const std::filesystem::path& dir, const DecidedAddressInfo& info, int64_t nPid, std::string& strError)
+{
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("address", info.IsSet() ? info.address.ToStringIP() : "");
+    obj.pushKV("pid", nPid);
+
+    std::error_code ec;
+    if (!std::filesystem::is_directory(dir, ec)) {
+        if (!std::filesystem::create_directories(dir, ec) || ec) {
+            strError = strprintf("cannot create %s: %s", dir.string(), ec ? ec.message() : "not a directory");
+            return false;
+        }
+        std::filesystem::permissions(dir, std::filesystem::perms(0755), ec);
+    }
+
+    // Written beside the final name and renamed over it, so a reader sees the old file or the new one.
+    const std::filesystem::path path = dir / DECIDED_ADDRESS_FILE;
+    const std::filesystem::path tmp = dir / strprintf(".%s.%d.tmp", DECIDED_ADDRESS_FILE, nPid);
+    {
+        std::ofstream file(tmp, std::ios::out | std::ios::trunc);
+        file << obj.write() << "\n";
+        file.close();
+        if (!file) {
+            std::filesystem::remove(tmp, ec);
+            strError = strprintf("cannot write %s", tmp.string());
+            return false;
+        }
+    }
+    std::filesystem::permissions(tmp, std::filesystem::perms(0644), ec);
+    if (ec) {
+        strError = strprintf("cannot make %s world-readable: %s", tmp.string(), ec.message());
+        std::filesystem::remove(tmp, ec);
+        return false;
+    }
+    std::filesystem::rename(tmp, path, ec);
+    if (ec) {
+        strError = strprintf("cannot rename %s to %s: %s", tmp.string(), path.string(), ec.message());
+        std::filesystem::remove(tmp, ec);
+        return false;
+    }
+    return true;
+}
+
+bool RemoveDecidedAddressFile(const std::filesystem::path& dir, std::string& strError)
+{
+    std::error_code ec;
+    std::filesystem::remove(dir / DECIDED_ADDRESS_FILE, ec);
+    if (ec) {
+        strError = strprintf("cannot remove %s: %s", (dir / DECIDED_ADDRESS_FILE).string(), ec.message());
+        return false;
+    }
+    return true;
+}
+
+static void PublishDecidedAddressLocked()
+{
+    AssertLockHeld(cs_decidedAddress);
+    if (!decidedAddressDir)
+        return;
+    std::string strError;
+    const bool fWritten = WriteDecidedAddressFile(*decidedAddressDir, decidedAddress, getpid(), strError);
+    const std::string strLine = decidedAddressWriteLog.Outcome(fWritten, strError);
+    if (strLine.empty())
+        return;
+    if (fWritten)
+        LogPrintf("%s\n", strLine);
+    else
+        error("%s", strLine);
+}
+
+std::string DecidedAddressWriteLog::Outcome(bool fWritten, const std::string& strError)
+{
+    if (fWritten) {
+        if (strFailing.empty())
+            return "";
+        strFailing.clear();
+        return "Decided address published again";
+    }
+    if (strError == strFailing)
+        return "";
+    strFailing = strError;
+    return "Decided address not published: " + strError;
+}
+
+bool IsPublishingDecidedAddress()
+{
+    LOCK(cs_decidedAddress);
+    return decidedAddressDir.has_value();
+}
+
+void StartPublishingDecidedAddress(const std::filesystem::path& dir)
+{
+    LOCK(cs_decidedAddress);
+    decidedAddressDir = dir;
+    PublishDecidedAddressLocked();
+}
+
+void StopPublishingDecidedAddress()
+{
+    LOCK(cs_decidedAddress);
+    if (!decidedAddressDir)
+        return;
+    std::string strError;
+    if (!RemoveDecidedAddressFile(*decidedAddressDir, strError))
+        LogPrintf("%s: %s\n", __func__, strError);
+    decidedAddressDir.reset();
+}
+
 /** check whether a given network is one we can probably connect to */
 bool IsReachable(enum Network net)
 {
@@ -471,7 +668,9 @@ void CNode::PushVersion()
     int nBestHeight = g_signals.GetHeight().get_value_or(0);
 
     int64_t nTime = (fInbound ? GetAdjustedTime() : GetTime());
-    CAddress addrYou = (addr.IsRoutable() && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0",0)));
+    // On regtest every peer is on loopback; reporting it lets peers decide their address there.
+    const bool fReportable = addr.IsRoutable() || (Params().NetworkIDString() == "regtest" && addr.IsValid());
+    CAddress addrYou = (fReportable && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0",0)));
     CAddress addrMe = GetLocalAddress(&addr);
     GetRandBytes((unsigned char*)&nLocalHostNonce, sizeof(nLocalHostNonce));
     if (fLogIPs)
@@ -1092,6 +1291,7 @@ void ThreadSocketHandler()
             LOCK(cs_vNodes);
             // Disconnect unused nodes
             vector<CNode*> vNodesCopy = vNodes;
+            bool fRemoved = false;
             for (CNode* pnode : vNodesCopy)
             {
                 if (pnode->fDisconnect ||
@@ -1110,8 +1310,11 @@ void ThreadSocketHandler()
                     if (pnode->fNetworkNode || pnode->fInbound)
                         pnode->Release();
                     vNodesDisconnected.push_back(pnode);
+                    fRemoved = true;
                 }
             }
+            if (fRemoved)
+                UpdateDecidedAddress();
         }
         {
             // Delete disconnected nodes
