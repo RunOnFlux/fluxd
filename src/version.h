@@ -10,7 +10,7 @@
  * network protocol versioning
  */
 
-static const int PROTOCOL_VERSION = 170021;
+static const int PROTOCOL_VERSION = 170022;
 
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
@@ -55,5 +55,9 @@ static const int SENDCMPCT_VERSION = 170021;
 
 //! "cmpheaders" message for efficient header sync of checkpointed blocks
 static const int CMPHEADERS_VERSION = 170021;
+
+//! BIP155 / TORv3: peers at or above this version exchange `sendaddrv2`
+//! and may receive `addrv2` / `getaddrv2` messages carrying TORv3 addresses.
+static const int SENDADDRV2_VERSION = 170022;
 
 #endif // BITCOIN_VERSION_H
