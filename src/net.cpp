@@ -2498,6 +2498,9 @@ bool CAddrDB::Read(CAddrMan& addr)
         ssPeers >> addr;
     }
     catch (const std::exception& e) {
+        // A load that fails part-way leaves entries the tables no longer point
+        // at; start from an empty addrman instead.
+        addr.Clear();
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
     }
 

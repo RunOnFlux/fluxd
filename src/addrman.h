@@ -286,7 +286,8 @@ public:
     /**
      * serialized format:
      * * version byte (1 = legacy, 2 = BIP155-aware addrv2 entries)
-     * * 0x20 + nKey (serialized as if it were a vector, for backward compatibility)
+     * * INCOMPATIBILITY_BASE + the lowest format version able to read the file, then nKey
+     *   (the byte is where a 32-byte key's length used to be)
      * * nNew
      * * nTried
      * * number of "new" buckets XOR 2**30
@@ -305,12 +306,16 @@ public:
      * as incompatible. This is necessary because it did not check the version number on
      * deserialization.
      *
-     * Backwards compatibility:
-     *  - A new fluxd reading a format-1 peers.dat: works (legacy V1 path).
-     *  - An old fluxd reading a format-2 peers.dat: bounds checks on the
-     *    garbage-shaped entries will throw, addrman starts empty, the node
-     *    relearns its peers from the network. addrman is a cache, not
-     *    consensus state, so this is acceptable.
+     * Compatibility:
+     *  - A format-2 reader reads format 1 and format 2, including format-2 files
+     *    that carry the bare 32 (lowest compatible 0).
+     *  - A format-1-only fluxd reads the second byte as the key's length and
+     *    throws "Incorrect keysize" on 34 before loading any entry, so it starts
+     *    empty rather than misparsing format-2 entries.
+     *  - A file whose lowest compatible version is above ADDRMAN_FORMAT_VERSION
+     *    is refused before any entry is read.
+     *  addrman is a cache, not consensus state: a refused file means an empty
+     *  start, and the node relearns its peers from the network.
      *
      * Notice that vvTried, mapAddr and vVector are never encoded explicitly;
      * they are instead reconstructed from the other information.
@@ -324,7 +329,12 @@ public:
      * We don't use ADD_SERIALIZE_METHODS since the serialization and deserialization code has
      * very little in common.
      */
-    static const unsigned char ADDRMAN_FORMAT_VERSION = 2;
+    static constexpr unsigned char ADDRMAN_FORMAT_VERSION = 2;
+    //! The lowest format version that can read what this version writes.
+    static constexpr unsigned char ADDRMAN_LOWEST_COMPATIBLE = 2;
+    //! Added to the lowest compatible version in the second byte. A reader
+    //! that predates the scheme takes the byte as a key length of 32.
+    static constexpr unsigned char INCOMPATIBILITY_BASE = 32;
 
     template<typename Stream>
     void Serialize(Stream &s) const
@@ -333,7 +343,7 @@ public:
 
         unsigned char nVersion = ADDRMAN_FORMAT_VERSION;
         s << nVersion;
-        s << ((unsigned char)32);
+        s << ((unsigned char)(INCOMPATIBILITY_BASE + ADDRMAN_LOWEST_COMPATIBLE));
         s << nKey;
         s << nNew;
         s << nTried;
@@ -393,9 +403,18 @@ public:
         }
         const bool fV2 = (nVersion == 2);
 
-        unsigned char nKeySize;
-        s >> nKeySize;
-        if (nKeySize != 32) throw std::ios_base::failure("Incorrect keysize in addrman deserialization");
+        unsigned char nCompat;
+        s >> nCompat;
+        if (nCompat < INCOMPATIBILITY_BASE) {
+            throw std::ios_base::failure("Corrupt CAddrMan serialization, compatibility byte below base");
+        }
+        const int nLowestCompatible = nCompat - INCOMPATIBILITY_BASE;
+        if (nLowestCompatible > ADDRMAN_FORMAT_VERSION) {
+            throw std::ios_base::failure(strprintf(
+                "Unsupported format of addrman database: %d. It is compatible with formats >=%d, "
+                "but the maximum supported by this version of fluxd is %d.",
+                nVersion, nLowestCompatible, ADDRMAN_FORMAT_VERSION));
+        }
         s >> nKey;
         s >> nNew;
         s >> nTried;
@@ -494,6 +513,8 @@ public:
 
     void Clear()
     {
+        mapInfo.clear();
+        mapAddr.clear();
         std::vector<int>().swap(vRandom);
         nKey = GetRandHash();
         for (size_t bucket = 0; bucket < ADDRMAN_NEW_BUCKET_COUNT; bucket++) {
