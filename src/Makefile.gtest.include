@@ -97,6 +97,9 @@ flux_gtest_SOURCES += \
 	gtest/test_decided_address.cpp \
 	gtest/test_blockindexpool.cpp \
 	gtest/test_fluxnodecache.cpp
+if ENABLE_ZMQ
+flux_gtest_SOURCES += gtest/test_zmqrpc.cpp
+endif
 if ENABLE_WALLET
 flux_gtest_SOURCES += \
 	wallet/gtest/test_paymentdisclosure.cpp \
