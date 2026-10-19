@@ -337,6 +337,9 @@ CBlockIndex * InsertBlockIndex(uint256 hash);
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
 /** Increase a node's misbehavior score. */
 void Misbehaving(NodeId nodeid, int howmuch);
+/** The misbehaviour score for a peer's nUnconnecting-th headers announcement in a row whose first
+ *  header does not connect: 20 for every MAX_UNCONNECTING_HEADERS-th, otherwise 0. */
+int UnconnectingHeadersScore(int nUnconnecting);
 /** Flush all state, indexes and buffers to disk. */
 void FlushStateToDisk();
 /** Prune block files and flush state to disk. */
