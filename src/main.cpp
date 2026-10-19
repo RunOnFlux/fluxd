@@ -325,6 +325,8 @@ struct CNodeState {
     CBlockIndex *pindexLastCommonBlock;
     //! Whether we've started headers synchronization with this peer.
     bool fSyncStarted;
+    //! Headers announcements in a row whose first header did not connect.
+    int nUnconnectingHeaders;
     //! Since when we're stalling block download progress (in microseconds), or 0.
     int64_t nStallingSince;
     list<QueuedBlock> vBlocksInFlight;
@@ -349,6 +351,7 @@ struct CNodeState {
         hashLastUnknownBlock.SetNull();
         pindexLastCommonBlock = NULL;
         fSyncStarted = false;
+        nUnconnectingHeaders = 0;
         nStallingSince = 0;
         nBlocksInFlight = 0;
         nBlocksInFlightValidHeaders = 0;
@@ -3235,6 +3238,11 @@ void CheckForkWarningConditionsOnNewFork(CBlockIndex* pindexNewForkTip, const CC
 }
 
 // Requires cs_main.
+int UnconnectingHeadersScore(int nUnconnecting)
+{
+    return nUnconnecting > 0 && nUnconnecting % MAX_UNCONNECTING_HEADERS == 0 ? 20 : 0;
+}
+
 void Misbehaving(NodeId pnode, int howmuch)
 {
     if (howmuch == 0)
@@ -8753,6 +8761,26 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             return true;
         }
 
+        CNodeState *nodestate = State(pfrom->GetId());
+
+        // An announcement whose first header's parent is unknown is a branch this node has not
+        // seen, such as the other side of a one-block split. Ask the peer for the headers that
+        // connect it, from the best header known, and remember the announced block so the peer
+        // is a download candidate once they arrive. The peer is scored only for every
+        // MAX_UNCONNECTING_HEADERS-th such announcement in a row.
+        if (nCount < MAX_BLOCKS_TO_ANNOUNCE && mapBlockIndex.find(headers[0].hashPrevBlock) == mapBlockIndex.end()) {
+            nodestate->nUnconnectingHeaders++;
+            pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), uint256());
+            LogPrint("net", "received header %s: missing prev block %s, sending getheaders (%d) to end (peer=%d, nUnconnectingHeaders=%d)\n",
+                headers[0].GetHash().ToString(), headers[0].hashPrevBlock.ToString(),
+                pindexBestHeader->nHeight, pfrom->id, nodestate->nUnconnectingHeaders);
+            UpdateBlockAvailability(pfrom->GetId(), headers.back().GetHash());
+            int nDoS = UnconnectingHeadersScore(nodestate->nUnconnectingHeaders);
+            if (nDoS > 0)
+                Misbehaving(pfrom->GetId(), nDoS);
+            return true;
+        }
+
         CBlockIndex *pindexLast = NULL;
         for (const CBlockHeader& header : headers) {
             CValidationState state;
@@ -8769,6 +8797,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 }
             }
         }
+
+        nodestate->nUnconnectingHeaders = 0;
 
         if (pindexLast)
             UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
