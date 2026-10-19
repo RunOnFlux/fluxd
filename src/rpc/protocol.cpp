@@ -76,7 +76,17 @@ std::filesystem::path GetAuthCookieFile()
     return path;
 }
 
-bool GenerateAuthCookie(std::string *cookie_out)
+std::optional<std::filesystem::perms> ParseCookiePerms(const std::string& value)
+{
+    using std::filesystem::perms;
+    const perms owner = perms::owner_read | perms::owner_write;
+    if (value == "owner") return owner;
+    if (value == "group") return owner | perms::group_read;
+    if (value == "all") return owner | perms::group_read | perms::others_read;
+    return std::nullopt;
+}
+
+bool GenerateAuthCookie(std::string *cookie_out, std::optional<std::filesystem::perms> perms)
 {
     unsigned char rand_pwd[32];
     GetRandBytes(rand_pwd, 32);
@@ -85,15 +95,39 @@ bool GenerateAuthCookie(std::string *cookie_out)
     /** the umask determines what permissions are used to create this file -
      * these are set to 077 in init.cpp unless overridden with -sysperms.
      */
+    /* Written beside the cookie and renamed over it, so a reader never sees a
+     * partial cookie or one with the wrong mode. */
     std::ofstream file;
     std::filesystem::path filepath = GetAuthCookieFile();
-    file.open(filepath.string().c_str());
+    std::filesystem::path filepath_tmp = filepath;
+    filepath_tmp += ".tmp";
+    file.open(filepath_tmp.string().c_str());
     if (!file.is_open()) {
-        LogPrintf("Unable to open cookie authentication file %s for writing\n", filepath.string());
+        LogPrintf("Unable to open cookie authentication file %s for writing\n", filepath_tmp.string());
         return false;
     }
     file << cookie;
     file.close();
+    if (!file) {
+        LogPrintf("Unable to write cookie authentication file %s\n", filepath_tmp.string());
+        return false;
+    }
+
+    std::error_code ec;
+    if (perms) {
+        std::filesystem::permissions(filepath_tmp, *perms, std::filesystem::perm_options::replace, ec);
+        if (ec) {
+            LogPrintf("Unable to set permissions on cookie authentication file %s: %s\n", filepath_tmp.string(), ec.message());
+            std::filesystem::remove(filepath_tmp, ec);
+            return false;
+        }
+    }
+    std::filesystem::rename(filepath_tmp, filepath, ec);
+    if (ec) {
+        LogPrintf("Unable to rename cookie authentication file %s to %s: %s\n", filepath_tmp.string(), filepath.string(), ec.message());
+        std::filesystem::remove(filepath_tmp, ec);
+        return false;
+    }
     LogPrintf("Generated RPC authentication cookie %s\n", filepath.string());
 
     if (cookie_out)

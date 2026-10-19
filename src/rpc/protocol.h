@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <string>
 #include <filesystem>
+#include <optional>
 
 #include <univalue.h>
 
@@ -84,8 +85,11 @@ UniValue JSONRPCError(int code, const std::string& message);
 
 /** Get name of RPC authentication cookie file */
 std::filesystem::path GetAuthCookieFile();
-/** Generate a new RPC authentication cookie and write it to disk */
-bool GenerateAuthCookie(std::string *cookie_out);
+/** Parse a -rpccookieperms value: "owner" (0600), "group" (0640) or "all" (0644) */
+std::optional<std::filesystem::perms> ParseCookiePerms(const std::string& value);
+/** Generate a new RPC authentication cookie and write it to disk, with mode
+ * ``perms`` when given and the process umask otherwise */
+bool GenerateAuthCookie(std::string *cookie_out, std::optional<std::filesystem::perms> perms = std::nullopt);
 /** Read the RPC authentication cookie from disk */
 bool GetAuthCookie(std::string *cookie_out);
 /** Delete RPC authentication cookie from disk */
