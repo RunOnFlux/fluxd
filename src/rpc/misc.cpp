@@ -1132,10 +1132,58 @@ UniValue getspentinfo(const UniValue& params, bool fHelp)
     return obj;
 }
 
+UniValue getindexinfo(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)
+        throw runtime_error(
+            "getindexinfo ( \"index_name\" )\n"
+            "\nReturns the indexes this node maintains, each with its status. An index that is\n"
+            "off is absent. -txindex turns on txindex; -insightexplorer turns on addressindex,\n"
+            "spentindex and timestampindex. Both are fixed in the block database when it is\n"
+            "created and change only with -reindex.\n"
+            "\nArguments:\n"
+            "1. \"index_name\"   (string, optional) Report only this index\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"name\": {                 (json object) one per index that is on\n"
+            "    \"synced\": true|false,     (boolean) false while the node is reindexing or importing blocks\n"
+            "    \"best_block_height\": n   (numeric) the height the index covers\n"
+            "  }\n"
+            "  ,...\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getindexinfo", "")
+            + HelpExampleCli("getindexinfo", "\"addressindex\"")
+            + HelpExampleRpc("getindexinfo", ""));
+
+    const std::string filter = params.size() == 1 ? params[0].get_str() : "";
+
+    LOCK(cs_main);
+    const bool synced = !fReindex && !fImporting;
+    const int height = chainActive.Height();
+
+    UniValue result(UniValue::VOBJ);
+    const std::pair<const char*, bool> indexes[] = {
+        {"txindex", fTxIndex},
+        {"addressindex", fAddressIndex},
+        {"spentindex", fSpentIndex},
+        {"timestampindex", fTimestampIndex},
+    };
+    for (const auto& [name, enabled] : indexes) {
+        if (!enabled || (!filter.empty() && filter != name)) continue;
+        UniValue info(UniValue::VOBJ);
+        info.pushKV("synced", synced);
+        info.pushKV("best_block_height", height);
+        result.pushKV(name, info);
+    }
+    return result;
+}
+
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafeMode
   //  --------------------- ------------------------  -----------------------  ----------
     { "control",            "getinfo",                &getinfo,                true  }, /* uses wallet if enabled */
+    { "util",               "getindexinfo",           &getindexinfo,           true  },
     { "util",               "validateaddress",        &validateaddress,        true  }, /* uses wallet if enabled */
     { "util",               "z_validateaddress",      &z_validateaddress,      true  }, /* uses wallet if enabled */
     { "util",               "createmultisig",         &createmultisig,         true  },
