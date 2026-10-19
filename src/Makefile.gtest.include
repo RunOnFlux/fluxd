@@ -93,6 +93,7 @@ flux_gtest_SOURCES += \
 	gtest/test_emergencyblock.cpp \
 	gtest/test_net.cpp \
 	gtest/test_addrman_format.cpp \
+	gtest/test_rpccookie.cpp \
 	gtest/test_decided_address.cpp \
 	gtest/test_blockindexpool.cpp \
 	gtest/test_fluxnodecache.cpp
