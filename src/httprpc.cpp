@@ -152,17 +152,31 @@ static bool HTTPReq_JSONRPC(HTTPRequest* req, const std::string &)
     return true;
 }
 
+/** Whether this run wrote the auth cookie, and so removes it at stop */
+static bool fCookieWritten = false;
+
 static bool InitRPCAuthentication()
 {
     if (mapArgs["-rpcpassword"] == "")
     {
         LogPrintf("No rpcpassword set - using random cookie authentication\n");
-        if (!GenerateAuthCookie(&strRPCUserColonPass)) {
+        std::optional<std::filesystem::perms> perms;
+        if (mapArgs.count("-rpccookieperms")) {
+            perms = ParseCookiePerms(mapArgs["-rpccookieperms"]);
+            if (!perms) {
+                uiInterface.ThreadSafeMessageBox(
+                    strprintf(_("Invalid -rpccookieperms '%s': use owner, group or all"), mapArgs["-rpccookieperms"]),
+                    "", CClientUIInterface::MSG_ERROR);
+                return false;
+            }
+        }
+        if (!GenerateAuthCookie(&strRPCUserColonPass, perms)) {
             uiInterface.ThreadSafeMessageBox(
                 _("Error: A fatal internal error occurred, see debug.log for details"), // Same message as AbortNode
                 "", CClientUIInterface::MSG_ERROR);
             return false;
         }
+        fCookieWritten = true;
     } else {
         strRPCUserColonPass = mapArgs["-rpcuser"] + ":" + mapArgs["-rpcpassword"];
     }
@@ -192,6 +206,10 @@ void StopHTTPRPC()
 {
     LogPrint("rpc", "Stopping HTTP RPC server\n");
     UnregisterHTTPHandler("/", true);
+    if (fCookieWritten) {
+        DeleteAuthCookie();
+        fCookieWritten = false;
+    }
     if (httpRPCTimerInterface) {
         RPCUnregisterTimerInterface(httpRPCTimerInterface);
         delete httpRPCTimerInterface;
