@@ -11,6 +11,8 @@
 #include "streams.h"
 #include "util.h"
 
+CZMQNotificationInterface* g_zmq_notification_interface = NULL;
+
 void zmqError(const char *str)
 {
     LogPrint("zmq", "zmq: Error: %s, errno=%s\n", str, zmq_strerror(errno));
@@ -75,6 +77,16 @@ CZMQNotificationInterface* CZMQNotificationInterface::CreateWithArguments(const 
     return notificationInterface;
 }
 
+std::vector<std::pair<std::string, std::string>> CZMQNotificationInterface::GetActiveNotifiers() const
+{
+    LOCK(cs_notifiers);
+    std::vector<std::pair<std::string, std::string>> active;
+    for (const CZMQAbstractNotifier* notifier : notifiers) {
+        active.emplace_back(notifier->GetType(), notifier->GetAddress());
+    }
+    return active;
+}
+
 // Called at startup to conditionally set up ZMQ socket(s)
 bool CZMQNotificationInterface::Initialize()
 {
@@ -115,6 +127,7 @@ bool CZMQNotificationInterface::Initialize()
 // Called during shutdown sequence
 void CZMQNotificationInterface::Shutdown()
 {
+    LOCK(cs_notifiers);
     LogPrint("zmq", "zmq: Shutdown notification interface\n");
     if (pcontext)
     {
@@ -132,6 +145,7 @@ void CZMQNotificationInterface::Shutdown()
 
 void CZMQNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindex)
 {
+    LOCK(cs_notifiers);
     for (std::list<CZMQAbstractNotifier*>::iterator i = notifiers.begin(); i!=notifiers.end(); )
     {
         CZMQAbstractNotifier *notifier = *i;
@@ -149,6 +163,7 @@ void CZMQNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindex)
 
 void CZMQNotificationInterface::BlockChecked(const CBlock& block, const CValidationState& state)
 {
+    LOCK(cs_notifiers);
     if (state.IsInvalid()) {
         return;
     }
@@ -170,6 +185,7 @@ void CZMQNotificationInterface::BlockChecked(const CBlock& block, const CValidat
 
 void CZMQNotificationInterface::SyncTransaction(const CTransaction &tx, const CBlock *pblock)
 {
+    LOCK(cs_notifiers);
     for (std::list<CZMQAbstractNotifier*>::iterator i = notifiers.begin(); i!=notifiers.end(); )
     {
         CZMQAbstractNotifier *notifier = *i;
@@ -187,6 +203,7 @@ void CZMQNotificationInterface::SyncTransaction(const CTransaction &tx, const CB
 
 void CZMQNotificationInterface::ChainReorg(const CBlockIndex *pindexOldTip, const CBlockIndex *pindexNewTip, const CBlockIndex *pindexFork)
 {
+    LOCK(cs_notifiers);
     for (std::list<CZMQAbstractNotifier*>::iterator i = notifiers.begin(); i!=notifiers.end(); )
     {
         CZMQAbstractNotifier *notifier = *i;
