@@ -12,7 +12,7 @@ Vcs-Browser: https://github.com/runonflux/fluxd
 
 Package: flux
 Architecture: amd64
-Depends: ${shlibs:Depends}
+Depends: ${shlibs:Depends}, fluxbench (>= 6.5.0)
 Description: flux libraries and tools
  Based on Bitcoin's code, it intends to offer a far higher standard
  of privacy and anonymity through a sophisticiated zero-knowledge
