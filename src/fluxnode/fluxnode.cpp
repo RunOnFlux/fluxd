@@ -1675,18 +1675,23 @@ std::string FluxnodeLocationToString(int nLocation) {
 
 void FluxnodeCache::CountNetworks(int& ipv4, int& ipv6, int& onion, std::vector<int>& vNodeCount) {
     for (const auto& entry : mapConfirmedFluxnodeData) {
-        std::string strHost = entry.second.ip;
+        // Stored ips may include a port ("host:port"), which CNetAddr can't parse,
+        // so split it off first, the same way listfluxnodes does.
+        std::string strHost;
+        int nPort;
+        SplitHostPort(entry.second.ip, nPort, strHost);
         CNetAddr node = CNetAddr(strHost, false);
-        int nNetwork = node.GetNetwork();
-        switch (nNetwork) {
-            case 1 :
+        switch (node.GetNetwork()) {
+            case NET_IPV4 :
                 ipv4++;
                 break;
-            case 2 :
+            case NET_IPV6 :
                 ipv6++;
                 break;
-            case 3 :
+            case NET_TOR :
                 onion++;
+                break;
+            default :
                 break;
         }
 
