@@ -357,7 +357,7 @@ CAddrInfo CAddrMan::Select_(bool newOnly)
     // addrman caller (the message handler answering getaddr among them) waits on.
     double fChanceFactor = 1.0;
     while (1) {
-        int nBucket = RandomInt(nBucketCount);
+        int nBucket = insecure_rand() % nBucketCount;
         int vBucketIds[ADDRMAN_BUCKET_SIZE];
         int nCount = 0;
         for (int nPos = 0; nPos < ADDRMAN_BUCKET_SIZE; nPos++) {
