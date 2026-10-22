@@ -345,63 +345,35 @@ CAddrInfo CAddrMan::Select_(bool newOnly)
     if (size() == 0)
         return CAddrInfo();
 
-    // Track number of attempts to find a table entry, before giving up to avoid infinite loop
-    const int kMaxRetries = 200000;         // magic number so unit tests can pass
-    const int kRetriesBetweenSleep = 1000;
-    const int kRetrySleepInterval = 100;    // milliseconds
-
     if (newOnly && nNew == 0)
         return CAddrInfo();
 
     // Use a 50% chance for choosing between tried and new table entries.
-    if (!newOnly &&
-       (nTried > 0 && (nNew == 0 || RandomInt(2) == 0))) { 
-        // use a tried node
-        double fChanceFactor = 1.0;
-        while (1) {
-            int i = 0;
-            int nKBucket = RandomInt(ADDRMAN_TRIED_BUCKET_COUNT);
-            int nKBucketPos = RandomInt(ADDRMAN_BUCKET_SIZE);
-            while (vvTried[nKBucket][nKBucketPos] == -1) {
-                nKBucket = (nKBucket + insecure_rand()) % ADDRMAN_TRIED_BUCKET_COUNT;
-                nKBucketPos = (nKBucketPos + insecure_rand()) % ADDRMAN_BUCKET_SIZE;
-                if (i++ > kMaxRetries)
-                    return CAddrInfo();
-                if (i % kRetriesBetweenSleep == 0 && !nKey.IsNull())
-                    MilliSleep(kRetrySleepInterval);
-            }
-            int nId = vvTried[nKBucket][nKBucketPos];
-            assert(mapInfo.count(nId) == 1);
-            CAddrInfo& info = mapInfo[nId];
-            if (RandomInt(1 << 30) < fChanceFactor * info.GetChance() * (1 << 30))
-                return info;
-            fChanceFactor *= 1.2;
+    bool fTried = !newOnly && nTried > 0 && (nNew == 0 || RandomInt(2) == 0);
+    int nBucketCount = fTried ? ADDRMAN_TRIED_BUCKET_COUNT : ADDRMAN_NEW_BUCKET_COUNT;
+
+    // Each round reads one whole bucket and picks among its occupied slots, so a sparse table costs
+    // empty buckets, not empty slots. Never sleep here: Select() holds cs, which every other
+    // addrman caller (the message handler answering getaddr among them) waits on.
+    double fChanceFactor = 1.0;
+    while (1) {
+        int nBucket = RandomInt(nBucketCount);
+        int vBucketIds[ADDRMAN_BUCKET_SIZE];
+        int nCount = 0;
+        for (int nPos = 0; nPos < ADDRMAN_BUCKET_SIZE; nPos++) {
+            int nId = fTried ? vvTried[nBucket][nPos] : vvNew[nBucket][nPos];
+            if (nId != -1)
+                vBucketIds[nCount++] = nId;
         }
-    } else {
-        // use a new node
-        double fChanceFactor = 1.0;
-        while (1) {
-            int i = 0;
-            int nUBucket = RandomInt(ADDRMAN_NEW_BUCKET_COUNT);
-            int nUBucketPos = RandomInt(ADDRMAN_BUCKET_SIZE);
-            while (vvNew[nUBucket][nUBucketPos] == -1) {
-                nUBucket = (nUBucket + insecure_rand()) % ADDRMAN_NEW_BUCKET_COUNT;
-                nUBucketPos = (nUBucketPos + insecure_rand()) % ADDRMAN_BUCKET_SIZE;
-                if (i++ > kMaxRetries)
-                    return CAddrInfo();
-                if (i % kRetriesBetweenSleep == 0 && !nKey.IsNull())
-                    MilliSleep(kRetrySleepInterval);
-            }
-            int nId = vvNew[nUBucket][nUBucketPos];
-            assert(mapInfo.count(nId) == 1);
-            CAddrInfo& info = mapInfo[nId];
-            if (RandomInt(1 << 30) < fChanceFactor * info.GetChance() * (1 << 30))
-                return info;
-            fChanceFactor *= 1.2;
-        }
+        if (nCount == 0)
+            continue;
+        int nId = vBucketIds[RandomInt(nCount)];
+        assert(mapInfo.count(nId) == 1);
+        CAddrInfo& info = mapInfo[nId];
+        if (RandomInt(1 << 30) < fChanceFactor * info.GetChance() * (1 << 30))
+            return info;
+        fChanceFactor *= 1.2;
     }
-    
-    return CAddrInfo();
 }
 
 #ifdef DEBUG_ADDRMAN
