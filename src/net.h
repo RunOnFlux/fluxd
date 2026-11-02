@@ -235,11 +235,12 @@ void UpdateDecidedAddress();
 /** The current decided address. */
 DecidedAddressInfo DecidedAddress();
 
-/** fluxd publishes its decided address for fluxbench and FluxOS to read, in
- *  DECIDED_ADDRESS_FILE under DecidedAddressFileDir(), as
- *  {"address": "a.b.c.d" or "", "pid": n}: what a reader acts on, so a peer
- *  connecting or leaving does not rewrite it; the peer count and the time of the
- *  last change are in the RPC. Nothing in fluxd reads it. */
+/** fluxd publishes its decided address and how to reach it for fluxbench and
+ *  FluxOS to read, in DECIDED_ADDRESS_FILE under DecidedAddressFileDir(), as
+ *  {"address": "a.b.c.d" or "", "pid": n, "rpcport": n}, rpcport being the port
+ *  its RPC server binds: what a reader acts on, so a peer connecting or leaving
+ *  does not rewrite it; the peer count and the time of the last change are in
+ *  the RPC. Nothing in fluxd reads it. */
 #define DECIDED_ADDRESS_DIR "/run/fluxd"
 #define DECIDED_ADDRESS_FILE "fluxd.json"
 
@@ -249,7 +250,7 @@ std::filesystem::path DecidedAddressFileDir();
 /** Write info to dir/DECIDED_ADDRESS_FILE, world-readable, through a temporary
  *  file in dir renamed over it; dir is created 0755 if absent. False, with
  *  strError, on any failure, leaving no temporary file behind. */
-bool WriteDecidedAddressFile(const std::filesystem::path& dir, const DecidedAddressInfo& info, int64_t nPid, std::string& strError);
+bool WriteDecidedAddressFile(const std::filesystem::path& dir, const DecidedAddressInfo& info, int64_t nPid, int nRpcPort, std::string& strError);
 
 /** Remove dir/DECIDED_ADDRESS_FILE; an absent file is not a failure. */
 bool RemoveDecidedAddressFile(const std::filesystem::path& dir, std::string& strError);
