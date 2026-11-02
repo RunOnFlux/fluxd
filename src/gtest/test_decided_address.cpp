@@ -513,7 +513,7 @@ std::vector<std::string> Entries(const std::filesystem::path& dir)
 
 } // namespace
 
-TEST(DecidedAddress, FileWrittenWithAddressAndPid)
+TEST(DecidedAddress, FileWrittenWithAddressPidAndRpcPort)
 {
     TempDir tmp;
     // The directory is created when absent.
@@ -524,25 +524,27 @@ TEST(DecidedAddress, FileWrittenWithAddressAndPid)
     info.nPeers = 14;
     info.nChanged = 1792067007;
     std::string strError;
-    ASSERT_TRUE(WriteDecidedAddressFile(dir, info, 12345, strError)) << strError;
+    ASSERT_TRUE(WriteDecidedAddressFile(dir, info, 12345, 16124, strError)) << strError;
 
     // Written by rename: the final name and nothing else.
     EXPECT_EQ(Entries(dir), std::vector<std::string>{DECIDED_ADDRESS_FILE});
     const UniValue json = ReadJson(dir / DECIDED_ADDRESS_FILE);
     ASSERT_TRUE(json.isObject());
-    EXPECT_EQ(json.size(), 2u);
+    EXPECT_EQ(json.size(), 3u);
     EXPECT_EQ(find_value(json, "address").get_str(), "178.79.183.164");
     EXPECT_EQ(find_value(json, "pid").get_int(), 12345);
+    EXPECT_EQ(find_value(json, "rpcport").get_int(), 16124);
 
     using std::filesystem::perms;
     EXPECT_EQ(std::filesystem::status(dir / DECIDED_ADDRESS_FILE).permissions() & perms::all, perms(0644));
     EXPECT_EQ(std::filesystem::status(dir).permissions() & perms::all, perms(0755));
 
     // Nothing decided: an empty address.
-    ASSERT_TRUE(WriteDecidedAddressFile(dir, DecidedAddressInfo(), 12345, strError)) << strError;
+    ASSERT_TRUE(WriteDecidedAddressFile(dir, DecidedAddressInfo(), 12345, 16124, strError)) << strError;
     const UniValue none = ReadJson(dir / DECIDED_ADDRESS_FILE);
-    EXPECT_EQ(none.size(), 2u);
+    EXPECT_EQ(none.size(), 3u);
     EXPECT_EQ(find_value(none, "address").get_str(), "");
+    EXPECT_EQ(find_value(none, "rpcport").get_int(), 16124);
     EXPECT_EQ(Entries(dir), std::vector<std::string>{DECIDED_ADDRESS_FILE});
 }
 
@@ -556,7 +558,7 @@ TEST(DecidedAddress, FileReplacesAMalformedOne)
     info.nPeers = 3;
     info.nChanged = 1700000000;
     std::string strError;
-    ASSERT_TRUE(WriteDecidedAddressFile(tmp.path, info, 7, strError)) << strError;
+    ASSERT_TRUE(WriteDecidedAddressFile(tmp.path, info, 7, 16124, strError)) << strError;
     EXPECT_EQ(find_value(ReadJson(tmp.path / DECIDED_ADDRESS_FILE), "address").get_str(), "1.2.3.4");
     EXPECT_EQ(Entries(tmp.path), std::vector<std::string>{DECIDED_ADDRESS_FILE});
 }
@@ -570,7 +572,7 @@ TEST(DecidedAddress, FileWriteFailureReportedNotThrown)
 
     std::string strError;
     bool fWritten = true;
-    EXPECT_NO_THROW(fWritten = WriteDecidedAddressFile(dir, DecidedAddressInfo(), 7, strError));
+    EXPECT_NO_THROW(fWritten = WriteDecidedAddressFile(dir, DecidedAddressInfo(), 7, 16124, strError));
     EXPECT_FALSE(fWritten);
     EXPECT_FALSE(strError.empty());
 
@@ -621,7 +623,7 @@ TEST(DecidedAddress, FileRemoval)
 {
     TempDir tmp;
     std::string strError;
-    ASSERT_TRUE(WriteDecidedAddressFile(tmp.path, DecidedAddressInfo(), 7, strError)) << strError;
+    ASSERT_TRUE(WriteDecidedAddressFile(tmp.path, DecidedAddressInfo(), 7, 16124, strError)) << strError;
     EXPECT_TRUE(RemoveDecidedAddressFile(tmp.path, strError)) << strError;
     EXPECT_TRUE(Entries(tmp.path).empty());
     // Already gone: not a failure.

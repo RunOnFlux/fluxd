@@ -422,11 +422,12 @@ std::filesystem::path DecidedAddressFileDir()
     return DECIDED_ADDRESS_DIR;
 }
 
-bool WriteDecidedAddressFile(const std::filesystem::path& dir, const DecidedAddressInfo& info, int64_t nPid, std::string& strError)
+bool WriteDecidedAddressFile(const std::filesystem::path& dir, const DecidedAddressInfo& info, int64_t nPid, int nRpcPort, std::string& strError)
 {
     UniValue obj(UniValue::VOBJ);
     obj.pushKV("address", info.IsSet() ? info.address.ToStringIP() : "");
     obj.pushKV("pid", nPid);
+    obj.pushKV("rpcport", nRpcPort);
 
     std::error_code ec;
     if (!std::filesystem::is_directory(dir, ec)) {
@@ -482,7 +483,7 @@ static void PublishDecidedAddressLocked()
     if (!decidedAddressDir)
         return;
     std::string strError;
-    const bool fWritten = WriteDecidedAddressFile(*decidedAddressDir, decidedAddress, getpid(), strError);
+    const bool fWritten = WriteDecidedAddressFile(*decidedAddressDir, decidedAddress, getpid(), GetArg("-rpcport", BaseParams().RPCPort()), strError);
     const std::string strLine = decidedAddressWriteLog.Outcome(fWritten, strError);
     if (strLine.empty())
         return;
