@@ -29,8 +29,12 @@ void ActiveFluxnode::ManageDeterministricFluxnode()
     // Get the current height
     int nHeight = chainActive.Height();
 
+    std::string strConfirmIp, strMissing;
+    const bool fHaveConfirmIp = GetConfirmIp(strConfirmIp, strMissing);
+
     // Check if fluxnode is currently in the start list, if so we will be building the Initial Confirm Transaction
     // If the fluxnode is already confirmed check to see if it needs to be re confirmed, if so, Create the Update Transaction
+    int nUpdateType;
     if (g_fluxnodeCache.InStartTracker(activeFluxnode.deterministicOutPoint)) {
         // Check if we currently have a tx with the same vin in our mempool
         // If we do, Resend the wallet transactions to our peers
@@ -43,18 +47,40 @@ void ActiveFluxnode::ManageDeterministricFluxnode()
 
         // If we don't have one in our mempool. That means it is time to confirm the fluxnode
         if (nHeight - nLastTriedToConfirm > 3) { // Only try this every couple blocks
-            activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::INITIAL_CONFIRM);
+            nUpdateType = FluxnodeUpdateType::INITIAL_CONFIRM;
             LogPrintf("Fluxnode found in start tracker. Creating Initial Confirm Transactions %s\n", activeFluxnode.deterministicOutPoint.ToString());
         } else {
             return;
         }
     } else if (g_fluxnodeCache.CheckIfNeedsNextConfirm(activeFluxnode.deterministicOutPoint, nHeight)) {
-        activeFluxnode.BuildDeterministicConfirmTx(mutTx, FluxnodeUpdateType::UPDATE_CONFIRM);
+        nUpdateType = FluxnodeUpdateType::UPDATE_CONFIRM;
         LogPrintf("Time to Confirm Fluxnode reached, Creating Update Confirm Transaction on height: %s for outpoint: %s\n", nHeight, activeFluxnode.deterministicOutPoint.ToString());
+    } else if (fHaveConfirmIp && strConfirmIp != strEarlyConfirmIp &&
+               g_fluxnodeCache.CheckIfNeedsIpChangeConfirm(activeFluxnode.deterministicOutPoint, nHeight, strConfirmIp)) {
+        // A confirm for this outpoint already in the mempool (FluxOS sends one through
+        // createconfirmationtransaction when it sees the change) takes the one slot the
+        // mempool holds per node; this check runs again once it is mined.
+        if (mempool.mapFluxnodeTxMempool.count(activeFluxnode.deterministicOutPoint)) {
+            LogPrintf("Confirm address %s differs from the record, but a confirm for %s is already in the mempool\n", strConfirmIp, activeFluxnode.deterministicOutPoint.ToString());
+            return;
+        }
+        strEarlyConfirmIp = strConfirmIp;
+        nUpdateType = FluxnodeUpdateType::UPDATE_CONFIRM;
+        LogPrintf("Confirm address changed to %s, Creating Update Confirm Transaction on height: %s for outpoint: %s\n", strConfirmIp, nHeight, activeFluxnode.deterministicOutPoint.ToString());
     } else {
         LogPrintf("Fluxnode found nothing to do on height: %s for outpoint: %s\n", nHeight, activeFluxnode.deterministicOutPoint.ToString());
         return;
     }
+
+    if (!fHaveConfirmIp) {
+        if (nLastNoConfirmIpHeight != nHeight) {
+            nLastNoConfirmIpHeight = nHeight;
+            LogPrintf("Fluxnode confirm due on height: %s for outpoint: %s, not sending: %s\n", nHeight, activeFluxnode.deterministicOutPoint.ToString(), strMissing);
+        }
+        return;
+    }
+
+    activeFluxnode.BuildDeterministicConfirmTx(mutTx, nUpdateType, strConfirmIp);
 
     if (activeFluxnode.SignDeterministicConfirmTx(mutTx, errorMessage)) {
         CReserveKey reservekey(pwalletMain);
@@ -377,7 +403,7 @@ bool ActiveFluxnode::BuildDeterministicStartTx(std::string strKeyFluxnode, std::
     return true;
 }
 
-void ActiveFluxnode::BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType)
+void ActiveFluxnode::BuildDeterministicConfirmTx(CMutableTransaction& mutTransaction, const int nUpdateType, const std::string& strIp)
 {
     // When we should move to upgraded version for fluxnode transactions
     bool fP2SHNodesActive = NetworkUpgradeActive(chainActive.Height(), Params().GetConsensus(), Consensus::UPGRADE_P2SHNODES);
@@ -404,6 +430,26 @@ void ActiveFluxnode::BuildDeterministicConfirmTx(CMutableTransaction& mutTransac
     mutTransaction.nType = FLUXNODE_CONFIRM_TX_TYPE;
     mutTransaction.collateralIn = deterministicOutPoint;
     mutTransaction.nUpdateType = nUpdateType;
+
+    // fluxbench overwrites ip with its own value when it countersigns a version 5 or 6 confirm
+    mutTransaction.ip = strIp;
+}
+
+bool GetConfirmIp(std::string& strIp, std::string& strMissing)
+{
+    const DecidedAddressInfo decided = DecidedAddress();
+    const FluxOSPortInfo port = FluxOSPort();
+
+    strMissing.clear();
+    if (!decided.IsSet())
+        strMissing = strprintf("no decided address: fewer than %d connected peers report one", Params().DecidedAddressMinPeers());
+    if (!port.IsSet())
+        strMissing += strprintf("%sno FluxOS port: %s", strMissing.empty() ? "" : "; ", port.strReason);
+    if (!strMissing.empty())
+        return false;
+
+    strIp = FluxnodeConfirmIp(decided.address.ToStringIP(), port.nPort);
+    return true;
 }
 
 void ActiveFluxnode::EnforceActiveFluxNodeTxVersion()

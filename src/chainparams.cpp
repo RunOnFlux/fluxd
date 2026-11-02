@@ -254,6 +254,8 @@ public:
         emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
         nEmergencyMinSignatures = 2; // Require 2 signatures minimum
 
+        nDecidedAddressMinPeers = 3;
+
         checkpointData = (CCheckpointData) {
             {
                 {0, consensus.hashGenesisBlock},
@@ -523,6 +525,9 @@ public:
         emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
         nEmergencyMinSignatures = 2; // Require 2 signatures minimum
 
+        // A small network: one peer's report decides the address.
+        nDecidedAddressMinPeers = 1;
+
     // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
         // in #2795.
@@ -561,7 +566,8 @@ public:
         consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
         consensus.nPowTargetSpacing = 60;
 
-        consensus.ponLimit = uint256S("0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        // ~1/2 chance minimum: labnet runs about 16 nodes, and at 1/16 a third of slots would have no eligible node
+        consensus.ponLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.ponStartLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPonTargetSpacing = 30;
         consensus.nPonDifficultyWindow = 60;
@@ -690,6 +696,9 @@ public:
         // sets it from -labnetkey at startup, with the magic bytes derived from it.
         emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
         nEmergencyMinSignatures = 1;
+
+        // A small network: one peer's report decides the address.
+        nDecidedAddressMinPeers = 1;
     }
 
     bool SetLabNetKey(const std::string& strPubKey, std::string& strError)
@@ -904,6 +913,9 @@ public:
         vecEmergencyPublicKeys[1] = "023c806b01f35a18b42b08f23f5c7e8490801a7da8fd6f6e77708d9f26f22c423e";
         vecEmergencyPublicKeys[2] = "02615c78e21078c21a63cb21cc4d29eaa148d97c3dcbe7be5d9d4dda4e969bb05a";
         vecEmergencyPublicKeys[3] = "033d301dc7ef7ab653da36da1285063ea9be1448d601e3c9f99185476b9d4ae1d1";
+
+        // Every daemon is on loopback with few peers: one peer's report decides the address.
+        nDecidedAddressMinPeers = 1;
     }
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)
