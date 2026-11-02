@@ -74,9 +74,10 @@ CCriticalSection cs_main;
 
 BlockMap mapBlockIndex;
 // The block index entries no other entry has as pprev, by (height, entry): the tips of the
-// block tree. Kept as entries are added (AddToBlockIndex) and recomputed whenever the index is
-// loaded or entries are removed (RebuildChainTips), so it never names a removed entry. The
-// height beside each entry lets a reader select by height without reading the entry.
+// block tree. Kept as entries are added (AddToBlockIndex), and recomputed by RewindBlockIndex
+// (RebuildChainTips), which every start that loads the index runs and which alone removes
+// entries, so it never names a removed entry. The height beside each entry lets a reader select
+// by height without reading the entry.
 static std::set<std::pair<int, const CBlockIndex*>> setChainTips;
 CBlockIndexPool* g_blockIndexPool = nullptr;
 CChain chainActive;
@@ -7085,8 +7086,6 @@ bool LoadBlockIndex()
     // Load block index from databases
     if (!fReindex && !LoadBlockIndexDB())
         return false;
-    LOCK(cs_main);
-    RebuildChainTips();
     return true;
 }
 

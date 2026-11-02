@@ -284,8 +284,8 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block);
  *  other entry has as pprev. Read from a set kept as entries are added, which holds each tip's
  *  height beside it, so no other entry is read. Requires cs_main. */
 std::vector<const CBlockIndex*> ChainTipsFrom(int nMinHeight);
-/** Recompute the chain tips from mapBlockIndex and chainActive, once the index is loaded or
- *  rewound. Requires cs_main. */
+/** Recompute the chain tips from mapBlockIndex and chainActive, after RewindBlockIndex.
+ *  Requires cs_main. */
 void RebuildChainTips();
 /** Process protocol messages received from a given node */
 bool ProcessMessages(CNode* pfrom);
