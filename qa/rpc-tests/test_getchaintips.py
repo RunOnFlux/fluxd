@@ -1,7 +1,7 @@
 """Exercise getchaintips across a fork.
 
 A node that reorgs onto a longer competing chain keeps its abandoned chain as
-a valid fork, so getchaintips reports two tips.
+a valid fork, so getchaintips reports two tips, before and after a restart.
 """
 
 from conftest import NodeFactory
@@ -31,3 +31,21 @@ async def test_getchaintips_fork(node_factory: NodeFactory) -> None:
     fork = by_status["valid-fork"]
     assert fork["height"] == 10
     assert fork["branchlen"] == 10
+
+
+async def test_getchaintips_after_restart(node_factory: NodeFactory) -> None:
+    """A node reports the same tips after a restart, read back from its block index on disk."""
+    node0 = await node_factory(0)
+    node1 = await node_factory(1)
+    await node0.mine(10)
+    await node1.mine(20)
+    await connect_nodes_bi(node0, node1)
+    await sync_blocks([node0, node1])
+    before = await node0.rpc.getchaintips()
+    assert len(before) == 2
+
+    await node0.restart()
+
+    assert await node0.rpc.getchaintips() == before
+    # minheight above the fork leaves only the active tip
+    assert [tip["status"] for tip in await node0.rpc.getchaintips(11)] == ["active"]

@@ -69,9 +69,12 @@ protected:
     }
 
     // The tips getchaintips reported before the set: every entry at or above minHeight that
-    // no entry at or above minHeight has as pprev, read by walking the whole index.
+    // no entry at or above minHeight has as pprev, read by walking the whole index. A
+    // minheight above the active height reads as 0, as getchaintips takes it.
     static std::set<const CBlockIndex*> FullWalkTips(int minHeight)
     {
+        if (minHeight < 0 || minHeight > chainActive.Height())
+            minHeight = 0;
         std::set<const CBlockIndex*> referenced, tips;
         std::vector<const CBlockIndex*> recent;
         for (const auto& [hash, block] : mapBlockIndex) {
