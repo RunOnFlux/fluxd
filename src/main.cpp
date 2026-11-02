@@ -73,6 +73,12 @@ using namespace std;
 CCriticalSection cs_main;
 
 BlockMap mapBlockIndex;
+// The block index entries no other entry has as pprev, by (height, entry): the tips of the
+// block tree. Kept as entries are added (AddToBlockIndex), and recomputed by RewindBlockIndex
+// (RebuildChainTips), which every start that loads the index runs and which alone removes
+// entries, so it never names a removed entry. The height beside each entry lets a reader select
+// by height without reading the entry.
+static std::set<std::pair<int, const CBlockIndex*>> setChainTips;
 CBlockIndexPool* g_blockIndexPool = nullptr;
 CChain chainActive;
 CBlockIndex *pindexBestHeader = NULL;
@@ -5333,6 +5339,9 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
 
     pindexNew->nChainWork = (pindexNew->pprev ? pindexNew->pprev->nChainWork : 0) + GetBlockProof(*pindexNew);
     pindexNew->RaiseValidity(BLOCK_VALID_TREE);
+    if (pindexNew->pprev)
+        setChainTips.erase({pindexNew->pprev->nHeight, pindexNew->pprev});
+    setChainTips.insert({pindexNew->nHeight, pindexNew});
     if (pindexBestHeader == NULL || pindexBestHeader->nChainWork < pindexNew->nChainWork)
         pindexBestHeader = pindexNew;
 
@@ -6939,6 +6948,7 @@ bool RewindBlockIndex(const CChainParams& chainparams, bool& clearWitnessCaches)
     }
 
     PruneBlockIndexCandidates();
+    RebuildChainTips();
 
     CheckBlockIndex(chainparams.GetConsensus());
 
@@ -6953,6 +6963,7 @@ void UnloadBlockIndex()
 {
     LOCK(cs_main);
     setBlockIndexCandidates.clear();
+    setChainTips.clear();
     chainActive.SetTip(NULL);
     pindexBestInvalid = NULL;
     pindexBestHeader = NULL;
@@ -7001,6 +7012,38 @@ bool LoadBlockIndex()
     if (!fReindex && !LoadBlockIndexDB())
         return false;
     return true;
+}
+
+void RebuildChainTips()
+{
+    AssertLockHeld(cs_main);
+    // A child of an entry off the active chain is off it too, so every entry with a child is
+    // either on the active chain below its tip or the pprev of an off-chain entry.
+    std::vector<const CBlockIndex*> offChain;
+    std::set<const CBlockIndex*> offChainParents;
+    for (const auto& [hash, pindex] : mapBlockIndex) {
+        if (!chainActive.Contains(pindex)) {
+            offChain.push_back(pindex);
+            offChainParents.insert(pindex->pprev);
+        }
+    }
+    setChainTips.clear();
+    for (const CBlockIndex* pindex : offChain) {
+        if (!offChainParents.count(pindex))
+            setChainTips.insert({pindex->nHeight, pindex});
+    }
+    const CBlockIndex* pindexTip = chainActive.Tip();
+    if (pindexTip && !offChainParents.count(pindexTip))
+        setChainTips.insert({pindexTip->nHeight, pindexTip});
+}
+
+std::vector<const CBlockIndex*> ChainTipsFrom(int nMinHeight)
+{
+    AssertLockHeld(cs_main);
+    std::vector<const CBlockIndex*> vTips;
+    for (auto it = setChainTips.lower_bound({nMinHeight, nullptr}); it != setChainTips.end(); ++it)
+        vTips.push_back(it->second);
+    return vTips;
 }
 
 bool InitBlockIndex(const CChainParams& chainparams)

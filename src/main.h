@@ -278,6 +278,15 @@ bool InitBlockIndex(const CChainParams& chainparams);
 bool LoadBlockIndex();
 /** Unload database information */
 void UnloadBlockIndex();
+/** Add a header to the block index, or return the entry it already holds. Requires cs_main. */
+CBlockIndex* AddToBlockIndex(const CBlockHeader& block);
+/** The tips of the block tree at or above nMinHeight, lowest first: the block index entries no
+ *  other entry has as pprev. Read from a set kept as entries are added, which holds each tip's
+ *  height beside it, so no other entry is read. Requires cs_main. */
+std::vector<const CBlockIndex*> ChainTipsFrom(int nMinHeight);
+/** Recompute the chain tips from mapBlockIndex and chainActive, after RewindBlockIndex.
+ *  Requires cs_main. */
+void RebuildChainTips();
 /** Process protocol messages received from a given node */
 bool ProcessMessages(CNode* pfrom);
 /**
