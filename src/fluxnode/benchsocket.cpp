@@ -4,6 +4,15 @@
 
 #include "fluxnode/benchsocket.h"
 
+#ifdef WIN32
+
+std::string BenchSocketCall(const std::string&, const std::string&, const UniValue&)
+{
+    return "";
+}
+
+#else
+
 #include <cstring>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -97,3 +106,5 @@ std::string BenchSocketCall(const std::string& socketPath, const std::string& me
     const UniValue& result = find_value(response, "result");
     return result.isStr() ? result.get_str() : result.write(2);
 }
+
+#endif // WIN32

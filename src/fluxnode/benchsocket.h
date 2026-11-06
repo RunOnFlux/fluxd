@@ -15,7 +15,7 @@
  *
  * Answers as fluxbench-cli prints the reply: a string result as it is, anything else as indented
  * JSON. Empty when the socket cannot be reached or the reply cannot be read; the error's message
- * when fluxbench refuses the call.
+ * when fluxbench refuses the call. Windows has no such socket, so there it is always empty.
  */
 std::string BenchSocketCall(const std::string& socketPath, const std::string& method, const UniValue& params);
 
