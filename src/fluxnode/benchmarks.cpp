@@ -13,6 +13,7 @@
 
 #include "fluxnode/fluxnode.h"
 #include "benchmarks.h"
+#include "fluxnode/benchsocket.h"
 
 #include "activefluxnode.h"
 #include "fluxnode.h"
@@ -198,9 +199,20 @@ std::vector<std::string> split (std::string s, std::string delimiter) {
     return res;
 }
 
+/** fluxbench's answer to one call: over -fluxbenchsocket when it is set, else through its cli. */
+static std::string BenchCall(const std::string& method, const UniValue& params, const std::string& cliArgs,
+                             bool fRedirectStdout = false, bool fRedirectDevNull = false)
+{
+    const std::string socket = GetArg("-fluxbenchsocket", "");
+    if (!socket.empty()) return BenchSocketCall(socket, method, params);
+    return GetStdoutFromCommand(BenchCliCommand() + method + cliArgs, fRedirectStdout, fRedirectDevNull);
+}
+
 bool IsFluxBenchdRunning()
 {
-    std::string strBenchmarkStatus = GetStdoutFromCommand(BenchCliCommand() + "getstatus true", false, true);
+    UniValue params(UniValue::VARR);
+    params.push_back(UniValue(true));
+    std::string strBenchmarkStatus = BenchCall("getstatus", params, " true", false, true);
 
     UniValue response;
     response.read(strBenchmarkStatus);
@@ -232,7 +244,7 @@ void StopFluxBenchd()
 std::string GetBenchmarks()
 {
     if (IsFluxBenchdRunning()) {
-        std::string strBenchmarkStatus = GetStdoutFromCommand(BenchCliCommand() + "getbenchmarks");
+        std::string strBenchmarkStatus = BenchCall("getbenchmarks", UniValue(UniValue::VARR), "");
 
         return strBenchmarkStatus;
     }
@@ -243,7 +255,7 @@ std::string GetBenchmarks()
 std::string GetFluxBenchdStatus()
 {
     if (IsFluxBenchdRunning()) {
-        std::string strBenchmarkStatus = GetStdoutFromCommand(BenchCliCommand() + "getstatus");
+        std::string strBenchmarkStatus = BenchCall("getstatus", UniValue(UniValue::VARR), "");
 
         return strBenchmarkStatus;
     }
@@ -272,7 +284,9 @@ bool GetBenchmarkSignedTransaction(const CTransaction& tx, CTransaction& signedT
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         ss << tx;
         std::string txHexStr = HexStr(ss.begin(), ss.end());
-        std::string response = GetStdoutFromCommand(BenchCliCommand() + "signfluxnodetransaction " + txHexStr, true);
+        UniValue signParams(UniValue::VARR);
+        signParams.push_back(txHexStr);
+        std::string response = BenchCall("signfluxnodetransaction", signParams, " " + txHexStr, true);
 
         UniValue signedresponse;
         signedresponse.read(response);
