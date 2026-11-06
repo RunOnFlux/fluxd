@@ -2615,6 +2615,8 @@ UniValue stopfluxbenchd(const UniValue& params, bool fHelp, string cmdname)
                 "\nExamples:\n" +
                 HelpExampleCli(cmdname, "") + HelpExampleRpc(cmdname, ""));
 
+    if (fArcane) throw runtime_error("The benchmark runs under its own unit on ArcaneOS");
+
     if (IsFluxBenchdRunning()) {
         StopFluxBenchd();
         return "Stopping process";
@@ -2644,6 +2646,8 @@ UniValue startfluxbenchd(const UniValue& params, bool fHelp, string cmdname)
 
                 "\nExamples:\n" +
                 HelpExampleCli(cmdname, "") + HelpExampleRpc(cmdname, ""));
+
+    if (fArcane) throw runtime_error("The benchmark runs under its own unit on ArcaneOS");
 
     if (!IsFluxBenchdRunning()) {
         StartFluxBenchd();
