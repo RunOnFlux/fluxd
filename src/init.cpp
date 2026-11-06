@@ -2159,7 +2159,8 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         }
     }
 
-    if (fFluxnode) {
+    // On ArcaneOS fluxbench runs from its own image under its own unit, never beside fluxd.
+    if (fFluxnode && !fArcane) {
         strPath = GetSelfPath();
         LogPrintf("Path: %s\n",strPath);
     
