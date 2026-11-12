@@ -95,6 +95,7 @@ flux_gtest_SOURCES += \
 	gtest/test_addrman_format.cpp \
 	gtest/test_decided_address.cpp \
 	gtest/test_outbound_slots.cpp \
+	gtest/test_seednodes.cpp \
 	gtest/test_blockindexpool.cpp \
 	gtest/test_fluxnodecache.cpp
 if ENABLE_WALLET

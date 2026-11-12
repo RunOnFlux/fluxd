@@ -73,7 +73,49 @@ static const int NETWORK_UPGRADE_PEER_PREFERENCE_BLOCK_PERIOD = 24 * 24 * 3;
 unsigned int ReceiveFloodSize();
 unsigned int SendBufferSize();
 
+/** Queue a destination to be dialled once for its addresses and dropped: the
+ *  connection asks for addresses and is closed when they arrive. A destination
+ *  is dialled at most once; a failed dial is not repeated. */
 void AddOneShot(const std::string& strDest);
+
+/** A one-shot connection that has sent no addresses is closed this long after
+ *  it was made. */
+static const int64_t ONE_SHOT_TIMEOUT = 5 * 60;
+bool OneShotTimedOut(int64_t nNow, int64_t nTimeConnected);
+
+/** A node with at least this many kept outbound connections asks no seed node
+ *  for addresses. */
+static const int SEED_NODE_OUTBOUND_THRESHOLD = 2;
+/** The wait between one seed node and the next. */
+static const int64_t SEED_NODE_INTERVAL = 10;
+
+/** Hands the -seednode destinations to the one-shot queue one at a time, each
+ *  once: the first at once when the address book is empty, and another every
+ *  SEED_NODE_INTERVAL seconds for as long as the node has fewer than
+ *  SEED_NODE_OUTBOUND_THRESHOLD kept outbound connections. A node with peers
+ *  never dials a seed node, and a seed node that cannot be reached costs one
+ *  attempt. */
+class SeedNodeFeeder
+{
+public:
+    /** vSeedsIn is dialled from the back; the caller shuffles it. */
+    SeedNodeFeeder(std::vector<std::string> vSeedsIn, bool fAddressBookEmpty, int64_t nNow)
+        : vSeeds(std::move(vSeedsIn)), fDue(fAddressBookEmpty), nLast(nNow) {}
+
+    /** The seed node to queue now, if one is due. */
+    std::optional<std::string> Next(int nKeptOutbound, int64_t nNow);
+
+private:
+    std::vector<std::string> vSeeds;
+    bool fDue;      // the next call hands one out whatever the node's peers
+    int64_t nLast;  // when one was last handed out, or the feeder was made
+};
+
+/** The destinations given with -seednode. Called before StartNode. */
+void SetSeedNodes(const std::vector<std::string>& vSeeds);
+
+/** The outbound connections this node dialled and keeps: not feelers, not one-shots. */
+int KeptOutboundCount();
 void AddressCurrentlyConnected(const CService& addr);
 CNode* FindNode(const CNetAddr& ip);
 CNode* FindNode(const CSubNet& subNet);
@@ -159,9 +201,8 @@ extern int nMaxOnionOutbound;
 /** Maximum number of outbound connections (shared by all outbound classes). */
 extern const int MAX_OUTBOUND_CONNECTIONS;
 
-/** Whether every outbound slot holds a connection this node dialled and keeps:
- *  feelers and one-shots are not counted. A kept connection is opened only
- *  while this is false. */
+/** Whether every outbound slot holds a kept connection (KeptOutboundCount). A
+ *  kept connection is opened only while this is false. */
 bool OutboundSlotsFull();
 
 /** What the outbound connection loop opens on the semaphore permit it holds.

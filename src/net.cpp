@@ -147,6 +147,34 @@ static const size_t MAX_ANCHOR_CONNECTIONS = 2;
 static CNodeSignals g_signals;
 CNodeSignals& GetNodeSignals() { return g_signals; }
 
+// The -seednode destinations not yet handed to the one-shot queue; guarded by cs_vOneShots.
+static std::vector<std::string> vSeedNodes;
+
+void SetSeedNodes(const std::vector<std::string>& vSeeds)
+{
+    LOCK(cs_vOneShots);
+    vSeedNodes = vSeeds;
+}
+
+std::optional<std::string> SeedNodeFeeder::Next(int nKeptOutbound, int64_t nNow)
+{
+    if (vSeeds.empty())
+        return std::nullopt;
+    if (!fDue && (nKeptOutbound >= SEED_NODE_OUTBOUND_THRESHOLD || nNow < nLast + SEED_NODE_INTERVAL))
+        return std::nullopt;
+
+    fDue = false;
+    nLast = nNow;
+    std::string strSeed = vSeeds.back();
+    vSeeds.pop_back();
+    return strSeed;
+}
+
+bool OneShotTimedOut(int64_t nNow, int64_t nTimeConnected)
+{
+    return nNow - nTimeConnected > ONE_SHOT_TIMEOUT;
+}
+
 void AddOneShot(const std::string& strDest)
 {
     LOCK(cs_vOneShots);
@@ -1676,6 +1704,11 @@ void ThreadSocketHandler()
                     LogPrintf("ping timeout: %fs\n", 0.000001 * (GetTimeMicros() - pnode->nPingUsecStart));
                     pnode->fDisconnect = true;
                 }
+                else if (pnode->fOneShot && OneShotTimedOut(nTime, pnode->nTimeConnected))
+                {
+                    LogPrintf("one-shot peer=%d sent no addresses in %ds, disconnecting\n", pnode->id, ONE_SHOT_TIMEOUT);
+                    pnode->fDisconnect = true;
+                }
                 // Tor authentication timeout: disconnect Tor peers (both
                 // inbound hidden-service and outbound-to-onion) that
                 // haven't completed torauth within the timeout.
@@ -1877,10 +1910,30 @@ void static ProcessOneShot()
     }
     CAddress addr;
     CSemaphoreGrant grant(*semOutbound, true);
-    if (grant) {
-        if (!OpenNetworkConnection(addr, &grant, strDest.c_str(), true))
-            AddOneShot(strDest);
+    if (grant)
+        OpenNetworkConnection(addr, &grant, strDest.c_str(), true);
+}
+
+// Queues the next seed node when one is due, then dials one queued destination.
+void static FeedAndProcessOneShots()
+{
+    static std::optional<SeedNodeFeeder> feeder;
+    if (!feeder) {
+        std::vector<std::string> vSeeds;
+        {
+            LOCK(cs_vOneShots);
+            vSeeds.swap(vSeedNodes);
+        }
+        // A new order at each start, so one seed node is not every node's first.
+        for (size_t i = vSeeds.size(); i > 1; i--)
+            std::swap(vSeeds[i - 1], vSeeds[GetRandInt(i)]);
+        feeder.emplace(std::move(vSeeds), addrman.size() == 0, GetTime());
     }
+    if (const std::optional<std::string> strSeed = feeder->Next(KeptOutboundCount(), GetTime())) {
+        LogPrintf("Asking seed node %s for addresses\n", *strSeed);
+        AddOneShot(*strSeed);
+    }
+    ProcessOneShot();
 }
 
 void ThreadOpenConnections()
@@ -1900,7 +1953,7 @@ void ThreadOpenConnections()
             if (ShutdownRequested())
                 return;
 
-            ProcessOneShot();
+            FeedAndProcessOneShots();
             for (const std::string& strAddr : mapMultiArgs["-connect"])
             {
                 if (ShutdownRequested())
@@ -1925,7 +1978,7 @@ void ThreadOpenConnections()
     static const int64_t FEELER_INTERVAL = 120;
     while (!ShutdownRequested())
     {
-        ProcessOneShot();
+        FeedAndProcessOneShots();
 
         if (!InterruptibleSleep(500))
             return;
@@ -2149,14 +2202,19 @@ OutboundDial NextOutboundDial(bool fFeelerDue, bool fSlotsFull)
     return fSlotsFull ? OutboundDial::None : OutboundDial::Kept;
 }
 
-bool OutboundSlotsFull()
+int KeptOutboundCount()
 {
     int nKept = 0;
     LOCK(cs_vNodes);
     for (const CNode* pnode : vNodes)
         if (!pnode->fInbound && !pnode->fFeeler && !pnode->fOneShot && !pnode->fDisconnect)
             nKept++;
-    return nKept >= nMaxOutboundSlots;
+    return nKept;
+}
+
+bool OutboundSlotsFull()
+{
+    return KeptOutboundCount() >= nMaxOutboundSlots;
 }
 
 bool TorAuthDedupDropInbound(const COutPoint& myOutpoint, const COutPoint& peerOutpoint)

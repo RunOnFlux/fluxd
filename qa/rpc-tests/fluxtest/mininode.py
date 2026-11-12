@@ -990,7 +990,13 @@ class NodeConn:
         cb.add_connection(self)
 
     async def connect(self) -> None:
-        self._reader, self._writer = await asyncio.open_connection(self.dstaddr, self.dstport)
+        reader, writer = await asyncio.open_connection(self.dstaddr, self.dstport)
+        await self.accept(reader, writer)
+
+    async def accept(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        """Speak to the node over an open connection: one this peer dialled, or
+        one the node dialled to a listener of the test's."""
+        self._reader, self._writer = reader, writer
         vt = msg_version(self.protocol_version)
         vt.addrTo.ip = self.addr_me if self.addr_me is not None else self.dstaddr
         vt.addrTo.port = self.dstport
