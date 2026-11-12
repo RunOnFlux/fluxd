@@ -54,9 +54,7 @@ async def _send_expiring_pair(
     Both are built for the next block, so they expire at tip + 1 + the delta.
     """
     tip = await n0.rpc.getblockcount()
-    opid = await n0.rpc.z_sendmany(
-        z_alice, [{"address": z_bob, "amount": Decimal("0.9999")}]
-    )
+    opid = await n0.rpc.z_sendmany(z_alice, [{"address": z_bob, "amount": Decimal("0.9999")}])
     shielded = await wait_and_assert_operationid_status(n0, opid)
     assert shielded is not None
     transparent = await n0.rpc.sendtoaddress(bob, Decimal("0.01"))

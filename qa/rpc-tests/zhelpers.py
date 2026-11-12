@@ -94,9 +94,7 @@ async def get_coinbase_address(node: FluxNode, expected_utxos: int | None = None
     "no UTXOs found".
     """
     addrs = [
-        u["address"]
-        for u in await node.rpc.listunspent()
-        if u["generated"] and u["spendable"]
+        u["address"] for u in await node.rpc.listunspent() if u["generated"] and u["spendable"]
     ]
     assert addrs, "node has no spendable coinbase outputs"
     if expected_utxos is None:
