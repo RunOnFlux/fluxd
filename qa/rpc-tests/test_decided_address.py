@@ -184,6 +184,22 @@ async def test_new_majority_changes_the_address(node_factory: NodeFactory) -> No
     assert (await wait_decided(node, "5.6.7.8", PEERS + 1))["changed"] == second
 
 
+async def test_fluxnode_refuses_a_proxy(
+    node_factory: NodeFactory, fluxd_binary: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    node = await start_fluxnode(node_factory, fluxd_binary, tmp_path, monkeypatch)
+    args = list(node.extra_args)
+    await node.stop_daemon()
+
+    # Through a proxy every peer would see the proxy's address, not the node's.
+    with pytest.raises(AssertionError, match="Fluxnodes cannot use -proxy"):
+        await node.restart([*args, "-proxy=127.0.0.1:9"])
+
+    # -onion alone leaves clearnet peers direct.
+    await node.restart([*args, "-onion=127.0.0.1:9"])
+    assert (await node.rpc.getnetworkinfo())["decided_address"]["address"] == ""
+
+
 async def test_regtest_reads_the_default_fluxos_port(node_factory: NodeFactory) -> None:
     # No FluxOS runs here, so /run/fluxos/fluxos.json is absent and regtest assumes 16127.
     node = await node_factory(0, extra_args=POW_ARGS)
