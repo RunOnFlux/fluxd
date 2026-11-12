@@ -2094,6 +2094,14 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
                            "Cannot use -onlynet without including ipv4."));
     }
 
+    // A fluxnode's address is decided by what the peers it dials see (net.h
+    // DecideAddress), and through a proxy every peer sees the proxy.
+    proxyType proxyIPv4;
+    if (fFluxnode && GetProxy(NET_IPV4, proxyIPv4)) {
+        return InitError(_("Fluxnodes cannot use -proxy: their peers must see the node's own address. "
+                           "Use -onion to reach Tor peers."));
+    }
+
     if (fFluxnode) {
         LogPrintf("IS FLUXNODE\n");
         strFluxnodeAddr = GetArg("-zelnodeaddr", "");
