@@ -7750,10 +7750,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         }
 
         {
-            // UpdateDecidedAddress reads every peer's addrLocal under cs_vNodes
+            // The decided address reads every peer's addrLocal under cs_vNodes
             LOCK(cs_vNodes);
             pfrom->addrLocal = addrMe;
-            UpdateDecidedAddress();
+            PeerReportedAddress(pfrom);
         }
         if (pfrom->fInbound && addrMe.IsRoutable())
         {

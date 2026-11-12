@@ -475,6 +475,10 @@ public:
 
     void AddBackUndoData(const CFluxnodeTxBlockUndo& p_undoData);
 
+    /** The host of the confirmed record's ip for out; absent when out has no
+     *  confirmed record or the record names no valid address. */
+    std::optional<CNetAddr> ConfirmedHost(const COutPoint& out);
+
     //! Getting info Methods
     bool InStartTracker(const COutPoint& out);
     bool InDoSTracker(const COutPoint& out);

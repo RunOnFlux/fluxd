@@ -33,6 +33,8 @@
 
 #include <filesystem>
 #include <fstream>
+#include <limits>
+#include <set>
 #include <string_view>
 #include <unistd.h>
 
@@ -346,73 +348,203 @@ static DecidedAddressInfo decidedAddress;
 
 static void PublishDecidedAddressLocked();
 
-bool DecideAddress(const std::vector<PeerAddressReport>& reports, bool fAllowNonRoutable, const CNetAddr& addrIncumbent, CNetAddr& addrOut, int& nPeersOut)
+// The address in this node's own fluxnode record; guarded by cs_decidedAddress.
+static std::optional<CNetAddr> onChainAddress;
+
+DecidedAddressRules GetDecidedAddressRules()
 {
-    // address -> (reporters, id of its newest reporter)
-    std::map<CNetAddr, std::pair<int, NodeId>> tally;
+    const CChainParams& params = Params();
+    DecidedAddressRules rules;
+    rules.nMinVotes = params.DecidedAddressMinVotes();
+    rules.nMinVoters = 1;
+    if (params.DecidedAddressNeedsHalfOutbound()) {
+        proxyType onionProxy;
+        const int nClearnetSlots = std::min(MAX_OUTBOUND_CONNECTIONS, nMaxConnections) - (GetProxy(NET_ONION, onionProxy) ? nMaxOnionOutbound : 0);
+        rules.nMinVoters = std::max(1, nClearnetSlots / 2);
+    }
+    rules.fInboundVotes = params.DecidedAddressInboundVotes();
+    rules.fAllowNonRoutable = params.NetworkIDString() == "regtest";
+    return rules;
+}
+
+static bool IsVotableAddress(const CNetAddr& addr, bool fAllowNonRoutable)
+{
+    return addr.IsIPv4() && addr.IsValid() && (fAllowNonRoutable || addr.IsRoutable());
+}
+
+AddressTally TallyAddressVotes(const std::vector<PeerAddressReport>& reports, const DecidedAddressRules& rules)
+{
+    AddressTally tally;
+    // netgroup -> the addresses its live voters report
+    std::map<std::vector<unsigned char>, std::set<CNetAddr>> mapGroups;
     for (const PeerAddressReport& report : reports) {
-        if (!report.addrLocal.IsIPv4() || !report.addrLocal.IsValid())
+        if (!IsVotableAddress(report.addrLocal, rules.fAllowNonRoutable))
             continue;
-        if (!fAllowNonRoutable && !report.addrLocal.IsRoutable())
+        if (!report.fVoter || !IsVotableAddress(report.addrPeer, rules.fAllowNonRoutable)) {
+            if (report.fInbound)
+                tally.mapInbound[report.addrLocal]++;
             continue;
-        auto& entry = tally.try_emplace(report.addrLocal, 0, report.nodeId).first->second;
-        entry.first++;
-        entry.second = std::max(entry.second, report.nodeId);
-    }
-
-    // Most reporters first; among equals the incumbent, then the newest reporter.
-    const std::pair<const CNetAddr, std::pair<int, NodeId>>* best = nullptr;
-    for (const auto& candidate : tally) {
-        if (best && candidate.second.first < best->second.first)
-            continue;
-        if (best && candidate.second.first == best->second.first) {
-            if (best->first == addrIncumbent)
-                continue;
-            if (candidate.first != addrIncumbent && candidate.second.second < best->second.second)
-                continue;
         }
-        best = &candidate;
+        if (!report.fLive)
+            continue;
+        std::vector<unsigned char> vchGroup = report.addrPeer.GetGroup();
+        if (!report.addrPeer.IsRoutable()) {
+            // Every non-routable address shares one netgroup; where they vote, each peer is its own.
+            for (int i = 0; i < 4; i++)
+                vchGroup.push_back((report.nodeId >> (8 * i)) & 0xff);
+        }
+        mapGroups[vchGroup].insert(report.addrLocal);
     }
-    if (!best || best->second.first < Params().DecidedAddressMinPeers())
-        return false;
+    for (const auto& group : mapGroups) {
+        if (group.second.size() != 1)
+            continue;
+        tally.mapVotes[*group.second.begin()]++;
+        tally.nVoters++;
+    }
+    return tally;
+}
 
-    addrOut = best->first;
-    nPeersOut = best->second.first;
-    return true;
+std::optional<CNetAddr> DecideAddress(const AddressTally& tally, const DecidedAddressRules& rules,
+                                      const std::optional<CNetAddr>& addrDecided, const std::optional<CNetAddr>& addrOnChain)
+{
+    const auto fAdoptable = [&](int nVotes) {
+        return nVotes >= rules.nMinVotes && 2 * nVotes > tally.nVoters && tally.nVoters >= rules.nMinVoters;
+    };
+    // More than half of the votes: at most one address has it.
+    std::optional<CNetAddr> addrAdoptable;
+    for (const auto& entry : tally.mapVotes)
+        if (fAdoptable(entry.second))
+            addrAdoptable = entry.first;
+
+    const std::optional<CNetAddr>& addrHeld = addrDecided ? addrDecided : addrOnChain;
+    if (addrHeld) {
+        if (addrAdoptable && *addrAdoptable != *addrHeld && 4 * tally.Votes(*addrAdoptable) >= 3 * tally.nVoters)
+            return addrAdoptable;
+        if (tally.Votes(*addrHeld) >= rules.nMinVotes)
+            return addrHeld;
+    }
+    if (addrAdoptable)
+        return addrAdoptable;
+    return addrDecided;
+}
+
+bool AddressVoteIsLive(int64_t nNowUsec, int64_t nPingStartUsec, int64_t nLastRecvUsec, int64_t nMinPingUsec)
+{
+    if (nPingStartUsec == 0 || nLastRecvUsec >= nPingStartUsec)
+        return true;
+    const int64_t nRoundTrip = nMinPingUsec == std::numeric_limits<int64_t>::max() ? 0 : nMinPingUsec;
+    return nNowUsec - nPingStartUsec <= ADDRESS_VOTE_PING_FLOOR_USEC + 3 * nRoundTrip;
+}
+
+// Whether the peer is of a kind whose report of this node's address may count
+// as a vote: one this node dialled directly and keeps. A feeler or one-shot is
+// gone in a moment, and a peer reached through a proxy sees the proxy.
+static bool IsAddressVoter(const CNode* pnode, const DecidedAddressRules& rules)
+{
+    if (pnode->fFeeler || pnode->fOneShot)
+        return false;
+    if (pnode->fInbound)
+        return rules.fInboundVotes && !pnode->fInboundOnion;
+    proxyType proxy;
+    return !GetProxy(pnode->addr.GetNetwork(), proxy);
+}
+
+static bool IsAddressVoteLive(const CNode* pnode, int64_t nNowUsec)
+{
+    return AddressVoteIsLive(nNowUsec, pnode->nPingNonceSent ? pnode->nPingUsecStart : 0, pnode->nLastRecvUsec, pnode->nMinPingUsecTime);
 }
 
 void UpdateDecidedAddress()
 {
     AssertLockHeld(cs_vNodes);
 
+    const DecidedAddressRules rules = GetDecidedAddressRules();
+    const int64_t nNowUsec = GetTimeMicros();
     std::vector<PeerAddressReport> reports;
     reports.reserve(vNodes.size());
-    for (const CNode* pnode : vNodes) {
+    for (CNode* pnode : vNodes) {
+        pnode->fAddressVoteLive = IsAddressVoteLive(pnode, nNowUsec);
         if (pnode->fDisconnect || !pnode->addrLocal.IsValid())
             continue;
-        reports.push_back({pnode->GetId(), pnode->addrLocal});
+        reports.push_back({pnode->GetId(), pnode->addr, pnode->addrLocal, pnode->fInbound, IsAddressVoter(pnode, rules), pnode->fAddressVoteLive});
     }
+    const AddressTally tally = TallyAddressVotes(reports, rules);
 
     LOCK(cs_decidedAddress);
-    CNetAddr addr;
-    int nPeers = 0;
-    const CNetAddr addrIncumbent = decidedAddress.IsSet() ? decidedAddress.address : CNetAddr();
-    const bool fFound = DecideAddress(reports, Params().NetworkIDString() == "regtest", addrIncumbent, addr, nPeers);
+    const std::optional<CNetAddr> addrDecided = decidedAddress.fSet ? std::optional<CNetAddr>(decidedAddress.address) : std::nullopt;
+    const std::optional<CNetAddr> addrNew = DecideAddress(tally, rules, addrDecided, onChainAddress);
 
-    const bool fChanged = fFound != decidedAddress.IsSet() || (fFound && addr != decidedAddress.address);
-    decidedAddress.nPeers = fFound ? nPeers : 0;
+    const bool fChanged = addrNew != addrDecided;
+    decidedAddress.fSet = addrNew.has_value();
+    decidedAddress.address = addrNew.value_or(CNetAddr());
+    decidedAddress.nVotes = addrNew ? tally.Votes(*addrNew) : 0;
+    decidedAddress.nVoters = tally.nVoters;
+    decidedAddress.mapOther = tally.mapVotes;
+    if (addrNew)
+        decidedAddress.mapOther.erase(*addrNew);
+    decidedAddress.mapInbound = tally.mapInbound;
     if (fChanged) {
-        decidedAddress.address = fFound ? addr : CNetAddr();
         decidedAddress.nChanged = GetTime();
-        LogPrintf("Decided address: %s (%d peers)\n", fFound ? addr.ToStringIP() : "none", decidedAddress.nPeers);
+        LogPrintf("Decided address: %s (%d of %d votes)\n", addrNew ? addrNew->ToStringIP() : "none", decidedAddress.nVotes, decidedAddress.nVoters);
         PublishDecidedAddressLocked();
     }
+
+    if (decidedAddress.fSet && decidedAddress.nVotes < rules.nMinVotes) {
+        for (CNode* pnode : vNodes) {
+            if (pnode->fDisconnect || pnode->fAddressVoteLive || !IsAddressVoter(pnode, rules))
+                continue;
+            LogPrintf("Decided address %s has %d votes; disconnecting peer=%d, which is not answering\n", decidedAddress.address.ToStringIP(), decidedAddress.nVotes, pnode->id);
+            pnode->fDisconnect = true;
+        }
+    }
+}
+
+void PingDecidedAddressVoters()
+{
+    AssertLockHeld(cs_vNodes);
+
+    CNetAddr addrDecided;
+    {
+        LOCK(cs_decidedAddress);
+        if (!decidedAddress.fSet)
+            return;
+        addrDecided = decidedAddress.address;
+    }
+    const DecidedAddressRules rules = GetDecidedAddressRules();
+    for (CNode* pnode : vNodes) {
+        if (pnode->fDisconnect || pnode->nPingNonceSent != 0 || (CNetAddr)pnode->addrLocal != addrDecided || !IsAddressVoter(pnode, rules))
+            continue;
+        pnode->fPingQueued = true;
+    }
+}
+
+void PeerReportedAddress(const CNode* pnode)
+{
+    AssertLockHeld(cs_vNodes);
+
+    const DecidedAddressInfo decided = DecidedAddress();
+    if (decided.IsSet() && (CNetAddr)pnode->addrLocal != decided.address && IsAddressVoter(pnode, GetDecidedAddressRules()))
+        PingDecidedAddressVoters();
+    UpdateDecidedAddress();
 }
 
 DecidedAddressInfo DecidedAddress()
 {
     LOCK(cs_decidedAddress);
     return decidedAddress;
+}
+
+void SetOnChainAddress(const std::optional<CNetAddr>& addr)
+{
+    LOCK(cs_decidedAddress);
+    onChainAddress = addr;
+}
+
+void ResetDecidedAddress()
+{
+    LOCK(cs_decidedAddress);
+    decidedAddress = DecidedAddressInfo();
+    onChainAddress.reset();
 }
 
 // The directory the decided address is published in; unset while not publishing.
@@ -1480,6 +1612,7 @@ void ThreadSocketHandler()
                             if (!pnode->ReceiveMsgBytes(pchBuf, nBytes))
                                 pnode->CloseSocketDisconnect();
                             pnode->nLastRecv = GetTime();
+                            pnode->nLastRecvUsec = GetTimeMicros();
                             pnode->nRecvBytes += nBytes;
                             pnode->RecordBytesRecv(nBytes);
                         }
@@ -1560,6 +1693,16 @@ void ThreadSocketHandler()
             LOCK(cs_vNodes);
             for (CNode* pnode : vNodesCopy)
                 pnode->Release();
+
+            // After the read pass above, so bytes that arrived while this thread was
+            // held up count before any peer is found silent.
+            const int64_t nNowUsec = GetTimeMicros();
+            bool fLivenessChanged = false;
+            for (const CNode* pnode : vNodes)
+                if (IsAddressVoteLive(pnode, nNowUsec) != pnode->fAddressVoteLive)
+                    fLivenessChanged = true;
+            if (fLivenessChanged)
+                UpdateDecidedAddress();
         }
     }
 }

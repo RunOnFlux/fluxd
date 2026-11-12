@@ -708,6 +708,23 @@ bool FluxnodeCache::CheckIfNeedsIpChangeConfirm(const COutPoint& out, const int&
     return IpChangeConfirmDue(it->second.ip, it->second.nLastConfirmedBlockHeight, strConfirmIp, nBlockHeight);
 }
 
+std::optional<CNetAddr> FluxnodeCache::ConfirmedHost(const COutPoint& out)
+{
+    LOCK(cs);
+
+    auto it = mapConfirmedFluxnodeData.find(out);
+    if (it == mapConfirmedFluxnodeData.end() || it->second.ip.empty())
+        return std::nullopt;
+
+    int nPort = 0;
+    std::string strHost;
+    SplitHostPort(it->second.ip, nPort, strHost);
+    const CNetAddr addr(strHost.c_str(), false);
+    if (!addr.IsValid())
+        return std::nullopt;
+    return addr;
+}
+
 std::string FluxnodeConfirmIp(const std::string& strHost, int nFluxOSPort)
 {
     return strprintf("%s:%d", strHost, nFluxOSPort);
