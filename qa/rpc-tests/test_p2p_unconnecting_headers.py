@@ -108,7 +108,9 @@ async def test_p2p_unconnecting_headers(node_factory: NodeFactory) -> None:
         if await node.rpc.getbestblockhash() == branch[-1].hash:
             break
         await asyncio.sleep(0.1)
-    assert await node.rpc.getbestblockhash() == branch[-1].hash, "did not reorganise onto the branch"
+    assert await node.rpc.getbestblockhash() == branch[-1].hash, (
+        "did not reorganise onto the branch"
+    )
     assert await node.rpc.getblockcount() == BASE + BRANCH
     assert not cb.closed
 
@@ -118,7 +120,9 @@ async def test_p2p_unconnecting_headers(node_factory: NodeFactory) -> None:
     orphans = []
     prev = branch[-1].sha256 ^ 1  # a parent the node does not have
     for i in range(MAX_UNCONNECTING_HEADERS - 1):
-        orphan = create_block(prev, create_coinbase(BASE + BRANCH + 1 + i), base_time + (i + 1) * STEP)
+        orphan = create_block(
+            prev, create_coinbase(BASE + BRANCH + 1 + i), base_time + (i + 1) * STEP
+        )
         orphan.solve()
         orphans.append(orphan)
         prev = orphan.sha256
@@ -127,4 +131,3 @@ async def test_p2p_unconnecting_headers(node_factory: NodeFactory) -> None:
     await cb.sync_with_ping()
     assert not cb.closed
     assert (await _inbound(node))["banscore"] == 20
-
