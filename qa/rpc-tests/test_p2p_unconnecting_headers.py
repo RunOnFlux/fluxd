@@ -85,6 +85,7 @@ async def test_p2p_unconnecting_headers(node_factory: NodeFactory) -> None:
     for i in range(BRANCH):
         block = create_block(prev, create_coinbase(BASE + 1 + i), tip["time"] + (i + 1) * STEP)
         block.solve()
+        assert block.sha256 is not None
         cb.blocks[block.sha256] = block
         branch.append(block)
         prev = block.sha256
@@ -118,12 +119,14 @@ async def test_p2p_unconnecting_headers(node_factory: NodeFactory) -> None:
     # of the limit from zero) add nothing. Had the count carried over from the
     # eleven above, the nineteenth-to-twentieth would have scored.
     orphans = []
+    assert branch[-1].sha256 is not None
     prev = branch[-1].sha256 ^ 1  # a parent the node does not have
     for i in range(MAX_UNCONNECTING_HEADERS - 1):
         orphan = create_block(
             prev, create_coinbase(BASE + BRANCH + 1 + i), base_time + (i + 1) * STEP
         )
         orphan.solve()
+        assert orphan.sha256 is not None
         orphans.append(orphan)
         prev = orphan.sha256
     for orphan in orphans:
