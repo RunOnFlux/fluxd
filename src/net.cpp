@@ -131,7 +131,11 @@ CCriticalSection cs_vAddedNodes;
 NodeId nLastNodeId = 0;
 CCriticalSection cs_nLastNodeId;
 
+// One permit per outbound slot and one more for the feeler, which therefore
+// runs with every outbound slot in use.
 static CSemaphore *semOutbound = NULL;
+// The outbound slots: connections this node dials and keeps.
+static int nMaxOutboundSlots = MAX_OUTBOUND_CONNECTIONS;
 static std::condition_variable messageHandlerCondition;
 
 static std::vector<CAddress> vAnchorAddresses;
@@ -1832,9 +1836,14 @@ void ThreadOpenConnections()
         }
 
         // Feeler connections: periodically test an untried address to keep
-        // the address table fresh (Bitcoin Core PR #8282)
+        // the address table fresh (Bitcoin Core PR #8282). With every outbound
+        // slot in use the permit held here is the feeler's, and nothing else
+        // may be opened on it.
         int64_t nNow = GetTime();
-        if (nNow > nNextFeeler) {
+        const OutboundDial dial = NextOutboundDial(nNow > nNextFeeler, OutboundSlotsFull());
+        if (dial == OutboundDial::None)
+            continue;
+        if (dial == OutboundDial::Feeler) {
             nNextFeeler = nNow + FEELER_INTERVAL;
             fFeeler = true;
         }
@@ -1887,19 +1896,8 @@ void ThreadOpenConnections()
             break;
         }
 
-        if (addrConnect.IsValid()) {
-            if (fFeeler) {
-                // Feeler: use a non-blocking grant so we don't consume a
-                // connection slot if all are in use
-                grant.Release();
-                CSemaphoreGrant feelerGrant(*semOutbound, true);
-                if (feelerGrant) {
-                    OpenNetworkConnection(addrConnect, &feelerGrant, NULL, false, true);
-                }
-            } else {
-                OpenNetworkConnection(addrConnect, &grant);
-            }
-        }
+        if (addrConnect.IsValid())
+            OpenNetworkConnection(addrConnect, &grant, NULL, false, fFeeler);
     }
 }
 
@@ -2001,6 +1999,23 @@ bool ClearnetOutboundCapReached(bool fFeeler, int nClearnetOut)
     return !fFeeler && nClearnetOut >= MAX_OUTBOUND_CONNECTIONS - nMaxOnionOutbound;
 }
 
+OutboundDial NextOutboundDial(bool fFeelerDue, bool fSlotsFull)
+{
+    if (fFeelerDue)
+        return OutboundDial::Feeler;
+    return fSlotsFull ? OutboundDial::None : OutboundDial::Kept;
+}
+
+bool OutboundSlotsFull()
+{
+    int nKept = 0;
+    LOCK(cs_vNodes);
+    for (const CNode* pnode : vNodes)
+        if (!pnode->fInbound && !pnode->fFeeler && !pnode->fOneShot && !pnode->fDisconnect)
+            nKept++;
+    return nKept >= nMaxOutboundSlots;
+}
+
 bool TorAuthDedupDropInbound(const COutPoint& myOutpoint, const COutPoint& peerOutpoint)
 {
     // Keep the connection initiated by the lower outpoint's owner so both ends
@@ -2017,6 +2032,11 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
     //
     // Initiate outbound network connection
     //
+    // The semaphore holds one permit more than the outbound slots, for a
+    // connection that is not kept.
+    if (!fFeeler && !fOneShot && OutboundSlotsFull())
+        return false;
+
     // Enforce onion outbound cap for both addrman and addnode paths. addnode
     // and -connect strings keep their :port suffix, so split it off before the
     // .onion test — "host.onion:port" does not end with ".onion".
@@ -2350,8 +2370,8 @@ void StartNode(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 
     if (semOutbound == NULL) {
         // initialize semaphore
-        int nMaxOutbound = min(MAX_OUTBOUND_CONNECTIONS, nMaxConnections);
-        semOutbound = new CSemaphore(nMaxOutbound);
+        nMaxOutboundSlots = min(MAX_OUTBOUND_CONNECTIONS, nMaxConnections);
+        semOutbound = new CSemaphore(nMaxOutboundSlots + 1);
     }
 
     if (pnodeLocalHost == NULL)

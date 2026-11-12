@@ -157,6 +157,19 @@ extern int nMaxOnionOutbound;
 /** Maximum number of outbound connections (shared by all outbound classes). */
 extern const int MAX_OUTBOUND_CONNECTIONS;
 
+/** Whether every outbound slot holds a connection this node dialled and keeps:
+ *  feelers and one-shots are not counted. A kept connection is opened only
+ *  while this is false. */
+bool OutboundSlotsFull();
+
+/** What the outbound connection loop opens on the semaphore permit it holds.
+ *  The semaphore has one permit per outbound slot and one more, so the loop
+ *  holds a permit even with every slot in use: a feeler when one is due,
+ *  whatever the slots hold, and otherwise a kept connection unless they are
+ *  full. */
+enum class OutboundDial { None, Kept, Feeler };
+OutboundDial NextOutboundDial(bool fFeelerDue, bool fSlotsFull);
+
 /** Whether an onion outbound dial must be refused by the onion-outbound cap.
  *  Feeler connections are one-shot probes (they disconnect on success and never
  *  hold a slot) and are exempt, so a maxonionoutbound=0 hub can still
