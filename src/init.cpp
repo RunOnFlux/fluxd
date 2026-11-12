@@ -1553,8 +1553,7 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         }
     }
 
-    for (const std::string& strDest : mapMultiArgs["-seednode"])
-        AddOneShot(strDest);
+    SetSeedNodes(mapMultiArgs["-seednode"]);
 
 #if ENABLE_ZMQ
     pzmqNotificationInterface = CZMQNotificationInterface::CreateWithArguments(mapArgs);
