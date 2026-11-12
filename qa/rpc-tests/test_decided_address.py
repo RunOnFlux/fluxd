@@ -1,11 +1,12 @@
 """The node's decided address: the IPv4 address its peers report in their version
-messages, taken by majority once enough peers agree: three on mainnet, one on
-regtest.
+messages, by a vote of the peers that are answering.
 
 Each mininode peer reports an address of its choosing as the version message's
-addrMe. Regtest admits any valid IPv4, so the addresses need not be routable.
-The early confirm on an address change needs a confirmed fluxnode, which the
-suite does not run; its logic is covered by the DecidedAddress gtests.
+addrMe. On regtest inbound peers vote, each peer is a netgroup of its own, one
+vote decides, and any valid IPv4 counts, so the addresses need not be routable.
+Mainnet's rules (only dialled peers vote, one vote per /16, half the outbound
+slots voting) and the early confirm on an address change, which needs a
+confirmed fluxnode, are covered by the DecidedAddress gtests.
 """
 
 import asyncio
@@ -17,20 +18,33 @@ from typing import Any
 
 import pytest
 from conftest import POW_ARGS, NodeFactory
-from fluxtest.mininode import NodeConn, NodeConnCB
+from fluxtest.mininode import NodeConn, NodeConnCB, msg_ping
 from fluxtest.node import FluxNode
 from fluxtest.rpc import JSONRPCError
 
 PEERS = 3
+UNDECIDED = {"address": "", "votes": 0, "voters": 0, "changed": 0, "other": [], "inbound": []}
 
 
-async def connect_reporting(node: FluxNode, addr_me: str, count: int) -> list[NodeConn]:
+class QuietableCB(NodeConnCB):
+    """A peer that stops answering pings once ``quiet`` is set, and so sends nothing."""
+
+    quiet = False
+
+    def on_ping(self, conn: NodeConn, message: msg_ping) -> None:
+        if not self.quiet:
+            super().on_ping(conn, message)
+
+
+async def connect_reporting(
+    node: FluxNode, addr_me: str, count: int, cb_class: type[NodeConnCB] = NodeConnCB
+) -> list[NodeConn]:
     """Open ``count`` peers that each report the node at ``addr_me``. The caller
     keeps the returned connections for as long as the peers must stay: a
     connection that is garbage-collected closes."""
     conns = []
     for _ in range(count):
-        cb = NodeConnCB()
+        cb = cb_class()
         conn = NodeConn("127.0.0.1", node.p2p_port, cb, addr_me=addr_me)
         await conn.connect()
         await cb.wait_for_verack()
@@ -44,15 +58,15 @@ async def decided(node: FluxNode) -> dict[str, Any]:
 
 
 async def wait_decided(
-    node: FluxNode, address: str, peers: int, timeout: float = 30
+    node: FluxNode, address: str, votes: int, timeout: float = 30
 ) -> dict[str, Any]:
     deadline = asyncio.get_running_loop().time() + timeout
     while True:
         info = await decided(node)
-        if info["address"] == address and info["peers"] == peers:
+        if info["address"] == address and info["votes"] == votes:
             return info
         if asyncio.get_running_loop().time() > deadline:
-            raise AssertionError(f"decided_address is {info}, want {address} with {peers} peers")
+            raise AssertionError(f"decided_address is {info}, want {address} with {votes} votes")
         await asyncio.sleep(0.1)
 
 
@@ -103,16 +117,20 @@ async def start_fluxnode(
 
 async def test_three_peers_decide_the_address(node_factory: NodeFactory) -> None:
     node = await node_factory(0, extra_args=POW_ARGS)
-    assert await decided(node) == {"address": "", "peers": 0, "changed": 0}
+    assert await decided(node) == UNDECIDED
 
     now = await node.advance_mocktime(10)
     conns = await connect_reporting(node, "1.2.3.4", PEERS)
     info = await wait_decided(node, "1.2.3.4", PEERS)
     assert info["changed"] == now
+    assert info["voters"] == PEERS
 
+    # A decided address stands when its voters leave.
+    await node.advance_mocktime(10)
     for conn in conns:
         await conn.disconnect_node()
-    await wait_decided(node, "", 0)
+    info = await wait_decided(node, "1.2.3.4", 0)
+    assert info["changed"] == now
 
     # Not a fluxnode: nothing is published.
     assert not (node.datadir / "run").exists()
@@ -137,10 +155,16 @@ async def test_fluxnode_publishes_the_decided_address(
     await wait_decided(node, "1.2.3.4", PEERS + 1)
     assert path.read_text() == "untouched"
 
+    # With every voter gone the address stands, and so does the file.
     for conn in conns:
         await conn.disconnect_node()
-    await wait_decided(node, "", 0)
-    assert published(node) == {"address": "", "pid": pid, "rpcport": node.rpc_port}
+    await wait_decided(node, "1.2.3.4", 0)
+    assert path.read_text() == "untouched"
+
+    # Voters for another address move it, and the file with it.
+    conns = await connect_reporting(node, "5.6.7.8", 1)
+    await wait_decided(node, "5.6.7.8", 1)
+    assert published(node) == {"address": "5.6.7.8", "pid": pid, "rpcport": node.rpc_port}
 
     # A clean stop removes the file.
     await node.stop_daemon()
@@ -150,38 +174,77 @@ async def test_fluxnode_publishes_the_decided_address(
 async def test_one_peer_suffices_on_regtest(node_factory: NodeFactory) -> None:
     node = await node_factory(0, extra_args=POW_ARGS)
     # No peer reports an address: none is decided.
-    assert await decided(node) == {"address": "", "peers": 0, "changed": 0}
+    assert await decided(node) == UNDECIDED
 
-    conns = await connect_reporting(node, "1.2.3.4", 1)
-    await wait_decided(node, "1.2.3.4", 1)
-
-    # Two peers for another address outvote the one.
-    conns += await connect_reporting(node, "5.6.7.8", 2)
-    await wait_decided(node, "5.6.7.8", 2)
-    peers = await node.rpc.getpeerinfo()
-    assert sorted(p["addrlocal"].rsplit(":", 1)[0] for p in peers) == [
-        "1.2.3.4",
-        "5.6.7.8",
-        "5.6.7.8",
-    ]
+    _conns = await connect_reporting(node, "1.2.3.4", 1)
+    info = await wait_decided(node, "1.2.3.4", 1)
+    assert info["voters"] == 1
+    assert info["other"] == []
 
 
-async def test_new_majority_changes_the_address(node_factory: NodeFactory) -> None:
+async def test_three_quarters_of_the_vote_changes_the_address(node_factory: NodeFactory) -> None:
     node = await node_factory(0, extra_args=POW_ARGS)
     first = await node.advance_mocktime(10)
     conns = await connect_reporting(node, "1.2.3.4", PEERS)
     assert (await wait_decided(node, "1.2.3.4", PEERS))["changed"] == first
 
-    # Three newer peers for another address tie the decided one, which keeps its place.
+    # Eight of eleven votes for another address are a majority and change nothing.
     await node.advance_mocktime(10)
-    conns += await connect_reporting(node, "5.6.7.8", PEERS)
-    assert len(await node.rpc.getpeerinfo()) == 2 * PEERS
-    assert await decided(node) == {"address": "1.2.3.4", "peers": PEERS, "changed": first}
+    conns += await connect_reporting(node, "5.6.7.8", 8)
+    assert len(await node.rpc.getpeerinfo()) == PEERS + 8
+    assert await decided(node) == {
+        "address": "1.2.3.4",
+        "votes": PEERS,
+        "voters": PEERS + 8,
+        "changed": first,
+        "other": [{"address": "5.6.7.8", "votes": 8}],
+        "inbound": [],
+    }
 
-    # A fourth peer for the new address gives it the majority.
+    # A ninth makes it nine of twelve: three quarters.
     second = await node.advance_mocktime(10)
     conns += await connect_reporting(node, "5.6.7.8", 1)
-    assert (await wait_decided(node, "5.6.7.8", PEERS + 1))["changed"] == second
+    info = await wait_decided(node, "5.6.7.8", 9)
+    assert info["changed"] == second
+    assert info["other"] == [{"address": "1.2.3.4", "votes": PEERS}]
+
+
+async def test_voters_that_stop_answering_lose_their_votes(node_factory: NodeFactory) -> None:
+    node = await node_factory(0, extra_args=POW_ARGS)
+    conns = await connect_reporting(node, "1.2.3.4", 2, QuietableCB)
+    await wait_decided(node, "1.2.3.4", 2)
+
+    # The node's address changes: the peers that saw the old one answer nothing
+    # more, and a new peer reports the new one. Its report sends a ping to the
+    # old address's voters; unanswered, their votes go and the one live vote decides.
+    for conn in conns:
+        assert isinstance(conn.cb, QuietableCB)
+        conn.cb.quiet = True
+    conns += await connect_reporting(node, "5.6.7.8", 1)
+    assert (await decided(node))["address"] == "1.2.3.4"
+    info = await wait_decided(node, "5.6.7.8", 1, timeout=20)
+    assert info["voters"] == 1
+
+
+async def test_silent_voters_are_dropped_while_the_address_lacks_votes(
+    node_factory: NodeFactory,
+) -> None:
+    node = await node_factory(0, extra_args=POW_ARGS)
+    conns = await connect_reporting(node, "1.2.3.4", 2, QuietableCB)
+    await wait_decided(node, "1.2.3.4", 2)
+
+    for conn in conns:
+        assert isinstance(conn.cb, QuietableCB)
+        conn.cb.quiet = True
+    await node.rpc.ping()
+
+    # Long before the ping timeout would close them, the silent peers are
+    # disconnected; the address stands with no votes.
+    deadline = asyncio.get_running_loop().time() + 20
+    while await node.rpc.getpeerinfo():
+        assert asyncio.get_running_loop().time() < deadline, "silent voters still connected"
+        await asyncio.sleep(0.2)
+    assert (await wait_decided(node, "1.2.3.4", 0))["voters"] == 0
 
 
 async def test_fluxnode_refuses_a_proxy(

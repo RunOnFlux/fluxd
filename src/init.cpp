@@ -2242,8 +2242,10 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
     }
 
     // Its readers, fluxbench and FluxOS, run only beside a fluxnode.
-    if (fFluxnode)
+    if (fFluxnode) {
+        SetOnChainAddress(g_fluxnodeCache.ConfirmedHost(activeFluxnode.deterministicOutPoint));
         StartPublishingDecidedAddress(DecidedAddressFileDir());
+    }
     StartNode(threadGroup, scheduler);
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected

@@ -23,6 +23,9 @@ void ActiveFluxnode::ManageDeterministricFluxnode()
 
     std::string errorMessage;
 
+    // The decided address holds the record's address on the minimum votes alone (net.h DecideAddress)
+    SetOnChainAddress(g_fluxnodeCache.ConfirmedHost(activeFluxnode.deterministicOutPoint));
+
     // Start confirm transaction
     CMutableTransaction mutTx;
 
@@ -442,7 +445,7 @@ bool GetConfirmIp(std::string& strIp, std::string& strMissing)
 
     strMissing.clear();
     if (!decided.IsSet())
-        strMissing = strprintf("no decided address: fewer than %d connected peers report one", Params().DecidedAddressMinPeers());
+        strMissing = "no decided address: too few of the peers this node dialled report one";
     if (!port.IsSet())
         strMissing += strprintf("%sno FluxOS port: %s", strMissing.empty() ? "" : "; ", port.strReason);
     if (!strMissing.empty())

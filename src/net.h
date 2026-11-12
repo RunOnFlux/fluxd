@@ -23,7 +23,9 @@
 #include "uint256.h"
 #include "utilstrencodings.h"
 
+#include <atomic>
 #include <deque>
+#include <map>
 #include <optional>
 #include <stdint.h>
 
@@ -216,43 +218,125 @@ struct LocalServiceInfo {
 extern CCriticalSection cs_mapLocalHost;
 extern std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
 
-/** One connected peer's view of this node's address: the addrMe of its version message. */
+/** One connected peer's view of this node's address. */
 struct PeerAddressReport {
-    NodeId nodeId;      // node ids rise with connection order: a higher id connected later
-    CNetAddr addrLocal;
+    NodeId nodeId;
+    CNetAddr addrPeer;    // the peer's own address
+    CNetAddr addrLocal;   // where it reports seeing this node: the addrMe of its version message
+    bool fInbound;
+    bool fVoter;          // of a kind that may vote: IsAddressVoter()
+    bool fLive;           // answering: AddressVoteIsLive()
 };
 
-/** The node's own public address as its peers report it. Nothing the operator
- *  configures reaches it: -externalip governs only what the node advertises. */
+/** How this network votes on the decided address. */
+struct DecidedAddressRules {
+    int nMinVotes;          // the votes an address needs to be decided, and to stand once decided
+    int nMinVoters;         // the live voters needed before an address other than the on-chain one is decided
+    bool fInboundVotes;     // inbound peers vote too
+    bool fAllowNonRoutable; // peers and reported addresses need not be routable, and each such peer is its own netgroup
+};
+
+/** The rules of the selected chain. nMinVoters on mainnet is half the outbound
+ *  slots open to clearnet peers. */
+DecidedAddressRules GetDecidedAddressRules();
+
+/** The votes of a set of peers. A peer fills addrMe with whatever it chooses and
+ *  anyone can open inbound connections, so a vote belongs to a netgroup of peers
+ *  this node dialled: each /16 of live voters casts one vote for the IPv4
+ *  address its peers report, and none when they disagree. */
+struct AddressTally {
+    std::map<CNetAddr, int> mapVotes;   // address -> netgroups voting for it
+    int nVoters = 0;                    // netgroups that cast a vote
+    std::map<CNetAddr, int> mapInbound; // address -> non-voting inbound peers reporting it
+
+    int Votes(const CNetAddr& addr) const
+    {
+        auto it = mapVotes.find(addr);
+        return it == mapVotes.end() ? 0 : it->second;
+    }
+};
+
+AddressTally TallyAddressVotes(const std::vector<PeerAddressReport>& reports, const DecidedAddressRules& rules);
+
+/** The address the node holds given a tally: addrDecided is the one it holds
+ *  now, addrOnChain the one in its own fluxnode record; either may be absent.
+ *
+ *  An address is adoptable with nMinVotes votes, more than half of all votes,
+ *  and nMinVoters voters. The held address (the on-chain one while none is
+ *  decided) gives way to an adoptable address with three quarters of the votes,
+ *  and otherwise stands on nMinVotes votes. Below that a decided address gives
+ *  way to any adoptable address and stands when there is none: once decided,
+ *  the result is never absent. The on-chain address is never returned on fewer
+ *  than nMinVotes votes.
+ *
+ *  A node whose address changes loses every connection made from the old one,
+ *  so the old address loses its votes without a clock. Voters reporting a false
+ *  address hold a moved node on its old one only with more than a quarter of
+ *  the votes, and move a node only with three quarters. */
+std::optional<CNetAddr> DecideAddress(const AddressTally& tally, const DecidedAddressRules& rules,
+                                      const std::optional<CNetAddr>& addrDecided, const std::optional<CNetAddr>& addrOnChain);
+
+/** The floor of the time a peer has to answer a ping before its vote is
+ *  suspended; three times its best round trip is added. */
+static const int64_t ADDRESS_VOTE_PING_FLOOR_USEC = 5 * 1000000;
+
+/** Whether a peer is answering. nPingStartUsec is when the ping it has not yet
+ *  answered was sent, 0 with none outstanding; nLastRecvUsec is when the socket
+ *  thread last read bytes from it; nMinPingUsec its best round trip, or
+ *  int64 max before the first. False once the ping has gone unanswered for
+ *  ADDRESS_VOTE_PING_FLOOR_USEC + 3 * nMinPingUsec with nothing received since
+ *  it was sent. Reading receive times, not processed pongs, keeps a busy
+ *  message thread on this node from suspending its peers. */
+bool AddressVoteIsLive(int64_t nNowUsec, int64_t nPingStartUsec, int64_t nLastRecvUsec, int64_t nMinPingUsec);
+
+/** The node's own public address as the peers it dialled report it. Nothing the
+ *  operator configures reaches it: -externalip governs only what the node
+ *  advertises. */
 struct DecidedAddressInfo {
-    CNetAddr address;     // meaningful only while IsSet()
-    int nPeers = 0;       // connected peers reporting address; 0 while none
-    int64_t nChanged = 0; // when address last changed, including to or from none; 0 if never decided
-    bool IsSet() const { return nPeers > 0; }
+    CNetAddr address;                   // meaningful only while IsSet()
+    bool fSet = false;
+    int nVotes = 0;                     // netgroups voting for address
+    int nVoters = 0;                    // netgroups that cast a vote
+    int64_t nChanged = 0;               // when address last changed, including from none; 0 if never decided
+    std::map<CNetAddr, int> mapOther;   // other addresses voted for, with their votes
+    std::map<CNetAddr, int> mapInbound; // addresses non-voting inbound peers report, with their peers
+    bool IsSet() const { return fSet; }
 };
 
-/** The IPv4 address reported by the most peers, when at least
- *  Params().DecidedAddressMinPeers() report it. On a tie addrIncumbent, the
- *  address currently decided (a default CNetAddr when none), keeps its place if
- *  it is among the leaders; otherwise the address whose newest reporter
- *  connected last wins. Only routable addresses count unless fAllowNonRoutable
- *  (regtest, where every peer is on loopback). Returns false, leaving the
- *  outputs untouched, when no address qualifies. */
-bool DecideAddress(const std::vector<PeerAddressReport>& reports, bool fAllowNonRoutable, const CNetAddr& addrIncumbent, CNetAddr& addrOut, int& nPeersOut);
-
-/** Recompute the decided address from every connected peer, inbound and
- *  outbound. Caller holds cs_vNodes. Called when a peer's version arrives and
- *  when peers are removed. */
+/** Re-evaluate the decided address from the connected peers, and while it holds
+ *  fewer than nMinVotes votes disconnect every voter that is not answering, so
+ *  its slot goes to a peer that can report the current address. Caller holds
+ *  cs_vNodes. Called when a peer's version arrives, when peers are removed, and
+ *  from the socket thread after each read pass. */
 void UpdateDecidedAddress();
+
+/** Queue a ping to every voter for the decided address that has none
+ *  outstanding. Caller holds cs_vNodes. */
+void PingDecidedAddressVoters();
+
+/** A peer's version message has set its addrLocal: re-evaluate the decided
+ *  address. When the peer is a voter and reports another address, the decided
+ *  address's voters are pinged first: after an address change they are dead,
+ *  and the ping finds that out without waiting for PING_INTERVAL. Only a peer
+ *  this node chose to dial starts that, never one that dialled in. Caller
+ *  holds cs_vNodes. */
+void PeerReportedAddress(const CNode* pnode);
 
 /** The current decided address. */
 DecidedAddressInfo DecidedAddress();
+
+/** The address in this node's own fluxnode record, absent when it has none.
+ *  Fluxnode code sets it; DecideAddress holds it on nMinVotes votes alone. */
+void SetOnChainAddress(const std::optional<CNetAddr>& addr);
+
+/** Forget the decided address and the on-chain one. For tests. */
+void ResetDecidedAddress();
 
 /** fluxd publishes its decided address and how to reach it for fluxbench and
  *  FluxOS to read, in DECIDED_ADDRESS_FILE under DecidedAddressFileDir(), as
  *  {"address": "a.b.c.d" or "", "pid": n, "rpcport": n}, rpcport being the port
  *  its RPC server binds: what a reader acts on, so a peer connecting or leaving
- *  does not rewrite it; the peer count and the time of the last change are in
+ *  does not rewrite it; the votes and the time of the last change are in
  *  the RPC. Nothing in fluxd reads it. */
 #define DECIDED_ADDRESS_DIR "/run/fluxd"
 #define DECIDED_ADDRESS_FILE "fluxd.json"
@@ -394,6 +478,10 @@ public:
 
     int64_t nLastSend;
     int64_t nLastRecv;
+    // When the socket thread last read bytes from the peer, in usec; 0 before the first.
+    std::atomic<int64_t> nLastRecvUsec{0};
+    // AddressVoteIsLive() as the socket thread last found it; guarded by cs_vNodes.
+    bool fAddressVoteLive{true};
     int64_t nTimeConnected;
     int64_t nTimeOffset;
     CAddress addr;

@@ -163,8 +163,13 @@ public:
     const uint256& GetEmergencyCollateralHash() const { return emergencyCollateralHash; }
     int GetEmergencyMinSignatures() const { return nEmergencyMinSignatures; }
 
-    /** The fewest connected peers that must report one address before the node takes it as its own. */
-    int DecidedAddressMinPeers() const { return nDecidedAddressMinPeers; }
+    /** The decided address's vote on this chain (net.h DecidedAddressRules): the
+     *  votes an address needs; whether deciding an address other than the on-chain
+     *  one needs half the clearnet outbound slots voting, or one voter; and
+     *  whether inbound peers vote. */
+    int DecidedAddressMinVotes() const { return nDecidedAddressMinVotes; }
+    bool DecidedAddressNeedsHalfOutbound() const { return fDecidedAddressNeedsHalfOutbound; }
+    bool DecidedAddressInboundVotes() const { return fDecidedAddressInboundVotes; }
 
 
 protected:
@@ -241,7 +246,9 @@ protected:
     uint256 emergencyCollateralHash;
     int nEmergencyMinSignatures = 2; // Require 2-of-N signatures
 
-    int nDecidedAddressMinPeers = 3;
+    int nDecidedAddressMinVotes = 3;
+    bool fDecidedAddressNeedsHalfOutbound = true;
+    bool fDecidedAddressInboundVotes = false;
 };
 
 /**

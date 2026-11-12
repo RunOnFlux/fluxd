@@ -254,7 +254,8 @@ public:
         emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
         nEmergencyMinSignatures = 2; // Require 2 signatures minimum
 
-        nDecidedAddressMinPeers = 3;
+        nDecidedAddressMinVotes = 3;
+        fDecidedAddressNeedsHalfOutbound = true;
 
         checkpointData = (CCheckpointData) {
             {
@@ -525,8 +526,9 @@ public:
         emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
         nEmergencyMinSignatures = 2; // Require 2 signatures minimum
 
-        // A small network: one peer's report decides the address.
-        nDecidedAddressMinPeers = 1;
+        // A small network: one voter decides the address.
+        nDecidedAddressMinVotes = 1;
+        fDecidedAddressNeedsHalfOutbound = false;
 
     // Hardcoded fallback value for the Sprout shielded value pool balance
         // for nodes that have not reindexed since the introduction of monitoring
@@ -697,8 +699,9 @@ public:
         emergencyCollateralHash = uint256S("1111111111111111111111111111111111111111111111111111111111111111");
         nEmergencyMinSignatures = 1;
 
-        // A small network: one peer's report decides the address.
-        nDecidedAddressMinPeers = 1;
+        // A small network: one voter decides the address.
+        nDecidedAddressMinVotes = 1;
+        fDecidedAddressNeedsHalfOutbound = false;
     }
 
     bool SetLabNetKey(const std::string& strPubKey, std::string& strError)
@@ -914,8 +917,11 @@ public:
         vecEmergencyPublicKeys[2] = "02615c78e21078c21a63cb21cc4d29eaa148d97c3dcbe7be5d9d4dda4e969bb05a";
         vecEmergencyPublicKeys[3] = "033d301dc7ef7ab653da36da1285063ea9be1448d601e3c9f99185476b9d4ae1d1";
 
-        // Every daemon is on loopback with few peers: one peer's report decides the address.
-        nDecidedAddressMinPeers = 1;
+        // Every daemon is on loopback with few peers, and the qa suite's peers dial in:
+        // one voter decides the address, and inbound peers vote.
+        nDecidedAddressMinVotes = 1;
+        fDecidedAddressNeedsHalfOutbound = false;
+        fDecidedAddressInboundVotes = true;
     }
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)
