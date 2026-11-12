@@ -56,7 +56,6 @@ Fluxd supports various build-time options:
 - `--disable-wallet` - Build without wallet support
 - `--disable-mining` - Build without mining support
 - `--disable-zmq` - Build without ZeroMQ notifications
-- `--disable-proton` - Build without AMQP messaging
 - `--enable-debug` - Build with debug symbols
 
 ## Running a FluxNode
