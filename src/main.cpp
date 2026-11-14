@@ -5489,6 +5489,7 @@ bool ReceivedBlockTransactions(
     pindexNew->pHeaderData->nSolution = block.nSolution;
     pindexNew->pHeaderData->nodesCollateral = block.nodesCollateral;
     pindexNew->pHeaderData->vchBlockSig = block.vchBlockSig;
+    pindexNew->pHeaderData->nodesVrfProof = block.nodesVrfProof;
 
     pindexNew->nTx = block.vtx.size();
     pindexNew->nChainTx = 0;
@@ -6110,6 +6111,11 @@ static bool AcceptBlock(const CBlock& block, CValidationState& state, const CCha
     // the full block with a valid signature, update the index to store the correct one.
     if (block.IsPON() && pindex->pHeaderData && pindex->pHeaderData->vchBlockSig != block.vchBlockSig) {
         pindex->pHeaderData->vchBlockSig = block.vchBlockSig;
+        setDirtyBlockIndex.insert(pindex);
+    }
+    // The VRF proof is outside the block hash in the same way.
+    if (block.IsPON() && pindex->pHeaderData && pindex->pHeaderData->nodesVrfProof != block.nodesVrfProof) {
+        pindex->pHeaderData->nodesVrfProof = block.nodesVrfProof;
         setDirtyBlockIndex.insert(pindex);
     }
 

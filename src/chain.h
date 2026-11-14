@@ -253,6 +253,9 @@ public:
         std::vector<unsigned char> nSolution;
         COutPoint nodesCollateral;
         std::vector<unsigned char> vchBlockSig;
+        //! PON-VRF proof. Outside the block hash, as vchBlockSig is, and carried by every
+        //! header this entry is served as: a header without it fails CheckPONBlockHeader.
+        std::vector<unsigned char> nodesVrfProof;
     };
     HeaderData* pHeaderData;
 
@@ -289,6 +292,7 @@ public:
         pHeaderData->nSolution            = block.nSolution;
         pHeaderData->nodesCollateral      = block.nodesCollateral;
         pHeaderData->vchBlockSig          = block.vchBlockSig;
+        pHeaderData->nodesVrfProof        = block.nodesVrfProof;
     }
 
     ~CBlockIndex()
@@ -425,6 +429,7 @@ public:
             block.nSolution      = pHeaderData->nSolution;
             block.nodesCollateral = pHeaderData->nodesCollateral;
             block.vchBlockSig    = pHeaderData->vchBlockSig;
+            block.nodesVrfProof  = pHeaderData->nodesVrfProof;
         }
         return block;
     }
@@ -563,6 +568,7 @@ public:
             // persisted to recompute the hash and to serve as the fork-choice tie-breaker.
             if (this->nVersion >= CBlockHeader::PON_VRF_VERSION) {
                 READWRITE(nodesVrfOutput);
+                READWRITE(pHeaderData->nodesVrfProof);
             }
         }
 
@@ -613,6 +619,7 @@ public:
             block.nSolution       = pHeaderData->nSolution;
             block.nodesCollateral = pHeaderData->nodesCollateral;
             block.vchBlockSig     = pHeaderData->vchBlockSig;
+            block.nodesVrfProof   = pHeaderData->nodesVrfProof;
         }
         return block.GetHash();
     }

@@ -796,3 +796,30 @@ TEST_F(PONTest, VrfVersionRefusedBeforeActivation) {
                 CheckProofOfNode(vrf.nodesVrfOutput, vrf.nBits, params, nHeight));
     EXPECT_FALSE(CheckPONBlockHeader(vrf, &prev, params));
 }
+
+// getheaders serves a header rebuilt from the block index, and CheckPONBlockHeader refuses a
+// VRF header whose proof is not 81 bytes: the proof is carried by the index entry and by its
+// record on disk.
+TEST_F(PONTest, VrfProofSurvivesBlockIndexRoundTrip) {
+    CBlockHeader original = MakeVrfHeader();
+    ASSERT_EQ(original.nodesVrfProof.size(), 81u);
+
+    CBlockIndex index(original);
+    uint256 blockHash = original.GetHash();
+    index.phashBlock = &blockHash;
+    CBlockHeader relayed = index.GetBlockHeader();
+    EXPECT_EQ(relayed.nodesVrfOutput, original.nodesVrfOutput);
+    EXPECT_EQ(relayed.nodesVrfProof, original.nodesVrfProof);
+
+    CBlockIndex copy(index);
+    EXPECT_EQ(copy.GetBlockHeader().nodesVrfProof, original.nodesVrfProof);
+
+    CDiskBlockIndex disk(&index);
+    CDataStream ss(SER_DISK, CLIENT_VERSION);
+    ss << disk;
+    CDiskBlockIndex loaded;
+    ss >> loaded;
+    ASSERT_NE(loaded.pHeaderData, nullptr);
+    EXPECT_EQ(loaded.nodesVrfOutput, original.nodesVrfOutput);
+    EXPECT_EQ(loaded.pHeaderData->nodesVrfProof, original.nodesVrfProof);
+}
