@@ -823,3 +823,33 @@ TEST_F(PONTest, VrfProofSurvivesBlockIndexRoundTrip) {
     EXPECT_EQ(loaded.nodesVrfOutput, original.nodesVrfOutput);
     EXPECT_EQ(loaded.pHeaderData->nodesVrfProof, original.nodesVrfProof);
 }
+
+TEST_F(PONTest, MixedVersionForkChoiceDeterministic) {
+    // A legacy block and a VRF block competing at the same height (the
+    // activation-boundary fork shape): each scores by its own resident value.
+    CBlockIndex legacy = MakeLegacyPonIndex(100, uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa"));
+    CBlockIndex vrf = MakeVrfIndex(100, uint256S("0x00000000000000000000000000000000000000000000000000000000000000bb"));
+
+    int lv = ComparePonForkChoice(&legacy, &vrf);
+    EXPECT_LT(lv, 0);                                    // lower score (legacy aa) preferred
+    EXPECT_EQ(lv, -ComparePonForkChoice(&vrf, &legacy)); // antisymmetric
+    EXPECT_EQ(lv, ComparePonForkChoice(&legacy, &vrf));  // deterministic
+}
+
+// A v101 (PON-VRF) block commits nodesVrfOutput to its block hash, so the
+// hand-written CBlockIndex copy operations MUST carry it. The serialization
+// write path builds CDiskBlockIndex(*pindex) through the copy constructor, so
+// an omitted field is persisted as zero and the entry fails its hash check on
+// the next startup. Guards against the copy ctor / operator= dropping it.
+TEST_F(PONTest, VrfOutputSurvivesCBlockIndexCopy) {
+    const uint256 vrf = uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa");
+    CBlockIndex original = MakeVrfIndex(100, vrf);
+    ASSERT_EQ(original.nodesVrfOutput, vrf);
+
+    CBlockIndex copyCtor(original);
+    EXPECT_EQ(copyCtor.nodesVrfOutput, vrf) << "CBlockIndex copy constructor dropped nodesVrfOutput";
+
+    CBlockIndex assigned;
+    assigned = original;
+    EXPECT_EQ(assigned.nodesVrfOutput, vrf) << "CBlockIndex operator= dropped nodesVrfOutput";
+}
