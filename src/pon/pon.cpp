@@ -290,10 +290,17 @@ bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPre
         if (!CheckProofOfNode(block.nodesVrfOutput, block.nBits, Params().GetConsensus(), nHeight)) {
             return error("CheckPONBlockHeader: VRF output doesn't meet target");
         }
-    } else if (!CheckProofOfNode(GetPONHash(block), block.nBits, Params().GetConsensus(), nHeight)) {
-        int64_t genesisTimestamp = Params().GenesisBlock().nTime;
-        uint32_t slot = GetSlotNumber(block.nTime, genesisTimestamp, Params().GetConsensus());
-        return error("CheckPONBlockHeader: stake hash doesn't meet target for slot %d", slot);
+    } else {
+        // Before UPGRADE_PON_VRF no block is at the VRF version: its VRF output is verified
+        // by nothing, and fork choice scores a block at that version by its output.
+        if (block.nVersion >= CBlockHeader::PON_VRF_VERSION) {
+            return error("CheckPONBlockHeader: block version %d before PON_VRF activation", block.nVersion);
+        }
+        if (!CheckProofOfNode(GetPONHash(block), block.nBits, Params().GetConsensus(), nHeight)) {
+            int64_t genesisTimestamp = Params().GenesisBlock().nTime;
+            uint32_t slot = GetSlotNumber(block.nTime, genesisTimestamp, Params().GetConsensus());
+            return error("CheckPONBlockHeader: stake hash doesn't meet target for slot %d", slot);
+        }
     }
 
     int64_t genesisTimestamp = Params().GenesisBlock().nTime;

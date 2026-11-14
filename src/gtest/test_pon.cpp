@@ -761,3 +761,38 @@ TEST_F(PONTest, VrfMessagePerNodeUnderSharedOperatorKey) {
     uint256 yx;
     EXPECT_FALSE(ECVRF_Verify(opPub, msgB, proofA, yx));
 }
+
+// Before UPGRADE_PON_VRF a header at the VRF version is refused, whatever its eligibility:
+// fork choice scores such a block by a VRF output that nothing has verified.
+TEST_F(PONTest, VrfVersionRefusedBeforeActivation) {
+    SelectParams(CBaseChainParams::MAIN);
+    const Consensus::Params& params = Params().GetConsensus();
+
+    CBlockIndex prev;
+    prev.nHeight = GetPONActivationHeight() + params.nPonDifficultyWindow + 10;   // ponLimit applies
+    const int nHeight = prev.nHeight + 1;
+    ASSERT_FALSE(IsPONVRFActive(nHeight));
+
+    // A legacy header that meets the target at the easiest difficulty.
+    CBlockHeader legacy;
+    legacy.nVersion = CBlockHeader::PON_VERSION;
+    legacy.hashPrevBlock = uint256S("0x01");
+    legacy.nBits = UintToArith256(params.ponLimit).GetCompact();
+    legacy.nodesCollateral = COutPoint(uint256S("0x04"), 1);
+    bool fEligible = false;
+    for (uint32_t t = 0; t < 100000 && !fEligible; t++) {
+        legacy.nTime = 1700000000 + t * params.nPonTargetSpacing;
+        fEligible = CheckProofOfNode(GetPONHash(legacy), legacy.nBits, params, nHeight);
+    }
+    ASSERT_TRUE(fEligible);
+    EXPECT_TRUE(CheckPONBlockHeader(legacy, &prev, params));
+
+    // The same header at the VRF version, with the smallest output there is.
+    CBlockHeader vrf = legacy;
+    vrf.nVersion = CBlockHeader::PON_VRF_VERSION;
+    vrf.nodesVrfOutput = uint256();
+    vrf.nodesVrfProof = std::vector<unsigned char>(81, 0x77);
+    ASSERT_TRUE(CheckProofOfNode(GetPONHash(vrf), vrf.nBits, params, nHeight) ||
+                CheckProofOfNode(vrf.nodesVrfOutput, vrf.nBits, params, nHeight));
+    EXPECT_FALSE(CheckPONBlockHeader(vrf, &prev, params));
+}
