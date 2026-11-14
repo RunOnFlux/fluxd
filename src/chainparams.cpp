@@ -11,6 +11,7 @@
 #include "crypto/equihash.h"
 
 #include "util.h"
+#include "version.h"
 #include "utilstrencodings.h"
 
 #include <assert.h>
@@ -153,7 +154,7 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
         consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight = 2020000;
-        consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nProtocolVersion = 170022;
+        consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nProtocolVersion = PON_VRF_PROTO_VERSION;
         consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight =
                 Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;  // TBD: set at scheduled network upgrade
         
@@ -400,7 +401,7 @@ public:
 
         consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
         consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight = 800;
-        consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nProtocolVersion = 170022;
+        consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nProtocolVersion = PON_VRF_PROTO_VERSION;
         consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight =
                 9999999;  // PLACEHOLDER — REPLACE with the scheduled testnet activation height (well above the current tip) before tagging the release
         
@@ -604,6 +605,9 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_P2SHNODES].nActivationHeight = 1;
         consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
         consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight = 2;
+        consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nProtocolVersion = PON_VRF_PROTO_VERSION;
+        consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight =
+                Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         consensus.nPONInitialSubsidy = 14;
         consensus.nPONSubsidyReductionInterval = 1051200;
@@ -811,7 +815,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
         consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight =
                 Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-        consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nProtocolVersion = 170022;
+        consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nProtocolVersion = PON_VRF_PROTO_VERSION;
         consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight =
                 Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;  // TBD: set at scheduled network upgrade
         
