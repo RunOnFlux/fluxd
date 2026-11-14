@@ -38,8 +38,7 @@ from zhelpers import (
 # regtest bech32 HRPs, so they decode unchanged. Importing the key lets node
 # 0's wallet track the funds migrated to the configured destination.
 SAPLING_ADDR = (
-    "zregtestsapling1ssqj3f3majnl270985gqcdqedd9t4nlttjqskccwevj2v20sc25deqspv3masufnwcdy6"
-    "7cydyy"
+    "zregtestsapling1ssqj3f3majnl270985gqcdqedd9t4nlttjqskccwevj2v20sc25deqspv3masufnwcdy67cydyy"
 )
 SAPLING_KEY = (
     "secret-extended-key-regtest1qv62zt2fqyqqpqrh2qzc08h7gncf4447jh9kvnnnhjg959fkwt7mhw9j8"

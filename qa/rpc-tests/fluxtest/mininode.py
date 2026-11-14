@@ -972,8 +972,12 @@ class NodeConn:
         cb: NodeConnCB,
         net: str = "regtest",
         protocol_version: int = SPROUT_PROTO_VERSION,
+        addr_me: str | None = None,
     ) -> None:
+        """addr_me is the address the version message reports the node at (its
+        addrMe); the address dialled when None."""
         self.dstaddr = dstaddr
+        self.addr_me = addr_me
         self.dstport = dstport
         self.cb = cb
         self.network = net
@@ -986,9 +990,15 @@ class NodeConn:
         cb.add_connection(self)
 
     async def connect(self) -> None:
-        self._reader, self._writer = await asyncio.open_connection(self.dstaddr, self.dstport)
+        reader, writer = await asyncio.open_connection(self.dstaddr, self.dstport)
+        await self.accept(reader, writer)
+
+    async def accept(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        """Speak to the node over an open connection: one this peer dialled, or
+        one the node dialled to a listener of the test's."""
+        self._reader, self._writer = reader, writer
         vt = msg_version(self.protocol_version)
-        vt.addrTo.ip = self.dstaddr
+        vt.addrTo.ip = self.addr_me if self.addr_me is not None else self.dstaddr
         vt.addrTo.port = self.dstport
         vt.addrFrom.ip = "0.0.0.0"
         vt.addrFrom.port = 0

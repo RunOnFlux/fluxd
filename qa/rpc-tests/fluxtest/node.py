@@ -32,6 +32,9 @@ class FluxNode:
         self.rpc_port = rpc_port
         self.p2p_port = p2p_port
         self.extra_args = list(extra_args or [])
+        # Whether the open-connections thread runs (see _write_conf). A test of
+        # that thread sets it before a restart.
+        self.auto_connect = False
         self._proc: asyncio.subprocess.Process | None = None
         self._stderr_path = datadir / "node_stderr.log"
         self._stderr = None
@@ -60,9 +63,7 @@ class FluxNode:
             "rpcpassword=rt\n"
             f"port={self.p2p_port}\n"
             f"rpcport={self.rpc_port}\n"
-            "listenonion=0\n"
-            "connect=0\n"
-            "listen=1\n"
+            "listenonion=0\n" + ("" if self.auto_connect else "connect=0\n") + "listen=1\n"
         )
 
     async def start(self, timeout: float = 60) -> None:
