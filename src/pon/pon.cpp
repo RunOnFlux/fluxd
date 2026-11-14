@@ -96,6 +96,13 @@ uint32_t GetSlotNumber(int64_t timestamp, int64_t genesisTimestamp, const Consen
 // PON-VRF epoch seed. The randomness for a block's VRF eligibility is derived from a
 // window of blocks buried beyond the reorg horizon, so the proposer of the current block
 // cannot have authored (and therefore cannot grind) the seed. Constant for an entire epoch.
+//
+// A VRF block contributes its VRF output, never its block hash. A block hash covers the
+// merkle root, so the producer of a window block could try transaction sets and keep the one
+// whose seed favours its own nodes; its VRF output is fixed by its key, its slot and the seed
+// of its own epoch, which leaves it the choice of publishing the block or not. A block below
+// the VRF version, in a window that reaches back before activation, has no output and
+// contributes its hash. Both are resident on the index entry.
 static const int PON_VRF_EPOCH_LEN = 60;   // blocks per epoch (~30 min at 30s spacing)
 static const int PON_VRF_SEED_BURY = 60;   // window end is buried this many blocks (> MAX_REORG_LENGTH=40)
 
@@ -113,7 +120,11 @@ uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& par
     CHashWriter ss(SER_GETHASH, 0);
     const CBlockIndex* p = pindexPrev->GetAncestor(windowEnd);
     for (int i = 0; i < PON_VRF_EPOCH_LEN && p != NULL; ++i, p = p->pprev) {
-        ss << p->GetBlockHash();
+        if (p->nVersion >= CBlockHeader::PON_VRF_VERSION) {
+            ss << (unsigned char)1 << p->nodesVrfOutput;
+        } else {
+            ss << (unsigned char)0 << p->GetBlockHash();
+        }
     }
     return ss.GetHash();
 }

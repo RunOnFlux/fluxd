@@ -853,3 +853,63 @@ TEST_F(PONTest, VrfOutputSurvivesCBlockIndexCopy) {
     assigned = original;
     EXPECT_EQ(assigned.nodesVrfOutput, vrf) << "CBlockIndex operator= dropped nodesVrfOutput";
 }
+
+// The epoch seed is taken from the VRF outputs of its window, not the block hashes: a block
+// hash covers the transactions its producer chose, a VRF output does not.
+namespace {
+struct SeedChain {
+    std::vector<uint256> hashes;
+    std::vector<CBlockIndex> entries;
+
+    // Heights 0..nBlocks-1; VRF blocks from nVrfFrom.
+    SeedChain(int nBlocks, int nVrfFrom) : hashes(nBlocks), entries(nBlocks) {
+        for (int h = 0; h < nBlocks; h++) {
+            hashes[h] = ArithToUint256(arith_uint256(1000 + h));
+            entries[h].nHeight = h;
+            entries[h].phashBlock = &hashes[h];
+            entries[h].pprev = h ? &entries[h - 1] : nullptr;
+            entries[h].nVersion = h >= nVrfFrom ? CBlockHeader::PON_VRF_VERSION : CBlockHeader::PON_VERSION;
+            entries[h].nodesVrfOutput = h >= nVrfFrom ? ArithToUint256(arith_uint256(5000 + h)) : uint256();
+        }
+    }
+    uint256 Seed() const { return GetEpochSeed(&entries.back(), Params().GetConsensus()); }
+};
+}
+
+TEST_F(PONTest, EpochSeedIsTakenFromVrfOutputs) {
+    // The block after height 239 is 240, epoch 4: its window is heights 180 down to 121.
+    SeedChain base(240, 0);
+    const uint256 seed = base.Seed();
+    EXPECT_NE(seed, Params().GenesisBlock().GetHash());
+
+    // Another block hash at the top of the window, the same VRF output: the same seed.
+    SeedChain otherHash(240, 0);
+    otherHash.hashes[180] = ArithToUint256(arith_uint256(999999));
+    EXPECT_EQ(otherHash.Seed(), seed);
+
+    // Another VRF output anywhere in the window: another seed.
+    SeedChain otherOutput(240, 0);
+    otherOutput.entries[121].nodesVrfOutput = ArithToUint256(arith_uint256(999999));
+    EXPECT_NE(otherOutput.Seed(), seed);
+
+    // Outside the window, neither matters.
+    SeedChain outside(240, 0);
+    outside.entries[120].nodesVrfOutput = ArithToUint256(arith_uint256(999999));
+    outside.entries[181].nodesVrfOutput = ArithToUint256(arith_uint256(999999));
+    EXPECT_EQ(outside.Seed(), seed);
+}
+
+TEST_F(PONTest, EpochSeedUsesTheHashOfABlockWithoutAnOutput) {
+    // VRF from height 150: the window 121..180 holds legacy blocks 121..149.
+    SeedChain base(240, 150);
+    const uint256 seed = base.Seed();
+
+    SeedChain legacyHash(240, 150);
+    legacyHash.hashes[130] = ArithToUint256(arith_uint256(999999));
+    EXPECT_NE(legacyHash.Seed(), seed);
+
+    SeedChain vrfHash(240, 150);
+    vrfHash.hashes[170] = ArithToUint256(arith_uint256(999999));
+    EXPECT_EQ(vrfHash.Seed(), seed);
+}
+
