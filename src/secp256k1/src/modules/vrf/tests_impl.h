@@ -50,18 +50,24 @@ void run_vrf_tests(void) {
 
     {  /* test nonce generation */
 
-    unsigned char gen_nonce[32], exp_nonce[32];
+    unsigned char gen_nonce[32], ecdsa_nonce[32], exp_ecdsa_nonce[32], msg32[32];
 
     from_hex("c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721", 64, seckey);
 
     vrf_nonce_generation(gen_nonce, seckey, (unsigned char *)msg, msglen);
 
-    from_hex("A6E3C57DD01ABE90086538398355DD4C3B17AA873382B0F24D6129493D8AAD60", 64, exp_nonce);
+    /* The nonce secp256k1_ecdsa_sign derives for the same key over the digest SHA256(msg):
+     * RFC 6979 with no algorithm tag (the RFC 6979 A.2.5 SHA-256 "sample" vector). */
+    sha256(msg32, (unsigned char *)msg, msglen);
+    CHECK(nonce_function_rfc6979(ecdsa_nonce, msg32, seckey, NULL, NULL, 0) == 1);
+    from_hex("A6E3C57DD01ABE90086538398355DD4C3B17AA873382B0F24D6129493D8AAD60", 64, exp_ecdsa_nonce);
+    CHECK(memcmp(exp_ecdsa_nonce, ecdsa_nonce, 32) == 0);
 
-    print_hex("exp=", exp_nonce, 32);
-    print_hex("gen=", gen_nonce, 32);
+    print_hex("ecdsa=", ecdsa_nonce, 32);
+    print_hex("vrf=", gen_nonce, 32);
 
-    CHECK(memcmp(exp_nonce, gen_nonce, 32) == 0);
+    /* The draw never uses the nonce ECDSA would use for that key and digest. */
+    CHECK(memcmp(ecdsa_nonce, gen_nonce, 32) != 0);
 
     }
 
@@ -77,7 +83,7 @@ void run_vrf_tests(void) {
 
     CHECK(secp256k1_vrf_prove(proof, seckey, &pubkey, msg, msglen) == 1);
 
-    from_hex("031f4dbca087a1972d04a07a779b7df1caa99e0f5db2aa21f3aecc4f9e10e85d08748c9fbe6b95d17359707bfb8e8ab0c93ba0c515333adcb8b64f372c535e115ccf66ebf5abe6fadb01b5efb37c0a0ec9", 162, expected_proof);
+    from_hex("031f4dbca087a1972d04a07a779b7df1caa99e0f5db2aa21f3aecc4f9e10e85d08d09c57eb65340e8c2ea13cbbe7c20174401a4dd845b51c213583d24b4d236b554d9999ea4d682d07d6a88c2afd2e9b2d", 162, expected_proof);
 
     print_hex("expec=", expected_proof, 81);
     print_hex("proof=", proof, 81);

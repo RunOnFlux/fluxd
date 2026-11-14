@@ -287,13 +287,19 @@ static void vrf_hash_points(
     memset(hash32, 0, 32);
 }
 
+/* The nonce is RFC 6979 over (key, SHA256(msg)) with a 16-byte algorithm tag.
+ * secp256k1_ecdsa_sign derives its nonce from the same function with no tag, so
+ * without one a key that made a proof over msg and an ECDSA signature over the
+ * digest SHA256(msg) would use one nonce for both, which gives away the key. */
+static const unsigned char vrf_nonce_algo16[17] = "FLUX/ECVRF/nonce";
+
 static void vrf_nonce_generation(unsigned char nonce32[32], const unsigned char seckey[32], const unsigned char *msg, const unsigned int msglen) {
   unsigned char msg32[32];
   int count = 0, overflow = 0;
   sha256(msg32, msg, msglen);
   while (1) {
       secp256k1_scalar non;
-      int ret = nonce_function_rfc6979(nonce32, msg32, seckey, NULL, NULL, count);
+      int ret = nonce_function_rfc6979(nonce32, msg32, seckey, vrf_nonce_algo16, NULL, count);
       if (!ret) {
           secp256k1_scalar_clear(&non);
           break;
