@@ -89,8 +89,8 @@ TEST(FluxnodeCacheCount, CountNetworksReadsHostWithAndWithoutPort)
         "1.2.3.4",
         "1.2.3.4:16137",
         "5.6.7.8:16127",
-        "2001:db8::1",
-        "[2001:db8::1]:16137",
+        "2606:4700:4700::1111",
+        "[2606:4700:4700::1111]:16137",
         "not an address",
         "not-an-address:16137",
     };
