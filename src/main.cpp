@@ -325,6 +325,8 @@ struct CNodeState {
     CBlockIndex *pindexLastCommonBlock;
     //! Whether we've started headers synchronization with this peer.
     bool fSyncStarted;
+    //! Headers announcements in a row whose first header did not connect.
+    int nUnconnectingHeaders;
     //! Since when we're stalling block download progress (in microseconds), or 0.
     int64_t nStallingSince;
     list<QueuedBlock> vBlocksInFlight;
@@ -349,6 +351,7 @@ struct CNodeState {
         hashLastUnknownBlock.SetNull();
         pindexLastCommonBlock = NULL;
         fSyncStarted = false;
+        nUnconnectingHeaders = 0;
         nStallingSince = 0;
         nBlocksInFlight = 0;
         nBlocksInFlightValidHeaders = 0;
@@ -3235,6 +3238,11 @@ void CheckForkWarningConditionsOnNewFork(CBlockIndex* pindexNewForkTip, const CC
 }
 
 // Requires cs_main.
+int UnconnectingHeadersScore(int nUnconnecting)
+{
+    return nUnconnecting > 0 && nUnconnecting % MAX_UNCONNECTING_HEADERS == 0 ? 20 : 0;
+}
+
 void Misbehaving(NodeId pnode, int howmuch)
 {
     if (howmuch == 0)
@@ -3271,6 +3279,74 @@ void static InvalidChainFound(CBlockIndex* pindexNew, const CChainParams& chainP
     CheckForkWarningConditions(chainParams);
 }
 
+/**
+ * Return a stored block to the state of a header whose block was never received, so that the
+ * block is downloaded again. For a stored copy that failed on data outside the block hash: the
+ * hash stays usable and only the copy is bad.
+ *
+ * The block and everything built on it leave setBlockIndexCandidates. Descendants that hold
+ * data wait in mapBlocksUnlinked, where ReceivedBlockTransactions links them again when the
+ * block arrives. A peer whose last common block was this block or a descendant is walked from
+ * the block's parent again, so FindNextBlocksToDownload asks it for the block.
+ */
+void static ForgetStoredBlock(CBlockIndex *pindex) {
+    AssertLockHeld(cs_main);
+
+    pindex->nStatus &= ~(BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO);
+    pindex->nStatus = (pindex->nStatus & ~BLOCK_VALID_MASK) | BLOCK_VALID_TREE;
+    pindex->nFile = 0;
+    pindex->nDataPos = 0;
+    pindex->nUndoPos = 0;
+    pindex->nTx = 0;
+    pindex->nChainTx = 0;
+    pindex->nSequenceId = 0;
+    pindex->nChainSproutValue = std::nullopt;
+    pindex->nChainSaplingValue = std::nullopt;
+    setDirtyBlockIndex.insert(pindex);
+    setBlockIndexCandidates.erase(pindex);
+
+    auto unlinked = mapBlocksUnlinked.equal_range(pindex->pprev);
+    while (unlinked.first != unlinked.second) {
+        auto it = unlinked.first++;
+        if (it->second == pindex)
+            mapBlocksUnlinked.erase(it);
+    }
+
+    for (const auto& item : mapBlockIndex) {
+        CBlockIndex *pdescendant = item.second;
+        if (pdescendant->nHeight <= pindex->nHeight || pdescendant->GetAncestor(pindex->nHeight) != pindex)
+            continue;
+
+        if ((pdescendant->nStatus & BLOCK_VALID_MASK) > BLOCK_VALID_TRANSACTIONS)
+            pdescendant->nStatus = (pdescendant->nStatus & ~BLOCK_VALID_MASK) | BLOCK_VALID_TRANSACTIONS;
+        pdescendant->nChainTx = 0;
+        pdescendant->nSequenceId = 0;
+        pdescendant->nChainSproutValue = std::nullopt;
+        pdescendant->nChainSaplingValue = std::nullopt;
+        setDirtyBlockIndex.insert(pdescendant);
+        setBlockIndexCandidates.erase(pdescendant);
+
+        if (!(pdescendant->nStatus & BLOCK_HAVE_DATA))
+            continue;
+        bool fUnlinked = false;
+        auto range = mapBlocksUnlinked.equal_range(pdescendant->pprev);
+        for (auto it = range.first; it != range.second; ++it) {
+            if (it->second == pdescendant) {
+                fUnlinked = true;
+                break;
+            }
+        }
+        if (!fUnlinked)
+            mapBlocksUnlinked.insert(std::make_pair(pdescendant->pprev, pdescendant));
+    }
+
+    for (auto& item : mapNodeState) {
+        CBlockIndex *&pindexCommon = item.second.pindexLastCommonBlock;
+        if (pindexCommon && pindexCommon->nHeight >= pindex->nHeight && pindexCommon->GetAncestor(pindex->nHeight) == pindex)
+            pindexCommon = pindex->pprev;
+    }
+}
+
 void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state, const CChainParams& chainParams) {
     int nDoS = 0;
     if (state.IsInvalid(nDoS)) {
@@ -3287,6 +3363,13 @@ void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state
         setDirtyBlockIndex.insert(pindex);
         setBlockIndexCandidates.erase(pindex);
         InvalidChainFound(pindex, chainParams);
+    } else {
+        // The failure is in data the block hash does not commit to, so the hash stays unmarked
+        // and the stored copy is dropped: every connect of the block reads that copy, and a
+        // block that is held is never fetched again.
+        LogPrintf("%s: block %s failed on data outside its hash (%s); the stored copy is dropped and the block is downloaded again\n",
+                  __func__, pindex->GetBlockHash().ToString(), state.GetRejectReason());
+        ForgetStoredBlock(pindex);
     }
 }
 
@@ -8753,6 +8836,26 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             return true;
         }
 
+        CNodeState *nodestate = State(pfrom->GetId());
+
+        // An announcement whose first header's parent is unknown is a branch this node has not
+        // seen, such as the other side of a one-block split. Ask the peer for the headers that
+        // connect it, from the best header known, and remember the announced block so the peer
+        // is a download candidate once they arrive. The peer is scored only for every
+        // MAX_UNCONNECTING_HEADERS-th such announcement in a row.
+        if (nCount < MAX_BLOCKS_TO_ANNOUNCE && mapBlockIndex.find(headers[0].hashPrevBlock) == mapBlockIndex.end()) {
+            nodestate->nUnconnectingHeaders++;
+            pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), uint256());
+            LogPrint("net", "received header %s: missing prev block %s, sending getheaders (%d) to end (peer=%d, nUnconnectingHeaders=%d)\n",
+                headers[0].GetHash().ToString(), headers[0].hashPrevBlock.ToString(),
+                pindexBestHeader->nHeight, pfrom->id, nodestate->nUnconnectingHeaders);
+            UpdateBlockAvailability(pfrom->GetId(), headers.back().GetHash());
+            int nDoS = UnconnectingHeadersScore(nodestate->nUnconnectingHeaders);
+            if (nDoS > 0)
+                Misbehaving(pfrom->GetId(), nDoS);
+            return true;
+        }
+
         CBlockIndex *pindexLast = NULL;
         for (const CBlockHeader& header : headers) {
             CValidationState state;
@@ -8769,6 +8872,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 }
             }
         }
+
+        nodestate->nUnconnectingHeaders = 0;
 
         if (pindexLast)
             UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
