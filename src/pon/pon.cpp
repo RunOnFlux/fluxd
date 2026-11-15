@@ -93,13 +93,6 @@ uint32_t GetSlotNumber(int64_t timestamp, int64_t genesisTimestamp, const Consen
     return static_cast<uint32_t>(timeSinceGenesis / params.nPonTargetSpacing);
 }
 
-bool IsLaterSlotThan(int64_t nTime, const CBlockIndex* pindexPrev, const Consensus::Params& params)
-{
-    const int64_t genesisTimestamp = Params().GenesisBlock().nTime;
-    return GetSlotNumber(nTime, genesisTimestamp, params) >
-           GetSlotNumber(pindexPrev->GetBlockTime(), genesisTimestamp, params);
-}
-
 // PON-VRF epoch seed. The randomness for a block's VRF eligibility is derived from a
 // window of blocks buried beyond the reorg horizon, so the proposer of the current block
 // cannot have authored (and therefore cannot grind) the seed. Constant for an entire epoch.
@@ -309,11 +302,6 @@ bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPre
         }
         if (!CheckProofOfNode(block.nodesVrfOutput, block.nBits, Params().GetConsensus(), nHeight)) {
             return error("CheckPONBlockHeader: VRF output doesn't meet target");
-        }
-        // One block a slot. An emergency block returned above: its signers time it.
-        if (!IsLaterSlotThan(block.nTime, pindexPrev, params)) {
-            return error("CheckPONBlockHeader: block at time %d is not in a later slot than its parent at time %d",
-                         block.nTime, pindexPrev->GetBlockTime());
         }
     } else {
         // Before UPGRADE_PON_VRF no block is at the VRF version: its VRF output is verified

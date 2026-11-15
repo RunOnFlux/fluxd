@@ -26,10 +26,6 @@ uint256 GetPONHash(const COutPoint& collateral, const uint256& prevBlockHash, ui
 // Calculate the slot number for a given timestamp relative to genesis
 uint32_t GetSlotNumber(int64_t timestamp, int64_t genesisTimestamp, const Consensus::Params& params);
 
-// Whether a block timed at nTime is in a later slot than pindexPrev. A PON-VRF block is: a node
-// draws once per slot against the tip, and a block in its parent's slot is a second draw there.
-bool IsLaterSlotThan(int64_t nTime, const CBlockIndex* pindexPrev, const Consensus::Params& params);
-
 // PON-VRF: epoch seed (randomness) for VRF eligibility — derived from a buried block
 // window the current proposer did not author, so it is not grindable.
 uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& params);
