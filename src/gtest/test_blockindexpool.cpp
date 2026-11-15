@@ -299,7 +299,7 @@ TEST(BlockIndex, DiskBlockIndexVrfOutputRoundTrip)
     h.nodesVrfOutput = uint256S("0x00000000000000000000000000000000000000000000000000000000000000aa");
 
     CBlockIndex idx(h);
-    ASSERT_EQ(idx.nodesVrfOutput, h.nodesVrfOutput);   // header ctor carried it
+    ASSERT_EQ(idx.VrfOutput(), h.nodesVrfOutput);      // header ctor carried it
     idx.nHeight   = 2654321;
     idx.nFile     = 4;
     idx.nDataPos  = 1234;
@@ -311,14 +311,14 @@ TEST(BlockIndex, DiskBlockIndexVrfOutputRoundTrip)
     idx.phashBlock = &blockHash;
 
     CDiskBlockIndex disk(&idx);                         // copy ctor MUST carry nodesVrfOutput
-    ASSERT_EQ(disk.nodesVrfOutput, h.nodesVrfOutput);
+    ASSERT_EQ(disk.VrfOutput(), h.nodesVrfOutput);
 
     CDataStream ss(SER_DISK, CLIENT_VERSION);
     ss << disk;
     CDiskBlockIndex disk2;
     ss >> disk2;
 
-    EXPECT_EQ(disk2.nodesVrfOutput, h.nodesVrfOutput)
+    EXPECT_EQ(disk2.VrfOutput(), h.nodesVrfOutput)
         << "nodesVrfOutput lost across CDiskBlockIndex serialization";
     EXPECT_EQ(disk2.GetBlockHash(), h.GetHash())
         << "recomputed v101 block hash differs -> startup rejects the entry as corrupt";

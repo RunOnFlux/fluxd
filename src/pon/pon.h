@@ -39,6 +39,10 @@ uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& par
 // agree (the header already commits the outpoint as nodesCollateral).
 uint256 GetPonVrfMessage(const CBlockIndex* pindexPrev, uint32_t slot, const COutPoint& collateral, const Consensus::Params& params);
 
+// The proof-of-node score a block index entry keeps in hashPON: the VRF output of a PON-VRF
+// block, the PON hash of a legacy PON block.
+uint256 GetPonScore(const CBlockHeader& block);
+
 // PON fork-choice tie-break between two competing same-work/same-height PON blocks.
 // Returns <0 if a is preferred (wins the tie), >0 if b is preferred, 0 if undecided
 // (caller falls back to first-seen). PON-VRF blocks compare by VRF output (un-grindable);

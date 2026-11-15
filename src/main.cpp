@@ -5400,10 +5400,10 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     // Construct new block index object (arena-backed when available)
     CBlockIndex* pindexNew = AddBlockIndexFromHeader(block, hash);
     assert(pindexNew);
-    // Cache the PON hash for the fork-choice tie-breaker; it must stay
+    // Keep the proof-of-node score for the fork-choice tie-breaker; it must stay
     // available after the header data is pruned.
     if (block.IsPON())
-        pindexNew->hashPON = GetPONHash(block);
+        pindexNew->hashPON = GetPonScore(block);
     // We assign the sequence id to blocks only when the full data is available,
     // to avoid miners withholding blocks but broadcasting headers, to get a
     // competitive advantage.
@@ -9014,7 +9014,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             CBlockIndex* pindexNew = AddBlockIndexFromHeader(compactHeader, hash);
             assert(pindexNew);
             if (compactHeader.IsPON())
-                pindexNew->hashPON = GetPONHash(compactHeader);
+                pindexNew->hashPON = GetPonScore(compactHeader);
             pindexNew->nSequenceId = 0;
 
             if (pindexPrev) {

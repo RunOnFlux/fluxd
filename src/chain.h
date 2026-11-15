@@ -228,20 +228,18 @@ public:
     uint256 hashSproutAnchor;
     uint256 hashFinalSproutRoot;
 
-    //! (memory only) Cached PON hash for nVersion >= PON_VERSION entries.
+    //! The proof-of-node score of an nVersion >= PON_VERSION entry, one field for both kinds:
+    //! - a PON-VRF entry (nVersion >= PON_VRF_VERSION): its VRF output, which is part of
+    //!   the block hash and is serialized with the entry (see VrfOutput());
+    //! - a legacy PON entry: its PON hash, memory only, computed from the header at load
+    //!   time (before pruning) and when the entry is created (GetPonScore).
     //! Resident (not in the prunable HeaderData) because the fork-choice
-    //! tie-breaker (CBlockIndexWorkComparator) reads it for entries whose
-    //! header data has been pruned — recomputing there would hash a zeroed
-    //! nodesCollateral (wrong result), and restoring header data on entries
-    //! sitting in setBlockIndexCandidates would mutate the comparator key
-    //! in place (strict-weak-ordering violation). Computed from the header
-    //! at load time (before pruning) and when the entry is created.
+    //! tie-breaker (CBlockIndexWorkComparator), the load-time eligibility check and the
+    //! epoch seed read it for entries whose header data has been pruned — recomputing a
+    //! PON hash there would hash a zeroed nodesCollateral (wrong result), and restoring
+    //! header data on entries sitting in setBlockIndexCandidates would mutate the
+    //! comparator key in place (strict-weak-ordering violation).
     uint256 hashPON;
-
-    //! PON-VRF: VRF output (committed to the block hash; fork-choice tie-breaker).
-    //! Kept directly on CBlockIndex (not in HeaderData) so fork choice and
-    //! load-time checks work even after header data is pruned.
-    uint256 nodesVrfOutput;
 
     //! Block-file data: present in the block on disk and therefore rebuildable.
     //! This is what gets pruned from memory for buried blocks. Allocated on
@@ -335,7 +333,6 @@ public:
             hashSproutAnchor = other.hashSproutAnchor;
             hashFinalSproutRoot = other.hashFinalSproutRoot;
             hashPON = other.hashPON;
-            nodesVrfOutput = other.nodesVrfOutput;
             nSequenceId = other.nSequenceId;
             delete pHeaderData;
             if (other.pHeaderData) {
@@ -374,7 +371,6 @@ public:
         hashSproutAnchor   = uint256();
         hashFinalSproutRoot = uint256();
         hashPON            = uint256();
-        nodesVrfOutput.SetNull();
 
         pHeaderData = nullptr;
     }
@@ -391,8 +387,14 @@ public:
         nVersion       = block.nVersion;
         nTime          = block.nTime;
         nBits          = block.nBits;
-        nodesVrfOutput = block.nodesVrfOutput;
+        if (block.nVersion >= CBlockHeader::PON_VRF_VERSION)
+            hashPON = block.nodesVrfOutput;
         RestoreHeaderData(block);
+    }
+
+    //! The VRF output of a PON-VRF entry; null for any other.
+    uint256 VrfOutput() const {
+        return nVersion >= CBlockHeader::PON_VRF_VERSION ? hashPON : uint256();
     }
 
     CDiskBlockPos GetBlockPos() const {
@@ -421,7 +423,7 @@ public:
             block.hashPrevBlock = pprev->GetBlockHash();
         block.nTime          = nTime;
         block.nBits          = nBits;
-        block.nodesVrfOutput = nodesVrfOutput;
+        block.nodesVrfOutput = VrfOutput();
         if (pHeaderData) {
             block.hashMerkleRoot = pHeaderData->hashMerkleRoot;
             block.hashFinalSaplingRoot   = pHeaderData->hashFinalSaplingRoot;
@@ -567,7 +569,7 @@ public:
             // PON-VRF: the VRF output is committed to the block hash, so it must be
             // persisted to recompute the hash and to serve as the fork-choice tie-breaker.
             if (this->nVersion >= CBlockHeader::PON_VRF_VERSION) {
-                READWRITE(nodesVrfOutput);
+                READWRITE(hashPON);
                 READWRITE(pHeaderData->nodesVrfProof);
             }
         }
@@ -611,7 +613,7 @@ public:
         block.hashPrevBlock   = hashPrev;
         block.nTime           = nTime;
         block.nBits           = nBits;
-        block.nodesVrfOutput  = nodesVrfOutput;
+        block.nodesVrfOutput  = VrfOutput();
         if (pHeaderData) {
             block.hashMerkleRoot  = pHeaderData->hashMerkleRoot;
             block.hashFinalSaplingRoot    = pHeaderData->hashFinalSaplingRoot;

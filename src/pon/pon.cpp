@@ -102,7 +102,8 @@ uint32_t GetSlotNumber(int64_t timestamp, int64_t genesisTimestamp, const Consen
 // whose seed favours its own nodes; its VRF output is fixed by its key, its slot and the seed
 // of its own epoch, which leaves it the choice of publishing the block or not. A block below
 // the VRF version, in a window that reaches back before activation, has no output and
-// contributes its hash. Both are resident on the index entry.
+// contributes its hash. Both are resident on the index entry (a VRF entry's output is its
+// hashPON).
 static const int PON_VRF_EPOCH_LEN = 60;   // blocks per epoch (~30 min at 30s spacing)
 static const int PON_VRF_SEED_BURY = 60;   // window end is buried this many blocks (> MAX_REORG_LENGTH=40)
 
@@ -121,7 +122,7 @@ uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& par
     const CBlockIndex* p = pindexPrev->GetAncestor(windowEnd);
     for (int i = 0; i < PON_VRF_EPOCH_LEN && p != NULL; ++i, p = p->pprev) {
         if (p->nVersion >= CBlockHeader::PON_VRF_VERSION) {
-            ss << (unsigned char)1 << p->nodesVrfOutput;
+            ss << (unsigned char)1 << p->hashPON;
         } else {
             ss << (unsigned char)0 << p->GetBlockHash();
         }
@@ -251,21 +252,22 @@ unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
     return newTarget.GetCompact();
 }
 
+uint256 GetPonScore(const CBlockHeader& block)
+{
+    return block.nVersion >= CBlockHeader::PON_VRF_VERSION ? block.nodesVrfOutput : GetPONHash(block);
+}
+
 int ComparePonForkChoice(const CBlockIndex* a, const CBlockIndex* b)
 {
-    // VRF blocks: compare by the committed VRF output (un-grindable). Legacy PON
-    // blocks: by the PON hash cached on the index entry. A VRF and a legacy block
-    // (mixed-version fork around activation) each use their own score; lower wins
-    // in all cases. Both scores are resident fields: recomputing the legacy hash
-    // from GetBlockHeader() would hash a zeroed nodesCollateral once the entry's
-    // header data has been pruned, and the score would change when header data is
-    // restored — mutating a comparator key in place for entries already inside
-    // setBlockIndexCandidates.
-    bool vrfA = (a->nVersion >= CBlockHeader::PON_VRF_VERSION);
-    bool vrfB = (b->nVersion >= CBlockHeader::PON_VRF_VERSION);
-
-    const uint256& scoreA = vrfA ? a->nodesVrfOutput : a->hashPON;
-    const uint256& scoreB = vrfB ? b->nodesVrfOutput : b->hashPON;
+    // Each entry compares by its score in hashPON: a VRF block's committed VRF output
+    // (un-grindable), a legacy PON block's PON hash. A VRF and a legacy block (mixed-version
+    // fork around activation) each use their own; lower wins in all cases. The score is a
+    // resident field: recomputing a PON hash from GetBlockHeader() would hash a zeroed
+    // nodesCollateral once the entry's header data has been pruned, and the score would
+    // change when header data is restored — mutating a comparator key in place for entries
+    // already inside setBlockIndexCandidates.
+    const uint256& scoreA = a->hashPON;
+    const uint256& scoreB = b->hashPON;
 
     if (scoreA < scoreB) return -1;  // a preferred
     if (scoreA > scoreB) return 1;   // b preferred

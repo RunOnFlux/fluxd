@@ -529,7 +529,10 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                 pindexNew->nVersion       = diskindex.nVersion;
                 pindexNew->nTime          = diskindex.nTime;
                 pindexNew->nBits          = diskindex.nBits;
-                pindexNew->nodesVrfOutput = diskindex.nodesVrfOutput;
+                // A PON-VRF entry's score is its VRF output, read from the record: the block
+                // hash checked below covers it. A legacy entry's is computed below.
+                if (diskindex.nVersion >= CBlockHeader::PON_VRF_VERSION)
+                    pindexNew->hashPON = diskindex.hashPON;
                 pindexNew->nStatus        = diskindex.nStatus;
                 pindexNew->nTx            = diskindex.nTx;
                 // These live directly on CBlockIndex (not in the prunable
@@ -561,15 +564,12 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                 }
 
                 if (header.IsPON()) {
-                    // Cache the PON hash while the header data is still
-                    // resident: the fork-choice tie-breaker needs it after
-                    // the prune below.
-                    pindexNew->hashPON = GetPONHash(header);
-                    // For PON-VRF blocks the eligibility value is the committed VRF output, not GetPONHash.
-                    const uint256& ponEligibilityValue = (header.nVersion >= CBlockHeader::PON_VRF_VERSION)
-                                                      ? pindexNew->nodesVrfOutput
-                                                      : pindexNew->hashPON;
-                    if (!CheckProofOfNode(ponEligibilityValue, pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight) && !IsEmergencyBlock(header))
+                    // Set the score while the header data is still resident: the
+                    // fork-choice tie-breaker needs it after the prune below. It is
+                    // also the eligibility value: the committed VRF output of a
+                    // PON-VRF block, the PON hash of a legacy one.
+                    pindexNew->hashPON = GetPonScore(header);
+                    if (!CheckProofOfNode(pindexNew->hashPON, pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight) && !IsEmergencyBlock(header))
                         return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
                 } else if (!isCheckpointed) {
                     // Only verify PoW for non-checkpointed POW blocks
