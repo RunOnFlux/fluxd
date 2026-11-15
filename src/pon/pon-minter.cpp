@@ -197,6 +197,13 @@ void PONMinter(const CChainParams& chainparams)
                 pindexPrev = chainActive.Tip();
             }
 
+            // Under PON-VRF a slot the tip already fills takes no second block
+            // (CheckPONBlockHeader), so there is no draw for it.
+            if (IsPONVRFActive(pindexPrev->nHeight + 1) && !IsLaterSlotThan(now, pindexPrev, consensusParams)) {
+                lastAttemptedSlot = currentSlot;
+                continue;
+            }
+
             // Don't mint if last block is very recent (< 5 seconds old)
             // This covers block propagation time without artificially slowing difficulty adjustments
             // The rank-based system provides the main coordination
