@@ -797,6 +797,79 @@ TEST_F(PONTest, VrfVersionRefusedBeforeActivation) {
     EXPECT_FALSE(CheckPONBlockHeader(vrf, &prev, params));
 }
 
+// With UPGRADE_PON_VRF active a block is in a later slot than its parent: a block in its
+// parent's slot is refused, at any offset within the slot, and the first second of the next
+// slot is accepted.
+TEST_F(PONTest, VrfBlockIsInALaterSlotThanItsParent) {
+    SelectParams(CBaseChainParams::LABNET);
+    const Consensus::Params& params = Params().GetConsensus();
+    const int64_t genesisTime = Params().GenesisBlock().nTime;
+    const int64_t spacing = params.nPonTargetSpacing;
+
+    CBlockIndex prev;
+    prev.nHeight = 1000;
+    const int nHeight = prev.nHeight + 1;
+    ASSERT_TRUE(IsPONVRFActive(nHeight));
+    const int64_t slotStart = genesisTime + 5000 * spacing;
+    prev.nTime = slotStart + 3;
+
+    CBlockHeader h;
+    h.nVersion = CBlockHeader::PON_VRF_VERSION;
+    h.hashPrevBlock = uint256S("0x01");
+    h.nBits = UintToArith256(params.ponLimit).GetCompact();
+    h.nodesCollateral = COutPoint(uint256S("0x04"), 1);
+    h.nodesVrfOutput = uint256();
+    h.nodesVrfProof = std::vector<unsigned char>(81, 0x77);
+    ASSERT_TRUE(CheckProofOfNode(h.nodesVrfOutput, h.nBits, params, nHeight));
+
+    EXPECT_FALSE(IsLaterSlotThan(slotStart + 4, &prev, params));
+    EXPECT_FALSE(IsLaterSlotThan(slotStart + spacing - 1, &prev, params));
+    EXPECT_TRUE(IsLaterSlotThan(slotStart + spacing, &prev, params));
+
+    h.nTime = slotStart + 4;
+    EXPECT_FALSE(CheckPONBlockHeader(h, &prev, params));
+    h.nTime = slotStart + spacing - 1;
+    EXPECT_FALSE(CheckPONBlockHeader(h, &prev, params));
+    h.nTime = slotStart + spacing;
+    EXPECT_TRUE(CheckPONBlockHeader(h, &prev, params));
+    h.nTime = slotStart + 3 * spacing + 7;
+    EXPECT_TRUE(CheckPONBlockHeader(h, &prev, params));
+
+    // The parent at the last second of its slot: the next second is the next slot.
+    prev.nTime = slotStart + spacing - 1;
+    h.nTime = slotStart + spacing;
+    EXPECT_TRUE(CheckPONBlockHeader(h, &prev, params));
+
+    SelectParams(CBaseChainParams::MAIN);
+}
+
+// Before UPGRADE_PON_VRF a block may share its parent's slot.
+TEST_F(PONTest, LegacyBlockMayShareItsParentsSlot) {
+    SelectParams(CBaseChainParams::MAIN);
+    const Consensus::Params& params = Params().GetConsensus();
+    const int64_t genesisTime = Params().GenesisBlock().nTime;
+
+    CBlockIndex prev;
+    prev.nHeight = GetPONActivationHeight() + params.nPonDifficultyWindow + 10;
+    const int nHeight = prev.nHeight + 1;
+    ASSERT_FALSE(IsPONVRFActive(nHeight));
+
+    CBlockHeader legacy;
+    legacy.nVersion = CBlockHeader::PON_VERSION;
+    legacy.hashPrevBlock = uint256S("0x01");
+    legacy.nBits = UintToArith256(params.ponLimit).GetCompact();
+    legacy.nodesCollateral = COutPoint(uint256S("0x04"), 1);
+    bool fEligible = false;
+    for (uint32_t t = 0; t < 100000 && !fEligible; t++) {
+        legacy.nTime = genesisTime + (9000000 + t) * params.nPonTargetSpacing + 20;
+        fEligible = CheckProofOfNode(GetPONHash(legacy), legacy.nBits, params, nHeight);
+    }
+    ASSERT_TRUE(fEligible);
+    prev.nTime = legacy.nTime - 15;   // the same slot, 15 s earlier
+    ASSERT_FALSE(IsLaterSlotThan(legacy.nTime, &prev, params));
+    EXPECT_TRUE(CheckPONBlockHeader(legacy, &prev, params));
+}
+
 // getheaders serves a header rebuilt from the block index, and CheckPONBlockHeader refuses a
 // VRF header whose proof is not 81 bytes: the proof is carried by the index entry and by its
 // record on disk.
