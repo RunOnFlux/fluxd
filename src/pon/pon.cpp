@@ -100,6 +100,11 @@ bool IsLaterSlotThan(int64_t nTime, const CBlockIndex* pindexPrev, const Consens
            GetSlotNumber(pindexPrev->GetBlockTime(), genesisTimestamp, params);
 }
 
+bool IsStampedAheadOfClock(int64_t nBlockTime, int64_t nNow)
+{
+    return nBlockTime > nNow + PON_VRF_MAX_AHEAD_SECONDS;
+}
+
 // PON-VRF epoch seed. The randomness for a block's VRF eligibility is derived from a
 // window of blocks buried beyond the reorg horizon, so the proposer of the current block
 // cannot have authored (and therefore cannot grind) the seed. Constant for an entire epoch.

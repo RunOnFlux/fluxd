@@ -5839,6 +5839,14 @@ bool ContextualCheckBlockHeader(
                              REJECT_INVALID, "bad-fork-prior-to-maxreorgdepth");
     }
 
+    // Under PON-VRF a block from ahead of the clock is refused until the clock reaches it: every
+    // block after it would be stamped earlier than its parent. An emergency block is held to
+    // it too. The block is not marked invalid.
+    if (block.IsPON() && IsPONVRFActive(nHeight) && IsStampedAheadOfClock(block.GetBlockTime(), GetTime())) {
+        return state.Invalid(error("%s: block stamped %d is ahead of the clock", __func__, block.GetBlockTime()),
+                             REJECT_INVALID, "time-too-new");
+    }
+
     //Check EH solution size matches an acceptable N,K
     size_t nSolSize = block.nSolution.size();
 

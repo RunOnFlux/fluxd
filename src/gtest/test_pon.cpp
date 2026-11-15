@@ -6,12 +6,14 @@
 
 #include "chainparams.h"
 #include "consensus/params.h"
+#include "consensus/validation.h"
 #include "main.h"
 #include "pon/pon.h"
 #include "pon/pon-fork.h"
 #include "primitives/block.h"
 #include "chain.h"
 #include "uint256.h"
+#include "utiltime.h"
 #include "amount.h"
 #include "crypto/ecvrf.h"
 #include "key.h"
@@ -841,6 +843,54 @@ TEST_F(PONTest, VrfBlockIsInALaterSlotThanItsParent) {
     EXPECT_TRUE(CheckPONBlockHeader(h, &prev, params));
 
     SelectParams(CBaseChainParams::MAIN);
+}
+
+// With UPGRADE_PON_VRF active a block stamped more than PON_VRF_MAX_AHEAD_SECONDS ahead of the
+// system clock is refused as too new, whatever its version; one stamped within it is not
+// refused for its time. Before activation the bound does not apply.
+TEST_F(PONTest, VrfBlockIsNotAheadOfTheClock) {
+    EXPECT_FALSE(IsStampedAheadOfClock(1000 + PON_VRF_MAX_AHEAD_SECONDS, 1000));
+    EXPECT_TRUE(IsStampedAheadOfClock(1001 + PON_VRF_MAX_AHEAD_SECONDS, 1000));
+
+    SelectParams(CBaseChainParams::LABNET);
+    const int64_t now = Params().GenesisBlock().nTime + 5000 * Params().GetConsensus().nPonTargetSpacing + 7;
+    SetMockTime(now);
+
+    CBlockIndex prev;
+    prev.nHeight = 1000;
+    prev.nTime = now - 60;
+    ASSERT_TRUE(IsPONVRFActive(prev.nHeight + 1));
+
+    for (int32_t version : {CBlockHeader::PON_VERSION, CBlockHeader::PON_VRF_VERSION}) {
+        CBlockHeader h;
+        h.nVersion = version;
+        h.nodesVrfProof = std::vector<unsigned char>(81, 0x77);
+
+        h.nTime = now + PON_VRF_MAX_AHEAD_SECONDS + 1;
+        CValidationState ahead;
+        EXPECT_FALSE(ContextualCheckBlockHeader(h, ahead, Params(), &prev));
+        EXPECT_EQ(ahead.GetRejectReason(), "time-too-new") << "version " << version;
+
+        h.nTime = now + PON_VRF_MAX_AHEAD_SECONDS;
+        CValidationState within;
+        ContextualCheckBlockHeader(h, within, Params(), &prev);
+        EXPECT_NE(within.GetRejectReason(), "time-too-new") << "version " << version;
+    }
+
+    // Before activation: mainnet, where a legacy block 200 s ahead is not refused here.
+    SelectParams(CBaseChainParams::MAIN);
+    CBlockIndex legacyPrev;
+    legacyPrev.nHeight = GetPONActivationHeight() + 100;
+    legacyPrev.nTime = now - 60;
+    ASSERT_FALSE(IsPONVRFActive(legacyPrev.nHeight + 1));
+    CBlockHeader legacy;
+    legacy.nVersion = CBlockHeader::PON_VERSION;
+    legacy.nTime = now + 200;
+    CValidationState state;
+    ContextualCheckBlockHeader(legacy, state, Params(), &legacyPrev);
+    EXPECT_NE(state.GetRejectReason(), "time-too-new");
+
+    SetMockTime(0);
 }
 
 // Before UPGRADE_PON_VRF a block may share its parent's slot.

@@ -30,6 +30,14 @@ uint32_t GetSlotNumber(int64_t timestamp, int64_t genesisTimestamp, const Consen
 // draws once per slot against the tip, and a block in its parent's slot is a second draw there.
 bool IsLaterSlotThan(int64_t nTime, const CBlockIndex* pindexPrev, const Consensus::Params& params);
 
+// How far ahead of this node's clock a block may be stamped once PON-VRF is active. It is
+// shorter than the wait between two nodes' turns, so a stamp cannot buy an earlier turn.
+static const int64_t PON_VRF_MAX_AHEAD_SECONDS = 2;
+
+// Whether a block stamped nBlockTime is ahead of the clock reading nNow by more than that. The
+// clock is the system clock: network-adjusted time is the peers' clocks, sampled once.
+bool IsStampedAheadOfClock(int64_t nBlockTime, int64_t nNow);
+
 // PON-VRF: epoch seed (randomness) for VRF eligibility — derived from a buried block
 // window the current proposer did not author, so it is not grindable.
 uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& params);
