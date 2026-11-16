@@ -96,6 +96,9 @@ enum class PonClaimResult {
     NOT_AMONG_BEST,
 };
 
+/** A word for a PonClaimResult, for the log. */
+const char* PonClaimResultName(PonClaimResult result);
+
 /**
  * Check a claim against the tip and offer it to the pool, cheapest check first. A claim is
  * verified on the receiver's own tip: one made on another tip, or across a change of seed,

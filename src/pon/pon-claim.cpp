@@ -62,6 +62,22 @@ void CPonClaimPool::Forget(uint32_t slotCurrent)
     mapSlots.erase(mapSlots.begin(), mapSlots.lower_bound(slotCurrent));
 }
 
+const char* PonClaimResultName(PonClaimResult result)
+{
+    switch (result) {
+    case PonClaimResult::KEPT:            return "kept";
+    case PonClaimResult::BAD_PROOF_SIZE:  return "bad proof size";
+    case PonClaimResult::WRONG_SLOT:      return "wrong slot";
+    case PonClaimResult::HELD:            return "held already";
+    case PonClaimResult::NOT_ACTIVE:      return "not active";
+    case PonClaimResult::UNCONFIRMED:     return "unconfirmed";
+    case PonClaimResult::BAD_PROOF:       return "bad proof";
+    case PonClaimResult::NOT_ELIGIBLE:    return "not eligible";
+    case PonClaimResult::NOT_AMONG_BEST:  return "not among the best";
+    }
+    return "unknown";
+}
+
 PonClaimResult AcceptPonClaim(const CPonClaim& claim, const CBlockIndex* pindexTip, int64_t nNow,
                               const Consensus::Params& params, CPonClaimPool& pool)
 {

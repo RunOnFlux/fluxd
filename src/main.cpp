@@ -9391,6 +9391,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 Misbehaving(pfrom->GetId(), 20);
             }
         }
+        LogPrint("pon", "ponclaim: slot %d %s output %s peer=%d: %s\n", claim.slot,
+                 claim.collateral.ToString(), claim.output.GetHex(), pfrom->GetId(), PonClaimResultName(result));
         if (result == PonClaimResult::KEPT) {
             RelayPonClaim(claim, pfrom);
         }

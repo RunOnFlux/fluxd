@@ -291,6 +291,8 @@ void PONMinter(const CChainParams& chainparams)
                         vBetterTurns.push_back(PonVrfTurnSeconds(better, nBits));
                     }
                     if (GetTime() >= slotStart + PonVrfMintSecond(nOwnTurn, vBetterTurns)) {
+                        LogPrint("pon", "PON: slot %d - second %d, behind %d better claims\n", currentSlot,
+                                 PonVrfMintSecond(nOwnTurn, vBetterTurns), (int)vBetterTurns.size());
                         break;
                     }
                     {

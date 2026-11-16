@@ -1393,6 +1393,8 @@ TEST_F(PONTest, VrfClaimIsCheckedBeforeItIsKept) {
         EXPECT_EQ(AcceptPonClaim(claim, chain.Tip(), slotStart + 1, params, pool), PonClaimResult::KEPT);
         EXPECT_TRUE(pool.Have(slot, collateral));
         EXPECT_EQ(AcceptPonClaim(claim, chain.Tip(), slotStart + 1, params, pool), PonClaimResult::HELD);
+        EXPECT_STREQ(PonClaimResultName(PonClaimResult::KEPT), "kept");
+        EXPECT_STREQ(PonClaimResultName(PonClaimResult::HELD), "held already");
     }
     {
         // The slot before, two seconds from this one's start, and not three.
