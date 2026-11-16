@@ -153,6 +153,7 @@ BITCOIN_CORE_H = \
   policy/fees.h \
   pon/pon.h \
   pon/pon-fork.h \
+  pon/pon-claim.h \
   pon/pon-minter.h \
   pow.h \
   prevector.h \
@@ -271,6 +272,7 @@ libbitcoin_server_a_SOURCES = \
   policy/fees.cpp \
   pon/pon.cpp \
   pon/pon-fork.cpp \
+  pon/pon-claim.cpp \
   pon/pon-minter.cpp \
   pow.cpp \
   rest.cpp \

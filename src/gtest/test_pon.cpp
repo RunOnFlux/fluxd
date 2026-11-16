@@ -12,6 +12,7 @@
 #include "emergencyblock.h"
 #include "main.h"
 #include "pon/pon.h"
+#include "pon/pon-claim.h"
 #include "pon/pon-fork.h"
 #include "pow.h"
 #include "primitives/block.h"
@@ -1282,6 +1283,51 @@ TEST_F(PONTest, VrfBlockWaitsItsTurn) {
     EXPECT_TRUE(CheckPONBlockHeader(emergency, &prev, params));
 
     SelectParams(CBaseChainParams::MAIN);
+}
+
+// A node keeps the best six claims of a slot: a claim is kept when it is new and among them,
+// the worst gives way to a better one, and a collateral claims a slot once.
+TEST_F(PONTest, VrfClaimsKeepTheBestSix) {
+    CPonClaimPool pool;
+    const uint32_t slot = 5000;
+    auto collateral = [](int i) { return COutPoint(uint256S("0x04"), i); };
+
+    for (int i = 0; i < 6; i++) {
+        EXPECT_TRUE(pool.Add(slot, collateral(i), arith_uint256(100 + 10 * i)));
+    }
+    EXPECT_TRUE(pool.Have(slot, collateral(5)));
+    EXPECT_FALSE(pool.Add(slot, collateral(3), arith_uint256(1)));      // claimed already
+    EXPECT_FALSE(pool.Add(slot, collateral(6), arith_uint256(151)));    // worse than all six
+    EXPECT_FALSE(pool.Have(slot, collateral(6)));
+
+    EXPECT_TRUE(pool.Add(slot, collateral(7), arith_uint256(105)));     // better than the worst
+    EXPECT_TRUE(pool.Have(slot, collateral(7)));
+    EXPECT_FALSE(pool.Have(slot, collateral(5)));                       // the worst gave way
+
+    const std::vector<arith_uint256> better = pool.BetterThan(slot, arith_uint256(120));
+    ASSERT_EQ(better.size(), 3u);
+    EXPECT_EQ(better[0], arith_uint256(100));
+    EXPECT_EQ(better[1], arith_uint256(105));
+    EXPECT_EQ(better[2], arith_uint256(110));
+    EXPECT_TRUE(pool.BetterThan(slot, arith_uint256(100)).empty());
+    EXPECT_TRUE(pool.BetterThan(slot + 1, arith_uint256(120)).empty());
+
+    // Another slot is its own six, and a slot that has passed is forgotten.
+    EXPECT_TRUE(pool.Add(slot + 1, collateral(3), arith_uint256(999)));
+    pool.Forget(slot + 1);
+    EXPECT_FALSE(pool.Have(slot, collateral(0)));
+    EXPECT_TRUE(pool.Have(slot + 1, collateral(3)));
+}
+
+// A node mints at its own turn when it has heard no better claim, and gives each better
+// claim four seconds after that claim's turn, or after the one before it.
+TEST_F(PONTest, VrfMinterWaitsForBetterClaims) {
+    EXPECT_EQ(PonVrfMintSecond(10, {}), 10u);
+    EXPECT_EQ(PonVrfMintSecond(10, {4}), 10u);          // the better claim's four seconds are up
+    EXPECT_EQ(PonVrfMintSecond(5, {4}), 8u);
+    EXPECT_EQ(PonVrfMintSecond(4, {4, 4}), 12u);        // two better claims: two turns
+    EXPECT_EQ(PonVrfMintSecond(5, {4, 9}), 13u);
+    EXPECT_EQ(PonVrfMintSecond(23, {4, 4, 4}), 23u);
 }
 
 // With UPGRADE_PON_VRF active a block stamped more than PON_VRF_MAX_AHEAD_SECONDS ahead of the
