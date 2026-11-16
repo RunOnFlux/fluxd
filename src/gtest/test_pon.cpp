@@ -843,8 +843,8 @@ TEST_F(PONTest, VrfVersionRefusedBeforeActivation) {
 }
 
 // With UPGRADE_PON_VRF active a block is in a later slot than its parent: a block in its
-// parent's slot is refused, at any offset within the slot, and the first second of the next
-// slot is accepted. An emergency block is held to it too.
+// parent's slot is refused, at any offset within the slot, and one in the next slot is
+// accepted. An emergency block is held to it too.
 TEST_F(PONTest, VrfBlockIsInALaterSlotThanItsParent) {
     SelectParams(CBaseChainParams::LABNET);
     const Consensus::Params& params = Params().GetConsensus();
@@ -875,14 +875,15 @@ TEST_F(PONTest, VrfBlockIsInALaterSlotThanItsParent) {
     EXPECT_FALSE(CheckPONBlockHeader(h, &prev, params));
     h.nTime = slotStart + spacing - 1;
     EXPECT_FALSE(CheckPONBlockHeader(h, &prev, params));
-    h.nTime = slotStart + spacing;
+    h.nTime = slotStart + spacing + PON_VRF_FIRST_TURN_SECONDS;
     EXPECT_TRUE(CheckPONBlockHeader(h, &prev, params));
     h.nTime = slotStart + 3 * spacing + 7;
     EXPECT_TRUE(CheckPONBlockHeader(h, &prev, params));
 
     // The parent at the last second of its slot: the next second is the next slot.
     prev.nTime = slotStart + spacing - 1;
-    h.nTime = slotStart + spacing;
+    EXPECT_TRUE(IsLaterSlotThan(slotStart + spacing, &prev, params));
+    h.nTime = slotStart + spacing + PON_VRF_FIRST_TURN_SECONDS;
     EXPECT_TRUE(CheckPONBlockHeader(h, &prev, params));
 
     // An emergency block is held to the same rule.
@@ -1226,6 +1227,59 @@ TEST_F(PONTest, VrfCandidateTipOrder) {
     b.nChainWork = arith_uint256(1001);
     EXPECT_TRUE(IsWorseBlockIndex(&a, &b));
     EXPECT_FALSE(IsWorseBlockIndex(&b, &a));
+
+    SelectParams(CBaseChainParams::MAIN);
+}
+
+// A PON-VRF block is not stamped before its draw's turn: four seconds into its slot for the
+// best draws and a second later for each twentieth of the target. A block a second early is
+// refused and one on its turn is not. An emergency block has no draw and no turn.
+TEST_F(PONTest, VrfBlockWaitsItsTurn) {
+    SelectParams(CBaseChainParams::LABNET);
+    const Consensus::Params& params = Params().GetConsensus();
+    const uint32_t nBits = PonVrfFirstTarget(6956).GetCompact();
+    const arith_uint256 target = TargetFromBits(nBits);
+    const arith_uint256 step = target / 20 + 1;
+
+    EXPECT_EQ(PonVrfTurnSeconds(arith_uint256(0), nBits), 4u);
+    EXPECT_EQ(PonVrfTurnSeconds(step - 1, nBits), 4u);
+    EXPECT_EQ(PonVrfTurnSeconds(step, nBits), 5u);
+    EXPECT_EQ(PonVrfTurnSeconds(step * 10, nBits), 14u);
+    EXPECT_EQ(PonVrfTurnSeconds(target, nBits), 23u);
+
+    CBlockIndex prev;
+    prev.nHeight = 1000;
+    ASSERT_TRUE(IsPONVRFActive(prev.nHeight + 1));
+    const uint32_t slot = 5000;
+    const int64_t slotStart = GetPonSlotStart(slot, params);
+    EXPECT_EQ(GetSlotNumber(slotStart, Params().GenesisBlock().nTime, params), slot);
+    EXPECT_EQ(GetSlotNumber(slotStart - 1, Params().GenesisBlock().nTime, params), slot - 1);
+    prev.nTime = slotStart - 10;
+
+    CBlockHeader h;
+    h.nVersion = CBlockHeader::PON_VRF_VERSION;
+    h.nBits = nBits;
+    h.nodesCollateral = COutPoint(uint256S("0x04"), 1);
+    h.nodesVrfProof = std::vector<unsigned char>(81, 0x77);
+
+    h.nodesVrfOutput = uint256();
+    h.nTime = slotStart + 3;
+    EXPECT_FALSE(CheckPONBlockHeader(h, &prev, params));
+    h.nTime = slotStart + 4;
+    EXPECT_TRUE(CheckPONBlockHeader(h, &prev, params));
+
+    h.nodesVrfOutput = ArithToUint256(step * 10);
+    h.nTime = slotStart + 13;
+    EXPECT_FALSE(CheckPONBlockHeader(h, &prev, params));
+    h.nTime = slotStart + 14;
+    EXPECT_TRUE(CheckPONBlockHeader(h, &prev, params));
+
+    CBlockHeader emergency;
+    emergency.nVersion = CBlockHeader::PON_VERSION;
+    emergency.nBits = nBits;
+    emergency.nodesCollateral = COutPoint(Params().GetEmergencyCollateralHash(), 0);
+    emergency.nTime = slotStart;
+    EXPECT_TRUE(CheckPONBlockHeader(emergency, &prev, params));
 
     SelectParams(CBaseChainParams::MAIN);
 }

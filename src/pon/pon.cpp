@@ -304,6 +304,21 @@ arith_uint256 PonVrfBlockWork(const arith_uint256& output, unsigned int nBits, b
     return grade * proof;
 }
 
+uint32_t PonVrfTurnSeconds(const arith_uint256& output, unsigned int nBits)
+{
+    arith_uint256 target;
+    target.SetCompact(nBits);
+    const arith_uint256 step = target / PON_VRF_TURN_SPREAD_SECONDS + 1;
+    const arith_uint256 steps = output / step;
+    const uint32_t last = PON_VRF_TURN_SPREAD_SECONDS - 1;
+    return PON_VRF_FIRST_TURN_SECONDS + (steps > arith_uint256(last) ? last : (uint32_t)steps.GetLow64());
+}
+
+int64_t GetPonSlotStart(uint32_t slot, const Consensus::Params& params)
+{
+    return Params().GenesisBlock().nTime + (int64_t)slot * params.nPonTargetSpacing;
+}
+
 bool CheckPonVrfDraw(const uint256& output, unsigned int nBits)
 {
     bool fNegative;
@@ -568,6 +583,13 @@ bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPre
         }
         if (!CheckPonVrfDraw(block.nodesVrfOutput, block.nBits)) {
             return error("CheckPONBlockHeader: VRF output doesn't meet target");
+        }
+        // A block waits its draw's turn, so that the best draw of a slot is minted first.
+        const uint32_t slot = GetSlotNumber(block.nTime, Params().GenesisBlock().nTime, params);
+        const int64_t nTurn = GetPonSlotStart(slot, params) +
+                              PonVrfTurnSeconds(UintToArith256(block.nodesVrfOutput), block.nBits);
+        if (block.nTime < nTurn) {
+            return error("CheckPONBlockHeader: block at time %d is before its turn at %d", block.nTime, nTurn);
         }
     } else {
         // Before UPGRADE_PON_VRF no block is at the VRF version: its VRF output is verified

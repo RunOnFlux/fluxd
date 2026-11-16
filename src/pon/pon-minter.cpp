@@ -208,7 +208,7 @@ void PONMinter(const CChainParams& chainparams)
             // This covers block propagation time without artificially slowing difficulty adjustments
             // The rank-based system provides the main coordination
             int64_t timeSinceLastBlock = now - pindexPrev->nTime;
-            if (timeSinceLastBlock < 5) {
+            if (!IsPONVRFActive(pindexPrev->nHeight + 1) && timeSinceLastBlock < 5) {
                 MilliSleep(1000);
                 continue;
             }
@@ -265,15 +265,15 @@ void PONMinter(const CChainParams& chainparams)
                     lastAttemptedSlot = currentSlot;
                     continue;
                 }
-                // Map y in [0, target] to a delay in [0, window]: lowest y mints first.
-                arith_uint256 denom = tgt >> 16;
-                if (denom == 0) denom = arith_uint256(1);
-                uint64_t frac16 = (UintToArith256(vrfOutput) / denom).GetLow64();
-                if (frac16 > 65535) frac16 = 65535;
-                int rankDelayMs = (int)((int64_t)24000 * (int64_t)frac16 / 65536);
-                LogPrintf("PON: VRF-eligible for slot %d (y=%s) - waiting %dms before minting\n",
-                         currentSlot, vrfOutput.GetHex(), rankDelayMs);
-                MilliSleep(rankDelayMs);
+                // Wait the draw's turn: a block stamped before it is refused
+                // (CheckPONBlockHeader), and a better draw's block is minted first.
+                const int64_t nTurn = GetPonSlotStart(currentSlot, consensusParams) +
+                                      PonVrfTurnSeconds(UintToArith256(vrfOutput), nBits);
+                LogPrintf("PON: VRF-eligible for slot %d (y=%s) - minting at second %d of the slot\n",
+                         currentSlot, vrfOutput.GetHex(), (int)(nTurn - GetPonSlotStart(currentSlot, consensusParams)));
+                while (GetTime() < nTurn && fPONMinter && !ShutdownRequested()) {
+                    MilliSleep(100);
+                }
             } else {
                 std::vector<EligibleNodeInfo> eligibleNodes = GetEligibleNodes(pindexPrev, currentSlot, nBits);
 

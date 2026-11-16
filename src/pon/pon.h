@@ -97,6 +97,21 @@ unsigned int GetPonVrfActivationBits();
  */
 arith_uint256 PonVrfBlockWork(const arith_uint256& output, unsigned int nBits, bool fEmergency);
 
+/** Seconds into its slot before which no PON-VRF block is stamped. */
+static const uint32_t PON_VRF_FIRST_TURN_SECONDS = 4;
+/** Seconds over which the turns of a slot's draws are spread, best first. */
+static const uint32_t PON_VRF_TURN_SPREAD_SECONDS = 20;
+
+/**
+ * A draw's turn: the second of its slot before which a block of that output is not stamped.
+ * PON_VRF_FIRST_TURN_SECONDS for the best draws, a second later for each twentieth of the
+ * target the output is, so that a better draw's block exists before a worse one may.
+ */
+uint32_t PonVrfTurnSeconds(const arith_uint256& output, unsigned int nBits);
+
+/** The time a slot begins. */
+int64_t GetPonSlotStart(uint32_t slot, const Consensus::Params& params);
+
 /** A PON-VRF draw: nBits decodes to a target and the output is at or under it. */
 bool CheckPonVrfDraw(const uint256& output, unsigned int nBits);
 
