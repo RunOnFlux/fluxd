@@ -295,11 +295,17 @@ bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPre
         return error("CheckPONBlockHeader: Block version %d is not PON", block.nVersion);
     }
 
+    int nHeight = pindexPrev ? pindexPrev->nHeight + 1 : 0;
+
+    // One block a slot under PON-VRF, an emergency block included.
+    if (IsPONVRFActive(nHeight) && !IsLaterSlotThan(block.nTime, pindexPrev, params)) {
+        return error("CheckPONBlockHeader: block at time %d is not in a later slot than its parent at time %d",
+                     block.nTime, pindexPrev->GetBlockTime());
+    }
+
     if (IsEmergencyBlock(block)) {
         return true;
     }
-
-    int nHeight = pindexPrev ? pindexPrev->nHeight + 1 : 0;
 
     if (IsPONVRFActive(nHeight)) {
         // VRF leader election: eligibility is y <= target, where y = nodesVrfOutput.
@@ -314,11 +320,6 @@ bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPre
         }
         if (!CheckProofOfNode(block.nodesVrfOutput, block.nBits, Params().GetConsensus(), nHeight)) {
             return error("CheckPONBlockHeader: VRF output doesn't meet target");
-        }
-        // One block a slot. An emergency block returned above: its signers time it.
-        if (!IsLaterSlotThan(block.nTime, pindexPrev, params)) {
-            return error("CheckPONBlockHeader: block at time %d is not in a later slot than its parent at time %d",
-                         block.nTime, pindexPrev->GetBlockTime());
         }
     } else {
         // Before UPGRADE_PON_VRF no block is at the VRF version: its VRF output is verified

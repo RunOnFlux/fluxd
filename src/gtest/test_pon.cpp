@@ -7,6 +7,7 @@
 #include "chainparams.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
+#include "emergencyblock.h"
 #include "main.h"
 #include "pon/pon.h"
 #include "pon/pon-fork.h"
@@ -801,7 +802,7 @@ TEST_F(PONTest, VrfVersionRefusedBeforeActivation) {
 
 // With UPGRADE_PON_VRF active a block is in a later slot than its parent: a block in its
 // parent's slot is refused, at any offset within the slot, and the first second of the next
-// slot is accepted.
+// slot is accepted. An emergency block is held to it too.
 TEST_F(PONTest, VrfBlockIsInALaterSlotThanItsParent) {
     SelectParams(CBaseChainParams::LABNET);
     const Consensus::Params& params = Params().GetConsensus();
@@ -841,6 +842,19 @@ TEST_F(PONTest, VrfBlockIsInALaterSlotThanItsParent) {
     prev.nTime = slotStart + spacing - 1;
     h.nTime = slotStart + spacing;
     EXPECT_TRUE(CheckPONBlockHeader(h, &prev, params));
+
+    // An emergency block is held to the same rule.
+    CBlockHeader emergency;
+    emergency.nVersion = CBlockHeader::PON_VERSION;
+    emergency.hashPrevBlock = uint256S("0x01");
+    emergency.nBits = h.nBits;
+    emergency.nodesCollateral = COutPoint(Params().GetEmergencyCollateralHash(), 0);
+    ASSERT_TRUE(IsEmergencyBlock(emergency));
+    prev.nTime = slotStart + 3;
+    emergency.nTime = slotStart + 4;
+    EXPECT_FALSE(CheckPONBlockHeader(emergency, &prev, params));
+    emergency.nTime = slotStart + spacing;
+    EXPECT_TRUE(CheckPONBlockHeader(emergency, &prev, params));
 
     SelectParams(CBaseChainParams::MAIN);
 }
