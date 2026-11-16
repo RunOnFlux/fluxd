@@ -3,12 +3,14 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "pon-fork.h"
+#include "pon.h"
 #include "../chain.h"
 #include "../chainparams.h"
 #include "../consensus/upgrades.h"
 #include "../consensus/validation.h"
 #include "../pow.h"
 #include "../util.h"
+#include "../utiltime.h"
 #include "../main.h"
 
 bool IsPONActive(int nHeight)
@@ -41,6 +43,13 @@ unsigned int GetNextWorkRequiredByFork(const CBlockIndex* pindexLast,
     
     int nHeight = pindexLast->nHeight + 1;
     
+    if (IsPONVRFActive(nHeight)) {
+        if (!IsPONVRFActive(pindexLast->nHeight)) {
+            return GetPonVrfActivationBits();
+        }
+        return GetPonVrfBits(pindexLast, pblock ? pblock->GetBlockTime() : GetTime(), params);
+    }
+
     if (IsPONActive(nHeight)) {
         // Use PON difficulty adjustment
         LogPrintf("GetNextWorkRequiredByFork: Using PON difficulty for height %d\n", nHeight);

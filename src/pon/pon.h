@@ -70,6 +70,28 @@ arith_uint256 PonVrfNextTarget(const arith_uint256& target, const arith_uint320&
  */
 arith_uint256 PonVrfFirstTarget(unsigned int nConfirmedNodes);
 
+/** The epoch of the PON-VRF target a block time is in: PON_VRF_TARGET_EPOCH_SLOTS slots, the same on every chain. */
+uint32_t GetPonVrfTargetEpoch(int64_t nTime, const Consensus::Params& params);
+
+/**
+ * nBits of a block stamped nBlockTime on pindexPrev, above the activation block.
+ *
+ * A block carries its parent's nBits within an epoch. The activation block's nBits holds for
+ * its epoch and the two after it. After that an epoch's target is PonVrfNextTarget of the
+ * target of the epoch before it and the sum of the epoch before that. Read from nTime, nBits,
+ * nVersion and hashPON of the ancestors, all resident on a pruned entry.
+ */
+unsigned int GetPonVrfBits(const CBlockIndex* pindexPrev, int64_t nBlockTime, const Consensus::Params& params);
+
+/**
+ * nBits of the activation block: PonVrfFirstTarget of the confirmed list as it stands. It is
+ * the activation block's only while the fluxnode cache is at that block's parent.
+ */
+unsigned int GetPonVrfActivationBits();
+
+/** A PON-VRF draw: nBits decodes to a target and the output is at or under it. */
+bool CheckPonVrfDraw(const uint256& output, unsigned int nBits);
+
 // PON-VRF: epoch seed (randomness) for VRF eligibility — derived from a buried block
 // window the current proposer did not author, so it is not grindable.
 uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& params);

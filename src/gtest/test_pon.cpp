@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <deque>
+
 #include "chainparams.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
@@ -900,6 +902,171 @@ TEST_F(PONTest, VrfTargetArithmetic) {
     ceilingEmpty *= PON_VRF_TARGET_EPOCH_SLOTS;
     EXPECT_EQ(bits(PonVrfNextTarget(ceiling, ceilingEmpty)), 0x2100ffffu);
     EXPECT_EQ(bits(PonVrfNextTarget(ceiling, arith_uint320())), 0x2100bfffu);
+}
+
+namespace {
+// Index entries on labnet for the target's tests: a legacy parent, the activation block, and
+// blocks added on any of them, each carrying the nBits the rule gives it.
+struct VrfTargetChain {
+    std::deque<CBlockIndex> entries;
+    const Consensus::Params& params;
+    int64_t genesis;
+    uint32_t first;     //!< the first slot of the epoch the activation block is in
+
+    VrfTargetChain(uint32_t nBitsFirst) : params(Params().GetConsensus()), genesis(Params().GenesisBlock().nTime), first(1000 * PON_VRF_TARGET_EPOCH_SLOTS)
+    {
+        const int nActivation = params.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight;
+        CBlockIndex legacy;
+        legacy.nHeight = nActivation - 1;
+        legacy.nTime = TimeOf(first - 5);
+        legacy.nVersion = CBlockHeader::PON_VERSION;
+        legacy.nBits = nBitsFirst;
+        entries.push_back(legacy);
+
+        CBlockIndex activation;
+        activation.pprev = &entries.back();
+        activation.nHeight = nActivation;
+        activation.nTime = TimeOf(first + 10);
+        activation.nVersion = CBlockHeader::PON_VRF_VERSION;
+        activation.nBits = nBitsFirst;
+        entries.push_back(activation);
+    }
+
+    int64_t TimeOf(uint32_t slot) const { return genesis + (int64_t)slot * params.nPonTargetSpacing + 5; }
+    //! The first slot of the n-th epoch after the activation block's.
+    uint32_t Epoch(uint32_t n) const { return first + n * PON_VRF_TARGET_EPOCH_SLOTS; }
+    CBlockIndex* Activation() { return &entries[1]; }
+    uint32_t BitsAt(const CBlockIndex* parent, uint32_t slot) const { return GetPonVrfBits(parent, TimeOf(slot), params); }
+
+    CBlockIndex* Add(CBlockIndex* parent, uint32_t slot, const arith_uint256& output,
+                     int32_t version = CBlockHeader::PON_VRF_VERSION)
+    {
+        CBlockIndex entry;
+        entry.pprev = parent;
+        entry.nHeight = parent->nHeight + 1;
+        entry.nTime = TimeOf(slot);
+        entry.nVersion = version;
+        entry.nBits = BitsAt(parent, slot);
+        entry.hashPON = ArithToUint256(output);
+        entries.push_back(entry);
+        return &entries.back();
+    }
+};
+
+arith_uint256 TargetFromBits(uint32_t nBits) { arith_uint256 t; t.SetCompact(nBits); return t; }
+// The i-th output of the tests' pattern under a target.
+arith_uint256 PatternOutput(int i, const arith_uint256& target) { return target * (uint32_t)(i % 5 + 1) / arith_uint256(50); }
+} // namespace
+
+// A block carries its parent's target within an epoch; the activation block's target holds
+// for its epoch and the two after; then an epoch's target comes from the target before it
+// and the sum of the epoch before that, an empty slot counting as that epoch's target. The
+// expected values are worked outside this code.
+TEST_F(PONTest, VrfTargetFollowsTheEpochBeforeTheLast) {
+    SelectParams(CBaseChainParams::LABNET);
+    const uint32_t nBitsFirst = PonVrfFirstTarget(6956).GetCompact();
+    const arith_uint256 targetFirst = TargetFromBits(nBitsFirst);
+    VrfTargetChain chain(nBitsFirst);
+
+    CBlockIndex* tip = chain.Activation();
+    EXPECT_EQ(chain.BitsAt(tip, chain.Epoch(0) + 11), nBitsFirst);
+    EXPECT_EQ(chain.BitsAt(tip, chain.Epoch(1)), nBitsFirst);
+    EXPECT_EQ(chain.BitsAt(tip, chain.Epoch(2) + 59), nBitsFirst);
+
+    // The epoch after the activation block's: 50 slots filled, 10 empty.
+    for (int i = 0; i < 50; i++) tip = chain.Add(tip, chain.Epoch(1) + i, PatternOutput(i, targetFirst));
+    EXPECT_EQ(tip->nBits, nBitsFirst);
+    // The one after: 3 slots filled.
+    for (int i = 0; i < 3; i++) tip = chain.Add(tip, chain.Epoch(2) + i, PatternOutput(i, targetFirst));
+    EXPECT_EQ(tip->nBits, nBitsFirst);
+
+    // The third epoch after is moved by the first, not by the second.
+    EXPECT_EQ(chain.BitsAt(tip, chain.Epoch(3)), 0x1f6c5e11u);
+    EXPECT_EQ(chain.BitsAt(tip, chain.Epoch(3) + 59), 0x1f6c5e11u);
+    // With no block in the third, the fourth is still reached, moved by the second.
+    EXPECT_EQ(chain.BitsAt(tip, chain.Epoch(4)), 0x2000d8bcu);
+
+    const arith_uint256 target3 = TargetFromBits(0x1f6c5e11u);
+    CBlockIndex* fork = tip;
+    for (int i = 0; i < 10; i++) fork = chain.Add(fork, chain.Epoch(3) + i, PatternOutput(i, target3));
+    EXPECT_EQ(fork->nBits, 0x1f6c5e11u);
+    CBlockIndex* a = fork;
+    for (int i = 10; i < 20; i++) a = chain.Add(a, chain.Epoch(3) + i, PatternOutput(i, target3));
+
+    // An epoch with no block in it: the walk passes over it and its sum is all empty slots.
+    EXPECT_EQ(chain.BitsAt(a, chain.Epoch(5)), 0x20014de2u);
+    CBlockIndex* later = chain.Add(a, chain.Epoch(5), arith_uint256(0));
+    EXPECT_EQ(later->nBits, 0x20014de2u);
+    EXPECT_EQ(chain.BitsAt(later, chain.Epoch(6)), 0x20029bc4u);
+
+    // A branch forked inside an epoch carries the same target through the next epoch, and
+    // its own after that.
+    CBlockIndex* b = fork;
+    for (int i = 10; i < 20; i++) b = chain.Add(b, chain.Epoch(3) + i, arith_uint256(0));
+    EXPECT_EQ(chain.BitsAt(a, chain.Epoch(4) + 7), 0x2000d8bcu);
+    EXPECT_EQ(chain.BitsAt(b, chain.Epoch(4) + 7), 0x2000d8bcu);
+    EXPECT_EQ(chain.BitsAt(b, chain.Epoch(5)), 0x20014b63u);
+
+    SelectParams(CBaseChainParams::MAIN);
+}
+
+// An emergency block's slot counts in its epoch's sum as a slot no node minted in.
+TEST_F(PONTest, VrfTargetCountsAnEmergencyBlocksSlotAsEmpty) {
+    SelectParams(CBaseChainParams::LABNET);
+    const uint32_t nBitsFirst = PonVrfFirstTarget(6956).GetCompact();
+    const arith_uint256 targetFirst = TargetFromBits(nBitsFirst);
+    VrfTargetChain chain(nBitsFirst);
+
+    CBlockIndex* tip = chain.Activation();
+    for (int i = 0; i < 50; i++) {
+        tip = chain.Add(tip, chain.Epoch(1) + i, PatternOutput(i, targetFirst),
+                        i == 7 ? CBlockHeader::PON_VERSION : CBlockHeader::PON_VRF_VERSION);
+    }
+    tip = chain.Add(tip, chain.Epoch(2), arith_uint256(0));
+    EXPECT_EQ(chain.BitsAt(tip, chain.Epoch(3)), 0x1f6f7f5fu);
+
+    SelectParams(CBaseChainParams::MAIN);
+}
+
+// A block at a PON-VRF height whose nBits is not the rule's is refused, and a target above
+// ponLimit is a target: the draw is checked against nBits with no ceiling.
+TEST_F(PONTest, VrfBlockCarriesTheRulesTarget) {
+    SelectParams(CBaseChainParams::LABNET);
+    const Consensus::Params& params = Params().GetConsensus();
+    const uint32_t nBitsCeiling = PonVrfFirstTarget(1).GetCompact();
+    ASSERT_GT(TargetFromBits(nBitsCeiling), UintToArith256(params.ponLimit));
+    EXPECT_TRUE(CheckPonVrfDraw(uint256(), nBitsCeiling));
+    EXPECT_FALSE(CheckPonVrfDraw(uint256(), 0));
+    EXPECT_FALSE(CheckPonVrfDraw(ArithToUint256(TargetFromBits(0x1f6c5e11u) + 1), 0x1f6c5e11u));
+    EXPECT_TRUE(CheckPonVrfDraw(ArithToUint256(TargetFromBits(0x1f6c5e11u)), 0x1f6c5e11u));
+
+    VrfTargetChain chain(nBitsCeiling);
+    CBlockIndex* tip = chain.Activation();
+    for (int i = 0; i < 4; i++) tip = chain.Add(tip, chain.Epoch(1) + i, arith_uint256(0));
+    const uint32_t slot = chain.Epoch(1) + 9;
+
+    CBlockHeader h;
+    h.nVersion = CBlockHeader::PON_VRF_VERSION;
+    h.nTime = chain.TimeOf(slot);
+    h.nodesCollateral = COutPoint(uint256S("0x04"), 1);
+    h.nodesVrfOutput = uint256();
+    h.nodesVrfProof = std::vector<unsigned char>(81, 0x77);
+    SetMockTime(h.nTime);
+
+    h.nBits = nBitsCeiling;
+    EXPECT_TRUE(CheckPONBlockHeader(h, tip, params));
+    CValidationState right;
+    ContextualCheckBlockHeader(h, right, Params(), tip);
+    EXPECT_NE(right.GetRejectReason(), "bad-pon-diffbits");
+    EXPECT_NE(right.GetRejectReason(), "bad-pon-header");
+
+    h.nBits = PonVrfFirstTarget(6956).GetCompact();
+    CValidationState wrong;
+    EXPECT_FALSE(ContextualCheckBlockHeader(h, wrong, Params(), tip));
+    EXPECT_EQ(wrong.GetRejectReason(), "bad-pon-diffbits");
+
+    SetMockTime(0);
+    SelectParams(CBaseChainParams::MAIN);
 }
 
 // With UPGRADE_PON_VRF active a block stamped more than PON_VRF_MAX_AHEAD_SECONDS ahead of the

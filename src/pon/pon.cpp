@@ -17,6 +17,7 @@
 #include "../util.h"
 
 #include <algorithm>
+#include <map>
 
 // Forward declarations to avoid circular dependency with main.h
 extern CChain chainActive;
@@ -164,6 +165,126 @@ arith_uint256 PonVrfFirstTarget(unsigned int nConfirmedNodes)
     arith_uint256 target = ceiling / arith_uint256(100 * (uint64_t)nConfirmedNodes);
     target *= PON_VRF_ELIGIBLE_X100;
     return PonVrfRoundTarget(target);
+}
+
+uint32_t GetPonVrfTargetEpoch(int64_t nTime, const Consensus::Params& params)
+{
+    return GetSlotNumber(nTime, Params().GenesisBlock().nTime, params) / PON_VRF_TARGET_EPOCH_SLOTS;
+}
+
+namespace {
+//! What a chain's blocks say of one epoch of the target.
+struct TargetEpoch {
+    arith_uint320 sum;      //!< the outputs of its PON-VRF blocks
+    uint32_t nFilled = 0;   //!< how many slots those fill
+    uint32_t nBits = 0;     //!< what its blocks carry
+};
+
+arith_uint256 TargetOf(unsigned int nBits)
+{
+    arith_uint256 target;
+    target.SetCompact(nBits);
+    return target;
+}
+} // namespace
+
+unsigned int GetPonVrfBits(const CBlockIndex* pindexPrev, int64_t nBlockTime, const Consensus::Params& params)
+{
+    const int nActivation = params.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight;
+    const CBlockIndex* pindexActivation = pindexPrev->GetAncestor(nActivation);
+    if (!pindexActivation) {
+        return pindexPrev->nBits;
+    }
+
+    const uint32_t epochFirst = GetPonVrfTargetEpoch(pindexActivation->GetBlockTime(), params);
+    const uint32_t epochPrev = GetPonVrfTargetEpoch(pindexPrev->GetBlockTime(), params);
+    const uint32_t epochBlock = GetPonVrfTargetEpoch(nBlockTime, params);
+
+    if (epochBlock <= epochPrev) {
+        return pindexPrev->nBits;
+    }
+    // The epoch the fork lands in holds legacy blocks, so the first sum that moves the
+    // target is that of the epoch after it.
+    if (epochBlock <= epochFirst + 2) {
+        return pindexActivation->nBits;
+    }
+
+    // Walk back to two consecutive epochs that each hold a block: their nBits give two
+    // targets to roll forward from. An epoch with no block carries no nBits, so the walk
+    // passes over it; it ends at the activation block at the latest.
+    std::map<uint32_t, TargetEpoch> epochs;
+    bool fAnchored = false;
+    uint32_t epochAnchor = 0;
+    {
+        bool fAbove = false;
+        uint32_t epochAbove = 0;
+        uint32_t epochWalking = epochPrev;
+        for (const CBlockIndex* p = pindexPrev; p && p->nHeight >= nActivation; p = p->pprev) {
+            const uint32_t epoch = GetPonVrfTargetEpoch(p->GetBlockTime(), params);
+            if (epoch != epochWalking) {
+                if (fAbove && epochAbove == epochWalking + 1) {
+                    fAnchored = true;
+                    epochAnchor = epochAbove;
+                    break;
+                }
+                fAbove = true;
+                epochAbove = epochWalking;
+                epochWalking = epoch;
+            }
+            TargetEpoch& acc = epochs[epoch];
+            acc.nBits = p->nBits;
+            // An emergency block is at PON_VERSION: its slot is one no node minted in.
+            if (p->nVersion >= CBlockHeader::PON_VRF_VERSION) {
+                acc.sum += WidenTo320(UintToArith256(p->hashPON));
+                acc.nFilled++;
+            }
+        }
+    }
+
+    const arith_uint256 targetFirst = TargetOf(pindexActivation->nBits);
+    std::map<uint32_t, arith_uint256> targets;
+    uint32_t epoch;
+    if (fAnchored) {
+        targets[epochAnchor - 1] = TargetOf(epochs[epochAnchor - 1].nBits);
+        targets[epochAnchor] = TargetOf(epochs[epochAnchor].nBits);
+        epoch = epochAnchor;
+    } else {
+        targets[epochFirst + 1] = targetFirst;
+        targets[epochFirst + 2] = targetFirst;
+        epoch = epochFirst + 2;
+    }
+
+    for (; epoch < epochBlock; epoch++) {
+        if (epoch + 1 <= epochFirst + 2) {
+            targets[epoch + 1] = targetFirst;
+        } else {
+            const TargetEpoch& before = epochs[epoch - 1];
+            arith_uint320 sum = WidenTo320(targets[epoch - 1]);
+            sum *= PON_VRF_TARGET_EPOCH_SLOTS - before.nFilled;
+            sum += before.sum;
+            targets[epoch + 1] = PonVrfNextTarget(targets[epoch], sum);
+        }
+        targets.erase(epoch - 1);
+    }
+    return targets[epochBlock].GetCompact();
+}
+
+unsigned int GetPonVrfActivationBits()
+{
+    LOCK(g_fluxnodeCache.cs);
+    return PonVrfFirstTarget(g_fluxnodeCache.mapConfirmedFluxnodeData.size()).GetCompact();
+}
+
+bool CheckPonVrfDraw(const uint256& output, unsigned int nBits)
+{
+    bool fNegative;
+    bool fOverflow;
+    arith_uint256 target;
+    target.SetCompact(nBits, &fNegative, &fOverflow);
+    if (fNegative || fOverflow || target == 0) {
+        return error("CheckPonVrfDraw(): nBits %08x does not decode to a target", nBits);
+    }
+    return UintToArith256(output) <= target;
 }
 
 // PON-VRF epoch seed. The randomness for a block's VRF eligibility is derived from a
@@ -379,7 +500,7 @@ bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPre
         if (block.nodesVrfProof.size() != 81) {
             return error("CheckPONBlockHeader: bad VRF proof size %d", (int)block.nodesVrfProof.size());
         }
-        if (!CheckProofOfNode(block.nodesVrfOutput, block.nBits, Params().GetConsensus(), nHeight)) {
+        if (!CheckPonVrfDraw(block.nodesVrfOutput, block.nBits)) {
             return error("CheckPONBlockHeader: VRF output doesn't meet target");
         }
     } else {

@@ -569,7 +569,10 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                     // also the eligibility value: the committed VRF output of a
                     // PON-VRF block, the PON hash of a legacy one.
                     pindexNew->hashPON = GetPonScore(header);
-                    if (!CheckProofOfNode(pindexNew->hashPON, pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight) && !IsEmergencyBlock(header))
+                    const bool fDrawOk = header.nVersion >= CBlockHeader::PON_VRF_VERSION
+                                             ? CheckPonVrfDraw(pindexNew->hashPON, pindexNew->nBits)
+                                             : CheckProofOfNode(pindexNew->hashPON, pindexNew->nBits, Params().GetConsensus(), pindexNew->nHeight);
+                    if (!fDrawOk && !IsEmergencyBlock(header))
                         return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
                 } else if (!isCheckpointed) {
                     // Only verify PoW for non-checkpointed POW blocks

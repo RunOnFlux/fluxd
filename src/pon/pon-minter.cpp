@@ -214,7 +214,14 @@ void PONMinter(const CChainParams& chainparams)
             }
 
             // Get current difficulty target for this block height
-            unsigned int nBits = GetNextPONWorkRequired(pindexPrev);
+            unsigned int nBits;
+            if (!IsPONVRFActive(pindexPrev->nHeight + 1)) {
+                nBits = GetNextPONWorkRequired(pindexPrev);
+            } else if (!IsPONVRFActive(pindexPrev->nHeight)) {
+                nBits = GetPonVrfActivationBits();
+            } else {
+                nBits = GetPonVrfBits(pindexPrev, now, consensusParams);
+            }
 
             // Calculate eligibility and rank for all nodes in this slot
             // Each node computes: Hash(collateral, prevBlockHash, slotNumber)

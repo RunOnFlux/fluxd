@@ -2823,7 +2823,10 @@ bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus:
         uint256 ponEligibilityValue = (block.nVersion >= CBlockHeader::PON_VRF_VERSION)
                                           ? block.nodesVrfOutput
                                           : GetPONHash(block);
-        if (!CheckProofOfNode(ponEligibilityValue, block.nBits, consensusParams) && !IsEmergencyBlock(block)) {
+        const bool fDrawOk = block.nVersion >= CBlockHeader::PON_VRF_VERSION
+                                 ? CheckPonVrfDraw(ponEligibilityValue, block.nBits)
+                                 : CheckProofOfNode(ponEligibilityValue, block.nBits, consensusParams);
+        if (!fDrawOk && !IsEmergencyBlock(block)) {
             return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
         }
     }
@@ -5689,7 +5692,10 @@ bool CheckBlockHeader(
             uint256 ponEligibilityValue = (block.nVersion >= CBlockHeader::PON_VRF_VERSION)
                                               ? block.nodesVrfOutput
                                               : GetPONHash(block);
-            if (fCheckPOW && !CheckProofOfNode(ponEligibilityValue, block.nBits, chainparams.GetConsensus()))
+            const bool fDrawOk = block.nVersion >= CBlockHeader::PON_VRF_VERSION
+                                     ? CheckPonVrfDraw(ponEligibilityValue, block.nBits)
+                                     : CheckProofOfNode(ponEligibilityValue, block.nBits, chainparams.GetConsensus());
+            if (fCheckPOW && !fDrawOk)
                 return state.DoS(50, error("CheckBlockHeader(): proof of node failed"),
                                  REJECT_INVALID, "high-hash");
         }
@@ -5882,7 +5888,19 @@ bool ContextualCheckBlockHeader(
             }
             
             // Check PON difficulty
-            if (block.nBits != GetNextPONWorkRequired(pindexPrev)) {
+            if (IsPONVRFActive(nHeight)) {
+                if (!IsPONVRFActive(nHeight - 1)) {
+                    // The activation block's target comes from the confirmed list, which is
+                    // this node's own at its tip.
+                    if (pindexPrev == chainActive.Tip() && block.nBits != GetPonVrfActivationBits()) {
+                        return state.DoS(100, error("%s: incorrect first PON-VRF target", __func__),
+                                         REJECT_INVALID, "bad-pon-diffbits");
+                    }
+                } else if (block.nBits != GetPonVrfBits(pindexPrev, block.GetBlockTime(), consensusParams)) {
+                    return state.DoS(100, error("%s: incorrect PON-VRF target", __func__),
+                                     REJECT_INVALID, "bad-pon-diffbits");
+                }
+            } else if (block.nBits != GetNextPONWorkRequired(pindexPrev)) {
                 bool fTestNet = GetBoolArg("-testnet", false);
                 if (fTestNet && nHeight >= 800 && nHeight <= 1800) {
                     LogPrintf("SKipping nBits check on testnet during fix phase: At height : %d\n", nHeight);
@@ -5965,6 +5983,13 @@ bool ContextualCheckBlock(
 {
     const int nHeight = pindexPrev == NULL ? 0 : pindexPrev->nHeight + 1;
     const Consensus::Params& consensusParams = chainparams.GetConsensus();
+
+    // The activation block of PON-VRF connects on the tip its target was counted at.
+    if (block.IsPON() && IsPONVRFActive(nHeight) && !IsPONVRFActive(nHeight - 1) &&
+        pindexPrev == chainActive.Tip() && block.nBits != GetPonVrfActivationBits()) {
+        return state.DoS(100, error("%s: incorrect first PON-VRF target", __func__),
+                         REJECT_INVALID, "bad-pon-diffbits");
+    }
 
     // PON-specific validation if PON is active
     if (IsPONActive(nHeight)) {
