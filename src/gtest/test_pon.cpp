@@ -859,6 +859,49 @@ TEST_F(PONTest, VrfBlockIsInALaterSlotThanItsParent) {
     SelectParams(CBaseChainParams::MAIN);
 }
 
+// The PON-VRF target's arithmetic, against values worked outside this code: the target at
+// activation from the confirmed-node count, and an epoch's target from the target before it
+// and an epoch's sum.
+TEST_F(PONTest, VrfTargetArithmetic) {
+    auto bits = [](const arith_uint256& t) { return t.GetCompact(); };
+
+    EXPECT_EQ(bits(PonVrfFirstTarget(1)), 0x2100ffffu);
+    EXPECT_EQ(bits(PonVrfFirstTarget(9)), 0x2100ffffu);
+    EXPECT_EQ(bits(PonVrfFirstTarget(10)), 0x2100ebc6u);
+    EXPECT_EQ(bits(PonVrfFirstTarget(18)), 0x210082fcu);
+    EXPECT_EQ(bits(PonVrfFirstTarget(6956)), 0x1f56c5a6u);
+    EXPECT_EQ(bits(PonVrfFirstTarget(100000)), 0x1f06092eu);
+
+    const arith_uint256 target = PonVrfFirstTarget(6956);
+    EXPECT_EQ(target, PonVrfRoundTarget(target));
+    const arith_uint320 wide = WidenTo320(target);
+
+    // No winning output at all: three quarters of the target.
+    EXPECT_EQ(bits(PonVrfNextTarget(target, arith_uint320())), 0x1f41143cu);
+    // Every slot empty: the sum asks for 9.21 times the target, and twice is the most.
+    arith_uint320 empty = wide;
+    empty *= PON_VRF_TARGET_EPOCH_SLOTS;
+    EXPECT_EQ(bits(PonVrfNextTarget(target, empty)), 0x2000ad8bu);
+    // Half the slots empty and the rest with an output of zero: 1.9 times.
+    arith_uint320 half = wide;
+    half *= PON_VRF_TARGET_EPOCH_SLOTS / 2;
+    EXPECT_EQ(bits(PonVrfNextTarget(target, half)), 0x2000a4f9u);
+    // The sum that asks for the target itself, floored: one step under it.
+    const arith_uint320 neutral = WidenTo320(
+        arith_uint256("02354a5273132ddcfa29b19d9a4460bac9cc4cb773e8a6c676691182eb273132"));
+    EXPECT_EQ(bits(PonVrfNextTarget(target, neutral)), 0x1f56c5a5u);
+    const arith_uint320 odd = WidenTo320(
+        arith_uint256("02ffc22b1dbdd887a4d45c4844ef0b657476f7621e9351712113bc2d95d1dbdc"));
+    EXPECT_EQ(bits(PonVrfNextTarget(target, odd)), 0x1f5e8ab2u);
+
+    // At the ceiling the target does not rise, and falls by a quarter on a sum of zero.
+    const arith_uint256 ceiling = PonVrfFirstTarget(1);
+    arith_uint320 ceilingEmpty = WidenTo320(ceiling);
+    ceilingEmpty *= PON_VRF_TARGET_EPOCH_SLOTS;
+    EXPECT_EQ(bits(PonVrfNextTarget(ceiling, ceilingEmpty)), 0x2100ffffu);
+    EXPECT_EQ(bits(PonVrfNextTarget(ceiling, arith_uint320())), 0x2100bfffu);
+}
+
 // With UPGRADE_PON_VRF active a block stamped more than PON_VRF_MAX_AHEAD_SECONDS ahead of the
 // system clock is refused as too new, whatever its version; one stamped within it is not
 // refused for its time. Before activation the bound does not apply.

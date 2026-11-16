@@ -105,6 +105,67 @@ bool IsStampedAheadOfClock(int64_t nBlockTime, int64_t nNow)
     return nBlockTime > nNow + PON_VRF_MAX_AHEAD_SECONDS;
 }
 
+arith_uint320 WidenTo320(const arith_uint256& a)
+{
+    arith_uint320 wide;
+    for (int i = 3; i >= 0; i--) {
+        wide <<= 64;
+        wide |= arith_uint320((a >> (64 * i)).GetLow64());
+    }
+    return wide;
+}
+
+// The low 256 bits of a value that fits in them.
+static arith_uint256 NarrowTo256(const arith_uint320& a)
+{
+    arith_uint256 narrow;
+    for (int i = 3; i >= 0; i--) {
+        narrow <<= 64;
+        narrow |= arith_uint256((a >> (64 * i)).GetLow64());
+    }
+    return narrow;
+}
+
+arith_uint256 PonVrfRoundTarget(const arith_uint256& target)
+{
+    arith_uint256 rounded;
+    rounded.SetCompact(target.GetCompact());
+    return rounded;
+}
+
+arith_uint256 PonVrfNextTarget(const arith_uint256& target, const arith_uint320& sum)
+{
+    const arith_uint320 old = WidenTo320(target);
+    const arith_uint320 ceiling = WidenTo320(~arith_uint256());
+
+    arith_uint320 asked = sum;
+    asked *= PON_VRF_ELIGIBLE_X100;
+    asked /= arith_uint320(100 * PON_VRF_TARGET_EPOCH_SLOTS);
+
+    arith_uint320 next = old;
+    next *= 3;
+    next += asked;
+    next >>= 2;
+
+    arith_uint320 twice = old;
+    twice <<= 1;
+    if (next > twice) next = twice;
+    if (next > ceiling) next = ceiling;
+
+    return PonVrfRoundTarget(NarrowTo256(next));
+}
+
+arith_uint256 PonVrfFirstTarget(unsigned int nConfirmedNodes)
+{
+    const arith_uint256 ceiling = ~arith_uint256();
+    if (nConfirmedNodes * 100 <= PON_VRF_ELIGIBLE_X100) {
+        return PonVrfRoundTarget(ceiling);
+    }
+    arith_uint256 target = ceiling / arith_uint256(100 * (uint64_t)nConfirmedNodes);
+    target *= PON_VRF_ELIGIBLE_X100;
+    return PonVrfRoundTarget(target);
+}
+
 // PON-VRF epoch seed. The randomness for a block's VRF eligibility is derived from a
 // window of blocks buried beyond the reorg horizon, so the proposer of the current block
 // cannot have authored (and therefore cannot grind) the seed. Constant for an entire epoch.

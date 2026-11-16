@@ -38,6 +38,38 @@ static const int64_t PON_VRF_MAX_AHEAD_SECONDS = 2;
 // clock is the system clock: network-adjusted time is the peers' clocks, sampled once.
 bool IsStampedAheadOfClock(int64_t nBlockTime, int64_t nNow);
 
+/** Slots in an epoch of the PON-VRF target. */
+static const uint32_t PON_VRF_TARGET_EPOCH_SLOTS = 60;
+/** Live eligible nodes a slot the PON-VRF target aims at, times 100. */
+static const uint32_t PON_VRF_ELIGIBLE_X100 = 921;
+
+/** Wide enough for the sum of an epoch's winning outputs times PON_VRF_ELIGIBLE_X100. */
+typedef base_uint<320> arith_uint320;
+
+/** a, in 320 bits. */
+arith_uint320 WidenTo320(const arith_uint256& a);
+
+/**
+ * The value nBits holds for a target: arith_uint256's compact form keeps three bytes, and a
+ * PON-VRF target is the value its nBits decodes to.
+ */
+arith_uint256 PonVrfRoundTarget(const arith_uint256& target);
+
+/**
+ * The PON-VRF target of an epoch from the target of the epoch before it and the sum of the
+ * epoch before that: its winning outputs, with the epoch's own target for each slot that
+ * has no version-PON_VRF_VERSION block. Three parts the old target and one part
+ * PON_VRF_ELIGIBLE_X100 / 100 times the mean winning output, at most twice the old target.
+ */
+arith_uint256 PonVrfNextTarget(const arith_uint256& target, const arith_uint320& sum);
+
+/**
+ * The PON-VRF target at activation, from the number of confirmed fluxnodes:
+ * PON_VRF_ELIGIBLE_X100 / 100 of them eligible a slot, all of them when there are nine or
+ * fewer.
+ */
+arith_uint256 PonVrfFirstTarget(unsigned int nConfirmedNodes);
+
 // PON-VRF: epoch seed (randomness) for VRF eligibility — derived from a buried block
 // window the current proposer did not author, so it is not grindable.
 uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& params);
