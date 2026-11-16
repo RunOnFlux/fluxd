@@ -10,6 +10,7 @@
 
 #include "main.h"
 #include "net.h"
+#include "pon/pon-claim.h"
 
 #include "addrman.h"
 #include "chainparams.h"
@@ -2745,6 +2746,15 @@ static bool RelaysInventoryTo(const CNode* pnode)
     }
 }
 
+void RelayPonClaim(const CPonClaim& claim, const CNode* pfrom)
+{
+    LOCK(cs_vNodes);
+    for (CNode* pnode : vNodes) {
+        if (pnode == pfrom || pnode->nVersion < PON_VRF_PROTO_VERSION) continue;
+        pnode->PushMessage("ponclaim", claim);
+    }
+}
+
 void RelayFluxnodeTx(const CInv& inv)
 {
     LOCK(cs_vNodes);
@@ -3105,6 +3115,8 @@ CNode::CNode(SOCKET hSocketIn, const CAddress& addrIn, const std::string& addrNa
     nPingNonceSent = 0;
     nPingUsecStart = 0;
     nPingUsecTime = 0;
+    nPonClaimSlot = 0;
+    nPonClaims = 0;
     fPingQueued = false;
     nMinPingUsecTime = std::numeric_limits<int64_t>::max();
     fPreferHeaders = false;

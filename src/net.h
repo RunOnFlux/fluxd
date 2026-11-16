@@ -633,6 +633,9 @@ public:
     int64_t nPingUsecStart;
     // Last measured round-trip time.
     int64_t nPingUsecTime;
+    //! The slot of the last ponclaim this peer sent, and how many it has sent for it.
+    uint32_t nPonClaimSlot;
+    unsigned int nPonClaims;
     // Best measured round-trip time.
     int64_t nMinPingUsecTime;
     // Whether a ping is requested.
@@ -990,6 +993,9 @@ public:
 
 class CTransaction;
 void RelayTransaction(const CTransaction& tx);
+class CPonClaim;
+/** Send a ponclaim to every peer at the PON-VRF protocol but pfrom, which may be null. */
+void RelayPonClaim(const CPonClaim& claim, const CNode* pfrom);
 void RelayTransaction(const CTransaction& tx, const CDataStream& ss);
 void RelayInv(const CInv& inv);
 

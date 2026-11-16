@@ -10,6 +10,7 @@
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "emergencyblock.h"
+#include "fluxnode/fluxnode.h"
 #include "main.h"
 #include "pon/pon.h"
 #include "pon/pon-claim.h"
@@ -1328,6 +1329,117 @@ TEST_F(PONTest, VrfMinterWaitsForBetterClaims) {
     EXPECT_EQ(PonVrfMintSecond(4, {4, 4}), 12u);        // two better claims: two turns
     EXPECT_EQ(PonVrfMintSecond(5, {4, 9}), 13u);
     EXPECT_EQ(PonVrfMintSecond(23, {4, 4, 4}), 23u);
+}
+
+namespace {
+// A labnet chain from genesis to a tip above the activation block, one block a slot, every
+// entry with a hash: enough behind the tip for an epoch seed.
+struct VrfClaimChain {
+    std::vector<uint256> hashes;
+    std::vector<CBlockIndex> entries;
+    uint32_t slotOfGenesis;
+
+    VrfClaimChain(int nTip, uint32_t nBits) : hashes(nTip + 1), entries(nTip + 1), slotOfGenesis(1000 * PON_VRF_TARGET_EPOCH_SLOTS)
+    {
+        const Consensus::Params& params = Params().GetConsensus();
+        const int nActivation = params.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight;
+        for (int h = 0; h <= nTip; h++) {
+            hashes[h] = ArithToUint256(arith_uint256(7000 + h));
+            entries[h].nHeight = h;
+            entries[h].phashBlock = &hashes[h];
+            entries[h].pprev = h ? &entries[h - 1] : nullptr;
+            entries[h].nTime = GetPonSlotStart(slotOfGenesis + h, params) + 5;
+            entries[h].nBits = nBits;
+            entries[h].nVersion = h >= nActivation ? CBlockHeader::PON_VRF_VERSION : CBlockHeader::PON_VERSION;
+            entries[h].hashPON = ArithToUint256(arith_uint256(9000 + h));
+        }
+    }
+    const CBlockIndex* Tip() const { return &entries.back(); }
+    uint32_t NextSlot() const { return slotOfGenesis + entries.size(); }
+};
+} // namespace
+
+// A claim is kept when its proof gives its output under the key of a confirmed node, for
+// the slot the clock is in or the next within two seconds, and the output is at or under
+// the target; each other claim is turned away for its own reason.
+TEST_F(PONTest, VrfClaimIsCheckedBeforeItIsKept) {
+    SelectParams(CBaseChainParams::LABNET);
+    const Consensus::Params& params = Params().GetConsensus();
+    const uint32_t nBitsCeiling = PonVrfFirstTarget(1).GetCompact();
+    VrfClaimChain chain(205, nBitsCeiling);
+    ASSERT_TRUE(IsPONVRFActive(chain.Tip()->nHeight + 1));
+    const uint32_t slot = chain.NextSlot();
+    const int64_t slotStart = GetPonSlotStart(slot, params);
+
+    CKey key;
+    key.MakeNewKey(true);
+    const CPubKey pub = key.GetPubKey();
+    const COutPoint collateral(uint256S("0xc1a1"), 0);
+    FluxnodeCacheData node;
+    node.pubKey = pub;
+    {
+        LOCK(g_fluxnodeCache.cs);
+        g_fluxnodeCache.mapConfirmedFluxnodeData[collateral] = node;
+    }
+
+    CPonClaim claim;
+    claim.slot = slot;
+    claim.collateral = collateral;
+    ASSERT_TRUE(ECVRF_Prove(key, pub, GetPonVrfMessage(chain.Tip(), slot, collateral, params), claim.proof, claim.output));
+
+    {
+        CPonClaimPool pool;
+        EXPECT_EQ(AcceptPonClaim(claim, chain.Tip(), slotStart + 1, params, pool), PonClaimResult::KEPT);
+        EXPECT_TRUE(pool.Have(slot, collateral));
+        EXPECT_EQ(AcceptPonClaim(claim, chain.Tip(), slotStart + 1, params, pool), PonClaimResult::HELD);
+    }
+    {
+        // The slot before, two seconds from this one's start, and not three.
+        CPonClaimPool pool;
+        EXPECT_EQ(AcceptPonClaim(claim, chain.Tip(), slotStart - 3, params, pool), PonClaimResult::WRONG_SLOT);
+        EXPECT_EQ(AcceptPonClaim(claim, chain.Tip(), slotStart - 2, params, pool), PonClaimResult::KEPT);
+    }
+    {
+        CPonClaimPool pool;
+        EXPECT_EQ(AcceptPonClaim(claim, chain.Tip(), slotStart + params.nPonTargetSpacing, params, pool), PonClaimResult::WRONG_SLOT);
+
+        CPonClaim shortProof = claim;
+        shortProof.proof.pop_back();
+        EXPECT_EQ(AcceptPonClaim(shortProof, chain.Tip(), slotStart + 1, params, pool), PonClaimResult::BAD_PROOF_SIZE);
+
+        CPonClaim stranger = claim;
+        stranger.collateral = COutPoint(uint256S("0xc1a2"), 0);
+        EXPECT_EQ(AcceptPonClaim(stranger, chain.Tip(), slotStart + 1, params, pool), PonClaimResult::UNCONFIRMED);
+
+        CPonClaim otherOutput = claim;
+        otherOutput.output = ArithToUint256(UintToArith256(claim.output) + 1);
+        EXPECT_EQ(AcceptPonClaim(otherOutput, chain.Tip(), slotStart + 1, params, pool), PonClaimResult::BAD_PROOF);
+
+        CPonClaim otherSlot = claim;
+        otherSlot.slot = slot + 1;
+        EXPECT_EQ(AcceptPonClaim(otherSlot, chain.Tip(), slotStart + params.nPonTargetSpacing, params, pool), PonClaimResult::BAD_PROOF);
+
+        // Before the PON-VRF height.
+        EXPECT_EQ(AcceptPonClaim(claim, &chain.entries[100], slotStart + 1, params, pool), PonClaimResult::NOT_ACTIVE);
+        EXPECT_FALSE(pool.Have(slot, collateral));
+    }
+    {
+        // A target the output is over: the same chain, the same seed, tighter nBits.
+        VrfClaimChain tight(205, arith_uint256(arith_uint256(1) << 200).GetCompact());
+        CPonClaimPool pool;
+        EXPECT_EQ(AcceptPonClaim(claim, tight.Tip(), slotStart + 1, params, pool), PonClaimResult::NOT_ELIGIBLE);
+    }
+    {
+        CPonClaimPool pool;
+        for (int i = 0; i < 6; i++) pool.Add(slot, COutPoint(uint256S("0x04"), i), arith_uint256(i));
+        EXPECT_EQ(AcceptPonClaim(claim, chain.Tip(), slotStart + 1, params, pool), PonClaimResult::NOT_AMONG_BEST);
+    }
+
+    {
+        LOCK(g_fluxnodeCache.cs);
+        g_fluxnodeCache.mapConfirmedFluxnodeData.erase(collateral);
+    }
+    SelectParams(CBaseChainParams::MAIN);
 }
 
 // With UPGRADE_PON_VRF active a block stamped more than PON_VRF_MAX_AHEAD_SECONDS ahead of the

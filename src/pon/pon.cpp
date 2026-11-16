@@ -269,6 +269,14 @@ unsigned int GetPonVrfBits(const CBlockIndex* pindexPrev, int64_t nBlockTime, co
     return targets[epochBlock].GetCompact();
 }
 
+unsigned int GetPonVrfNextBits(const CBlockIndex* pindexPrev, int64_t nBlockTime, const Consensus::Params& params)
+{
+    if (!IsPONVRFActive(pindexPrev->nHeight)) {
+        return GetPonVrfActivationBits();
+    }
+    return GetPonVrfBits(pindexPrev, nBlockTime, params);
+}
+
 unsigned int GetPonVrfActivationBits()
 {
     LOCK(g_fluxnodeCache.cs);
@@ -677,7 +685,16 @@ bool ContextualCheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex*
         }
 
         // Past this point: block height matches chain tip or tip+1, cache state should be correct
-        FluxnodeCacheData data = g_fluxnodeCache.GetFluxnodeData(block.nodesCollateral);
+        // Under PON-VRF the minter is a confirmed node: GetFluxnodeData also returns one that
+        // is started and not confirmed.
+        FluxnodeCacheData data;
+        if (IsPONVRFActive(currentHeight)) {
+            LOCK(g_fluxnodeCache.cs);
+            const auto it = g_fluxnodeCache.mapConfirmedFluxnodeData.find(block.nodesCollateral);
+            if (it != g_fluxnodeCache.mapConfirmedFluxnodeData.end()) data = it->second;
+        } else {
+            data = g_fluxnodeCache.GetFluxnodeData(block.nodesCollateral);
+        }
 
         if (data.IsNull()) {
             // Fluxnode not found in cache

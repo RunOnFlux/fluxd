@@ -26,6 +26,7 @@
 #include "net.h"
 #include "pow.h"
 #include "pon/pon.h"
+#include "pon/pon-claim.h"
 #include "pon/pon-fork.h"
 #include "rpc/cache.h"
 #include "txmempool.h"
@@ -9361,6 +9362,38 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         }
         if (vInv.size() > 0)
             pfrom->PushMessage("inv", vInv);
+    }
+
+
+    else if (strCommand == "ponclaim")
+    {
+        if (pfrom->nVersion < PON_VRF_PROTO_VERSION) {
+            return true;
+        }
+        const int64_t nNow = GetTime();
+        const uint32_t slotNow = GetSlotNumber(nNow, Params().GenesisBlock().nTime, Params().GetConsensus());
+        if (pfrom->nPonClaimSlot != slotNow) {
+            pfrom->nPonClaimSlot = slotNow;
+            pfrom->nPonClaims = 0;
+        }
+        if (++pfrom->nPonClaims > PON_VRF_CLAIMS_PER_PEER) {
+            return true;
+        }
+
+        CPonClaim claim;
+        vRecv >> claim;
+
+        PonClaimResult result;
+        {
+            LOCK(cs_main);
+            result = AcceptPonClaim(claim, chainActive.Tip(), nNow, Params().GetConsensus(), g_ponClaims);
+            if (result == PonClaimResult::BAD_PROOF_SIZE) {
+                Misbehaving(pfrom->GetId(), 20);
+            }
+        }
+        if (result == PonClaimResult::KEPT) {
+            RelayPonClaim(claim, pfrom);
+        }
     }
 
 

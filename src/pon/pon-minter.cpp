@@ -7,8 +7,10 @@
 #include "../crypto/ecvrf.h"
 #include "../miner.h"
 #include "pon.h"
+#include "pon-claim.h"
 #include "pon-fork.h"
 #include "../main.h"
+#include "../net.h"
 #include "../chainparams.h"
 #include "../fluxnode/activefluxnode.h"
 #include "../fluxnode/fluxnode.h"
@@ -115,6 +117,8 @@ void PONMinter(const CChainParams& chainparams)
 
     // Track last slot we attempted to avoid retrying the same slot
     uint32_t lastAttemptedSlot = 0;
+    // The last slot this node announced its draw for
+    uint32_t lastClaimedSlot = 0;
 
     try {
         while (fPONMinter && !ShutdownRequested()) {
@@ -214,14 +218,9 @@ void PONMinter(const CChainParams& chainparams)
             }
 
             // Get current difficulty target for this block height
-            unsigned int nBits;
-            if (!IsPONVRFActive(pindexPrev->nHeight + 1)) {
-                nBits = GetNextPONWorkRequired(pindexPrev);
-            } else if (!IsPONVRFActive(pindexPrev->nHeight)) {
-                nBits = GetPonVrfActivationBits();
-            } else {
-                nBits = GetPonVrfBits(pindexPrev, now, consensusParams);
-            }
+            const unsigned int nBits = IsPONVRFActive(pindexPrev->nHeight + 1)
+                                           ? GetPonVrfNextBits(pindexPrev, now, consensusParams)
+                                           : GetNextPONWorkRequired(pindexPrev);
 
             // Calculate eligibility and rank for all nodes in this slot
             // Each node computes: Hash(collateral, prevBlockHash, slotNumber)
@@ -265,13 +264,39 @@ void PONMinter(const CChainParams& chainparams)
                     lastAttemptedSlot = currentSlot;
                     continue;
                 }
-                // Wait the draw's turn: a block stamped before it is refused
-                // (CheckPONBlockHeader), and a better draw's block is minted first.
-                const int64_t nTurn = GetPonSlotStart(currentSlot, consensusParams) +
-                                      PonVrfTurnSeconds(UintToArith256(vrfOutput), nBits);
-                LogPrintf("PON: VRF-eligible for slot %d (y=%s) - minting at second %d of the slot\n",
-                         currentSlot, vrfOutput.GetHex(), (int)(nTurn - GetPonSlotStart(currentSlot, consensusParams)));
-                while (GetTime() < nTurn && fPONMinter && !ShutdownRequested()) {
+                // Announce the draw once, as the slot begins, and keep it with the claims
+                // heard: the eligible nodes of the slot then mint best first.
+                const arith_uint256 own = UintToArith256(vrfOutput);
+                g_ponClaims.Forget(currentSlot);
+                g_ponClaims.Add(currentSlot, collateral, own);
+                if (lastClaimedSlot != currentSlot) {
+                    CPonClaim claim;
+                    claim.slot = currentSlot;
+                    claim.collateral = collateral;
+                    claim.output = vrfOutput;
+                    claim.proof = vrfProof;
+                    RelayPonClaim(claim, nullptr);
+                    lastClaimedSlot = currentSlot;
+                }
+
+                // Wait the draw's turn, which no block may be stamped before
+                // (CheckPONBlockHeader), and behind each better claim heard by then.
+                const int64_t slotStart = GetPonSlotStart(currentSlot, consensusParams);
+                const uint32_t nOwnTurn = PonVrfTurnSeconds(own, nBits);
+                LogPrintf("PON: VRF-eligible for slot %d (y=%s) - turn at second %d of the slot\n",
+                         currentSlot, vrfOutput.GetHex(), nOwnTurn);
+                while (fPONMinter && !ShutdownRequested()) {
+                    std::vector<uint32_t> vBetterTurns;
+                    for (const arith_uint256& better : g_ponClaims.BetterThan(currentSlot, own)) {
+                        vBetterTurns.push_back(PonVrfTurnSeconds(better, nBits));
+                    }
+                    if (GetTime() >= slotStart + PonVrfMintSecond(nOwnTurn, vBetterTurns)) {
+                        break;
+                    }
+                    {
+                        LOCK(cs_main);
+                        if (chainActive.Tip() != pindexPrev) break;
+                    }
                     MilliSleep(100);
                 }
             } else {
@@ -328,6 +353,11 @@ void PONMinter(const CChainParams& chainparams)
                 }
 
                 CBlockIndex* pNewTip = chainActive.Tip();
+                // Under PON-VRF a new tip from an earlier slot leaves this slot open: draw
+                // again on it. A tip in this slot has filled it.
+                if (usingVrf && pNewTip != pindexPrev && IsLaterSlotThan(nowAfterWait, pNewTip, consensusParams)) {
+                    continue;
+                }
                 if (pNewTip->GetBlockHash() != pindexPrev->GetBlockHash()) {
                     LogPrintf("PON: Slot %d already filled by another node during wait (likely rank %d or better), skipping\n",
                              currentSlot, myRank - 1);

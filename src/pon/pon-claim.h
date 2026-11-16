@@ -6,6 +6,7 @@
 #define BITCOIN_PON_CLAIM_H
 
 #include "arith_uint256.h"
+#include "consensus/params.h"
 #include "primitives/transaction.h"
 #include "serialize.h"
 #include "sync.h"
@@ -19,6 +20,8 @@
 
 /** Claims a node keeps, and passes on, for one slot. */
 static const size_t PON_VRF_CLAIMS_KEPT = 6;
+/** Claims a node reads from one peer in one slot; the rest are dropped unread. */
+static const unsigned int PON_VRF_CLAIMS_PER_PEER = 100;
 /** Seconds a node gives a better claim to mint before it mints itself. */
 static const uint32_t PON_VRF_CLAIM_WAIT_SECONDS = 4;
 
@@ -77,6 +80,29 @@ private:
 };
 
 extern CPonClaimPool g_ponClaims;
+
+class CBlockIndex;
+
+/** What became of a claim. */
+enum class PonClaimResult {
+    KEPT,               //!< among the best of its slot: kept, and to be passed on
+    BAD_PROOF_SIZE,
+    WRONG_SLOT,         //!< not the slot the clock is in, nor the next within the clock bound
+    HELD,               //!< this collateral's claim for the slot is held already
+    NOT_ACTIVE,         //!< the next block is not at a PON-VRF height
+    UNCONFIRMED,        //!< the collateral is not a confirmed fluxnode
+    BAD_PROOF,          //!< the proof does not give the output under that node's key
+    NOT_ELIGIBLE,       //!< the output is over the target
+    NOT_AMONG_BEST,
+};
+
+/**
+ * Check a claim against the tip and offer it to the pool, cheapest check first. A claim is
+ * verified on the receiver's own tip: one made on another tip, or across a change of seed,
+ * fails here and its node mints at its own turn. nNow is the system clock.
+ */
+PonClaimResult AcceptPonClaim(const CPonClaim& claim, const CBlockIndex* pindexTip, int64_t nNow,
+                              const Consensus::Params& params, CPonClaimPool& pool);
 
 /**
  * The second of its slot at which a node with a draw of turn nOwnTurn mints, given the turns

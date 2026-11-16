@@ -84,6 +84,12 @@ uint32_t GetPonVrfTargetEpoch(int64_t nTime, const Consensus::Params& params);
 unsigned int GetPonVrfBits(const CBlockIndex* pindexPrev, int64_t nBlockTime, const Consensus::Params& params);
 
 /**
+ * nBits of a PON-VRF block stamped nBlockTime on pindexPrev: the activation block's from the
+ * confirmed list (GetPonVrfActivationBits), any other's from its chain (GetPonVrfBits).
+ */
+unsigned int GetPonVrfNextBits(const CBlockIndex* pindexPrev, int64_t nBlockTime, const Consensus::Params& params);
+
+/**
  * nBits of the activation block: PonVrfFirstTarget of the confirmed list as it stands. It is
  * the activation block's only while the fluxnode cache is at that block's parent.
  */

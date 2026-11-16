@@ -44,10 +44,7 @@ unsigned int GetNextWorkRequiredByFork(const CBlockIndex* pindexLast,
     int nHeight = pindexLast->nHeight + 1;
     
     if (IsPONVRFActive(nHeight)) {
-        if (!IsPONVRFActive(pindexLast->nHeight)) {
-            return GetPonVrfActivationBits();
-        }
-        return GetPonVrfBits(pindexLast, pblock ? pblock->GetBlockTime() : GetTime(), params);
+        return GetPonVrfNextBits(pindexLast, pblock ? pblock->GetBlockTime() : GetTime(), params);
     }
 
     if (IsPONActive(nHeight)) {
