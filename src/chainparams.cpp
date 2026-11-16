@@ -606,10 +606,11 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_PON].nProtocolVersion = 170020;
         consensus.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight = 2;
         // A labnet chain starts from genesis whenever its lab restarts it, so the height is low.
-        // At 200 the chain has legacy PON blocks before the change, and the first VRF epoch
-        // draws its seed from blocks of the chain (heights 61 to 120), not the bootstrap seed.
+        // At 400 a fleet confirmed a little after height 200 has minted legacy PON blocks for
+        // about a hundred minutes before the change, as a network that upgrades does, and the
+        // first VRF epoch draws its seed from blocks of the chain, not the bootstrap seed.
         consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nProtocolVersion = PON_VRF_PROTO_VERSION;
-        consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight = 200;
+        consensus.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight = 400;
 
         consensus.nPONInitialSubsidy = 14;
         consensus.nPONSubsidyReductionInterval = 1051200;

@@ -1366,7 +1366,8 @@ TEST_F(PONTest, VrfClaimIsCheckedBeforeItIsKept) {
     SelectParams(CBaseChainParams::LABNET);
     const Consensus::Params& params = Params().GetConsensus();
     const uint32_t nBitsCeiling = PonVrfFirstTarget(1).GetCompact();
-    VrfClaimChain chain(205, nBitsCeiling);
+    const int nTip = params.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight + 5;
+    VrfClaimChain chain(nTip, nBitsCeiling);
     ASSERT_TRUE(IsPONVRFActive(chain.Tip()->nHeight + 1));
     const uint32_t slot = chain.NextSlot();
     const int64_t slotStart = GetPonSlotStart(slot, params);
@@ -1425,7 +1426,7 @@ TEST_F(PONTest, VrfClaimIsCheckedBeforeItIsKept) {
     }
     {
         // A target the output is over: the same chain, the same seed, tighter nBits.
-        VrfClaimChain tight(205, arith_uint256(arith_uint256(1) << 200).GetCompact());
+        VrfClaimChain tight(nTip, arith_uint256(arith_uint256(1) << 200).GetCompact());
         CPonClaimPool pool;
         EXPECT_EQ(AcceptPonClaim(claim, tight.Tip(), slotStart + 1, params, pool), PonClaimResult::NOT_ELIGIBLE);
     }

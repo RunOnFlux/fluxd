@@ -186,13 +186,13 @@ TEST_F(LabNet, BypassedSignaturesOnlyOnLabnet)
 TEST_F(LabNet, PonVrfActivatesAtALowHeight)
 {
     const Consensus::Params& lab = Params(CBaseChainParams::LABNET).GetConsensus();
-    EXPECT_EQ(lab.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight, 200);
+    EXPECT_EQ(lab.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight, 400);
     EXPECT_EQ(lab.vUpgrades[Consensus::UPGRADE_PON_VRF].nProtocolVersion, PON_VRF_PROTO_VERSION);
     EXPECT_EQ(PROTOCOL_VERSION, PON_VRF_PROTO_VERSION);
     EXPECT_GT(PON_VRF_PROTO_VERSION, SENDADDRV2_VERSION);
 
-    EXPECT_FALSE(IsPONVRFActive(199));
-    EXPECT_TRUE(IsPONVRFActive(200));
+    EXPECT_FALSE(IsPONVRFActive(399));
+    EXPECT_TRUE(IsPONVRFActive(400));
 
     const Consensus::Params& main = Params(CBaseChainParams::MAIN).GetConsensus();
     EXPECT_EQ(main.vUpgrades[Consensus::UPGRADE_PON_VRF].nActivationHeight,
