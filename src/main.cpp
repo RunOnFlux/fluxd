@@ -162,47 +162,7 @@ namespace {
     struct CBlockIndexWorkComparator
     {
         bool operator()(CBlockIndex *pa, CBlockIndex *pb) const {
-            // First sort by most total work, ...
-            if (pa->nChainWork > pb->nChainWork) return false;
-            if (pa->nChainWork < pb->nChainWork) return true;
-
-            // For PON blocks at same height (same chain work), use a deterministic
-            // tie-breaker so all nodes converge on the same block instead of splitting.
-            bool isPONBlockA = (pa->nVersion >= CBlockHeader::PON_VERSION);
-            bool isPONBlockB = (pb->nVersion >= CBlockHeader::PON_VERSION);
-
-            if (isPONBlockA && isPONBlockB && pa->nHeight == pb->nHeight) {
-                // Deterministic PON tie-break (see ComparePonForkChoice): PON-VRF blocks
-                // compare by un-grindable VRF output, legacy PON blocks by the resident
-                // cached PON hash. Every node computes the same winner regardless of
-                // arrival order, so the network converges instead of forking. The scores
-                // must come from resident fields: recomputing from GetBlockHeader()
-                // would hash a zeroed nodesCollateral for pruned entries (wrong
-                // tie-break vs the network), and the result would change when
-                // connect/disconnect restores header data on an entry already in
-                // setBlockIndexCandidates — an in-place comparator-key mutation
-                // that breaks set ordering and makes erase-by-key silently fail.
-                int cmp = ComparePonForkChoice(pa, pb);
-                if (cmp < 0) {
-                    return false; // A preferred (lower score), A wins
-                }
-                if (cmp > 0) {
-                    return true;  // B preferred (lower score), B wins
-                }
-                // Undecided (equal scores): fall through to sequence ID
-            }
-
-            // ... then by earliest time received, ...
-            if (pa->nSequenceId < pb->nSequenceId) return false;
-            if (pa->nSequenceId > pb->nSequenceId) return true;
-
-            // Use pointer address as tie breaker (should only happen with blocks
-            // loaded from disk, as those all have id 0).
-            if (pa < pb) return false;
-            if (pa > pb) return true;
-
-            // Identical blocks.
-            return false;
+            return IsWorseBlockIndex(pa, pb);
         }
     };
 

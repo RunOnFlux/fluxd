@@ -591,6 +591,45 @@ TEST_F(PONTest, ForkChoicePrunedEntriesMatchUnpruned) {
     fullB.FreeHeaderData();
 }
 
+// The order of candidate tips: more chain work is better whatever else differs; PON entries
+// of equal work at one height go to the preferred score; what is left goes to the entry
+// received first. No entry is worse than itself.
+TEST_F(PONTest, CandidateTipOrder) {
+    const uint256 low = uint256S("0x01");
+    const uint256 high = uint256S("0x02");
+    ASSERT_TRUE(low < high);
+
+    CBlockIndex a = MakeLegacyPonIndex(100, low);
+    CBlockIndex b = MakeLegacyPonIndex(100, high);
+    a.nChainWork = b.nChainWork = arith_uint256(1000);
+    a.nSequenceId = 7;
+    b.nSequenceId = 3;
+
+    // Equal work, one height: the preferred score, though it was received later.
+    ASSERT_LT(ComparePonForkChoice(&a, &b), 0);
+    EXPECT_TRUE(IsWorseBlockIndex(&b, &a));
+    EXPECT_FALSE(IsWorseBlockIndex(&a, &b));
+
+    // More work wins against a better score and an earlier arrival.
+    b.nChainWork = arith_uint256(1001);
+    EXPECT_TRUE(IsWorseBlockIndex(&a, &b));
+    EXPECT_FALSE(IsWorseBlockIndex(&b, &a));
+
+    // Equal work at different heights: the score is not asked; the one received first.
+    b.nChainWork = arith_uint256(1000);
+    b.nHeight = a.nHeight + 1;
+    EXPECT_TRUE(IsWorseBlockIndex(&a, &b));
+    EXPECT_FALSE(IsWorseBlockIndex(&b, &a));
+
+    // Equal work, one height, equal scores: the one received first.
+    b.nHeight = a.nHeight;
+    b.hashPON = a.hashPON;
+    EXPECT_TRUE(IsWorseBlockIndex(&a, &b));
+    EXPECT_FALSE(IsWorseBlockIndex(&b, &a));
+
+    EXPECT_FALSE(IsWorseBlockIndex(&a, &a));
+}
+
 // --- PON-VRF deterministic fork choice (ComparePonForkChoice) -------------------------
 // This is the convergence guarantee: competing same-height VRF blocks must resolve to the
 // same winner on every node (lowest VRF output), regardless of arrival order.

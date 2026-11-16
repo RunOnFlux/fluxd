@@ -468,6 +468,35 @@ int ComparePonForkChoice(const CBlockIndex* a, const CBlockIndex* b)
     return 0;                         // undecided -> caller falls back to first-seen
 }
 
+bool IsWorseBlockIndex(const CBlockIndex* pa, const CBlockIndex* pb)
+{
+    if (pa->nChainWork > pb->nChainWork) return false;
+    if (pa->nChainWork < pb->nChainWork) return true;
+
+    // PON entries of equal work at one height: the preferred score, so that every node
+    // holds the same one whatever order they arrived in. ComparePonForkChoice reads
+    // resident fields only: a score recomputed from header data would change when an
+    // entry's header data is pruned or restored, and an entry's place in a set ordered by
+    // this must not move while it is in the set.
+    const bool fPonA = pa->nVersion >= CBlockHeader::PON_VERSION;
+    const bool fPonB = pb->nVersion >= CBlockHeader::PON_VERSION;
+    if (fPonA && fPonB && pa->nHeight == pb->nHeight) {
+        const int cmp = ComparePonForkChoice(pa, pb);
+        if (cmp < 0) return false;
+        if (cmp > 0) return true;
+    }
+
+    // The entry received first.
+    if (pa->nSequenceId < pb->nSequenceId) return false;
+    if (pa->nSequenceId > pb->nSequenceId) return true;
+
+    // Entries loaded from disk all have sequence id 0: the lower address.
+    if (pa < pb) return false;
+    if (pa > pb) return true;
+
+    return false;
+}
+
 
 bool CheckPONBlockHeader(const CBlockHeader& block, const CBlockIndex* pindexPrev,
                             const Consensus::Params& params)

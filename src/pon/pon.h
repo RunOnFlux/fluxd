@@ -116,6 +116,16 @@ uint256 GetPonScore(const CBlockHeader& block);
 // valid after header-data pruning. Lower value wins in both cases.
 int ComparePonForkChoice(const CBlockIndex* a, const CBlockIndex* b);
 
+/**
+ * The order of block index entries as candidate tips: true when pa is the worse of the two.
+ * More chain work is better. Between PON entries of equal work at one height the preferred
+ * score wins (ComparePonForkChoice). What is left goes to the entry received first, then to
+ * the lower address.
+ *
+ * It reads only fields that do not change while an entry is in a set ordered by it.
+ */
+bool IsWorseBlockIndex(const CBlockIndex* pa, const CBlockIndex* pb);
+
 // Get next PON work required (difficulty adjustment)
 unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast);
 
