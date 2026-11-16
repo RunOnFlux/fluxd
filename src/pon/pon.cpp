@@ -275,6 +275,35 @@ unsigned int GetPonVrfActivationBits()
     return PonVrfFirstTarget(g_fluxnodeCache.mapConfirmedFluxnodeData.size()).GetCompact();
 }
 
+arith_uint256 PonVrfBlockWork(const arith_uint256& output, unsigned int nBits, bool fEmergency)
+{
+    bool fNegative;
+    bool fOverflow;
+    arith_uint256 target;
+    target.SetCompact(nBits, &fNegative, &fOverflow);
+    if (fNegative || fOverflow || target == 0) {
+        return 0;
+    }
+
+    static const unsigned int GRADE_BITS = 16;
+    arith_uint256 grade(2 << GRADE_BITS);
+    if (!fEmergency) {
+        const arith_uint320 wide = WidenTo320(target);
+        arith_uint320 scaled = wide;
+        scaled <<= 1;
+        scaled -= WidenTo320(output > target ? target : output);
+        scaled <<= GRADE_BITS;
+        scaled /= wide;
+        grade = NarrowTo256(scaled);
+    }
+
+    arith_uint256 proof = ~arith_uint256() / ((target >> 32) + 1);
+    // A target under 2^49 has a proof the grade would carry out of 256 bits.
+    const arith_uint256 most = ~arith_uint256() >> (GRADE_BITS + 1);
+    if (proof > most) proof = most;
+    return grade * proof;
+}
+
 bool CheckPonVrfDraw(const uint256& output, unsigned int nBits)
 {
     bool fNegative;
@@ -465,6 +494,13 @@ int ComparePonForkChoice(const CBlockIndex* a, const CBlockIndex* b)
 
     if (scoreA < scoreB) return -1;  // a preferred
     if (scoreA > scoreB) return 1;   // b preferred
+
+    // At PON-VRF heights equal scores are one draw minted twice: the lower block hash, so
+    // that every node settles it alike.
+    if (IsPONVRFActive(a->nHeight) && IsPONVRFActive(b->nHeight) && a->phashBlock && b->phashBlock) {
+        if (*a->phashBlock < *b->phashBlock) return -1;
+        if (*b->phashBlock < *a->phashBlock) return 1;
+    }
     return 0;                         // undecided -> caller falls back to first-seen
 }
 
@@ -473,14 +509,15 @@ bool IsWorseBlockIndex(const CBlockIndex* pa, const CBlockIndex* pb)
     if (pa->nChainWork > pb->nChainWork) return false;
     if (pa->nChainWork < pb->nChainWork) return true;
 
-    // PON entries of equal work at one height: the preferred score, so that every node
-    // holds the same one whatever order they arrived in. ComparePonForkChoice reads
+    // PON entries of equal work at one height, or at any two PON-VRF heights: the preferred
+    // score, so that every node holds the same one whatever order they arrived in. ComparePonForkChoice reads
     // resident fields only: a score recomputed from header data would change when an
     // entry's header data is pruned or restored, and an entry's place in a set ordered by
     // this must not move while it is in the set.
     const bool fPonA = pa->nVersion >= CBlockHeader::PON_VERSION;
     const bool fPonB = pb->nVersion >= CBlockHeader::PON_VERSION;
-    if (fPonA && fPonB && pa->nHeight == pb->nHeight) {
+    const bool fBothVrfHeights = IsPONVRFActive(pa->nHeight) && IsPONVRFActive(pb->nHeight);
+    if (fPonA && fPonB && (pa->nHeight == pb->nHeight || fBothVrfHeights)) {
         const int cmp = ComparePonForkChoice(pa, pb);
         if (cmp < 0) return false;
         if (cmp > 0) return true;

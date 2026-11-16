@@ -10,6 +10,8 @@
 #include "chain.h"
 #include "chainparams.h"
 #include "crypto/equihash.h"
+#include "pon/pon.h"
+#include "pon/pon-fork.h"
 #include "primitives/block.h"
 #include "streams.h"
 #include "uint256.h"
@@ -284,6 +286,12 @@ arith_uint256 GetBlockProof(const CBlockIndex& block)
     // PON blocks use a fixed amount of work since they're based on time slots
     // and node selection, not computational difficulty
     if (block.nVersion >= 100) { // PON_VERSION
+        // At a PON-VRF height a block weighs by its draw and its target. Read from
+        // resident fields: a pruned entry weighs as an unpruned one.
+        if (IsPONVRFActive(block.nHeight)) {
+            return PonVrfBlockWork(UintToArith256(block.hashPON), block.nBits,
+                                   block.nVersion < CBlockHeader::PON_VRF_VERSION);
+        }
         // Use a reasonable fixed value - equivalent to a moderate difficulty POW block
         // This ensures chain work accumulates properly without overflow
         return arith_uint256(1) << 40; // 2^40, a reasonable work amount

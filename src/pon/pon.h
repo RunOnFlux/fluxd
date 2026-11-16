@@ -89,6 +89,14 @@ unsigned int GetPonVrfBits(const CBlockIndex* pindexPrev, int64_t nBlockTime, co
  */
 unsigned int GetPonVrfActivationBits();
 
+/**
+ * The work of a block at a PON-VRF height: a grade of its draw, 2 for an output of zero down
+ * to 1 for an output at the target, in 65536ths, times the proof-of-work form of its target
+ * with 32 more bits kept. An emergency block has the grade of the best draw. The target is
+ * tight when many nodes mint, so a chain minted by few weighs its share.
+ */
+arith_uint256 PonVrfBlockWork(const arith_uint256& output, unsigned int nBits, bool fEmergency);
+
 /** A PON-VRF draw: nBits decodes to a target and the output is at or under it. */
 bool CheckPonVrfDraw(const uint256& output, unsigned int nBits);
 
@@ -118,9 +126,10 @@ int ComparePonForkChoice(const CBlockIndex* a, const CBlockIndex* b);
 
 /**
  * The order of block index entries as candidate tips: true when pa is the worse of the two.
- * More chain work is better. Between PON entries of equal work at one height the preferred
- * score wins (ComparePonForkChoice). What is left goes to the entry received first, then to
- * the lower address.
+ * More chain work is better. Between PON entries of equal work at one height, or at any two
+ * PON-VRF heights, the preferred score wins (ComparePonForkChoice): chains of equal work
+ * need not be of equal length once a block weighs by its draw. What is left goes to the
+ * entry received first, then to the lower address.
  *
  * It reads only fields that do not change while an entry is in a set ordered by it.
  */

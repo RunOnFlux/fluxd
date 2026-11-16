@@ -13,6 +13,7 @@
 #include "main.h"
 #include "pon/pon.h"
 #include "pon/pon-fork.h"
+#include "pow.h"
 #include "primitives/block.h"
 #include "chain.h"
 #include "uint256.h"
@@ -1105,6 +1106,127 @@ TEST_F(PONTest, VrfBlockCarriesTheRulesTarget) {
     EXPECT_EQ(wrong.GetRejectReason(), "bad-pon-diffbits");
 
     SetMockTime(0);
+    SelectParams(CBaseChainParams::MAIN);
+}
+
+// The work of a block at a PON-VRF height, against values worked outside this code: twice the
+// proof of its target for an output of zero, once for an output at the target, and for an
+// emergency block the most. An index entry weighs so from its resident fields; below the
+// PON-VRF height a PON block weighs 2^40.
+TEST_F(PONTest, VrfBlockWorkGradesTheDrawOverTheTarget) {
+    const uint32_t nBits = PonVrfFirstTarget(6956).GetCompact();
+    const arith_uint256 target = TargetFromBits(nBits);
+
+    EXPECT_EQ(PonVrfBlockWork(arith_uint256(0), nBits, false), arith_uint256("05e688407d160000"));
+    EXPECT_EQ(PonVrfBlockWork(target / 2, nBits, false), arith_uint256("046ce6305dd08000"));
+    EXPECT_EQ(PonVrfBlockWork(target - 1, nBits, false), arith_uint256("02f344203e8b0000"));
+    EXPECT_EQ(PonVrfBlockWork(target, nBits, false), arith_uint256("02f344203e8b0000"));
+    EXPECT_EQ(PonVrfBlockWork(target, nBits, true), arith_uint256("05e688407d160000"));
+
+    const uint32_t nBitsCeiling = PonVrfFirstTarget(1).GetCompact();
+    EXPECT_EQ(PonVrfBlockWork(TargetFromBits(nBitsCeiling) / 3, nBitsCeiling, false), arith_uint256("01aaabaaabaaaa"));
+    EXPECT_EQ(PonVrfBlockWork(arith_uint256(0), 0, false), arith_uint256(0));
+
+    // A looser target never makes a draw weigh more.
+    const arith_uint256 output = target / 2;
+    const uint32_t nBitsLooser = arith_uint256(target * 3 / 2).GetCompact();
+    EXPECT_LT(PonVrfBlockWork(output, nBitsLooser, false), PonVrfBlockWork(output, nBits, false));
+
+    SelectParams(CBaseChainParams::LABNET);
+    CBlockIndex entry;
+    entry.nHeight = 1000;
+    ASSERT_TRUE(IsPONVRFActive(entry.nHeight));
+    entry.nVersion = CBlockHeader::PON_VRF_VERSION;
+    entry.nBits = nBits;
+    entry.hashPON = ArithToUint256(target / 2);
+    EXPECT_EQ(GetBlockProof(entry), arith_uint256("046ce6305dd08000"));
+    entry.nVersion = CBlockHeader::PON_VERSION;     // an emergency block
+    EXPECT_EQ(GetBlockProof(entry), arith_uint256("05e688407d160000"));
+
+    SelectParams(CBaseChainParams::MAIN);
+    CBlockIndex legacy;
+    legacy.nHeight = GetPONActivationHeight() + 10;
+    ASSERT_FALSE(IsPONVRFActive(legacy.nHeight));
+    legacy.nVersion = CBlockHeader::PON_VERSION;
+    legacy.nBits = nBits;
+    EXPECT_EQ(GetBlockProof(legacy), arith_uint256(arith_uint256(1) << 40));
+}
+
+// Between two entries at PON-VRF heights with the same draw the lower block hash is
+// preferred, whichever is asked first; below the PON-VRF height it stays undecided.
+TEST_F(PONTest, VrfEqualDrawsGoToTheLowerBlockHash) {
+    SelectParams(CBaseChainParams::LABNET);
+    const uint256 draw = uint256S("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+    const uint256 lower = uint256S("0x01");
+    const uint256 higher = uint256S("0x02");
+    ASSERT_TRUE(lower < higher);
+
+    CBlockIndex a, b;
+    a.nHeight = b.nHeight = 1000;
+    ASSERT_TRUE(IsPONVRFActive(a.nHeight));
+    a.nVersion = b.nVersion = CBlockHeader::PON_VRF_VERSION;
+    a.hashPON = b.hashPON = draw;
+    a.phashBlock = &lower;
+    b.phashBlock = &higher;
+    EXPECT_LT(ComparePonForkChoice(&a, &b), 0);
+    EXPECT_GT(ComparePonForkChoice(&b, &a), 0);
+
+    // A better draw is preferred whatever the hashes.
+    b.hashPON = uint256S("0x0023456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+    ASSERT_TRUE(b.hashPON < a.hashPON);
+    EXPECT_GT(ComparePonForkChoice(&a, &b), 0);
+
+    SelectParams(CBaseChainParams::MAIN);
+    CBlockIndex c, d;
+    c.nHeight = d.nHeight = GetPONActivationHeight() + 10;
+    ASSERT_FALSE(IsPONVRFActive(c.nHeight));
+    c.nVersion = d.nVersion = CBlockHeader::PON_VERSION;
+    c.hashPON = d.hashPON = draw;
+    c.phashBlock = &lower;
+    d.phashBlock = &higher;
+    EXPECT_EQ(ComparePonForkChoice(&c, &d), 0);
+}
+
+// At PON-VRF heights candidate tips of equal work are ordered by draw and then by block
+// hash at any two heights, ahead of the order they were received in; more work still wins.
+TEST_F(PONTest, VrfCandidateTipOrder) {
+    SelectParams(CBaseChainParams::LABNET);
+    const uint256 lowHash = uint256S("0x01");
+    const uint256 highHash = uint256S("0x02");
+    const uint256 better = uint256S("0x0023456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+    const uint256 worse = uint256S("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+    ASSERT_TRUE(better < worse);
+
+    CBlockIndex a, b;
+    a.nHeight = 1000;
+    b.nHeight = 1001;
+    ASSERT_TRUE(IsPONVRFActive(a.nHeight));
+    a.nVersion = b.nVersion = CBlockHeader::PON_VRF_VERSION;
+    a.nChainWork = b.nChainWork = arith_uint256(1000);
+    a.phashBlock = &highHash;
+    b.phashBlock = &lowHash;
+    a.hashPON = better;
+    b.hashPON = worse;
+    a.nSequenceId = 7;      // received later
+    b.nSequenceId = 3;
+
+    // The better draw, at another height and received later.
+    EXPECT_TRUE(IsWorseBlockIndex(&b, &a));
+    EXPECT_FALSE(IsWorseBlockIndex(&a, &b));
+
+    // Equal draws: the lower block hash.
+    a.hashPON = worse;
+    EXPECT_TRUE(IsWorseBlockIndex(&a, &b));
+    EXPECT_FALSE(IsWorseBlockIndex(&b, &a));
+
+    // More work wins against a better draw and a lower hash.
+    a.hashPON = better;
+    a.phashBlock = &lowHash;
+    b.phashBlock = &highHash;
+    b.nChainWork = arith_uint256(1001);
+    EXPECT_TRUE(IsWorseBlockIndex(&a, &b));
+    EXPECT_FALSE(IsWorseBlockIndex(&b, &a));
+
     SelectParams(CBaseChainParams::MAIN);
 }
 
