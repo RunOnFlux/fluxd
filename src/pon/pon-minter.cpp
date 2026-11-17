@@ -285,22 +285,28 @@ void PONMinter(const CChainParams& chainparams)
                 const uint32_t nOwnTurn = PonVrfTurnSeconds(own, nBits);
                 LogPrintf("PON: VRF-eligible for slot %d (y=%s) - turn at second %d of the slot\n",
                          currentSlot, vrfOutput.GetHex(), nOwnTurn);
-                while (fPONMinter && !ShutdownRequested()) {
+                PonMinterStep step;
+                while (true) {
                     std::vector<uint32_t> vBetterTurns;
                     for (const arith_uint256& better : g_ponClaims.BetterThan(currentSlot, own)) {
                         vBetterTurns.push_back(PonVrfTurnSeconds(better, nBits));
                     }
-                    if (GetTime() >= slotStart + PonVrfMintSecond(nOwnTurn, vBetterTurns)) {
-                        LogPrint("pon", "PON: slot %d - second %d, behind %d better claims\n", currentSlot,
-                                 PonVrfMintSecond(nOwnTurn, vBetterTurns), (int)vBetterTurns.size());
-                        break;
-                    }
+                    const uint32_t nMintSecond = PonVrfMintSecond(nOwnTurn, vBetterTurns);
+                    bool fTipMoved;
                     {
                         LOCK(cs_main);
-                        if (chainActive.Tip() != pindexPrev) break;
+                        fTipMoved = chainActive.Tip() != pindexPrev;
                     }
+                    step = PonVrfMinterStep(GetTime(), slotStart + nMintSecond, fTipMoved,
+                                            !fPONMinter || ShutdownRequested());
+                    if (step == PonMinterStep::MINT) {
+                        LogPrint("pon", "PON: slot %d - second %d, behind %d better claims\n", currentSlot,
+                                 nMintSecond, (int)vBetterTurns.size());
+                    }
+                    if (step != PonMinterStep::WAIT) break;
                     MilliSleep(100);
                 }
+                if (step == PonMinterStep::STOP) return;
             } else {
                 std::vector<EligibleNodeInfo> eligibleNodes = GetEligibleNodes(pindexPrev, currentSlot, nBits);
 

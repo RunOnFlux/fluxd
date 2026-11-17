@@ -1331,6 +1331,18 @@ TEST_F(PONTest, VrfMinterWaitsForBetterClaims) {
     EXPECT_EQ(PonVrfMintSecond(23, {4, 4, 4}), 23u);
 }
 
+// A node waiting to mint mints from its time on, hands the slot back when the tip it drew on
+// has moved, and mints nothing once the minter is stopping.
+TEST_F(PONTest, VrfMinterStepsThroughItsWait) {
+    EXPECT_TRUE(PonVrfMinterStep(99, 100, false, false) == PonMinterStep::WAIT);
+    EXPECT_TRUE(PonVrfMinterStep(100, 100, false, false) == PonMinterStep::MINT);
+    EXPECT_TRUE(PonVrfMinterStep(99, 100, true, false) == PonMinterStep::TIP_MOVED);
+    EXPECT_TRUE(PonVrfMinterStep(100, 100, true, false) == PonMinterStep::MINT);   // the caller checks the tip
+    EXPECT_TRUE(PonVrfMinterStep(99, 100, false, true) == PonMinterStep::STOP);    // stopped before its time
+    EXPECT_TRUE(PonVrfMinterStep(100, 100, false, true) == PonMinterStep::STOP);
+    EXPECT_TRUE(PonVrfMinterStep(99, 100, true, true) == PonMinterStep::STOP);
+}
+
 namespace {
 // A labnet chain from genesis to a tip above the activation block, one block a slot, every
 // entry with a hash: enough behind the tip for an epoch seed.

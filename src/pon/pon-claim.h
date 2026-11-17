@@ -114,4 +114,19 @@ PonClaimResult AcceptPonClaim(const CPonClaim& claim, const CBlockIndex* pindexT
  */
 uint32_t PonVrfMintSecond(uint32_t nOwnTurn, const std::vector<uint32_t>& vBetterTurns);
 
+/** What a node waiting to mint in a slot does next. */
+enum class PonMinterStep {
+    WAIT,
+    MINT,       //!< the time to mint has come
+    TIP_MOVED,  //!< the tip drawn on is no longer the tip: the slot is filled, or is drawn again
+    STOP,       //!< the minter is stopping: nothing is minted
+};
+
+/**
+ * The step of a node waiting to mint at nMintTime, at the time nNow. A minter that is stopping
+ * mints nothing, whatever the time. A node whose time has come mints even when the tip has
+ * moved under it: the caller decides, under cs_main, whether the slot is still open.
+ */
+PonMinterStep PonVrfMinterStep(int64_t nNow, int64_t nMintTime, bool fTipMoved, bool fStopping);
+
 #endif // BITCOIN_PON_CLAIM_H

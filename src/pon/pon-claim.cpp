@@ -133,3 +133,11 @@ uint32_t PonVrfMintSecond(uint32_t nOwnTurn, const std::vector<uint32_t>& vBette
     }
     return std::max(nOwnTurn, nDue);
 }
+
+PonMinterStep PonVrfMinterStep(int64_t nNow, int64_t nMintTime, bool fTipMoved, bool fStopping)
+{
+    if (fStopping) return PonMinterStep::STOP;
+    if (nNow >= nMintTime) return PonMinterStep::MINT;
+    if (fTipMoved) return PonMinterStep::TIP_MOVED;
+    return PonMinterStep::WAIT;
+}
