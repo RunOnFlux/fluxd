@@ -400,9 +400,16 @@ void PONMinter(const CChainParams& chainparams)
             // Uses fresh timestamp (nowAfterWait) calculated after rank delay, giving each
             // rank a naturally distributed timestamp within the slot window
             // (Rank 1 ~T+4s, Rank 2 ~T+8s, Rank 3 ~T+12s, etc.)
-            std::unique_ptr<CBlockTemplate> pblocktemplate(
-                CreateNewBlock(chainparams, scriptPubKey, false, collateral, nowAfterWait)
-            );
+            // CreateNewBlock throws when the block it built fails its own validity test.
+            // That costs this slot: the minter goes on to the next.
+            std::unique_ptr<CBlockTemplate> pblocktemplate;
+            try {
+                pblocktemplate.reset(CreateNewBlock(chainparams, scriptPubKey, false, collateral, nowAfterWait));
+            } catch (const std::runtime_error& e) {
+                LogPrintf("PON: no block for slot %d: %s\n", currentSlot, e.what());
+                lastAttemptedSlot = currentSlot;
+                continue;
+            }
 
             if (!pblocktemplate) {
                 LogPrintf("PON: CreateNewBlock failed\n");
