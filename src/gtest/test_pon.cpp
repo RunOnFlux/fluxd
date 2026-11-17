@@ -1343,6 +1343,32 @@ TEST_F(PONTest, VrfMinterStepsThroughItsWait) {
     EXPECT_TRUE(PonVrfMinterStep(99, 100, true, true) == PonMinterStep::STOP);
 }
 
+// An emergency block has no draw and passes under any target it carries; a node's block is
+// held to its draw, by the rule of its version.
+TEST_F(PONTest, BlockDrawIsCheckedByItsKind) {
+    const Consensus::Params& params = Params().GetConsensus();
+    const int nHeight = params.vUpgrades[Consensus::UPGRADE_PON].nActivationHeight + params.nPonDifficultyWindow;
+
+    CBlockHeader block;
+    block.nVersion = CBlockHeader::PON_VERSION;
+    block.nBits = 0x2100ffff;                                           // above ponLimit
+    block.nodesCollateral = COutPoint(Params().GetEmergencyCollateralHash(), 0);
+    EXPECT_TRUE(CheckPonBlockDraw(block, params));
+    EXPECT_TRUE(CheckPonBlockDraw(block, params, nHeight));
+
+    block.nodesCollateral.n = 1;                                        // a node's block
+    EXPECT_FALSE(CheckPonBlockDraw(block, params));
+    EXPECT_FALSE(CheckPonBlockDraw(block, params, nHeight));
+
+    block.nVersion = CBlockHeader::PON_VRF_VERSION;
+    arith_uint256 target;
+    target.SetCompact(block.nBits);
+    block.nodesVrfOutput = ArithToUint256(target);
+    EXPECT_TRUE(CheckPonBlockDraw(block, params));                      // a VRF target has no ceiling
+    block.nBits = 0x2000ffff;
+    EXPECT_FALSE(CheckPonBlockDraw(block, params));                     // the same output over a tighter target
+}
+
 namespace {
 // A labnet chain from genesis to a tip above the activation block, one block a slot, every
 // entry with a hash: enough behind the tip for an epoch seed.

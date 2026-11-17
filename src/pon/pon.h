@@ -121,6 +121,13 @@ int64_t GetPonSlotStart(uint32_t slot, const Consensus::Params& params);
 /** A PON-VRF draw: nBits decodes to a target and the output is at or under it. */
 bool CheckPonVrfDraw(const uint256& output, unsigned int nBits);
 
+/**
+ * Whether a PON block's draw meets the target the block carries: the VRF output of a block at
+ * the VRF version, the PON hash of a legacy one against the limit of nHeight (0: the larger
+ * limit). An emergency block has no draw and its target is under no limit: it passes.
+ */
+bool CheckPonBlockDraw(const CBlockHeader& block, const Consensus::Params& params, int nHeight = 0);
+
 // PON-VRF: epoch seed (randomness) for VRF eligibility — derived from a buried block
 // window the current proposer did not author, so it is not grindable.
 uint256 GetEpochSeed(const CBlockIndex* pindexPrev, const Consensus::Params& params);

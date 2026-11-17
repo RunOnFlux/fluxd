@@ -339,6 +339,17 @@ bool CheckPonVrfDraw(const uint256& output, unsigned int nBits)
     return UintToArith256(output) <= target;
 }
 
+bool CheckPonBlockDraw(const CBlockHeader& block, const Consensus::Params& params, int nHeight)
+{
+    if (IsEmergencyBlock(block)) {
+        return true;
+    }
+    if (block.nVersion >= CBlockHeader::PON_VRF_VERSION) {
+        return CheckPonVrfDraw(block.nodesVrfOutput, block.nBits);
+    }
+    return CheckProofOfNode(GetPONHash(block), block.nBits, params, nHeight);
+}
+
 // PON-VRF epoch seed. The randomness for a block's VRF eligibility is derived from a
 // window of blocks buried beyond the reorg horizon, so the proposer of the current block
 // cannot have authored (and therefore cannot grind) the seed. Constant for an entire epoch.
