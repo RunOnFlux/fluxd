@@ -17,27 +17,24 @@ jobs:
           - arch: amd64
             runs-on: ubuntu-24.04
             ubuntu-version: "20.04"
-            container: ubuntu:20.04
+            container: ubuntu:20.04@sha256:8feb4d8ca5354def3d8fce243717141ce31e2c428701f6682bd2fafe15388214
           - arch: arm64
             runs-on: ubuntu-24.04
             ubuntu-version: "22.04"
-            container: ubuntu:22.04
+            container: ubuntu:22.04@sha256:9abcaffc92a5279fff3a6a41635c0800ea33e528425fb389658806476e7defde
           # - arch: i386
           #   runs-on: ubuntu-24.04
           #   ubuntu-version: "20.04"
-          #   container: ubuntu:20.04
+          #   container: ubuntu:20.04@sha256:8feb4d8ca5354def3d8fce243717141ce31e2c428701f6682bd2fafe15388214
           - arch: windows
             runs-on: ubuntu-24.04
             ubuntu-version: "24.04"
-            container: ubuntu:24.04
+            container: ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8
     
     runs-on: ${{ matrix.runs-on }}
     container: ${{ matrix.container }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Set up environment
         shell: bash
         run: |
@@ -61,13 +58,16 @@ jobs:
               apt-get install -y build-essential pkg-config libc6-dev m4 autoconf libtool unzip git wget curl bsdmainutils automake g++-aarch64-linux-gnu ncurses-dev python3 python3-zmq zlib1g-dev
             fi
           else
-            # Ubuntu 20.04 - install GCC-11 from toolchain PPA for C++20 support
+            # Ubuntu 20.04 - install GCC-11 from toolchain PPA for C++20 support.
+            # Pinned for reproducible builds: if the PPA drops this version the
+            # build fails here instead of silently changing the compiler.
+            GCC11="11.5.0-10ubuntu1~20~ppa3"
             apt-get install -y software-properties-common
             add-apt-repository -y ppa:ubuntu-toolchain-r/test
             apt-get update
 
             if [[ "${{ matrix.arch }}" == "amd64" ]]; then
-              apt-get install -y build-essential pkg-config libc6-dev m4 autoconf libtool unzip git wget curl bsdmainutils automake ncurses-dev python3 python3-zmq zlib1g-dev gcc-11 g++-11 g++-11-multilib
+              apt-get install -y build-essential pkg-config libc6-dev m4 autoconf libtool unzip git wget curl bsdmainutils automake ncurses-dev python3 python3-zmq zlib1g-dev gcc-11=$GCC11 g++-11=$GCC11 g++-11-multilib=$GCC11 cpp-11=$GCC11
               update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
               update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100
             elif [[ "${{ matrix.arch }}" == "i386" ]]; then
@@ -78,6 +78,17 @@ jobs:
               update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100
             fi
           fi
+
+      # Checkout after git is installed, so the job has a real clone: the version
+      # string and SOURCE_DATE_EPOCH come from the actual commit.
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set SOURCE_DATE_EPOCH
+        shell: bash
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> $GITHUB_ENV
 
       - name: Set version and branch
         shell: bash
@@ -104,6 +115,18 @@ jobs:
           elif [[ "${{ matrix.arch }}" == "windows" ]]; then
             ./zcutil/build-win.sh
           fi
+
+      - name: Binary checksums
+        if: matrix.arch != 'windows'
+        shell: bash
+        run: |
+          # Stripped binaries, as shipped. Compare with contrib/repro-build.sh from a second builder.
+          mkdir -p checksum-tmp
+          cp src/fluxd src/flux-cli src/flux-tx checksum-tmp/
+          if [[ "${{ matrix.arch }}" == "arm64" ]]; then STRIP_CMD="aarch64-linux-gnu-strip"; else STRIP_CMD="strip"; fi
+          $STRIP_CMD checksum-tmp/fluxd checksum-tmp/flux-cli checksum-tmp/flux-tx
+          (cd checksum-tmp && sha256sum fluxd flux-cli flux-tx) | tee SHA256SUMS-${{ matrix.arch }}.txt
+          rm -rf checksum-tmp
 
       - name: Create deb package
         if: (matrix.arch != 'windows') && (github.event_name == 'workflow_dispatch' || github.event_name == 'release')
@@ -141,7 +164,8 @@ jobs:
             chmod 755 $DEB_DIR/usr/local/bin/flux-fetch-params
           fi
           
-          # Set correct permissions
+          # Set correct permissions (normalize first so umask doesn't leak into the package)
+          chmod -R u=rwX,go=rX $DEB_DIR
           chmod 755 $DEB_DIR/usr/local/bin/fluxd
           chmod 755 $DEB_DIR/usr/local/bin/flux-cli
           chmod 755 $DEB_DIR/usr/local/bin/flux-tx
@@ -156,8 +180,9 @@ jobs:
           # Update version in control file
           sed -i "s/Version: .*/Version: ${{ env.VERSION }}/" $DEB_DIR/DEBIAN/control
           
-          # Build the deb package
-          dpkg-deb --build $DEB_DIR flux-${{ matrix.arch }}-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.deb
+          # Build the deb package deterministically: fixed mtimes, root ownership
+          find $DEB_DIR -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
+          dpkg-deb --root-owner-group --build $DEB_DIR flux-${{ matrix.arch }}-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.deb
 
       - name: Package binaries (tar.gz)
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
@@ -176,7 +201,8 @@ jobs:
             fi
             
             # Create zip archive for Windows
-            zip Flux-Windows-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.zip fluxd.exe flux-cli.exe flux-tx.exe $([ -f fetch-params.bat ] && echo fetch-params.bat)
+            touch -d "@${SOURCE_DATE_EPOCH}" fluxd.exe flux-cli.exe flux-tx.exe $([ -f fetch-params.bat ] && echo fetch-params.bat)
+            TZ=UTC zip -X Flux-Windows-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.zip fluxd.exe flux-cli.exe flux-tx.exe $([ -f fetch-params.bat ] && echo fetch-params.bat)
           else
             # Set the correct strip command based on architecture
             if [[ "${{ matrix.arch }}" == "arm64" ]]; then
@@ -205,13 +231,11 @@ jobs:
               cp ./zcutil/fetch-params.sh .
             fi
             
-            if [[ "${{ matrix.arch }}" == "amd64" ]]; then
-              tar -cvzf Flux-Linux-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.tar.gz fluxd flux-cli flux-tx $([ -f flux-gtest ] && echo flux-gtest) $([ -f fetch-params.sh ] && echo fetch-params.sh)
-            elif [[ "${{ matrix.arch }}" == "arm64" ]]; then
-              tar -cvzf Flux-arm-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.tar.gz fluxd flux-cli flux-tx $([ -f flux-gtest ] && echo flux-gtest) $([ -f fetch-params.sh ] && echo fetch-params.sh)
-            elif [[ "${{ matrix.arch }}" == "i386" ]]; then
-              tar -cvzf Flux-i386-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.tar.gz fluxd flux-cli flux-tx $([ -f flux-gtest ] && echo flux-gtest) $([ -f fetch-params.sh ] && echo fetch-params.sh)
-            fi
+            if [[ "${{ matrix.arch }}" == "amd64" ]]; then NAME=Linux; elif [[ "${{ matrix.arch }}" == "arm64" ]]; then NAME=arm; else NAME=i386; fi
+            FILES="fluxd flux-cli flux-tx $([ -f flux-gtest ] && echo flux-gtest) $([ -f fetch-params.sh ] && echo fetch-params.sh)"
+            # Deterministic archive: sorted entries, fixed mtimes and owners, no gzip timestamp
+            touch -d "@${SOURCE_DATE_EPOCH}" $FILES
+            tar --sort=name --mtime="@${SOURCE_DATE_EPOCH}" --owner=0 --group=0 --numeric-owner -cf - $FILES | gzip -n > Flux-$NAME-${{ env.VERSION }}-${{ env.BRANCH }}-${{ github.run_id }}.tar.gz
           fi
 
       - name: Upload to Release
@@ -225,5 +249,6 @@ jobs:
             *.deb
             *.tar.gz
             *.zip
+            SHA256SUMS-*.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

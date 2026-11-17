@@ -33,7 +33,9 @@ if [ -e "$(which git 2>/dev/null)" -a "$(git rev-parse --is-inside-work-tree 2>/
     fi
 
     # otherwise generate suffix from git, i.e. string like "59887e8-dirty"
-    SUFFIX=$(git rev-parse --short HEAD)
+    # Fixed length: the default abbreviation depends on clone size (shallow CI
+    # clone vs full clone), which made the version string non-reproducible.
+    SUFFIX=$(git rev-parse --short=12 HEAD)
     git diff-index --quiet HEAD -- || SUFFIX="$SUFFIX-dirty"
 
     # get a string like "2012-04-10 16:27:19 +0200"
