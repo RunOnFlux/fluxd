@@ -129,4 +129,20 @@ enum class PonMinterStep {
  */
 PonMinterStep PonVrfMinterStep(int64_t nNow, int64_t nMintTime, bool fTipMoved, bool fStopping);
 
+/**
+ * The slots a node that has started waits for a block of the live chain before it mints on
+ * the tip it holds. Two minutes: long enough that a node on a live network has connected the
+ * block of a slot it is in, short enough that a network whose every node has stopped mints
+ * again without an emergency block.
+ */
+static const uint32_t PON_MINTER_START_WAIT_SLOTS = 4;
+
+/**
+ * Whether a node that began waiting in slotStarted may mint in slotNow. It may once its tip
+ * has changed since it started and is a block of this slot or the one before: only a block
+ * that connected moves the tip, so the node is then on the chain its peers are minting. With
+ * no such block it may after PON_MINTER_START_WAIT_SLOTS.
+ */
+bool PonMinterMayStart(bool fTipMovedSinceStart, uint32_t slotTip, uint32_t slotNow, uint32_t slotStarted);
+
 #endif // BITCOIN_PON_CLAIM_H

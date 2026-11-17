@@ -141,3 +141,9 @@ PonMinterStep PonVrfMinterStep(int64_t nNow, int64_t nMintTime, bool fTipMoved, 
     if (fTipMoved) return PonMinterStep::TIP_MOVED;
     return PonMinterStep::WAIT;
 }
+
+bool PonMinterMayStart(bool fTipMovedSinceStart, uint32_t slotTip, uint32_t slotNow, uint32_t slotStarted)
+{
+    if (fTipMovedSinceStart && slotTip + 1 >= slotNow) return true;
+    return slotNow >= slotStarted + PON_MINTER_START_WAIT_SLOTS;
+}

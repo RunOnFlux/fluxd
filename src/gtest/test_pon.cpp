@@ -1343,6 +1343,20 @@ TEST_F(PONTest, VrfMinterStepsThroughItsWait) {
     EXPECT_TRUE(PonVrfMinterStep(99, 100, true, true) == PonMinterStep::STOP);
 }
 
+// A node that has started mints once its tip has moved to a block of this slot or the one
+// before, and without one after the start wait.
+TEST_F(PONTest, MinterStartsOnALiveTip) {
+    const uint32_t started = 1000;
+    EXPECT_FALSE(PonMinterMayStart(false, 999, 1000, started));             // the stored tip, however recent
+    EXPECT_FALSE(PonMinterMayStart(true, 900, 1001, started));              // still syncing: the tip is old
+    EXPECT_FALSE(PonMinterMayStart(true, 999, 1001, started));              // two slots behind
+    EXPECT_TRUE(PonMinterMayStart(true, 1000, 1001, started));              // the block of the slot before
+    EXPECT_TRUE(PonMinterMayStart(true, 1001, 1001, started));              // the block of this slot
+    EXPECT_FALSE(PonMinterMayStart(false, 999, started + PON_MINTER_START_WAIT_SLOTS - 1, started));
+    EXPECT_TRUE(PonMinterMayStart(false, 999, started + PON_MINTER_START_WAIT_SLOTS, started));
+    EXPECT_TRUE(PonMinterMayStart(true, 900, started + PON_MINTER_START_WAIT_SLOTS, started));
+}
+
 // An emergency block has no draw and passes under any target it carries; a node's block is
 // held to its draw, by the rule of its version.
 TEST_F(PONTest, BlockDrawIsCheckedByItsKind) {

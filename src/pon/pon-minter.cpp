@@ -119,6 +119,10 @@ void PONMinter(const CChainParams& chainparams)
     uint32_t lastAttemptedSlot = 0;
     // The last slot this node announced its draw for
     uint32_t lastClaimedSlot = 0;
+    // The tip and the slot this node began waiting with, until it may mint (PonMinterMayStart)
+    const CBlockIndex* pindexAtStart = nullptr;
+    uint32_t slotStarted = 0;
+    bool fMayMint = false;
 
     try {
         while (fPONMinter && !ShutdownRequested()) {
@@ -173,6 +177,30 @@ void PONMinter(const CChainParams& chainparams)
             // GetAdjustedTime can vary between nodes based on different peer time offsets
             int64_t now = GetTime();
             uint32_t currentSlot = GetSlotNumber(now, genesisTime, consensusParams);
+
+            // A node that has just started holds the tip it stopped with, which the chain
+            // may have left: it mints once a block of the live chain has become its tip.
+            if (!fMayMint) {
+                const CBlockIndex* pindexTip;
+                {
+                    LOCK(cs_main);
+                    pindexTip = chainActive.Tip();
+                }
+                if (pindexAtStart == nullptr) {
+                    pindexAtStart = pindexTip;
+                    slotStarted = currentSlot;
+                }
+                fMayMint = PonMinterMayStart(pindexTip != pindexAtStart,
+                                             GetSlotNumber(pindexTip->GetBlockTime(), genesisTime, consensusParams),
+                                             currentSlot, slotStarted);
+                if (!fMayMint) {
+                    MilliSleep(1000);
+                    continue;
+                }
+                LogPrintf("PON: minting from slot %d, tip %s height %d\n", currentSlot,
+                          pindexTip != pindexAtStart ? "moved since the start" : "unchanged since the start",
+                          pindexTip->nHeight);
+            }
 
             // Skip if we already tried this slot
             if (currentSlot <= lastAttemptedSlot) {
