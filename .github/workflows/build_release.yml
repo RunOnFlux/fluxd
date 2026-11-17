@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up environment
         shell: bash
@@ -216,7 +216,7 @@ jobs:
 
       - name: Upload to Release
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event_name == 'release' && github.event.release.tag_name || format('v{0}-{1}-{2}', env.VERSION, env.BRANCH, github.run_id) }}
           name: ${{ github.event_name == 'release' && github.event.release.name || format('Flux v{0}-{1}-{2}', env.VERSION, env.BRANCH, github.run_id) }}
