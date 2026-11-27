@@ -1186,26 +1186,9 @@ UniValue getchaintips(const UniValue& params, bool fHelp)
         }
     }
 
-    // First, collect only relevant blocks
-    std::set<const CBlockIndex*> referenced;
-    std::vector<const CBlockIndex*> recentBlocks;
-
-    for (const auto& item : mapBlockIndex) {
-        const CBlockIndex* block = item.second;
-        if (block->nHeight >= minHeight) {
-            recentBlocks.push_back(block);
-            if (block->pprev && block->pprev->nHeight >= minHeight) {
-                referenced.insert(block->pprev);
-            }
-        }
-    }
-
-    // Then, filter to find tips among them
     std::set<const CBlockIndex*, CompareBlocksByHeight> setTips;
-    for (const CBlockIndex* block : recentBlocks) {
-        if (referenced.find(block) == referenced.end()) {
-            setTips.insert(block);
-        }
+    for (const CBlockIndex* block : ChainTipsFrom(minHeight)) {
+        setTips.insert(block);
     }
 
     // Always report the currently active tip.
