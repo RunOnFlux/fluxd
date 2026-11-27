@@ -266,7 +266,7 @@ UniValue rebuildfluxnodedb(const UniValue& params, bool fHelp, string cmdname) {
 
             rescanIndex = chainActive.Next(rescanIndex);
         }
-        g_fluxnodeCache.DumpFluxnodeCache();
+        g_fluxnodeCache.PersistToDisk(chainActive.Tip(), true);
     }
 
     return true;

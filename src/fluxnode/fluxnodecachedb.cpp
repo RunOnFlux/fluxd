@@ -16,8 +16,7 @@ static const char BLOCK_FLUXNODE_UNDO_DATA = 'u';
 static const char FLUXNODE_DELEGATE_DATA = 'f';
 static const char DB_FLUXNODE_SYNC_STATE = 's';
 
-// EST 720 blocks * 7 Days
-static const int ONE_WEEK_OF_BLOCK_COUNT = 5040;
+// ONE_WEEK_OF_BLOCK_COUNT is defined in fluxnodecachedb.h (shared with recovery).
 
 // If we remove this or more things from the deterministic database
 // We do a compact database call
@@ -120,19 +119,26 @@ bool CDeterministicFluxnodeDB::ReadBlockUndoFluxnodeData(const uint256 &p_blockH
     return true;
 }
 
+bool CDeterministicFluxnodeDB::ExistsBlockUndoFluxnodeData(const uint256& p_blockHash)
+{
+    return Exists(std::make_pair(BLOCK_FLUXNODE_UNDO_DATA, p_blockHash));
+}
+
 bool CDeterministicFluxnodeDB::CleanupOldFluxnodeData()
 {
     LOCK(cs_main);
-    // Get the latest 500 block hashes from the active chain.
-    std::set<uint256> recentHashes;
-    const CBlockIndex* pindex = chainActive.Tip();
-    int count = 0;
+    if (!chainActive.Tip())
+        return true;
 
-    while (pindex && count < ONE_WEEK_OF_BLOCK_COUNT) {
-        recentHashes.insert(pindex->GetBlockHash());
-        pindex = pindex->pprev;
-        count++;
-    }
+    // Retain undo records by HEIGHT across ALL known chains, not by
+    // membership in the recent active chain. After a reorg the losing fork's
+    // records must survive: crash recovery can find the sync marker on the
+    // fork side and needs those records to rewind fork-side effects. A record
+    // is erased only when its block is buried more than
+    // ONE_WEEK_OF_BLOCK_COUNT below the tip, or when its block is unknown to
+    // the block index entirely (such a block can never be disconnected, so
+    // its record is unreachable).
+    const int nCutoffHeight = chainActive.Height() - ONE_WEEK_OF_BLOCK_COUNT;
 
     // Iterate through the database entries with BLOCK_FLUXNODE_UNDO_DATA.
     std::unique_ptr<CDBIterator> pcursor(NewIterator());
@@ -142,10 +148,10 @@ bool CDeterministicFluxnodeDB::CleanupOldFluxnodeData()
     int64_t erased = 0;
     while (pcursor->Valid()) {
         if (pcursor->GetKey(key) && key.first == BLOCK_FLUXNODE_UNDO_DATA) {
-            uint256 blockHash = key.second;
+            const uint256& blockHash = key.second;
 
-            // If the block hash is not in the recentHashes set, erase it.
-            if (recentHashes.find(blockHash) == recentHashes.end()) {
+            auto mi = mapBlockIndex.find(blockHash);
+            if (mi == mapBlockIndex.end() || mi->second->nHeight < nCutoffHeight) {
                 Erase(key);
                 erased++;
             }
@@ -159,16 +165,6 @@ bool CDeterministicFluxnodeDB::CleanupOldFluxnodeData()
     }
 
     return true;
-}
-
-bool CDeterministicFluxnodeDB::WriteSyncState(const FluxnodeSyncState& syncState)
-{
-    return Write(DB_FLUXNODE_SYNC_STATE, syncState);
-}
-
-bool CDeterministicFluxnodeDB::ReadSyncState(FluxnodeSyncState& syncState)
-{
-    return Read(DB_FLUXNODE_SYNC_STATE, syncState);
 }
 
 void CDeterministicFluxnodeDB::WriteBatchFluxnodeData(CDBBatch& batch, const FluxnodeCacheData& data)
@@ -194,4 +190,9 @@ void CDeterministicFluxnodeDB::EraseBatchDelegates(CDBBatch& batch, const COutPo
 void CDeterministicFluxnodeDB::WriteBatchSyncState(CDBBatch& batch, const FluxnodeSyncState& syncState)
 {
     batch.Write(DB_FLUXNODE_SYNC_STATE, syncState);
+}
+
+bool CDeterministicFluxnodeDB::ReadSyncState(FluxnodeSyncState& syncState)
+{
+    return Read(DB_FLUXNODE_SYNC_STATE, syncState);
 }

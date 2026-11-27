@@ -19,9 +19,12 @@ class COutPoint;
 class CFluxnodeTxBlockUndo;
 class CFluxnodeDelegates;
 
-/** Tracks the block height/hash that the fluxnode cache was last synced to.
- *  Used to detect inconsistency between coins DB and fluxnode DB after crashes.
- */
+// Fluxnode undo records are retained for this many blocks below the active tip;
+// CleanupOldFluxnodeData prunes anything older. Recovery relies on it both to
+// bound how far it rewinds and to tell a pruned record from a legitimately
+// empty one. ~720 blocks/day * 7 days.
+static const int ONE_WEEK_OF_BLOCK_COUNT = 5040;
+
 struct FluxnodeSyncState {
     uint256 bestBlockHash;
     int nHeight;
@@ -57,6 +60,7 @@ public:
 
     bool WriteBlockUndoFluxnodeData(const uint256& p_blockHash, CFluxnodeTxBlockUndo& p_undoData);
     bool ReadBlockUndoFluxnodeData(const uint256 &p_blockHash, CFluxnodeTxBlockUndo& p_undoData);
+    bool ExistsBlockUndoFluxnodeData(const uint256& p_blockHash);
 
     bool WriteFluxnodeDelegates(const COutPoint& outpoint, const CFluxnodeDelegates& delegates);
     bool ReadFluxnodeDelegates(const COutPoint& outpoint, CFluxnodeDelegates& delegates);
@@ -65,16 +69,14 @@ public:
 
     bool CleanupOldFluxnodeData();
 
-    // Sync state methods for crash recovery detection
-    bool WriteSyncState(const FluxnodeSyncState& syncState);
-    bool ReadSyncState(FluxnodeSyncState& syncState);
-
-    // Batch write support for atomic operations
+    // Batch write support
     void WriteBatchFluxnodeData(CDBBatch& batch, const FluxnodeCacheData& data);
     void EraseBatchFluxnodeData(CDBBatch& batch, const COutPoint& outpoint);
     void WriteBatchDelegates(CDBBatch& batch, const COutPoint& outpoint, const CFluxnodeDelegates& delegates);
     void EraseBatchDelegates(CDBBatch& batch, const COutPoint& outpoint);
     void WriteBatchSyncState(CDBBatch& batch, const FluxnodeSyncState& syncState);
+
+    bool ReadSyncState(FluxnodeSyncState& syncState);
 };
 
 #endif //ZELCASH_FLUXNODECACHEDB_H
