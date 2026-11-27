@@ -197,7 +197,7 @@ unsigned int GetNextPONWorkRequired(const CBlockIndex* pindexLast)
 int ComparePonForkChoice(const CBlockIndex* a, const CBlockIndex* b)
 {
     // PON blocks compare by the PON hash cached on the index entry; lower wins.
-    // The score is a resident field: recomputing it from GetBlockHeader() would
+    // The score is a resident field: recomputing it from the entry's resident header would
     // hash a zeroed nodesCollateral once the entry's header data has been
     // pruned, and the score would change when header data is restored —
     // mutating a comparator key in place for entries already inside

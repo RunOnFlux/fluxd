@@ -171,7 +171,7 @@ namespace {
                 // compare by the resident cached PON hash. Every node computes the same
                 // winner regardless of arrival order, so the network converges instead
                 // of forking. The score must come from a resident field: recomputing
-                // from GetBlockHeader() would hash a zeroed nodesCollateral for pruned
+                // from the entry's resident header would hash a zeroed nodesCollateral for pruned
                 // entries (wrong tie-break vs the network), and the result would change
                 // when connect/disconnect restores header data on an entry already in
                 // setBlockIndexCandidates — an in-place comparator-key mutation
@@ -2887,9 +2887,7 @@ static bool EnsureHeaderDataFromDisk(CBlockIndex* pindex, const Consensus::Param
 
 bool GetFullBlockHeader(CBlockHeader& header, const CBlockIndex* pindex, const Consensus::Params& consensusParams)
 {
-    header = pindex->GetBlockHeader();
-    bool fNeedDisk = !pindex->pHeaderData || (header.IsPOW() && header.nSolution.empty());
-    if (!fNeedDisk)
+    if (pindex->ResidentHeader(header))
         return true;
 
     CBlockHeader diskHeader;
@@ -2901,6 +2899,15 @@ bool GetFullBlockHeader(CBlockHeader& header, const CBlockIndex* pindex, const C
     }
     header = diskHeader;
     return true;
+}
+
+bool GetAnnouncementHeader(CBlockHeader& header, const CBlockIndex* pindex, const CBlock* pblock, const Consensus::Params& consensusParams)
+{
+    if (pblock) {
+        header = pblock->GetBlockHeader();
+        return true;
+    }
+    return pindex->ResidentHeader(header) || ReadBlockHeaderFromDisk(header, pindex, consensusParams);
 }
 
 // Runtime-accepted block index entries keep their (rebuildable) header data
@@ -5148,7 +5155,16 @@ bool ActivateBestChain(CValidationState& state, const CChainParams& chainparams,
                         pblock = &block;
                 }
 
+                // A block another thread has since taken off the active chain is not
+                // announced: the call that replaced it announces its own tip.
+                const bool fStillActive = chainActive.Contains(pindexNewTip);
+                CBlockHeader announceHeader;
+                const bool fHaveHeader = fStillActive &&
+                    GetAnnouncementHeader(announceHeader, pindexNewTip, fHaveBlock ? pblock : nullptr, chainparams.GetConsensus());
+
                 for (CNode* pnode : vNodes) {
+                    if (!fStillActive)
+                        break;
                     if (chainActive.Height() > (pnode->nStartingHeight != -1 ? pnode->nStartingHeight - 2000 : nBlockEstimate)) {
                         CNodeState *state = State(pnode->GetId());
                         if (!state) continue;
@@ -5161,11 +5177,11 @@ bool ActivateBestChain(CValidationState& state, const CChainParams& chainparams,
                             pnode->PushMessage("cmpctblock", cmpctblock);
                         }
                         // BIP 130: If peer prefers headers, announce via headers instead of inv
-                        else if (state->fPreferHeaders) {
+                        else if (state->fPreferHeaders && fHaveHeader) {
                             LogPrint("net", "Announcing block %s via headers to peer=%d\n",
                                      hashNewTip.ToString(), pnode->id);
                             std::vector<CBlock> vHeaders;
-                            vHeaders.push_back(CBlock(pindexNewTip->GetBlockHeader()));
+                            vHeaders.push_back(CBlock(announceHeader));
                             pnode->PushMessage("headers", vHeaders);
                         } else {
                             // Send traditional inv message
@@ -7281,7 +7297,7 @@ void static CheckBlockIndex(const Consensus::Params& consensusParams)
                 }
             }
         }
-        // assert(pindex->GetBlockHash() == pindex->GetBlockHeader().GetHash()); // Perhaps too slow
+        // assert(pindex->GetBlockHash() == GetFullBlockHeader(...).GetHash()); // Perhaps too slow
         // End: actual consistency checks.
 
         // Try descending into the first subnode.
@@ -8505,12 +8521,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
             for (const CBlockIndex* pblock : vBlocks)
             {
-                vHeaders.push_back(pblock->GetBlockHeader());
-                // Entries whose header data was pruned (buried block on a
-                // fluxnode) or held without nSolution must be completed from
-                // disk so we never serve zeroed merkle roots / nonces.
-                const CBlockHeader& h = vHeaders.back();
-                if (!pblock->pHeaderData || (h.IsPOW() && h.nSolution.empty()))
+                // A header that is not whole in memory is completed from disk below.
+                vHeaders.emplace_back();
+                if (!pblock->ResidentHeader(vHeaders.back()))
                     vNeedDisk.emplace_back(vHeaders.size() - 1, pblock);
             }
         }

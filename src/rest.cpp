@@ -160,9 +160,8 @@ static bool rest_headers(HTTPRequest* req,
             long served = 0;
             while (pindex != NULL && chainActive.Contains(pindex)) {
                 vIndex.push_back(pindex);
-                vHeaders.push_back(pindex->GetBlockHeader());
-                const CBlockHeader& h = vHeaders.back();
-                bool resident = pindex->pHeaderData && !(h.IsPOW() && h.nSolution.empty());
+                vHeaders.emplace_back();
+                bool resident = pindex->ResidentHeader(vHeaders.back());
                 vHave.push_back(resident);
                 if (!resident)
                     vNeedDisk.push_back(vHeaders.size() - 1);
@@ -196,9 +195,8 @@ static bool rest_headers(HTTPRequest* req,
             const CBlockIndex *pindex = (it != mapBlockIndex.end()) ? it->second : NULL;
             long served = 0;
             while (pindex != NULL && chainActive.Contains(pindex)) {
-                vHeaders.push_back(pindex->GetBlockHeader());
-                const CBlockHeader& h = vHeaders.back();
-                if (!pindex->pHeaderData || (h.IsPOW() && h.nSolution.empty()))
+                vHeaders.emplace_back();
+                if (!pindex->ResidentHeader(vHeaders.back()))
                     vNeedDisk.emplace_back(vHeaders.size() - 1, pindex);
                 if (++served == count)
                     break;

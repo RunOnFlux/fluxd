@@ -545,7 +545,8 @@ bool CBlockTreeDB::LoadBlockIndexGuts(std::function<CBlockIndex*(const uint256&)
                 }
 
                 // Consistency checks
-                auto header = pindexNew->GetBlockHeader();
+                CBlockHeader header;
+                (void)pindexNew->ResidentHeader(header);
 
                 // For POW blocks below checkpoint: header may be from compact headers (no nSolution),
                 // so header.GetHash() won't match. Skip hash check for checkpointed blocks.

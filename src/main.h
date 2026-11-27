@@ -528,6 +528,12 @@ bool ReadBlockHeaderFromDisk(CBlockHeader& header, const CBlockIndex* pindex, co
  * that is acceptable (P2P best-effort) or an error (RPC). */
 bool GetFullBlockHeader(CBlockHeader& header, const CBlockIndex* pindex, const Consensus::Params& consensusParams);
 
+/** The whole header a tip is announced to peers with: pblock's when the entry's block is in
+ *  hand (pblock is that block, or null), else the entry's when it is whole in memory, else
+ *  the block file's. Returns false when none can be had; the tip is then announced by
+ *  inventory. */
+bool GetAnnouncementHeader(CBlockHeader& header, const CBlockIndex* pindex, const CBlock* pblock, const Consensus::Params& consensusParams);
+
 /** Decide whether a block index entry that has aged nBelowTip blocks below the
  *  active tip should have its rebuildable header data freed: fluxnode-only, only
  *  past the prune window, and only when the block data is on disk (so it can be

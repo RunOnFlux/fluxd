@@ -17,14 +17,26 @@
 
 #include "chain.h"
 #include "blockindexpool.h"
+#include "chainparams.h"
 #include "clientversion.h"
 #include "main.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "streams.h"
 #include "uint256.h"
+#include "util.h"
 
+#include <filesystem>
 #include <optional>
+
+#include <unistd.h>
+
+// The entry's header as held in memory, whole or not.
+static CBlockHeader InMemoryHeader(const CBlockIndex& index) {
+    CBlockHeader header;
+    (void)index.ResidentHeader(header);
+    return header;
+}
 
 namespace {
 
@@ -105,7 +117,7 @@ TEST(BlockIndex, PruneFreesBlockFileDataKeepsResidentState)
     idx.hashPON = uint256S("cc");
 
     ASSERT_TRUE(idx.HasHeaderData());
-    EXPECT_EQ(idx.GetBlockHeader().hashMerkleRoot, h.hashMerkleRoot);
+    EXPECT_EQ(InMemoryHeader(idx).hashMerkleRoot, h.hashMerkleRoot);
 
     // Simulate the load-time prune.
     idx.FreeHeaderData();
@@ -127,21 +139,25 @@ TEST(BlockIndex, PruneFreesBlockFileDataKeepsResidentState)
     EXPECT_EQ(idx.hashPON, uint256S("cc"));
 }
 
-TEST(BlockIndex, GetBlockHeaderZeroedAfterPrune)
+TEST(BlockIndex, ResidentHeaderNotWholeAfterPrune)
 {
     CBlockHeader h = MakePopulatedHeader();
     CBlockIndex idx(h);
 
-    CBlockHeader before = idx.GetBlockHeader();
+    CBlockHeader before = InMemoryHeader(idx);
     EXPECT_EQ(before.hashMerkleRoot, h.hashMerkleRoot);
     EXPECT_EQ(before.nNonce, h.nNonce);
     EXPECT_EQ(before.nSolution, h.nSolution);
 
-    idx.FreeHeaderData();
-    CBlockHeader after = idx.GetBlockHeader();
+    CBlockHeader whole;
+    EXPECT_TRUE(idx.ResidentHeader(whole));
 
-    // Contract: once pruned, GetBlockHeader returns zeroed block-file fields —
-    // callers serving headers must rehydrate from disk (GetFullBlockHeader).
+    idx.FreeHeaderData();
+    CBlockHeader after;
+    EXPECT_FALSE(idx.ResidentHeader(after));
+
+    // Once pruned the block-file fields read empty and the entry says its header is not
+    // whole: a caller serving headers takes the block file's (GetFullBlockHeader).
     EXPECT_TRUE(after.nSolution.empty());
     EXPECT_EQ(after.hashMerkleRoot, uint256());
     // Always-resident header scalars remain correct.
@@ -166,7 +182,7 @@ TEST(BlockIndex, CopyDeepCopiesHeaderDataAndResidentFields)
 
     a.FreeHeaderData();                  // mutating a must not affect b
     EXPECT_TRUE(b.HasHeaderData());
-    EXPECT_EQ(b.GetBlockHeader().hashMerkleRoot, h.hashMerkleRoot);
+    EXPECT_EQ(InMemoryHeader(b).hashMerkleRoot, h.hashMerkleRoot);
 }
 
 TEST(BlockIndex, RestoreHeaderDataAfterPruneSerializesIdentically)
@@ -284,4 +300,71 @@ TEST(BlockIndex, RuntimeHeaderDataPruneDecision)
 
     // Already pruned (no resident header data) -> nothing to free.
     EXPECT_FALSE(ShouldFreeAgedHeaderData(true, W, W, true, /*hasHeaderData=*/false));
+}
+
+// A tip is announced with its whole header whether or not its entry still holds header
+// data. A fluxnode frees an entry's header data when the entry leaves the active chain,
+// and the entry then says its header is not whole; the announcement takes the block in
+// hand, else the block file's header, else announces no header.
+TEST(BlockIndex, AnnouncementHeaderIsWholeAfterHeaderDataIsFreed)
+{
+    SelectParams(CBaseChainParams::MAIN);
+    const Consensus::Params& params = Params().GetConsensus();
+
+    const std::filesystem::path dir = std::filesystem::temp_directory_path() /
+        strprintf("flux-gtest-announce-%d", (int)getpid());
+    std::filesystem::create_directories(dir);
+    mapArgs["-datadir"] = dir.string();
+    ClearDatadirCache();
+
+    CBlock block;
+    static_cast<CBlockHeader&>(block) = MakePopulatedHeader();
+    const uint256 hash = block.GetHash();
+
+    // A block on disk whose entry has lost its header data, as a block just taken off
+    // the active chain has.
+    CBlockIndex entry(block.GetBlockHeader());
+    entry.phashBlock = &hash;
+    CDiskBlockPos pos(0, 0);
+    ASSERT_TRUE(WriteBlockToDisk(block, pos, Params().MessageStart()));
+    entry.nFile = pos.nFile;
+    entry.nDataPos = pos.nPos;
+    entry.nStatus |= BLOCK_HAVE_DATA;
+    entry.FreeHeaderData();
+
+    CBlockHeader resident;
+    EXPECT_FALSE(entry.ResidentHeader(resident));
+    EXPECT_TRUE(resident.nodesCollateral.IsNull());
+    EXPECT_TRUE(resident.vchBlockSig.empty());
+
+    const auto expectWhole = [&](const CBlockHeader& header) {
+        EXPECT_EQ(header.GetHash(), hash);
+        EXPECT_EQ(header.nodesCollateral, block.nodesCollateral);
+        EXPECT_EQ(header.vchBlockSig, block.vchBlockSig);
+    };
+
+    CBlockHeader fromBlock;
+    ASSERT_TRUE(GetAnnouncementHeader(fromBlock, &entry, &block, params));
+    expectWhole(fromBlock);
+
+    CBlockHeader fromDisk;
+    ASSERT_TRUE(GetAnnouncementHeader(fromDisk, &entry, nullptr, params));
+    expectWhole(fromDisk);
+
+    // An entry with header data in memory needs neither.
+    CBlockIndex live(block.GetBlockHeader());
+    live.phashBlock = &hash;
+    CBlockHeader fromMemory;
+    ASSERT_TRUE(GetAnnouncementHeader(fromMemory, &live, nullptr, params));
+    EXPECT_EQ(fromMemory.nodesCollateral, block.nodesCollateral);
+    EXPECT_EQ(fromMemory.vchBlockSig, block.vchBlockSig);
+
+    // No header data and no block to read: no header is announced.
+    live.FreeHeaderData();
+    CBlockHeader none;
+    EXPECT_FALSE(GetAnnouncementHeader(none, &live, nullptr, params));
+
+    mapArgs.erase("-datadir");
+    ClearDatadirCache();
+    std::filesystem::remove_all(dir);
 }

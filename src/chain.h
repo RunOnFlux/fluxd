@@ -401,9 +401,15 @@ public:
         return ret;
     }
 
-    CBlockHeader GetBlockHeader() const
+    //! Fills `block` with this entry's header as held in memory and returns whether that is
+    //! the whole header. It is not whole when the header data is pruned (the merkle root,
+    //! the PON collateral and the block signature read empty) or when a proof-of-work
+    //! entry holds no solution: the block file then has the whole header
+    //! (GetFullBlockHeader). A header that is not whole has the wrong hash and fails its
+    //! checks, which gets its sender banned: it is never sent to a peer.
+    [[nodiscard]] bool ResidentHeader(CBlockHeader& block) const
     {
-        CBlockHeader block;
+        block = CBlockHeader();
         block.nVersion       = nVersion;
         if (pprev)
             block.hashPrevBlock = pprev->GetBlockHash();
@@ -417,7 +423,7 @@ public:
             block.nodesCollateral = pHeaderData->nodesCollateral;
             block.vchBlockSig    = pHeaderData->vchBlockSig;
         }
-        return block;
+        return pHeaderData != nullptr && !(block.IsPOW() && block.nSolution.empty());
     }
 
     uint256 GetBlockHash() const
