@@ -29,9 +29,6 @@
 /* Define to 1 to enable mining functions */
 #define ENABLE_MINING 1
 
-/* Define to 1 to enable Proton functions */
-#define ENABLE_PROTON 0
-
 /* Define to 1 to enable wallet functions */
 #define ENABLE_WALLET 1
 
@@ -210,9 +207,6 @@
 
 /* Define this symbol if you have MSG_NOSIGNAL */
 #define HAVE_MSG_NOSIGNAL 1
-
-/* Define to 1 if you have the <proton/connection.hpp> header file. */
-/* #undef HAVE_PROTON_CONNECTION_HPP */
 
 /* Define if you have POSIX threads libraries and header files. */
 #define HAVE_PTHREAD 1
