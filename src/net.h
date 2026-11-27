@@ -23,7 +23,9 @@
 #include "uint256.h"
 #include "utilstrencodings.h"
 
+#include <atomic>
 #include <deque>
+#include <map>
 #include <optional>
 #include <stdint.h>
 
@@ -71,7 +73,49 @@ static const int NETWORK_UPGRADE_PEER_PREFERENCE_BLOCK_PERIOD = 24 * 24 * 3;
 unsigned int ReceiveFloodSize();
 unsigned int SendBufferSize();
 
+/** Queue a destination to be dialled once for its addresses and dropped: the
+ *  connection asks for addresses and is closed when they arrive. A destination
+ *  is dialled at most once; a failed dial is not repeated. */
 void AddOneShot(const std::string& strDest);
+
+/** A one-shot connection that has sent no addresses is closed this long after
+ *  it was made. */
+static const int64_t ONE_SHOT_TIMEOUT = 5 * 60;
+bool OneShotTimedOut(int64_t nNow, int64_t nTimeConnected);
+
+/** A node with at least this many kept outbound connections asks no seed node
+ *  for addresses. */
+static const int SEED_NODE_OUTBOUND_THRESHOLD = 2;
+/** The wait between one seed node and the next. */
+static const int64_t SEED_NODE_INTERVAL = 10;
+
+/** Hands the -seednode destinations to the one-shot queue one at a time, each
+ *  once: the first at once when the address book is empty, and another every
+ *  SEED_NODE_INTERVAL seconds for as long as the node has fewer than
+ *  SEED_NODE_OUTBOUND_THRESHOLD kept outbound connections. A node with peers
+ *  never dials a seed node, and a seed node that cannot be reached costs one
+ *  attempt. */
+class SeedNodeFeeder
+{
+public:
+    /** vSeedsIn is dialled from the back; the caller shuffles it. */
+    SeedNodeFeeder(std::vector<std::string> vSeedsIn, bool fAddressBookEmpty, int64_t nNow)
+        : vSeeds(std::move(vSeedsIn)), fDue(fAddressBookEmpty), nLast(nNow) {}
+
+    /** The seed node to queue now, if one is due. */
+    std::optional<std::string> Next(int nKeptOutbound, int64_t nNow);
+
+private:
+    std::vector<std::string> vSeeds;
+    bool fDue;      // the next call hands one out whatever the node's peers
+    int64_t nLast;  // when one was last handed out, or the feeder was made
+};
+
+/** The destinations given with -seednode. Called before StartNode. */
+void SetSeedNodes(const std::vector<std::string>& vSeeds);
+
+/** The outbound connections this node dialled and keeps: not feelers, not one-shots. */
+int KeptOutboundCount();
 void AddressCurrentlyConnected(const CService& addr);
 CNode* FindNode(const CNetAddr& ip);
 CNode* FindNode(const CSubNet& subNet);
@@ -157,6 +201,18 @@ extern int nMaxOnionOutbound;
 /** Maximum number of outbound connections (shared by all outbound classes). */
 extern const int MAX_OUTBOUND_CONNECTIONS;
 
+/** Whether every outbound slot holds a kept connection (KeptOutboundCount). A
+ *  kept connection is opened only while this is false. */
+bool OutboundSlotsFull();
+
+/** What the outbound connection loop opens on the semaphore permit it holds.
+ *  The semaphore has one permit per outbound slot and one more, so the loop
+ *  holds a permit even with every slot in use: a feeler when one is due,
+ *  whatever the slots hold, and otherwise a kept connection unless they are
+ *  full. */
+enum class OutboundDial { None, Kept, Feeler };
+OutboundDial NextOutboundDial(bool fFeelerDue, bool fSlotsFull);
+
 /** Whether an onion outbound dial must be refused by the onion-outbound cap.
  *  Feeler connections are one-shot probes (they disconnect on success and never
  *  hold a slot) and are exempt, so a maxonionoutbound=0 hub can still
@@ -202,6 +258,164 @@ struct LocalServiceInfo {
 
 extern CCriticalSection cs_mapLocalHost;
 extern std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
+
+/** One connected peer's view of this node's address. */
+struct PeerAddressReport {
+    NodeId nodeId;
+    CNetAddr addrPeer;    // the peer's own address
+    CNetAddr addrLocal;   // where it reports seeing this node: the addrMe of its version message
+    bool fInbound;
+    bool fVoter;          // of a kind that may vote: IsAddressVoter()
+    bool fLive;           // answering: AddressVoteIsLive()
+};
+
+/** How this network votes on the decided address. */
+struct DecidedAddressRules {
+    int nMinVotes;          // the votes an address needs to be decided, and to stand once decided
+    int nMinVoters;         // the live voters needed before an address other than the on-chain one is decided
+    bool fInboundVotes;     // inbound peers vote too
+    bool fAllowNonRoutable; // peers and reported addresses need not be routable, and each such peer is its own netgroup
+};
+
+/** The rules of the selected chain. nMinVoters on mainnet is half the outbound
+ *  slots open to clearnet peers. */
+DecidedAddressRules GetDecidedAddressRules();
+
+/** The votes of a set of peers. A peer fills addrMe with whatever it chooses and
+ *  anyone can open inbound connections, so a vote belongs to a netgroup of peers
+ *  this node dialled: each /16 of live voters casts one vote for the IPv4
+ *  address its peers report, and none when they disagree. */
+struct AddressTally {
+    std::map<CNetAddr, int> mapVotes;   // address -> netgroups voting for it
+    int nVoters = 0;                    // netgroups that cast a vote
+    std::map<CNetAddr, int> mapInbound; // address -> non-voting inbound peers reporting it
+
+    int Votes(const CNetAddr& addr) const
+    {
+        auto it = mapVotes.find(addr);
+        return it == mapVotes.end() ? 0 : it->second;
+    }
+};
+
+AddressTally TallyAddressVotes(const std::vector<PeerAddressReport>& reports, const DecidedAddressRules& rules);
+
+/** The address the node holds given a tally: addrDecided is the one it holds
+ *  now, addrOnChain the one in its own fluxnode record; either may be absent.
+ *
+ *  An address is adoptable with nMinVotes votes, more than half of all votes,
+ *  and nMinVoters voters. The held address (the on-chain one while none is
+ *  decided) gives way to an adoptable address with three quarters of the votes,
+ *  and otherwise stands on nMinVotes votes. Below that a decided address gives
+ *  way to any adoptable address and stands when there is none: once decided,
+ *  the result is never absent. The on-chain address is never returned on fewer
+ *  than nMinVotes votes.
+ *
+ *  A node whose address changes loses every connection made from the old one,
+ *  so the old address loses its votes without a clock. Voters reporting a false
+ *  address hold a moved node on its old one only with more than a quarter of
+ *  the votes, and move a node only with three quarters. */
+std::optional<CNetAddr> DecideAddress(const AddressTally& tally, const DecidedAddressRules& rules,
+                                      const std::optional<CNetAddr>& addrDecided, const std::optional<CNetAddr>& addrOnChain);
+
+/** The floor of the time a peer has to answer a ping before its vote is
+ *  suspended; three times its best round trip is added. */
+static const int64_t ADDRESS_VOTE_PING_FLOOR_USEC = 5 * 1000000;
+
+/** Whether a peer is answering. nPingStartUsec is when the ping it has not yet
+ *  answered was sent, 0 with none outstanding; nLastRecvUsec is when the socket
+ *  thread last read bytes from it; nMinPingUsec its best round trip, or
+ *  int64 max before the first. False once the ping has gone unanswered for
+ *  ADDRESS_VOTE_PING_FLOOR_USEC + 3 * nMinPingUsec with nothing received since
+ *  it was sent. Reading receive times, not processed pongs, keeps a busy
+ *  message thread on this node from suspending its peers. */
+bool AddressVoteIsLive(int64_t nNowUsec, int64_t nPingStartUsec, int64_t nLastRecvUsec, int64_t nMinPingUsec);
+
+/** The node's own public address as the peers it dialled report it. Nothing the
+ *  operator configures reaches it: -externalip governs only what the node
+ *  advertises. */
+struct DecidedAddressInfo {
+    CNetAddr address;                   // meaningful only while IsSet()
+    bool fSet = false;
+    int nVotes = 0;                     // netgroups voting for address
+    int nVoters = 0;                    // netgroups that cast a vote
+    int64_t nChanged = 0;               // when address last changed, including from none; 0 if never decided
+    std::map<CNetAddr, int> mapOther;   // other addresses voted for, with their votes
+    std::map<CNetAddr, int> mapInbound; // addresses non-voting inbound peers report, with their peers
+    bool IsSet() const { return fSet; }
+};
+
+/** Re-evaluate the decided address from the connected peers, and while it holds
+ *  fewer than nMinVotes votes disconnect every voter that is not answering, so
+ *  its slot goes to a peer that can report the current address. Caller holds
+ *  cs_vNodes. Called when a peer's version arrives, when peers are removed, and
+ *  from the socket thread after each read pass. */
+void UpdateDecidedAddress();
+
+/** Queue a ping to every voter for the decided address that has none
+ *  outstanding. Caller holds cs_vNodes. */
+void PingDecidedAddressVoters();
+
+/** A peer's version message has set its addrLocal: re-evaluate the decided
+ *  address. When the peer is a voter and reports another address, the decided
+ *  address's voters are pinged first: after an address change they are dead,
+ *  and the ping finds that out without waiting for PING_INTERVAL. Only a peer
+ *  this node chose to dial starts that, never one that dialled in. Caller
+ *  holds cs_vNodes. */
+void PeerReportedAddress(const CNode* pnode);
+
+/** The current decided address. */
+DecidedAddressInfo DecidedAddress();
+
+/** The address in this node's own fluxnode record, absent when it has none.
+ *  Fluxnode code sets it; DecideAddress holds it on nMinVotes votes alone. */
+void SetOnChainAddress(const std::optional<CNetAddr>& addr);
+
+/** Forget the decided address and the on-chain one. For tests. */
+void ResetDecidedAddress();
+
+/** fluxd publishes its decided address and how to reach it for fluxbench and
+ *  FluxOS to read, in DECIDED_ADDRESS_FILE under DecidedAddressFileDir(), as
+ *  {"address": "a.b.c.d" or "", "pid": n, "rpcport": n}, rpcport being the port
+ *  its RPC server binds: what a reader acts on, so a peer connecting or leaving
+ *  does not rewrite it; the votes and the time of the last change are in
+ *  the RPC. Nothing in fluxd reads it. */
+#define DECIDED_ADDRESS_DIR "/run/fluxd"
+#define DECIDED_ADDRESS_FILE "fluxd.json"
+
+/** DECIDED_ADDRESS_DIR; on regtest <datadir>/run, where the qa suite reads it. */
+std::filesystem::path DecidedAddressFileDir();
+
+/** Write info to dir/DECIDED_ADDRESS_FILE, world-readable, through a temporary
+ *  file in dir renamed over it; dir is created 0755 if absent. False, with
+ *  strError, on any failure, leaving no temporary file behind. */
+bool WriteDecidedAddressFile(const std::filesystem::path& dir, const DecidedAddressInfo& info, int64_t nPid, int nRpcPort, std::string& strError);
+
+/** Remove dir/DECIDED_ADDRESS_FILE; an absent file is not a failure. */
+bool RemoveDecidedAddressFile(const std::filesystem::path& dir, std::string& strError);
+
+/** Publish to dir now and on every later change of the decided address. A failed
+ *  write is logged as an error (DecidedAddressWriteLog) and otherwise ignored. */
+void StartPublishingDecidedAddress(const std::filesystem::path& dir);
+
+/** Stop publishing and remove the file; a failed removal is logged and ignored. */
+void StopPublishingDecidedAddress();
+
+/** Whether the decided address is being published: only between Start and Stop,
+ *  which a daemon calls only in fluxnode mode, beside the services that read it. */
+bool IsPublishingDecidedAddress();
+
+/** Which outcomes of publishing are logged: the first failure for a reason, and
+ *  the first success after failures. A write is attempted on every change, so a
+ *  failure that persists would otherwise log on every peer connect. */
+class DecidedAddressWriteLog
+{
+public:
+    /** The line to log for this write's outcome, or "" for none. */
+    std::string Outcome(bool fWritten, const std::string& strError);
+
+private:
+    std::string strFailing; // the reason of the failure last logged; "" while writes succeed
+};
 
 class CNodeStats
 {
@@ -305,6 +519,10 @@ public:
 
     int64_t nLastSend;
     int64_t nLastRecv;
+    // When the socket thread last read bytes from the peer, in usec; 0 before the first.
+    std::atomic<int64_t> nLastRecvUsec{0};
+    // AddressVoteIsLive() as the socket thread last found it; guarded by cs_vNodes.
+    bool fAddressVoteLive{true};
     int64_t nTimeConnected;
     int64_t nTimeOffset;
     CAddress addr;

@@ -76,3 +76,35 @@ TEST(FluxnodeCacheDB, ExistsBlockUndoDistinguishesAbsentFromEmpty)
     delete pFluxnodeDB;
     pFluxnodeDB = pOldDB;
 }
+
+// A confirmed record's ip is a bare host or host:port. CountNetworks counts each
+// record under its host's network either way, and a record whose host does not
+// parse under none.
+TEST(FluxnodeCacheCount, CountNetworksReadsHostWithAndWithoutPort)
+{
+    SelectParams(CBaseChainParams::REGTEST);
+    FluxnodeCache cache;
+
+    const std::vector<std::string> vIps = {
+        "1.2.3.4",
+        "1.2.3.4:16137",
+        "5.6.7.8:16127",
+        "2606:4700:4700::1111",
+        "[2606:4700:4700::1111]:16137",
+        "not an address",
+        "not-an-address:16137",
+    };
+    for (size_t i = 0; i < vIps.size(); i++) {
+        FluxnodeCacheData data;
+        data.ip = vIps[i];
+        cache.mapConfirmedFluxnodeData[COutPoint(uint256S("cc"), static_cast<uint32_t>(i))] = data;
+    }
+
+    int ipv4 = 0, ipv6 = 0, onion = 0;
+    std::vector<int> vNodeCount(GetNumberOfTiers());
+    cache.CountNetworks(ipv4, ipv6, onion, vNodeCount);
+
+    EXPECT_EQ(ipv4, 3);
+    EXPECT_EQ(ipv6, 2);
+    EXPECT_EQ(onion, 0);
+}

@@ -32,7 +32,13 @@
 #endif
 
 #include <filesystem>
+#include <fstream>
+#include <limits>
+#include <set>
 #include <string_view>
+#include <unistd.h>
+
+#include <univalue.h>
 #include <condition_variable>
 #include <mutex>
 #include <condition_variable>
@@ -127,7 +133,11 @@ CCriticalSection cs_vAddedNodes;
 NodeId nLastNodeId = 0;
 CCriticalSection cs_nLastNodeId;
 
+// One permit per outbound slot and one more for the feeler, which therefore
+// runs with every outbound slot in use.
 static CSemaphore *semOutbound = NULL;
+// The outbound slots: connections this node dials and keeps.
+static int nMaxOutboundSlots = MAX_OUTBOUND_CONNECTIONS;
 static std::condition_variable messageHandlerCondition;
 
 static std::vector<CAddress> vAnchorAddresses;
@@ -136,6 +146,34 @@ static const size_t MAX_ANCHOR_CONNECTIONS = 2;
 // Signals for message handling
 static CNodeSignals g_signals;
 CNodeSignals& GetNodeSignals() { return g_signals; }
+
+// The -seednode destinations not yet handed to the one-shot queue; guarded by cs_vOneShots.
+static std::vector<std::string> vSeedNodes;
+
+void SetSeedNodes(const std::vector<std::string>& vSeeds)
+{
+    LOCK(cs_vOneShots);
+    vSeedNodes = vSeeds;
+}
+
+std::optional<std::string> SeedNodeFeeder::Next(int nKeptOutbound, int64_t nNow)
+{
+    if (vSeeds.empty())
+        return std::nullopt;
+    if (!fDue && (nKeptOutbound >= SEED_NODE_OUTBOUND_THRESHOLD || nNow < nLast + SEED_NODE_INTERVAL))
+        return std::nullopt;
+
+    fDue = false;
+    nLast = nNow;
+    std::string strSeed = vSeeds.back();
+    vSeeds.pop_back();
+    return strSeed;
+}
+
+bool OneShotTimedOut(int64_t nNow, int64_t nTimeConnected)
+{
+    return nNow - nTimeConnected > ONE_SHOT_TIMEOUT;
+}
 
 void AddOneShot(const std::string& strDest)
 {
@@ -333,6 +371,330 @@ bool IsLocal(const CService& addr)
     return mapLocalHost.count(addr) > 0;
 }
 
+static CCriticalSection cs_decidedAddress;
+static DecidedAddressInfo decidedAddress;
+
+static void PublishDecidedAddressLocked();
+
+// The address in this node's own fluxnode record; guarded by cs_decidedAddress.
+static std::optional<CNetAddr> onChainAddress;
+
+DecidedAddressRules GetDecidedAddressRules()
+{
+    const CChainParams& params = Params();
+    DecidedAddressRules rules;
+    rules.nMinVotes = params.DecidedAddressMinVotes();
+    rules.nMinVoters = 1;
+    if (params.DecidedAddressNeedsHalfOutbound()) {
+        proxyType onionProxy;
+        const int nClearnetSlots = std::min(MAX_OUTBOUND_CONNECTIONS, nMaxConnections) - (GetProxy(NET_ONION, onionProxy) ? nMaxOnionOutbound : 0);
+        rules.nMinVoters = std::max(1, nClearnetSlots / 2);
+    }
+    rules.fInboundVotes = params.DecidedAddressInboundVotes();
+    rules.fAllowNonRoutable = params.NetworkIDString() == "regtest";
+    return rules;
+}
+
+static bool IsVotableAddress(const CNetAddr& addr, bool fAllowNonRoutable)
+{
+    return addr.IsIPv4() && addr.IsValid() && (fAllowNonRoutable || addr.IsRoutable());
+}
+
+AddressTally TallyAddressVotes(const std::vector<PeerAddressReport>& reports, const DecidedAddressRules& rules)
+{
+    AddressTally tally;
+    // netgroup -> the addresses its live voters report
+    std::map<std::vector<unsigned char>, std::set<CNetAddr>> mapGroups;
+    for (const PeerAddressReport& report : reports) {
+        if (!IsVotableAddress(report.addrLocal, rules.fAllowNonRoutable))
+            continue;
+        if (!report.fVoter || !IsVotableAddress(report.addrPeer, rules.fAllowNonRoutable)) {
+            if (report.fInbound)
+                tally.mapInbound[report.addrLocal]++;
+            continue;
+        }
+        if (!report.fLive)
+            continue;
+        std::vector<unsigned char> vchGroup = report.addrPeer.GetGroup();
+        if (!report.addrPeer.IsRoutable()) {
+            // Every non-routable address shares one netgroup; where they vote, each peer is its own.
+            for (int i = 0; i < 4; i++)
+                vchGroup.push_back((report.nodeId >> (8 * i)) & 0xff);
+        }
+        mapGroups[vchGroup].insert(report.addrLocal);
+    }
+    for (const auto& group : mapGroups) {
+        if (group.second.size() != 1)
+            continue;
+        tally.mapVotes[*group.second.begin()]++;
+        tally.nVoters++;
+    }
+    return tally;
+}
+
+std::optional<CNetAddr> DecideAddress(const AddressTally& tally, const DecidedAddressRules& rules,
+                                      const std::optional<CNetAddr>& addrDecided, const std::optional<CNetAddr>& addrOnChain)
+{
+    const auto fAdoptable = [&](int nVotes) {
+        return nVotes >= rules.nMinVotes && 2 * nVotes > tally.nVoters && tally.nVoters >= rules.nMinVoters;
+    };
+    // More than half of the votes: at most one address has it.
+    std::optional<CNetAddr> addrAdoptable;
+    for (const auto& entry : tally.mapVotes)
+        if (fAdoptable(entry.second))
+            addrAdoptable = entry.first;
+
+    const std::optional<CNetAddr>& addrHeld = addrDecided ? addrDecided : addrOnChain;
+    if (addrHeld) {
+        if (addrAdoptable && *addrAdoptable != *addrHeld && 4 * tally.Votes(*addrAdoptable) >= 3 * tally.nVoters)
+            return addrAdoptable;
+        if (tally.Votes(*addrHeld) >= rules.nMinVotes)
+            return addrHeld;
+    }
+    if (addrAdoptable)
+        return addrAdoptable;
+    return addrDecided;
+}
+
+bool AddressVoteIsLive(int64_t nNowUsec, int64_t nPingStartUsec, int64_t nLastRecvUsec, int64_t nMinPingUsec)
+{
+    if (nPingStartUsec == 0 || nLastRecvUsec >= nPingStartUsec)
+        return true;
+    const int64_t nRoundTrip = nMinPingUsec == std::numeric_limits<int64_t>::max() ? 0 : nMinPingUsec;
+    return nNowUsec - nPingStartUsec <= ADDRESS_VOTE_PING_FLOOR_USEC + 3 * nRoundTrip;
+}
+
+// Whether the peer is of a kind whose report of this node's address may count
+// as a vote: one this node dialled directly and keeps. A feeler or one-shot is
+// gone in a moment, and a peer reached through a proxy sees the proxy.
+static bool IsAddressVoter(const CNode* pnode, const DecidedAddressRules& rules)
+{
+    if (pnode->fFeeler || pnode->fOneShot)
+        return false;
+    if (pnode->fInbound)
+        return rules.fInboundVotes && !pnode->fInboundOnion;
+    proxyType proxy;
+    return !GetProxy(pnode->addr.GetNetwork(), proxy);
+}
+
+static bool IsAddressVoteLive(const CNode* pnode, int64_t nNowUsec)
+{
+    return AddressVoteIsLive(nNowUsec, pnode->nPingNonceSent ? pnode->nPingUsecStart : 0, pnode->nLastRecvUsec, pnode->nMinPingUsecTime);
+}
+
+void UpdateDecidedAddress()
+{
+    AssertLockHeld(cs_vNodes);
+
+    const DecidedAddressRules rules = GetDecidedAddressRules();
+    const int64_t nNowUsec = GetTimeMicros();
+    std::vector<PeerAddressReport> reports;
+    reports.reserve(vNodes.size());
+    for (CNode* pnode : vNodes) {
+        pnode->fAddressVoteLive = IsAddressVoteLive(pnode, nNowUsec);
+        if (pnode->fDisconnect || !pnode->addrLocal.IsValid())
+            continue;
+        reports.push_back({pnode->GetId(), pnode->addr, pnode->addrLocal, pnode->fInbound, IsAddressVoter(pnode, rules), pnode->fAddressVoteLive});
+    }
+    const AddressTally tally = TallyAddressVotes(reports, rules);
+
+    LOCK(cs_decidedAddress);
+    const std::optional<CNetAddr> addrDecided = decidedAddress.fSet ? std::optional<CNetAddr>(decidedAddress.address) : std::nullopt;
+    const std::optional<CNetAddr> addrNew = DecideAddress(tally, rules, addrDecided, onChainAddress);
+
+    const bool fChanged = addrNew != addrDecided;
+    decidedAddress.fSet = addrNew.has_value();
+    decidedAddress.address = addrNew.value_or(CNetAddr());
+    decidedAddress.nVotes = addrNew ? tally.Votes(*addrNew) : 0;
+    decidedAddress.nVoters = tally.nVoters;
+    decidedAddress.mapOther = tally.mapVotes;
+    if (addrNew)
+        decidedAddress.mapOther.erase(*addrNew);
+    decidedAddress.mapInbound = tally.mapInbound;
+    if (fChanged) {
+        decidedAddress.nChanged = GetTime();
+        LogPrintf("Decided address: %s (%d of %d votes)\n", addrNew ? addrNew->ToStringIP() : "none", decidedAddress.nVotes, decidedAddress.nVoters);
+        PublishDecidedAddressLocked();
+    }
+
+    if (decidedAddress.fSet && decidedAddress.nVotes < rules.nMinVotes) {
+        for (CNode* pnode : vNodes) {
+            if (pnode->fDisconnect || pnode->fAddressVoteLive || !IsAddressVoter(pnode, rules))
+                continue;
+            LogPrintf("Decided address %s has %d votes; disconnecting peer=%d, which is not answering\n", decidedAddress.address.ToStringIP(), decidedAddress.nVotes, pnode->id);
+            pnode->fDisconnect = true;
+        }
+    }
+}
+
+void PingDecidedAddressVoters()
+{
+    AssertLockHeld(cs_vNodes);
+
+    CNetAddr addrDecided;
+    {
+        LOCK(cs_decidedAddress);
+        if (!decidedAddress.fSet)
+            return;
+        addrDecided = decidedAddress.address;
+    }
+    const DecidedAddressRules rules = GetDecidedAddressRules();
+    for (CNode* pnode : vNodes) {
+        if (pnode->fDisconnect || pnode->nPingNonceSent != 0 || (CNetAddr)pnode->addrLocal != addrDecided || !IsAddressVoter(pnode, rules))
+            continue;
+        pnode->fPingQueued = true;
+    }
+}
+
+void PeerReportedAddress(const CNode* pnode)
+{
+    AssertLockHeld(cs_vNodes);
+
+    const DecidedAddressInfo decided = DecidedAddress();
+    if (decided.IsSet() && (CNetAddr)pnode->addrLocal != decided.address && IsAddressVoter(pnode, GetDecidedAddressRules()))
+        PingDecidedAddressVoters();
+    UpdateDecidedAddress();
+}
+
+DecidedAddressInfo DecidedAddress()
+{
+    LOCK(cs_decidedAddress);
+    return decidedAddress;
+}
+
+void SetOnChainAddress(const std::optional<CNetAddr>& addr)
+{
+    LOCK(cs_decidedAddress);
+    onChainAddress = addr;
+}
+
+void ResetDecidedAddress()
+{
+    LOCK(cs_decidedAddress);
+    decidedAddress = DecidedAddressInfo();
+    onChainAddress.reset();
+}
+
+// The directory the decided address is published in; unset while not publishing.
+static std::optional<std::filesystem::path> decidedAddressDir;
+static DecidedAddressWriteLog decidedAddressWriteLog;
+
+std::filesystem::path DecidedAddressFileDir()
+{
+    if (Params().NetworkIDString() == "regtest")
+        return GetDataDir(false) / "run";
+    return DECIDED_ADDRESS_DIR;
+}
+
+bool WriteDecidedAddressFile(const std::filesystem::path& dir, const DecidedAddressInfo& info, int64_t nPid, int nRpcPort, std::string& strError)
+{
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("address", info.IsSet() ? info.address.ToStringIP() : "");
+    obj.pushKV("pid", nPid);
+    obj.pushKV("rpcport", nRpcPort);
+
+    std::error_code ec;
+    if (!std::filesystem::is_directory(dir, ec)) {
+        if (!std::filesystem::create_directories(dir, ec) || ec) {
+            strError = strprintf("cannot create %s: %s", dir.string(), ec ? ec.message() : "not a directory");
+            return false;
+        }
+        std::filesystem::permissions(dir, std::filesystem::perms(0755), ec);
+    }
+
+    // Written beside the final name and renamed over it, so a reader sees the old file or the new one.
+    const std::filesystem::path path = dir / DECIDED_ADDRESS_FILE;
+    const std::filesystem::path tmp = dir / strprintf(".%s.%d.tmp", DECIDED_ADDRESS_FILE, nPid);
+    {
+        std::ofstream file(tmp, std::ios::out | std::ios::trunc);
+        file << obj.write() << "\n";
+        file.close();
+        if (!file) {
+            std::filesystem::remove(tmp, ec);
+            strError = strprintf("cannot write %s", tmp.string());
+            return false;
+        }
+    }
+    std::filesystem::permissions(tmp, std::filesystem::perms(0644), ec);
+    if (ec) {
+        strError = strprintf("cannot make %s world-readable: %s", tmp.string(), ec.message());
+        std::filesystem::remove(tmp, ec);
+        return false;
+    }
+    std::filesystem::rename(tmp, path, ec);
+    if (ec) {
+        strError = strprintf("cannot rename %s to %s: %s", tmp.string(), path.string(), ec.message());
+        std::filesystem::remove(tmp, ec);
+        return false;
+    }
+    return true;
+}
+
+bool RemoveDecidedAddressFile(const std::filesystem::path& dir, std::string& strError)
+{
+    std::error_code ec;
+    std::filesystem::remove(dir / DECIDED_ADDRESS_FILE, ec);
+    if (ec) {
+        strError = strprintf("cannot remove %s: %s", (dir / DECIDED_ADDRESS_FILE).string(), ec.message());
+        return false;
+    }
+    return true;
+}
+
+static void PublishDecidedAddressLocked()
+{
+    AssertLockHeld(cs_decidedAddress);
+    if (!decidedAddressDir)
+        return;
+    std::string strError;
+    const bool fWritten = WriteDecidedAddressFile(*decidedAddressDir, decidedAddress, getpid(), GetArg("-rpcport", BaseParams().RPCPort()), strError);
+    const std::string strLine = decidedAddressWriteLog.Outcome(fWritten, strError);
+    if (strLine.empty())
+        return;
+    if (fWritten)
+        LogPrintf("%s\n", strLine);
+    else
+        error("%s", strLine);
+}
+
+std::string DecidedAddressWriteLog::Outcome(bool fWritten, const std::string& strError)
+{
+    if (fWritten) {
+        if (strFailing.empty())
+            return "";
+        strFailing.clear();
+        return "Decided address published again";
+    }
+    if (strError == strFailing)
+        return "";
+    strFailing = strError;
+    return "Decided address not published: " + strError;
+}
+
+bool IsPublishingDecidedAddress()
+{
+    LOCK(cs_decidedAddress);
+    return decidedAddressDir.has_value();
+}
+
+void StartPublishingDecidedAddress(const std::filesystem::path& dir)
+{
+    LOCK(cs_decidedAddress);
+    decidedAddressDir = dir;
+    PublishDecidedAddressLocked();
+}
+
+void StopPublishingDecidedAddress()
+{
+    LOCK(cs_decidedAddress);
+    if (!decidedAddressDir)
+        return;
+    std::string strError;
+    if (!RemoveDecidedAddressFile(*decidedAddressDir, strError))
+        LogPrintf("%s: %s\n", __func__, strError);
+    decidedAddressDir.reset();
+}
+
 /** check whether a given network is one we can probably connect to */
 bool IsReachable(enum Network net)
 {
@@ -471,7 +833,9 @@ void CNode::PushVersion()
     int nBestHeight = g_signals.GetHeight().get_value_or(0);
 
     int64_t nTime = (fInbound ? GetAdjustedTime() : GetTime());
-    CAddress addrYou = (addr.IsRoutable() && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0",0)));
+    // On regtest every peer is on loopback; reporting it lets peers decide their address there.
+    const bool fReportable = addr.IsRoutable() || (Params().NetworkIDString() == "regtest" && addr.IsValid());
+    CAddress addrYou = (fReportable && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0",0)));
     CAddress addrMe = GetLocalAddress(&addr);
     GetRandBytes((unsigned char*)&nLocalHostNonce, sizeof(nLocalHostNonce));
     if (fLogIPs)
@@ -1092,6 +1456,7 @@ void ThreadSocketHandler()
             LOCK(cs_vNodes);
             // Disconnect unused nodes
             vector<CNode*> vNodesCopy = vNodes;
+            bool fRemoved = false;
             for (CNode* pnode : vNodesCopy)
             {
                 if (pnode->fDisconnect ||
@@ -1110,8 +1475,11 @@ void ThreadSocketHandler()
                     if (pnode->fNetworkNode || pnode->fInbound)
                         pnode->Release();
                     vNodesDisconnected.push_back(pnode);
+                    fRemoved = true;
                 }
             }
+            if (fRemoved)
+                UpdateDecidedAddress();
         }
         {
             // Delete disconnected nodes
@@ -1272,6 +1640,7 @@ void ThreadSocketHandler()
                             if (!pnode->ReceiveMsgBytes(pchBuf, nBytes))
                                 pnode->CloseSocketDisconnect();
                             pnode->nLastRecv = GetTime();
+                            pnode->nLastRecvUsec = GetTimeMicros();
                             pnode->nRecvBytes += nBytes;
                             pnode->RecordBytesRecv(nBytes);
                         }
@@ -1335,6 +1704,11 @@ void ThreadSocketHandler()
                     LogPrintf("ping timeout: %fs\n", 0.000001 * (GetTimeMicros() - pnode->nPingUsecStart));
                     pnode->fDisconnect = true;
                 }
+                else if (pnode->fOneShot && OneShotTimedOut(nTime, pnode->nTimeConnected))
+                {
+                    LogPrintf("one-shot peer=%d sent no addresses in %ds, disconnecting\n", pnode->id, ONE_SHOT_TIMEOUT);
+                    pnode->fDisconnect = true;
+                }
                 // Tor authentication timeout: disconnect Tor peers (both
                 // inbound hidden-service and outbound-to-onion) that
                 // haven't completed torauth within the timeout.
@@ -1352,6 +1726,16 @@ void ThreadSocketHandler()
             LOCK(cs_vNodes);
             for (CNode* pnode : vNodesCopy)
                 pnode->Release();
+
+            // After the read pass above, so bytes that arrived while this thread was
+            // held up count before any peer is found silent.
+            const int64_t nNowUsec = GetTimeMicros();
+            bool fLivenessChanged = false;
+            for (const CNode* pnode : vNodes)
+                if (IsAddressVoteLive(pnode, nNowUsec) != pnode->fAddressVoteLive)
+                    fLivenessChanged = true;
+            if (fLivenessChanged)
+                UpdateDecidedAddress();
         }
     }
 }
@@ -1526,10 +1910,30 @@ void static ProcessOneShot()
     }
     CAddress addr;
     CSemaphoreGrant grant(*semOutbound, true);
-    if (grant) {
-        if (!OpenNetworkConnection(addr, &grant, strDest.c_str(), true))
-            AddOneShot(strDest);
+    if (grant)
+        OpenNetworkConnection(addr, &grant, strDest.c_str(), true);
+}
+
+// Queues the next seed node when one is due, then dials one queued destination.
+void static FeedAndProcessOneShots()
+{
+    static std::optional<SeedNodeFeeder> feeder;
+    if (!feeder) {
+        std::vector<std::string> vSeeds;
+        {
+            LOCK(cs_vOneShots);
+            vSeeds.swap(vSeedNodes);
+        }
+        // A new order at each start, so one seed node is not every node's first.
+        for (size_t i = vSeeds.size(); i > 1; i--)
+            std::swap(vSeeds[i - 1], vSeeds[GetRandInt(i)]);
+        feeder.emplace(std::move(vSeeds), addrman.size() == 0, GetTime());
     }
+    if (const std::optional<std::string> strSeed = feeder->Next(KeptOutboundCount(), GetTime())) {
+        LogPrintf("Asking seed node %s for addresses\n", *strSeed);
+        AddOneShot(*strSeed);
+    }
+    ProcessOneShot();
 }
 
 void ThreadOpenConnections()
@@ -1549,7 +1953,7 @@ void ThreadOpenConnections()
             if (ShutdownRequested())
                 return;
 
-            ProcessOneShot();
+            FeedAndProcessOneShots();
             for (const std::string& strAddr : mapMultiArgs["-connect"])
             {
                 if (ShutdownRequested())
@@ -1574,7 +1978,7 @@ void ThreadOpenConnections()
     static const int64_t FEELER_INTERVAL = 120;
     while (!ShutdownRequested())
     {
-        ProcessOneShot();
+        FeedAndProcessOneShots();
 
         if (!InterruptibleSleep(500))
             return;
@@ -1628,9 +2032,14 @@ void ThreadOpenConnections()
         }
 
         // Feeler connections: periodically test an untried address to keep
-        // the address table fresh (Bitcoin Core PR #8282)
+        // the address table fresh (Bitcoin Core PR #8282). With every outbound
+        // slot in use the permit held here is the feeler's, and nothing else
+        // may be opened on it.
         int64_t nNow = GetTime();
-        if (nNow > nNextFeeler) {
+        const OutboundDial dial = NextOutboundDial(nNow > nNextFeeler, OutboundSlotsFull());
+        if (dial == OutboundDial::None)
+            continue;
+        if (dial == OutboundDial::Feeler) {
             nNextFeeler = nNow + FEELER_INTERVAL;
             fFeeler = true;
         }
@@ -1683,19 +2092,8 @@ void ThreadOpenConnections()
             break;
         }
 
-        if (addrConnect.IsValid()) {
-            if (fFeeler) {
-                // Feeler: use a non-blocking grant so we don't consume a
-                // connection slot if all are in use
-                grant.Release();
-                CSemaphoreGrant feelerGrant(*semOutbound, true);
-                if (feelerGrant) {
-                    OpenNetworkConnection(addrConnect, &feelerGrant, NULL, false, true);
-                }
-            } else {
-                OpenNetworkConnection(addrConnect, &grant);
-            }
-        }
+        if (addrConnect.IsValid())
+            OpenNetworkConnection(addrConnect, &grant, NULL, false, fFeeler);
     }
 }
 
@@ -1797,6 +2195,28 @@ bool ClearnetOutboundCapReached(bool fFeeler, int nClearnetOut)
     return !fFeeler && nClearnetOut >= MAX_OUTBOUND_CONNECTIONS - nMaxOnionOutbound;
 }
 
+OutboundDial NextOutboundDial(bool fFeelerDue, bool fSlotsFull)
+{
+    if (fFeelerDue)
+        return OutboundDial::Feeler;
+    return fSlotsFull ? OutboundDial::None : OutboundDial::Kept;
+}
+
+int KeptOutboundCount()
+{
+    int nKept = 0;
+    LOCK(cs_vNodes);
+    for (const CNode* pnode : vNodes)
+        if (!pnode->fInbound && !pnode->fFeeler && !pnode->fOneShot && !pnode->fDisconnect)
+            nKept++;
+    return nKept;
+}
+
+bool OutboundSlotsFull()
+{
+    return KeptOutboundCount() >= nMaxOutboundSlots;
+}
+
 bool TorAuthDedupDropInbound(const COutPoint& myOutpoint, const COutPoint& peerOutpoint)
 {
     // Keep the connection initiated by the lower outpoint's owner so both ends
@@ -1813,6 +2233,11 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
     //
     // Initiate outbound network connection
     //
+    // The semaphore holds one permit more than the outbound slots, for a
+    // connection that is not kept.
+    if (!fFeeler && !fOneShot && OutboundSlotsFull())
+        return false;
+
     // Enforce onion outbound cap for both addrman and addnode paths. addnode
     // and -connect strings keep their :port suffix, so split it off before the
     // .onion test — "host.onion:port" does not end with ".onion".
@@ -2146,8 +2571,8 @@ void StartNode(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
 
     if (semOutbound == NULL) {
         // initialize semaphore
-        int nMaxOutbound = min(MAX_OUTBOUND_CONNECTIONS, nMaxConnections);
-        semOutbound = new CSemaphore(nMaxOutbound);
+        nMaxOutboundSlots = min(MAX_OUTBOUND_CONNECTIONS, nMaxConnections);
+        semOutbound = new CSemaphore(nMaxOutboundSlots + 1);
     }
 
     if (pnodeLocalHost == NULL)

@@ -15,6 +15,7 @@
 #include "util.h"
 #include "version.h"
 #include "deprecation.h"
+#include "fluxnode/fluxnode.h"
 
 
 #include <univalue.h>
@@ -439,6 +440,43 @@ UniValue getdeprecationinfo(const UniValue& params, bool fHelp)
     return obj;
 }
 
+UniValue DecidedAddressToJSON()
+{
+    const DecidedAddressInfo info = DecidedAddress();
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("address", info.IsSet() ? info.address.ToStringIP() : "");
+    obj.pushKV("votes", info.nVotes);
+    obj.pushKV("voters", info.nVoters);
+    obj.pushKV("changed", info.nChanged);
+    UniValue other(UniValue::VARR);
+    for (const auto& entry : info.mapOther) {
+        UniValue o(UniValue::VOBJ);
+        o.pushKV("address", entry.first.ToStringIP());
+        o.pushKV("votes", entry.second);
+        other.push_back(o);
+    }
+    obj.pushKV("other", other);
+    UniValue inbound(UniValue::VARR);
+    for (const auto& entry : info.mapInbound) {
+        UniValue o(UniValue::VOBJ);
+        o.pushKV("address", entry.first.ToStringIP());
+        o.pushKV("peers", entry.second);
+        inbound.push_back(o);
+    }
+    obj.pushKV("inbound", inbound);
+    return obj;
+}
+
+UniValue FluxOSPortToJSON()
+{
+    const FluxOSPortInfo info = FluxOSPort();
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("port", info.IsSet() ? UniValue(info.nPort) : NullUniValue);
+    obj.pushKV("source", info.strSource);
+    obj.pushKV("reason", info.strReason);
+    return obj;
+}
+
 UniValue getnetworkinfo(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -471,6 +509,19 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
             "  }\n"
             "  ,...\n"
             "  ]\n"
+            "  \"decided_address\": {                   (object) this node's public address as the peers it dialled report it\n"
+            "    \"address\": \"a.b.c.d\",              (string) the IPv4 address decided by their vote, one vote per /16 of peers; empty if none\n"
+            "    \"votes\": n,                          (numeric) votes for it\n"
+            "    \"voters\": n,                         (numeric) votes cast for any address\n"
+            "    \"changed\": ttt,                      (numeric) unix time it last changed, including from none; 0 if never decided\n"
+            "    \"other\": [{\"address\": \"a.b.c.d\", \"votes\": n}, ...],     (array) other addresses voted for\n"
+            "    \"inbound\": [{\"address\": \"a.b.c.d\", \"peers\": n}, ...]    (array) what inbound peers, which do not vote, report\n"
+            "  }\n"
+            "  \"fluxos_port\": {                       (object) the port FluxOS publishes in " FLUXOS_PORT_FILE ", read now\n"
+            "    \"port\": n,                           (numeric) apiPort, one of 16127-16197 in steps of 10; null if absent\n"
+            "    \"source\": \"file\",                    (string) \"file\", \"default\" (regtest with no file: 16127) or \"none\"\n"
+            "    \"reason\": \"...\"                      (string) why the port is absent, or where it came from\n"
+            "  }\n"
             "  \"warnings\": \"...\"                    (string) any network warnings (such as alert messages) \n"
             "}\n"
             "\nExamples:\n"
@@ -502,6 +553,8 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
         }
     }
     obj.pushKV("localaddresses", localAddresses);
+    obj.pushKV("decided_address", DecidedAddressToJSON());
+    obj.pushKV("fluxos_port", FluxOSPortToJSON());
     obj.pushKV("warnings",       GetWarnings("statusbar"));
     return obj;
 }

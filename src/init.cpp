@@ -254,6 +254,7 @@ void Shutdown()
     StopPONMinter();
     // StopNode() is now called in Interrupt() before joining threads to release semaphores
     StopTorControl();
+    StopPublishingDecidedAddress();
 
     UnregisterNodeSignals(GetNodeSignals());
 
@@ -1552,8 +1553,7 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
         }
     }
 
-    for (const std::string& strDest : mapMultiArgs["-seednode"])
-        AddOneShot(strDest);
+    SetSeedNodes(mapMultiArgs["-seednode"]);
 
 #if ENABLE_ZMQ
     pzmqNotificationInterface = CZMQNotificationInterface::CreateWithArguments(mapArgs);
@@ -2093,6 +2093,14 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
                            "Cannot use -onlynet without including ipv4."));
     }
 
+    // A fluxnode's address is decided by what the peers it dials see (net.h
+    // DecideAddress), and through a proxy every peer sees the proxy.
+    proxyType proxyIPv4;
+    if (fFluxnode && GetProxy(NET_IPV4, proxyIPv4)) {
+        return InitError(_("Fluxnodes cannot use -proxy: their peers must see the node's own address. "
+                           "Use -onion to reach Tor peers."));
+    }
+
     if (fFluxnode) {
         LogPrintf("IS FLUXNODE\n");
         strFluxnodeAddr = GetArg("-zelnodeaddr", "");
@@ -2232,6 +2240,11 @@ bool AppInit2(std::vector<std::thread>& threadGroup, CScheduler& scheduler)
             LogPrintf("Tor hidden service not started: dedicated onion bind unavailable.\n");
     }
 
+    // Its readers, fluxbench and FluxOS, run only beside a fluxnode.
+    if (fFluxnode) {
+        SetOnChainAddress(g_fluxnodeCache.ConfirmedHost(activeFluxnode.deterministicOutPoint));
+        StartPublishingDecidedAddress(DecidedAddressFileDir());
+    }
     StartNode(threadGroup, scheduler);
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected

@@ -66,9 +66,7 @@ async def _wait_unconfirmed_funds(
         await asyncio.sleep(0.25)
 
 
-async def _send_pair(
-    n0: FluxNode, n2: FluxNode, receiver: str, via: str
-) -> tuple[str, str]:
+async def _send_pair(n0: FluxNode, n2: FluxNode, receiver: str, via: str) -> tuple[str, str]:
     """Node 0 funds ``via`` (node 2's) with 1.0; node 2 forwards 0.5 of it,
     still unconfirmed, to ``receiver`` through z_sendmany."""
     funded = await n0.rpc.sendtoaddress(via, Decimal("1.0"))
@@ -143,9 +141,7 @@ async def test_wallet_overwintertx(node_factory: NodeFactory) -> None:
     n2_balance_before = await n2.rpc.getbalance()
     # Shield first: a later sendtoaddress is free to pick the 10-coin UTXO
     # sitting on shield_from as its input and would leave the shield unfunded.
-    opid = await n0.rpc.z_sendmany(
-        shield_from, [{"address": zaddr3, "amount": Decimal("9.9999")}]
-    )
+    opid = await n0.rpc.z_sendmany(shield_from, [{"address": zaddr3, "amount": Decimal("9.9999")}])
     shielded_b = await wait_and_assert_operationid_status(n0, opid)
     assert shielded_b is not None
     funded_b, forwarded_b = await _send_pair(n0, n2, taddr1b, taddr3)
